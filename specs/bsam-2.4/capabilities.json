@@ -1,0 +1,1446 @@
+{
+  "$schema": "../../schemas/capability-registry.schema.json",
+  "schema_version": "1.1.0",
+  "registry_version": "0.2.0",
+  "target": {
+    "product": "BSAM",
+    "product_version": "2.4",
+    "source_commit": "7e414be55abae10e2a648bd39bcc07b4904e9edc",
+    "executable_sha256": "580B7AF434BF4F453B8137802246FEB292DD89A04FDB3DD54000EC9A225E146F",
+    "platform": "windows",
+    "execution_mode": "serial"
+  },
+  "policy": {
+    "generation_syntax": "current-only",
+    "obsolete_syntax": "diagnostics-only",
+    "source_authority": "local-only"
+  },
+  "evidence": [
+    {
+      "id": "evidence.main-input-sequence",
+      "kind": "source",
+      "locator": "source/bsam/mainf1.f",
+      "line_start": 41,
+      "line_end": 91,
+      "claim": "Defines the active initialization order from INPUT through CRACK."
+    },
+    {
+      "id": "evidence.input-parser",
+      "kind": "source",
+      "locator": "source/libbsam/inp_ini.f",
+      "line_start": 33,
+      "line_end": 112,
+      "claim": "Scans for INPUT and requires current type 3 before converting it to block-input mode."
+    },
+    {
+      "id": "evidence.block-matcher",
+      "kind": "source",
+      "locator": "source/libbsam/inp_block.f",
+      "line_start": 17,
+      "line_end": 60,
+      "claim": "Defines required/optional lookup and exact matching for MATERIALS and CLUSTERS versus three-character matching for other blocks."
+    },
+    {
+      "id": "evidence.solver-parser",
+      "kind": "source",
+      "locator": "source/libbsam/solve_ini.f",
+      "line_start": 181,
+      "line_end": 421,
+      "claim": "Documents and parses current solver types and option labels while retaining an old-format path."
+    },
+    {
+      "id": "evidence.ufunction-parser",
+      "kind": "source",
+      "locator": "source/libbsam/ufunction_ini.f90",
+      "line_start": 10,
+      "line_end": 68,
+      "claim": "Locates the optional UFUNCTIONS block and divides entries at *end records."
+    },
+    {
+      "id": "evidence.moisture-parser",
+      "kind": "source",
+      "locator": "source/libbsam/moisture.f90",
+      "line_start": 36,
+      "line_end": 173,
+      "claim": "Locates the optional MOISTURE block and dispatches its current key/value labels."
+    },
+    {
+      "id": "evidence.cluster-parser",
+      "kind": "source",
+      "locator": "source/libbsam/iap_ini.f",
+      "line_start": 119,
+      "line_end": 295,
+      "claim": "Requires CLUSTERS, accepts solid finite-element cluster type 100, and delegates each cluster to the FE reader."
+    },
+    {
+      "id": "evidence.fe-command-dispatch",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 225,
+      "line_end": 1170,
+      "claim": "Contains the active first-five-character finite-element command dispatch and line-option handling."
+    },
+    {
+      "id": "evidence.fe-core-records",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 1556,
+      "line_end": 2677,
+      "claim": "Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination."
+    },
+    {
+      "id": "evidence.fe-integration-orientation",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 3722,
+      "line_end": 4020,
+      "claim": "Defines nested integration-point records and nodal or elemental orientation records."
+    },
+    {
+      "id": "evidence.fe-section-reader",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 4029,
+      "line_end": 4128,
+      "claim": "Requires one thickness/material row per declared layer, normalizes thicknesses, and applies the section to the selected element set."
+    },
+    {
+      "id": "evidence.boundary-parser",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini.f",
+      "line_start": 19,
+      "line_end": 180,
+      "claim": "Requires BOUNDARY and begins dispatch of boundary problem types and nested controls."
+    },
+    {
+      "id": "evidence.boundary-active-dispatch",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini.f",
+      "line_start": 123,
+      "line_end": 2167,
+      "claim": "Defines mechanical/thermal problem starts and the active nested BOUNDARY command dispatch through convergence and output controls."
+    },
+    {
+      "id": "evidence.constitutive-parser",
+      "kind": "source",
+      "locator": "source/libbsam/con_ini.f",
+      "line_start": 22,
+      "line_end": 150,
+      "claim": "Requires CONSTITUTIVE and dispatches constitutive type records."
+    },
+    {
+      "id": "evidence.table-parser",
+      "kind": "source",
+      "locator": "source/libbsam/table_ini.f",
+      "line_start": 26,
+      "line_end": 84,
+      "claim": "Locates optional TABLES and divides table entries at *end records."
+    },
+    {
+      "id": "evidence.stat-dist-parser",
+      "kind": "source",
+      "locator": "source/libbsam/stat_dist_ini.f",
+      "line_start": 27,
+      "line_end": 80,
+      "claim": "Locates optional STATISTICAL DISTRIBUTIONS and divides entries at *end records."
+    },
+    {
+      "id": "evidence.material-parser",
+      "kind": "source",
+      "locator": "source/libbsam/mat_ini.f",
+      "line_start": 62,
+      "line_end": 230,
+      "claim": "Requires MATERIALS and begins dispatch of legacy numeric and newer material representations."
+    },
+    {
+      "id": "evidence.failure-parser",
+      "kind": "source",
+      "locator": "source/libbsam/fai_ini.f",
+      "line_start": 20,
+      "line_end": 150,
+      "claim": "Locates optional FAILURE and begins dispatch of failure criterion type records."
+    },
+    {
+      "id": "evidence.user-parser",
+      "kind": "source",
+      "locator": "source/libbsam/usf_ini.f",
+      "line_start": 13,
+      "line_end": 120,
+      "claim": "Locates optional USER and begins dispatch of numeric user-function types."
+    },
+    {
+      "id": "evidence.crack-parser",
+      "kind": "source",
+      "locator": "source/libbsam/crk_ini.f90",
+      "line_start": 1,
+      "line_end": 220,
+      "claim": "Locates optional CRACK and dispatches current FE crack types 101, 201, and 301."
+    },
+    {
+      "id": "evidence.current-vtms-deck-tric",
+      "kind": "example",
+      "locator": "projects/TriC_v311/TriC_v311.in",
+      "claim": "VTMS-generated current project deck using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands."
+    },
+    {
+      "id": "evidence.current-vtms-deck-notch",
+      "kind": "example",
+      "locator": "projects/notch_v1/notch_v1.in",
+      "claim": "VTMS-generated multi-cluster project deck that demonstrates repeated solid cluster records."
+    },
+    {
+      "id": "evidence.invocation-parser",
+      "kind": "source",
+      "locator": "source/libbsam/varnam.f90",
+      "line_start": 40,
+      "line_end": 235,
+      "claim": "Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems."
+    },
+    {
+      "id": "evidence.success-sentinel",
+      "kind": "source",
+      "locator": "source/bsam/mainf1.f",
+      "line_start": 133,
+      "line_end": 142,
+      "claim": "Writes the explicit end-of-program timing sentinel after all boundary problems finish."
+    },
+    {
+      "id": "evidence.exit-control",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_iter_stop.f",
+      "line_start": 5,
+      "line_end": 39,
+      "claim": "Defines .exit values 0 continue, 1 disrupt, and 2 stop."
+    },
+    {
+      "id": "evidence.runtime-zero-on-fatal",
+      "kind": "runtime",
+      "locator": "local-probe/2026-08-27/materials-required",
+      "claim": "A controlled copied deck produced a fatal missing-MATERIALS message while the Windows process returned exit code zero."
+    },
+    {
+      "id": "evidence.runtime-current-deck-success",
+      "kind": "runtime",
+      "locator": "local-probe/2026-08-27/current-materials-success",
+      "claim": "A controlled copied deck changed only MATERIAL to MATERIALS; its existing CLUSTERS and END CLUSTERS tokens were accepted, all steps completed, and the end-of-program sentinel was emitted."
+    }
+  ],
+  "top_level_blocks": [
+    {
+      "id": "block.input",
+      "canonical": "INPUT",
+      "lookup_token": "INPUT",
+      "match_rule": "special-input-scan",
+      "required": true,
+      "parser": "INP_INI",
+      "summary": "Selects the current non-sequential block input mode; the pinned executable requires type 3.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END INPUT"],
+        "certainty": "canonical"
+      },
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "type",
+          "value_type": "integer record",
+          "required": true,
+          "allowed_values": [3],
+          "summary": "Activates the current single-thread non-sequential input format before internal conversion to block mode."
+        }
+      ],
+      "evidence_ids": [
+        "evidence.input-parser",
+        "evidence.current-vtms-deck-tric",
+        "evidence.current-vtms-deck-notch"
+      ],
+      "remaining_work": [
+        "Confirm whether additional records can legally follow type 3 in a current deck."
+      ]
+    },
+    {
+      "id": "block.solver",
+      "canonical": "SOLVER",
+      "lookup_token": "SOLVE",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "SOLVE_INI",
+      "summary": "Selects the linear solver and solver-specific options; defaults to serial PARDISO when absent.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END SOLVER"],
+        "certainty": "canonical"
+      },
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "*type",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": ["pardiso", "cpardiso", "sheff"],
+          "summary": "Selects the current-format solver family."
+        },
+        {
+          "name": "n_threads",
+          "value_type": "integer",
+          "required": false,
+          "summary": "Requests the OpenMP thread count for PARDISO."
+        },
+        {
+          "name": "matrix_type",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["definite", "indefinite", "unsymmetric"],
+          "default": "definite",
+          "summary": "Selects the matrix classification passed to supported solvers."
+        },
+        {
+          "name": "backend",
+          "value_type": "string",
+          "required": false,
+          "summary": "Selects the SHEFF backend."
+        },
+        {
+          "name": "solver",
+          "value_type": "string",
+          "required": false,
+          "summary": "Selects the SHEFF iterative solver."
+        },
+        {
+          "name": "preconditioner",
+          "value_type": "string",
+          "required": false,
+          "summary": "Selects the SHEFF preconditioner using the active parser label."
+        },
+        {
+          "name": "relative_tolerance",
+          "value_type": "real",
+          "required": false,
+          "summary": "Sets the SHEFF relative tolerance."
+        },
+        {
+          "name": "maximum_iterations",
+          "value_type": "integer",
+          "required": false,
+          "summary": "Sets the SHEFF maximum iteration count."
+        },
+        {
+          "name": "petsc_opts",
+          "value_type": "string",
+          "required": false,
+          "summary": "Passes PETSc options to a SHEFF PETSc backend."
+        },
+        {
+          "name": "debug_opts",
+          "value_type": "string",
+          "required": false,
+          "summary": "Passes debug options to SHEFF."
+        }
+      ],
+      "evidence_ids": ["evidence.solver-parser"],
+      "remaining_work": [
+        "Resolve documentation/parser naming conflict between pc and preconditioner.",
+        "Document SHEFF value enums and defaults from downstream code.",
+        "Classify the numeric legacy solver format as diagnostics-only."
+      ]
+    },
+    {
+      "id": "block.ufunctions",
+      "canonical": "UFUNCTIONS",
+      "lookup_token": "UFUNCTIONS",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "UFUNCTION_INI",
+      "summary": "Defines named user functions parsed as *end-delimited entries.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END UFUNCTIONS"],
+        "certainty": "canonical"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.ufunction-parser"],
+      "remaining_work": [
+        "Trace the ufunction object initializer and document every entry key, type, and reference."
+      ]
+    },
+    {
+      "id": "block.moisture",
+      "canonical": "MOISTURE",
+      "lookup_token": "MOISTURE",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "MOI_INI",
+      "summary": "Configures optional coupling to the external moisture simulation workflow.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END MOISTURE"],
+        "certainty": "canonical"
+      },
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "program",
+          "value_type": "path-or-program-name",
+          "required": false,
+          "summary": "Selects the moisture simulation program."
+        },
+        {
+          "name": "converter",
+          "value_type": "path",
+          "required": false,
+          "summary": "Selects the moisture output converter."
+        },
+        {
+          "name": "converter_utils",
+          "value_type": "path-list",
+          "required": false,
+          "summary": "Lists supporting converter utilities."
+        },
+        {
+          "name": "directory",
+          "value_type": "path",
+          "required": false,
+          "summary": "Selects the directory containing moisture workflow files."
+        },
+        {
+          "name": "steps",
+          "value_type": "integer-list",
+          "required": false,
+          "summary": "Selects load steps at which the moisture program runs."
+        }
+      ],
+      "evidence_ids": ["evidence.moisture-parser"],
+      "remaining_work": [
+        "Document path resolution, defaults, required file checks, and failure behavior.",
+        "Determine whether this external integration is suitable for initial executable tests."
+      ]
+    },
+    {
+      "id": "block.clusters",
+      "canonical": "CLUSTERS",
+      "lookup_token": "CLUSTERS",
+      "match_rule": "exact",
+      "required": true,
+      "parser": "IAP_INI / FE_READ_INPUTFILE",
+      "summary": "Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls.",
+      "termination": {
+        "style": "command-and-end-line",
+        "tokens": ["*STOP per cluster", "END CLUSTERS"],
+        "certainty": "canonical"
+      },
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": [
+        "evidence.cluster-parser",
+        "evidence.fe-command-dispatch",
+        "evidence.current-vtms-deck-tric",
+        "evidence.current-vtms-deck-notch"
+      ],
+      "remaining_work": [
+        "Document all command data-body grammars and element-type constraints.",
+        "Build the node/element/set/orientation dependency model required for safe ply transformations.",
+        "Classify END APPROXIMATION, which remains accepted in VTMS project exports, as a compatibility diagnostic."
+      ]
+    },
+    {
+      "id": "block.boundary",
+      "canonical": "BOUNDARY",
+      "lookup_token": "BOUNDARY",
+      "match_rule": "first-three",
+      "required": true,
+      "parser": "IBN_INI",
+      "summary": "Defines boundary problems, loads, connections, convergence, stepping, and output controls.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END BOUNDARY"],
+        "certainty": "accepted-current"
+      },
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": [
+        "evidence.boundary-parser",
+        "evidence.boundary-active-dispatch",
+        "evidence.current-vtms-deck-tric",
+        "evidence.current-vtms-deck-notch"
+      ],
+      "remaining_work": [
+        "Document every record-pair schema, allowed value, default, and dependency beneath each active nested construct.",
+        "Trace the separate contact-problem branch selected by TYPE contact."
+      ]
+    },
+    {
+      "id": "block.constitutive",
+      "canonical": "CONSTITUTIVE",
+      "lookup_token": "CONSTITUTIVE",
+      "match_rule": "first-three",
+      "required": true,
+      "parser": "CON_INI",
+      "summary": "Defines constitutive law records that reference material and failure definitions.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END CONSTITUTIVE"],
+        "certainty": "accepted-current"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.constitutive-parser", "evidence.current-vtms-deck-tric"],
+      "remaining_work": [
+        "Enumerate all active constitutive type IDs, record layouts, defaults, and material/failure references."
+      ]
+    },
+    {
+      "id": "block.tables",
+      "canonical": "TABLES",
+      "lookup_token": "TABLES",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "TABLE_INI / table initializer",
+      "summary": "Defines named lookup tables used by material data.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["*end per table", "END TABLES"],
+        "certainty": "canonical"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.table-parser"],
+      "remaining_work": [
+        "Document table headers, axes, dimensions, interpolation rules, and material references."
+      ]
+    },
+    {
+      "id": "block.statistical-distributions",
+      "canonical": "STATISTICAL DISTRIBUTIONS",
+      "lookup_token": "STATISTICAL DISTRIBUTIONS",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "STAT_DIST_INI / statistical distribution initializer",
+      "summary": "Defines named statistical distributions that modify material data.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["*end per distribution", "END STATISTICAL DISTRIBUTIONS"],
+        "certainty": "canonical"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.stat-dist-parser"],
+      "remaining_work": [
+        "Document distribution types, seeding modes, coordinates, parameters, and material references."
+      ]
+    },
+    {
+      "id": "block.materials",
+      "canonical": "MATERIALS",
+      "lookup_token": "MATERIALS",
+      "match_rule": "exact",
+      "required": true,
+      "parser": "MAT_INI / material initializers",
+      "summary": "Defines bulk and interface material records, including current structured material forms.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["*end for structured material entries", "END MATERIALS"],
+        "certainty": "accepted-current"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.material-parser", "evidence.current-vtms-deck-tric"],
+      "remaining_work": [
+        "Enumerate every active material type and exact parameter schema.",
+        "Document structured bulk type 999 and interface type 998 from their class initializers.",
+        "Map table/statistical-distribution references and edit impacts."
+      ]
+    },
+    {
+      "id": "block.failure",
+      "canonical": "FAILURE",
+      "lookup_token": "FAILURE",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "FAI_INI",
+      "summary": "Defines failure criterion records referenced by constitutive laws and damage behavior.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END FAILURE"],
+        "certainty": "accepted-current"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.failure-parser", "evidence.current-vtms-deck-tric"],
+      "remaining_work": [
+        "Enumerate all active criterion type IDs, coefficient layouts, modes, and cross-block constraints."
+      ]
+    },
+    {
+      "id": "block.user",
+      "canonical": "USER",
+      "lookup_token": "USER",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "USF_INI",
+      "summary": "Defines numeric user-function records, including polynomial and discrete forms.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END USER"],
+        "certainty": "accepted-current"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.user-parser"],
+      "remaining_work": [
+        "Enumerate all active function types, record dimensions, external file formats, and consumers."
+      ]
+    },
+    {
+      "id": "block.crack",
+      "canonical": "CRACK",
+      "lookup_token": "CRACK",
+      "match_rule": "first-three",
+      "required": false,
+      "parser": "CRK_INI",
+      "summary": "Defines global finite-element crack insertion controls for crack types 101, 201, and 301.",
+      "termination": {
+        "style": "end-line",
+        "tokens": ["END CRACK"],
+        "certainty": "accepted-current"
+      },
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.crack-parser", "evidence.current-vtms-deck-tric"],
+      "remaining_work": [
+        "Document all common and type-specific crack records, tolerances, orientations, and cluster references."
+      ]
+    }
+  ],
+  "cluster_commands": [
+    {
+      "id": "command.type",
+      "parent_block_id": "block.clusters",
+      "canonical": "*TYPE",
+      "dispatch_prefix": "*TYPE",
+      "summary": "Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.cluster-parser", "evidence.fe-command-dispatch"],
+      "remaining_work": ["Document the complete accepted data-line spelling and case behavior for solid."]
+    },
+    {
+      "id": "command.dimensions",
+      "parent_block_id": "block.clusters",
+      "canonical": "*DIMENSIONS",
+      "dispatch_prefix": "*DIME",
+      "summary": "Allocates cluster dimensions before mesh entities are read.",
+      "coverage": "documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
+      "remaining_work": ["Confirm failure behavior for negative capacities and capacity overruns."],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{
+          "name": "capacities",
+          "when": "always",
+          "rows": [{
+            "name": "dimensions",
+            "repetition": "once",
+            "fields": [
+              {"name": "node_capacity", "value_type": "integer", "required": true, "summary": "Maximum explicit/generated nodes allocated for the cluster."},
+              {"name": "element_capacity", "value_type": "integer", "required": true, "summary": "Maximum explicit/generated elements allocated for the cluster."},
+              {"name": "selection_count", "value_type": "integer", "required": true, "summary": "Number of preallocated selection slots."},
+              {"name": "section_capacity", "value_type": "integer", "required": true, "summary": "Maximum layered sections allocated for the cluster."}
+            ]
+          }],
+          "constraints": ["Must precede commands that populate the allocated cluster arrays."]
+        }],
+        "dependencies": ["Capacities must cover all entities produced by explicit and generation commands."]
+      }
+    },
+    {
+      "id": "command.name",
+      "parent_block_id": "block.clusters",
+      "canonical": "*NAME",
+      "dispatch_prefix": "*NAME",
+      "summary": "Assigns a name to the current cluster.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document the data-body grammar, length, uniqueness, and reference matching rules."]
+    },
+    {
+      "id": "command.constitutive",
+      "parent_block_id": "block.clusters",
+      "canonical": "*CONSTITUTIVE",
+      "dispatch_prefix": "*CONS",
+      "summary": "Assigns the constitutive record used by the current cluster.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document the ID grammar and cross-reference validation rules."]
+    },
+    {
+      "id": "command.node",
+      "parent_block_id": "block.clusters",
+      "canonical": "*NODE",
+      "dispatch_prefix": "*NODE",
+      "summary": "Reads explicit node labels and coordinates, optionally adding them to a node set.",
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "NSET",
+          "value_type": "node-set-name",
+          "required": false,
+          "summary": "Creates or appends the listed nodes to the named node set."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
+      "remaining_work": ["Confirm duplicate-label and capacity-overrun diagnostics."],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{
+          "name": "explicit-nodes",
+          "when": "always",
+          "rows": [{"name": "node", "repetition": "repeated", "fields": [
+            {"name": "node_label", "value_type": "positive-integer", "required": true, "summary": "External node label."},
+            {"name": "x", "value_type": "real", "required": true, "summary": "Global X coordinate."},
+            {"name": "y", "value_type": "real", "required": true, "summary": "Global Y coordinate."},
+            {"name": "z", "value_type": "real", "required": true, "summary": "Global Z coordinate."}
+          ]}],
+          "constraints": ["Comment and blank lines are ignored; the next non-comment line beginning with * ends the command."]
+        }],
+        "dependencies": ["DIMENSIONS node_capacity must be large enough.", "NSET creates or appends membership when supplied on the command line."]
+      }
+    },
+    {
+      "id": "command.ngen",
+      "parent_block_id": "block.clusters",
+      "canonical": "*NGEN",
+      "dispatch_prefix": "*NGEN",
+      "summary": "Generates nodes from compact generation records.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "NSET",
+          "value_type": "node-set-name",
+          "required": false,
+          "summary": "Adds generated nodes to a named node set."
+        },
+        {
+          "name": "BIAS",
+          "value_type": "real",
+          "required": false,
+          "default": 1,
+          "summary": "Controls generation spacing bias."
+        },
+        {
+          "name": "ARC",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Selects arc generation mode."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document generation row grammar and numerical constraints."]
+    },
+    {
+      "id": "command.ncopy",
+      "parent_block_id": "block.clusters",
+      "canonical": "*NCOPY",
+      "dispatch_prefix": "*NCOP",
+      "summary": "Copies nodes using compact copy records.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "NSET",
+          "value_type": "node-set-name",
+          "required": false,
+          "summary": "Adds copied nodes to a named node set."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document copy row grammar, label allocation, and coordinate transformation behavior."]
+    },
+    {
+      "id": "command.element",
+      "parent_block_id": "block.clusters",
+      "canonical": "*ELEMENT",
+      "dispatch_prefix": "*ELEM",
+      "summary": "Reads explicit elements and connectivity into a named element set.",
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "TYPE",
+          "value_type": "element-type",
+          "required": true,
+          "summary": "Selects the element topology; B3D10 is internally mapped to C3D10 with a Bernstein flag."
+        },
+        {
+          "name": "ELSET",
+          "value_type": "element-set-name",
+          "required": false,
+          "summary": "Creates or appends elements to the named element set."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
+      "remaining_work": ["Enumerate every supported element type and its connectivity width; confirm duplicate-label diagnostics."],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{
+          "name": "explicit-elements",
+          "when": "always",
+          "rows": [{"name": "element", "repetition": "repeated", "fields": [
+            {"name": "element_label", "value_type": "positive-integer", "required": true, "summary": "External element label."},
+            {"name": "node_labels", "value_type": "integer-list(element-type-width)", "required": true, "summary": "Connectivity labels; count is selected by TYPE."}
+          ]}],
+          "constraints": ["Every connectivity node label must resolve to a node; row width depends on TYPE."]
+        }],
+        "dependencies": ["TYPE is required.", "Referenced nodes must already exist.", "DIMENSIONS element_capacity must be large enough."]
+      }
+    },
+    {
+      "id": "command.elgen",
+      "parent_block_id": "block.clusters",
+      "canonical": "*ELGEN",
+      "dispatch_prefix": "*ELGE",
+      "summary": "Generates elements from compact connectivity-generation records.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "TYPE",
+          "value_type": "element-type",
+          "required": true,
+          "summary": "Selects the generated element topology."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document generation records, supported types, and resulting set membership."]
+    },
+    {
+      "id": "command.nset",
+      "parent_block_id": "block.clusters",
+      "canonical": "*NSET",
+      "dispatch_prefix": "*NSET",
+      "summary": "Creates or extends a node set from explicit labels, a generated range, or a coordinate box.",
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "NSET",
+          "value_type": "node-set-name",
+          "required": true,
+          "summary": "Names the target node set."
+        },
+        {
+          "name": "GENERATE",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Selects generated-range mode and is mutually exclusive with BOX."
+        },
+        {
+          "name": "BOX",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Selects coordinate-box mode and is mutually exclusive with GENERATE."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
+      "remaining_work": ["Confirm missing-label and duplicate-membership diagnostics."],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "explicit", "when": "neither GENERATE nor BOX", "rows": [{"name": "labels", "repetition": "repeated", "fields": [{"name": "node_labels", "value_type": "positive-integer-list", "required": true, "summary": "One or more existing node labels."}]}], "constraints": []},
+          {"name": "generated-range", "when": "GENERATE", "rows": [{"name": "range", "repetition": "repeated", "fields": [{"name": "first_label", "value_type": "positive-integer", "required": true, "summary": "First node label."}, {"name": "last_label", "value_type": "positive-integer", "required": true, "summary": "Inclusive last node label."}, {"name": "increment", "value_type": "nonzero-integer", "required": true, "summary": "Label step."}]}], "constraints": ["GENERATE and BOX are mutually exclusive."]},
+          {"name": "coordinate-box", "when": "BOX", "rows": [{"name": "bounds", "repetition": "repeated", "fields": [{"name": "xmin", "value_type": "real", "required": true, "summary": "Minimum X."}, {"name": "ymin", "value_type": "real", "required": true, "summary": "Minimum Y."}, {"name": "zmin", "value_type": "real", "required": true, "summary": "Minimum Z."}, {"name": "xmax", "value_type": "real", "required": true, "summary": "Maximum X."}, {"name": "ymax", "value_type": "real", "required": true, "summary": "Maximum Y."}, {"name": "zmax", "value_type": "real", "required": true, "summary": "Maximum Z."}]}], "constraints": ["GENERATE and BOX are mutually exclusive."]}
+        ],
+        "dependencies": ["All selected node labels must already exist."]
+      }
+    },
+    {
+      "id": "command.elset",
+      "parent_block_id": "block.clusters",
+      "canonical": "*ELSET",
+      "dispatch_prefix": "*ELSE",
+      "summary": "Creates or extends an element set from explicit labels or a generated range.",
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "ELSET",
+          "value_type": "element-set-name",
+          "required": true,
+          "summary": "Names the target element set."
+        },
+        {
+          "name": "GENERATE",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Selects generated-range mode."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
+      "remaining_work": ["Confirm missing-label and duplicate-membership diagnostics."],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "explicit", "when": "GENERATE absent", "rows": [{"name": "labels", "repetition": "repeated", "fields": [{"name": "element_labels", "value_type": "positive-integer-list", "required": true, "summary": "One or more existing element labels."}]}], "constraints": []},
+          {"name": "generated-range", "when": "GENERATE", "rows": [{"name": "range", "repetition": "repeated", "fields": [{"name": "first_label", "value_type": "positive-integer", "required": true, "summary": "First element label."}, {"name": "last_label", "value_type": "positive-integer", "required": true, "summary": "Inclusive last element label."}, {"name": "increment", "value_type": "nonzero-integer", "required": true, "summary": "Label step."}]}], "constraints": []}
+        ],
+        "dependencies": ["All selected element labels must already exist."]
+      }
+    },
+    {
+      "id": "command.boundary",
+      "parent_block_id": "block.clusters",
+      "canonical": "*BOUNDARY",
+      "dispatch_prefix": "*BOUN",
+      "summary": "Applies cluster-local boundary data using supported row formats.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "FORMAT",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["ABAQUS", "LIST", "POLYNOMIAL"],
+          "default": "ABAQUS",
+          "summary": "Selects the boundary row parser; matching uses four-character prefixes."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document each row format, degree-of-freedom semantics, and set references."]
+    },
+    {
+      "id": "command.load",
+      "parent_block_id": "block.clusters",
+      "canonical": "*LOAD",
+      "dispatch_prefix": "*LOAD",
+      "summary": "Applies cluster-local nodal loading records.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document load row fields, degree-of-freedom semantics, and reference targets."]
+    },
+    {
+      "id": "command.field",
+      "parent_block_id": "block.clusters",
+      "canonical": "*FIELD",
+      "dispatch_prefix": "*FIEL",
+      "summary": "Applies field values with a configured variable count.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "VARIABLES",
+          "value_type": "integer",
+          "required": false,
+          "summary": "Sets the number of field variables in each record."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document field row grammar, default variable count, and consumers."]
+    },
+    {
+      "id": "command.selection",
+      "parent_block_id": "block.clusters",
+      "canonical": "*SELECTION",
+      "dispatch_prefix": "*SELE",
+      "summary": "Defines an indexed node or element selection used by later operations.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "ID",
+          "value_type": "integer",
+          "required": true,
+          "summary": "Identifies a pre-dimensioned selection slot and must be at least one."
+        },
+        {
+          "name": "TYPE",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["NODE", "ELEMENT"],
+          "default": "NODE",
+          "summary": "Selects whether the selection contains nodes or elements."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document selection body grammar and the dimension-card dependency."]
+    },
+    {
+      "id": "command.tolerance",
+      "parent_block_id": "block.clusters",
+      "canonical": "*TOLERANCE",
+      "dispatch_prefix": "*TOLE",
+      "summary": "Overrides one of the model tolerances used by geometry and crack operations.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "TYPE",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": ["PTOL", "ITOL", "FTOL", "OTOL"],
+          "summary": "Selects the tolerance category."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document the value record, units, defaults, and numerical constraints for each type."]
+    },
+    {
+      "id": "command.integration",
+      "parent_block_id": "block.clusters",
+      "canonical": "*INTEGRATION",
+      "dispatch_prefix": "*INTE",
+      "summary": "Sets the integration scheme for supported X3D8 elements.",
+      "coverage": "documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation"],
+      "remaining_work": ["Confirm behavior for non-X3D8 elements, repeated element headers, and nonpositive integration counts."],
+      "body": {
+        "style": "nested-records",
+        "termination": "next-command-or-eof",
+        "variants": [{
+          "name": "per-element-scheme",
+          "when": "always",
+          "rows": [
+            {"name": "element-header", "repetition": "repeated", "fields": [{"name": "element_label", "value_type": "positive-integer", "required": true, "summary": "Existing element receiving the scheme."}, {"name": "integration_point_count", "value_type": "positive-integer", "required": true, "summary": "Number of point rows that immediately follow."}]},
+            {"name": "integration-point", "repetition": "count-from-previous-field", "fields": [{"name": "p1", "value_type": "real", "required": true, "summary": "First parametric coordinate."}, {"name": "p2", "value_type": "real", "required": true, "summary": "Second parametric coordinate."}, {"name": "p3", "value_type": "real", "required": true, "summary": "Third parametric coordinate."}, {"name": "gauss_weight", "value_type": "real", "required": true, "summary": "Integration weight."}]}
+          ],
+          "constraints": ["Each element header is followed immediately by exactly integration_point_count point rows."]
+        }],
+        "dependencies": ["The target element must already exist."]
+      }
+    },
+    {
+      "id": "command.orientation",
+      "parent_block_id": "block.clusters",
+      "canonical": "*ORIENTATION",
+      "dispatch_prefix": "*ORIE",
+      "summary": "Defines nodal or elemental orientation data.",
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "NAME",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": ["ORI", "ORI-NODE", "ORI-ELE"],
+          "summary": "Selects nodal orientation (ORI or ORI-NODE) or elemental orientation (ORI-ELE)."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation"],
+      "remaining_work": ["Confirm zero-vector handling in nodal mode and the exact interpretation of fiber_volume."],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "nodal", "when": "NAME is ORI or ORI-NODE", "rows": [{"name": "orientation", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "One node or an existing node set."}, {"name": "v1_x", "value_type": "real", "required": true, "summary": "Material direction V1 X."}, {"name": "v1_y", "value_type": "real", "required": true, "summary": "Material direction V1 Y."}, {"name": "v1_z", "value_type": "real", "required": true, "summary": "Material direction V1 Z."}, {"name": "v3_x", "value_type": "real", "required": true, "summary": "Thickness direction V3 X."}, {"name": "v3_y", "value_type": "real", "required": true, "summary": "Thickness direction V3 Y."}, {"name": "v3_z", "value_type": "real", "required": true, "summary": "Thickness direction V3 Z."}, {"name": "fiber_volume", "value_type": "real", "required": true, "summary": "Fiber-volume value assigned to each target node."}]}], "constraints": ["The target is resolved as a node set first, otherwise as a numeric node label."]},
+          {"name": "elemental", "when": "NAME is ORI-ELE", "rows": [{"name": "orientation", "repetition": "repeated", "fields": [{"name": "target", "value_type": "element-label-or-element-set-name", "required": true, "summary": "One element or an existing element set."}, {"name": "v1_x", "value_type": "real", "required": true, "summary": "Material direction V1 X."}, {"name": "v1_y", "value_type": "real", "required": true, "summary": "Material direction V1 Y."}, {"name": "v1_z", "value_type": "real", "required": true, "summary": "Material direction V1 Z."}, {"name": "v3_x", "value_type": "real", "required": true, "summary": "Thickness direction V3 X."}, {"name": "v3_y", "value_type": "real", "required": true, "summary": "Thickness direction V3 Y."}, {"name": "v3_z", "value_type": "real", "required": true, "summary": "Thickness direction V3 Z."}, {"name": "fiber_volume", "value_type": "real", "required": true, "summary": "Fiber-volume value assigned to each target element."}]}], "constraints": ["V1 and V3 must be nonzero and mutually normal; the parser normalizes them and derives V2."]}
+        ],
+        "dependencies": ["The selected node/element or set must already exist."]
+      }
+    },
+    {
+      "id": "command.build",
+      "parent_block_id": "block.clusters",
+      "canonical": "*BUILD",
+      "dispatch_prefix": "*BUIL",
+      "summary": "Forces intermediate construction of element information before cluster input ends.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document body grammar, idempotency, ordering constraints, and downstream effects."]
+    },
+    {
+      "id": "command.stop",
+      "parent_block_id": "block.clusters",
+      "canonical": "*STOP",
+      "dispatch_prefix": "*STOP",
+      "summary": "Finishes the current FE cluster reader after updating element data.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Confirm ordering requirements and behavior with nested include files."]
+    },
+    {
+      "id": "command.include",
+      "parent_block_id": "block.clusters",
+      "canonical": "*INCLUDE",
+      "dispatch_prefix": "*INCL",
+      "summary": "Reads additional FE cluster commands from a workspace-local include file.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "FILE",
+          "value_type": "path",
+          "required": true,
+          "summary": "Names the include file resolved relative to BSAM's input directory behavior."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document nesting, cycle behavior, path quoting, return semantics, and source-preserving edit rules."]
+    },
+    {
+      "id": "command.shift",
+      "parent_block_id": "block.clusters",
+      "canonical": "*SHIFT",
+      "dispatch_prefix": "*SHIF",
+      "summary": "Translates all nodes or nodes in a named node set.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "ALL",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Selects all nodes and is mutually exclusive with NSET; it is the default."
+        },
+        {
+          "name": "NSET",
+          "value_type": "node-set-name",
+          "required": false,
+          "summary": "Selects one existing node set and is mutually exclusive with ALL."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document translation-vector row grammar and coordinate effects."]
+    },
+    {
+      "id": "command.scale",
+      "parent_block_id": "block.clusters",
+      "canonical": "*SCALE",
+      "dispatch_prefix": "*SCAL",
+      "summary": "Scales all nodes or nodes in a named node set.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "ALL",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Selects all nodes and is mutually exclusive with NSET; it is the default."
+        },
+        {
+          "name": "NSET",
+          "value_type": "node-set-name",
+          "required": false,
+          "summary": "Selects one existing node set and is mutually exclusive with ALL."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document scale factors, origin behavior, and coordinate effects."]
+    },
+    {
+      "id": "command.exclusion",
+      "parent_block_id": "block.clusters",
+      "canonical": "*EXCLUSION",
+      "dispatch_prefix": "*EXCL",
+      "summary": "Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "shape",
+          "value_type": "mutually-exclusive flags",
+          "required": true,
+          "allowed_values": ["BOX", "PLANE", "PREVIOUS"],
+          "summary": "Selects the exclusion geometry/source."
+        },
+        {
+          "name": "side",
+          "value_type": "mutually-exclusive flags",
+          "required": false,
+          "allowed_values": ["INSIDE", "OUTSIDE"],
+          "summary": "Selects which side of BOX or PLANE is excluded; invalid with PREVIOUS."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.current-vtms-deck-tric"],
+      "remaining_work": ["Document box, plane, and previous-crack data records and coordinate tolerances."]
+    },
+    {
+      "id": "command.flip",
+      "parent_block_id": "block.clusters",
+      "canonical": "*FLIP",
+      "dispatch_prefix": "*FLIP",
+      "summary": "Swaps two coordinate axes for subsequent/read cluster geometry.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "TYPE",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["XY", "YX", "XZ", "ZX", "YZ", "ZY"],
+          "default": "XY",
+          "summary": "Selects the directed axis exchange."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document operation ordering and effects on orientations and existing entities."]
+    },
+    {
+      "id": "command.spacing",
+      "parent_block_id": "block.clusters",
+      "canonical": "*SPACING",
+      "dispatch_prefix": "*SPAC",
+      "summary": "Defines crack spacing behavior for the cluster.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Trace CRACK_SPACING_INPUT and document strict, value, and relaxed modes plus defaults."]
+    },
+    {
+      "id": "command.section",
+      "parent_block_id": "block.clusters",
+      "canonical": "*SECTION",
+      "dispatch_prefix": "*SECT",
+      "summary": "Assigns layered section information to an existing element set.",
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "ELSET",
+          "value_type": "element-set-name",
+          "required": true,
+          "summary": "Selects the existing element set receiving the section."
+        },
+        {
+          "name": "LAYERS",
+          "value_type": "integer",
+          "required": true,
+          "summary": "Sets a positive number of layers."
+        },
+        {
+          "name": "CONNECTION",
+          "value_type": "flag",
+          "required": false,
+          "summary": "Enables the connection form handled by the section reader."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-section-reader"],
+      "remaining_work": ["Confirm CONNECTION semantics and material-ID resolution diagnostics."],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{
+          "name": "layer-stack",
+          "when": "always",
+          "rows": [{"name": "layer", "repetition": "count-from-command-parameter", "fields": [
+            {"name": "thickness", "value_type": "positive-real", "required": true, "summary": "Relative or absolute ply thickness; all rows are normalized by their sum."},
+            {"name": "material_id", "value_type": "positive-integer", "required": true, "summary": "Material identifier assigned to the ply."}
+          ]}],
+          "constraints": ["The number of non-comment layer rows must equal LAYERS; fewer rows are fatal.", "Layer thicknesses are divided by their total before assignment."]
+        }],
+        "dependencies": ["ELSET must name an existing element set.", "DIMENSIONS section_capacity must include this section.", "Every material_id must resolve in MATERIALS.", "A ply-count edit must update LAYERS and the layer-row sequence atomically."]
+      }
+    },
+    {
+      "id": "command.crack",
+      "parent_block_id": "block.clusters",
+      "canonical": "*CRACK",
+      "dispatch_prefix": "*CRAC",
+      "summary": "Dispatches cluster crack definition, region, spacing, initiation, and function variants.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Split and document DEFINITION, REGION, SPACING, INITIATION, and FUNCTION variant schemas and dependencies."]
+    },
+    {
+      "id": "command.transform",
+      "parent_block_id": "block.clusters",
+      "canonical": "*TRANSFORM",
+      "dispatch_prefix": "*TRAN",
+      "summary": "Transforms cluster geometry to its inertial coordinate system with optional flattening.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "INERTIA",
+          "value_type": "flag",
+          "required": true,
+          "summary": "Requests transformation to the computed inertial system."
+        },
+        {
+          "name": "FLATTEN",
+          "value_type": "real",
+          "required": false,
+          "summary": "Requests flattening and supplies the replacement thickness."
+        }
+      ],
+      "evidence_ids": ["evidence.fe-command-dispatch"],
+      "remaining_work": ["Document the data body, axis selection, and effects on orientations, sets, and existing entities."]
+    }
+  ],
+  "nested_constructs": [
+    {
+      "id": "construct.boundary-type",
+      "parent_block_id": "block.boundary",
+      "canonical": "*TYPE",
+      "match_prefix": "*type",
+      "kind": "problem-start",
+      "summary": "Starts a boundary problem and selects mechanical, thermal, or contact dispatch.",
+      "coverage": "partially-documented",
+      "parameters": [{"name": "problem_type", "value_type": "enum-record", "required": true, "allowed_values": ["mechanical", "thermal", "contact"], "summary": "The following cleaned record is matched by its first four characters."}],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Document the contact branch and the thermal temperature record in full."]
+    },
+    {
+      "id": "construct.boundary-g-control",
+      "parent_block_id": "block.boundary",
+      "canonical": "*G-CONTROL",
+      "match_prefix": "*g-co",
+      "kind": "keyword",
+      "summary": "Configures damage-increment control, update, damping, iteration, and exit thresholds.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch"],
+      "remaining_work": ["Record each option spelling, type, default, mutual dependency, and safe range."]
+    },
+    {
+      "id": "construct.boundary-geometric-nonlinearity",
+      "parent_block_id": "block.boundary",
+      "canonical": "*GEO_NL",
+      "match_prefix": "*geo_",
+      "kind": "keyword",
+      "summary": "Enables geometric nonlinearity for the current mechanical or thermal problem.",
+      "coverage": "documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch"],
+      "remaining_work": []
+    },
+    {
+      "id": "construct.boundary-name",
+      "parent_block_id": "block.boundary",
+      "canonical": "*NAME",
+      "match_prefix": "*name",
+      "kind": "keyword",
+      "summary": "Sets the current boundary-problem name from the following record.",
+      "coverage": "documented",
+      "parameters": [{"name": "name", "value_type": "string-record", "required": true, "summary": "Boundary problem name; defaults to boundname plus the problem index when absent."}],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Confirm length, character, and uniqueness constraints."]
+    },
+    {
+      "id": "construct.boundary-status",
+      "parent_block_id": "block.boundary",
+      "canonical": "*STATUS",
+      "match_prefix": "*stat",
+      "kind": "keyword",
+      "summary": "Selects restart/new-run handling for the current boundary problem.",
+      "coverage": "partially-documented",
+      "parameters": [{"name": "status", "value_type": "string-record", "required": false, "allowed_values": ["restart", "no restart"], "default": "restart", "summary": "The parser recognizes restart by first-four-character matching and treats no as a new run."}],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Resolve all accepted status strings and the default branch behavior."]
+    },
+    {
+      "id": "construct.boundary-clusters",
+      "parent_block_id": "block.boundary",
+      "canonical": "*CLUSTERS",
+      "match_prefix": "*clus",
+      "kind": "record-group",
+      "summary": "Restricts the boundary problem to a list of existing cluster names.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch"],
+      "remaining_work": ["Document list matching, wildcard behavior, defaults, and duplicate selection."]
+    },
+    {
+      "id": "construct.boundary-conditions",
+      "parent_block_id": "block.boundary",
+      "canonical": "*BOUNDARY CONDITION",
+      "match_prefix": "*boun",
+      "kind": "record-group",
+      "summary": "Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["displacement", "shift", "stretch", "force", "off"], "summary": "Boundary-condition action matched by a short prefix."},
+        {"name": "component", "value_type": "component", "required": true, "summary": "Degree-of-freedom/component converted by component2id."},
+        {"name": "name", "value_type": "string", "required": true, "summary": "Name of the boundary condition."},
+        {"name": "value", "value_type": "real", "required": true, "summary": "Boundary-condition magnitude."},
+        {"name": "nset", "value_type": "cluster-name.node-set-name", "required": true, "summary": "Existing node set qualified by its cluster name."}
+      ],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Document component values, all optional keys, and per-type required-field rules."]
+    },
+    {
+      "id": "construct.boundary-connections",
+      "parent_block_id": "block.boundary",
+      "canonical": "*CONNECTIONS",
+      "match_prefix": "*conn",
+      "kind": "record-group",
+      "summary": "Defines penalty and nodal connections between cluster selections.",
+      "coverage": "identified",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Split connection type families and document every multi-line record schema and cluster/set dependency."]
+    },
+    {
+      "id": "construct.boundary-loading-sequence",
+      "parent_block_id": "block.boundary",
+      "canonical": "*LOADING SEQUENCE",
+      "match_prefix": "*load",
+      "kind": "record-group",
+      "summary": "Defines load-step histories, cyclic controls, and optional repeated fatigue blocks.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Document all load type records and the type/name/nstep/maxcycle/mincycle/R/load_incr/block/inicycle option matrix."]
+    },
+    {
+      "id": "construct.boundary-convergence",
+      "parent_block_id": "block.boundary",
+      "canonical": "*CONVERGENCE",
+      "match_prefix": "*conv",
+      "kind": "record-group",
+      "summary": "Configures nonlinear convergence, time-step, iteration, and reattempt controls.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Enumerate the eleven scanned labels, defaults, numerical constraints, and interactions."]
+    },
+    {
+      "id": "construct.boundary-output",
+      "parent_block_id": "block.boundary",
+      "canonical": "*OUTPUT",
+      "match_prefix": "*outp",
+      "kind": "record-group",
+      "summary": "Defines output types and their target, coordinate-system, and intermediate-output options.",
+      "coverage": "partially-documented",
+      "parameters": [],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Enumerate output type IDs/names and each type-specific record schema."]
+    }
+  ],
+  "execution_contract": {
+    "invocation": "bsam20.exe -I <input-directory> -O <unique-output-directory> <deck-basename>",
+    "input_extension": ".in",
+    "success_policy": "Require the explicit end-of-program sentinel and absence of classified fatal diagnostics; process exit code alone is not authoritative.",
+    "control_files": [
+      {
+        "suffix": ".lst",
+        "role": "Primary text listing and diagnostic stream."
+      },
+      {
+        "suffix": ".ssn",
+        "role": "Text step-progress stream; repeated step numbers are possible."
+      },
+      {
+        "suffix": ".exit",
+        "role": "Live control file: 0 continue, 1 disrupt, 2 stop."
+      },
+      {
+        "suffix": ".tmp",
+        "role": "Binary run artifact."
+      },
+      {
+        "suffix": "_TP.dat",
+        "role": "Text run artifact observed in successful execution."
+      },
+      {
+        "suffix": ".D_Hs",
+        "role": "Binary damage/history artifact observed in successful execution."
+      },
+      {
+        "suffix": ".D_HsMIC",
+        "role": "Binary MIC damage/history artifact observed in successful execution."
+      }
+    ],
+    "evidence_ids": [
+      "evidence.invocation-parser",
+      "evidence.success-sentinel",
+      "evidence.exit-control",
+      "evidence.runtime-zero-on-fatal",
+      "evidence.runtime-current-deck-success"
+    ]
+  }
+}

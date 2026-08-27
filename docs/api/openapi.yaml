@@ -1,0 +1,703 @@
+openapi: 3.1.0
+info:
+  title: BSAM Agent Local API
+  version: 0.1.0-draft
+  description: >-
+    Documentation-first contract for current-syntax BSAM model import,
+    loss-preserving modification, validation, rendering, and supervised serial
+    execution. No service is implemented yet.
+servers:
+  - url: http://127.0.0.1:{port}
+    description: Loopback-only local service
+    variables:
+      port:
+        default: "8765"
+tags:
+  - name: System
+  - name: Models
+  - name: Runs
+paths:
+  /api/v1/health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Check local service health
+      responses:
+        "200":
+          description: Service is responsive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/v1/capabilities:
+    get:
+      tags: [System]
+      operationId: getCapabilities
+      summary: Get the pinned BSAM and syntax capabilities
+      responses:
+        "200":
+          description: Capability manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilityManifest"
+  /api/v1/models/import:
+    post:
+      tags: [Models]
+      operationId: importModel
+      summary: Import workspace-local VTMS, BSAM, or cluster data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportModelRequest"
+      responses:
+        "201":
+          description: Imported model revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelRevision"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /api/v1/models/{modelId}:
+    get:
+      tags: [Models]
+      operationId: getModel
+      summary: Get model metadata and a bounded summary
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      responses:
+        "200":
+          description: Model revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelRevision"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/models/{modelId}/changes/preview:
+    post:
+      tags: [Models]
+      operationId: previewModelChange
+      summary: Preview direct edits or a dependency-aware structural transformation
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewChangeRequest"
+      responses:
+        "200":
+          description: Immutable revision-bound change plan, possibly requiring input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangePlan"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Base revision or digest is stale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/v1/models/{modelId}/changes/apply:
+    post:
+      tags: [Models]
+      operationId: applyModelChange
+      summary: Apply one exact reviewed change plan to create a new revision
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyChangeRequest"
+      responses:
+        "201":
+          description: New immutable model revision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelRevision"
+        "409":
+          description: Plan is stale, ambiguous, invalid, or already applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/v1/models/{modelId}/diff:
+    get:
+      tags: [Models]
+      operationId: getModelDiff
+      summary: Compare two model revisions semantically and at source level
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+        - name: fromRevision
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: toRevision
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Revision diff
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelDiff"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/models/{modelId}/validate:
+    post:
+      tags: [Models]
+      operationId: validateModel
+      summary: Validate the exact current model revision
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      responses:
+        "200":
+          description: Deterministic validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/models/{modelId}/render:
+    post:
+      tags: [Models]
+      operationId: renderModel
+      summary: Render a validated model revision to current BSAM syntax
+      parameters:
+        - $ref: "#/components/parameters/ModelId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenderRequest"
+      responses:
+        "201":
+          description: Rendered input artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderedArtifact"
+        "409":
+          description: Revision is not valid or validation is stale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/v1/runs:
+    post:
+      tags: [Runs]
+      operationId: startRun
+      summary: Start serial BSAM execution for a rendered artifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRunRequest"
+      responses:
+        "202":
+          description: Run accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "409":
+          description: Artifact or executable preflight failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/v1/runs/{runId}:
+    get:
+      tags: [Runs]
+      operationId: getRun
+      summary: Get supervised run state
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Current run state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/runs/{runId}/stop:
+    post:
+      tags: [Runs]
+      operationId: stopRun
+      summary: Request controlled termination of one run
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "202":
+          description: Stop request accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "409":
+          description: Run is already terminal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+components:
+  parameters:
+    ModelId:
+      name: modelId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Request or workspace path is invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, api_version]
+      properties:
+        status:
+          const: ok
+        api_version:
+          type: string
+    CapabilityManifest:
+      type: object
+      additionalProperties: false
+      required: [api_version, specification_version, bsam, categories, transformations]
+      properties:
+        api_version:
+          type: string
+        specification_version:
+          type: string
+        bsam:
+          $ref: "#/components/schemas/BsamFingerprint"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CapabilityCategory"
+        transformations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransformationCapability"
+    BsamFingerprint:
+      type: object
+      additionalProperties: false
+      required: [product_version, executable_sha256, execution_mode]
+      properties:
+        product_version:
+          type: string
+        source_commit:
+          type: [string, "null"]
+        executable_sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+        execution_mode:
+          enum: [windows-serial]
+    CapabilityCategory:
+      type: object
+      additionalProperties: false
+      required: [id, support]
+      properties:
+        id:
+          type: string
+        support:
+          enum: [documented, partial, unsupported, pending-inventory]
+        evidence_count:
+          type: integer
+          minimum: 0
+    TransformationCapability:
+      type: object
+      additionalProperties: false
+      required: [id, version, support, parameter_schema]
+      properties:
+        id:
+          type: string
+        version:
+          type: string
+        support:
+          enum: [implemented, partial, unsupported, planned]
+        parameter_schema:
+          type: object
+          additionalProperties: true
+    ImportModelRequest:
+      type: object
+      additionalProperties: false
+      required: [format, source_path]
+      properties:
+        format:
+          enum: [vtms-ele, bsam-current-input, cluster-json]
+        source_path:
+          type: string
+          description: Path relative to the configured workspace root
+        options:
+          type: object
+          additionalProperties: true
+    ModelRevision:
+      type: object
+      additionalProperties: false
+      required: [model_id, revision, content_sha256, source, source_files, summary]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+          minimum: 1
+        content_sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+        source:
+          type: string
+        source_files:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceFile"
+        summary:
+          type: object
+          additionalProperties: true
+    SourceFile:
+      type: object
+      additionalProperties: false
+      required: [relative_path, sha256, role]
+      properties:
+        relative_path:
+          type: string
+        sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+        role:
+          enum: [root, include]
+    PreviewChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [base_revision, base_content_sha256, change]
+      properties:
+        base_revision:
+          type: integer
+          minimum: 1
+        base_content_sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+        change:
+          oneOf:
+            - $ref: "#/components/schemas/DirectEditsChange"
+            - $ref: "#/components/schemas/StructuralTransformationChange"
+    DirectEditsChange:
+      type: object
+      additionalProperties: false
+      required: [kind, operations]
+      properties:
+        kind:
+          const: direct-edits
+        operations:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DirectEditOperation"
+    DirectEditOperation:
+      type: object
+      additionalProperties: false
+      required: [operation, target]
+      properties:
+        operation:
+          enum: [set, add, remove]
+        target:
+          type: string
+          description: Stable capability/entity selector, not a raw text match
+        value: {}
+    StructuralTransformationChange:
+      type: object
+      additionalProperties: false
+      required: [kind, transformation_id, parameters]
+      properties:
+        kind:
+          const: structural-transformation
+        transformation_id:
+          type: string
+          description: Versioned transformation identifier from the capability manifest
+        parameters:
+          type: object
+          additionalProperties: true
+    ChangePlan:
+      type: object
+      additionalProperties: false
+      required:
+        - plan_id
+        - plan_sha256
+        - model_id
+        - base_revision
+        - status
+        - assumptions
+        - required_inputs
+        - impacts
+        - diff
+        - issues
+      properties:
+        plan_id:
+          type: string
+          format: uuid
+        plan_sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+        model_id:
+          type: string
+          format: uuid
+        base_revision:
+          type: integer
+          minimum: 1
+        status:
+          enum: [ready, needs-input, invalid]
+        assumptions:
+          type: array
+          items:
+            type: string
+        required_inputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RequiredInput"
+        impacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeImpact"
+        diff:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelDiffEntry"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationIssue"
+    RequiredInput:
+      type: object
+      additionalProperties: false
+      required: [id, message, value_schema]
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+        value_schema:
+          type: object
+          additionalProperties: true
+    ChangeImpact:
+      type: object
+      additionalProperties: false
+      required: [category, summary]
+      properties:
+        category:
+          enum:
+            - analysis-control
+            - mesh-topology
+            - sets
+            - materials
+            - orientations
+            - connections
+            - cracks-damage
+            - boundary-loads
+            - outputs
+            - source-files
+        summary:
+          type: string
+        affected_count:
+          type: integer
+          minimum: 0
+    ApplyChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [plan_id, plan_sha256]
+      properties:
+        plan_id:
+          type: string
+          format: uuid
+        plan_sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+    ModelDiff:
+      type: object
+      additionalProperties: false
+      required: [model_id, from_revision, to_revision, changes, source_diff]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        from_revision:
+          type: integer
+          minimum: 1
+        to_revision:
+          type: integer
+          minimum: 1
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelDiffEntry"
+        source_diff:
+          type: string
+          description: Unified diff with workspace-relative paths and bounded size
+    ModelDiffEntry:
+      type: object
+      additionalProperties: false
+      required: [operation, target, summary]
+      properties:
+        operation:
+          enum: [add, remove, modify, regenerate]
+        target:
+          type: string
+        summary:
+          type: string
+        before: {}
+        after: {}
+    ValidationResult:
+      type: object
+      additionalProperties: false
+      required: [model_id, revision, valid, specification_version, issues]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+        valid:
+          type: boolean
+        specification_version:
+          type: string
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationIssue"
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required: [code, severity, message]
+      properties:
+        code:
+          type: string
+        severity:
+          enum: [error, warning, information]
+        message:
+          type: string
+        model_path:
+          type: [string, "null"]
+        evidence_id:
+          type: [string, "null"]
+    RenderRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        mode:
+          enum: [preserve-imported-source, canonical-current-syntax]
+        file_stem:
+          type: string
+          pattern: "^[A-Za-z0-9._-]+$"
+    RenderedArtifact:
+      type: object
+      additionalProperties: false
+      required: [artifact_id, model_id, revision, relative_path, sha256, files]
+      properties:
+        artifact_id:
+          type: string
+          format: uuid
+        model_id:
+          type: string
+          format: uuid
+        revision:
+          type: integer
+        relative_path:
+          type: string
+        sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceFile"
+    StartRunRequest:
+      type: object
+      additionalProperties: false
+      required: [artifact_id, artifact_sha256]
+      properties:
+        artifact_id:
+          type: string
+          format: uuid
+        artifact_sha256:
+          type: string
+          pattern: "^[A-Fa-f0-9]{64}$"
+    Run:
+      type: object
+      additionalProperties: false
+      required: [run_id, artifact_id, state, classification, output_directory]
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        artifact_id:
+          type: string
+          format: uuid
+        state:
+          enum: [queued, starting, running, stopping, terminal]
+        classification:
+          enum: [pending, succeeded, failed, stopped, disrupted, unknown]
+        output_directory:
+          type: string
+        process_exit_code:
+          type: [integer, "null"]
+        success_sentinel_seen:
+          type: boolean
+          default: false
+        latest_step:
+          type: [integer, "null"]
+        diagnostic_codes:
+          type: array
+          items:
+            type: string
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

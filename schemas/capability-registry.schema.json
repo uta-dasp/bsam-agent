@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.bsam-agent.invalid/schemas/capability-registry.schema.json",
+  "title": "BSAM capability registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_version",
+    "target",
+    "policy",
+    "evidence",
+    "top_level_blocks",
+    "cluster_commands",
+    "nested_constructs",
+    "execution_contract"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1.0"
+    },
+    "registry_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "target": {
+      "$ref": "#/$defs/target"
+    },
+    "policy": {
+      "$ref": "#/$defs/policy"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "top_level_blocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/block"
+      }
+    },
+    "cluster_commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/command"
+      }
+    },
+    "nested_constructs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nestedConstruct"
+      }
+    },
+    "execution_contract": {
+      "$ref": "#/$defs/executionContract"
+    }
+  },
+  "$defs": {
+    "coverage": {
+      "enum": [
+        "identified",
+        "partially-documented",
+        "documented",
+        "runtime-verified"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "product_version",
+        "source_commit",
+        "executable_sha256",
+        "platform",
+        "execution_mode"
+      ],
+      "properties": {
+        "product": { "const": "BSAM" },
+        "product_version": { "type": "string" },
+        "source_commit": { "type": "string", "pattern": "^[A-Fa-f0-9]{40}$" },
+        "executable_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "platform": { "const": "windows" },
+        "execution_mode": { "const": "serial" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generation_syntax", "obsolete_syntax", "source_authority"],
+      "properties": {
+        "generation_syntax": { "const": "current-only" },
+        "obsolete_syntax": { "const": "diagnostics-only" },
+        "source_authority": { "const": "local-only" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "locator", "claim"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^evidence\\.[a-z0-9.-]+$" },
+        "kind": { "enum": ["source", "example", "runtime", "documentation"] },
+        "locator": { "type": "string", "minLength": 1 },
+        "line_start": { "type": "integer", "minimum": 1 },
+        "line_end": { "type": "integer", "minimum": 1 },
+        "claim": { "type": "string", "minLength": 1 }
+      }
+    },
+    "termination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "tokens", "certainty"],
+      "properties": {
+        "style": { "enum": ["end-line", "record-sentinel", "command-and-end-line"] },
+        "tokens": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "certainty": { "enum": ["canonical", "accepted-current", "unresolved-canonical"] }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value_type", "required", "summary"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "value_type": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "allowed_values": {
+          "type": "array",
+          "items": { "type": ["string", "number", "integer", "boolean"] }
+        },
+        "default": {},
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "termination", "variants", "dependencies"],
+      "properties": {
+        "style": { "enum": ["none", "single-record", "records", "nested-records"] },
+        "termination": { "enum": ["next-command", "fixed-count", "next-command-or-eof"] },
+        "variants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/bodyVariant" }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "bodyVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "when", "rows", "constraints"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "when": { "type": "string", "minLength": 1 },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/bodyRow" }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "bodyRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "repetition", "fields"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "repetition": { "enum": ["once", "repeated", "count-from-previous-field", "count-from-command-parameter"] },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/parameter" }
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "canonical",
+        "lookup_token",
+        "match_rule",
+        "required",
+        "parser",
+        "summary",
+        "termination",
+        "coverage",
+        "parameters",
+        "evidence_ids",
+        "remaining_work"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^block\\.[a-z0-9-]+$" },
+        "canonical": { "type": "string", "minLength": 1 },
+        "lookup_token": { "type": "string", "minLength": 1 },
+        "match_rule": { "enum": ["exact", "first-three", "special-input-scan"] },
+        "required": { "type": "boolean" },
+        "parser": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "termination": { "$ref": "#/$defs/termination" },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "remaining_work": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "body": { "$ref": "#/$defs/body" }
+      }
+    },
+    "nestedConstruct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "parent_block_id",
+        "canonical",
+        "match_prefix",
+        "kind",
+        "summary",
+        "coverage",
+        "parameters",
+        "evidence_ids",
+        "remaining_work"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^construct\\.[a-z0-9-]+$" },
+        "parent_block_id": { "type": "string", "pattern": "^block\\.[a-z0-9-]+$" },
+        "canonical": { "type": "string", "minLength": 1 },
+        "match_prefix": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["problem-start", "keyword", "record-group"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "remaining_work": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "body": { "$ref": "#/$defs/body" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "parent_block_id",
+        "canonical",
+        "dispatch_prefix",
+        "summary",
+        "coverage",
+        "parameters",
+        "evidence_ids",
+        "remaining_work"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^command\\.[a-z0-9-]+$" },
+        "parent_block_id": { "const": "block.clusters" },
+        "canonical": { "type": "string", "pattern": "^\\*[A-Z][A-Z ]*$" },
+        "dispatch_prefix": { "type": "string", "pattern": "^\\*[A-Z]{4}$" },
+        "summary": { "type": "string", "minLength": 1 },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "remaining_work": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "body": { "$ref": "#/$defs/body" }
+      }
+    },
+    "executionContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocation",
+        "input_extension",
+        "success_policy",
+        "control_files",
+        "evidence_ids"
+      ],
+      "properties": {
+        "invocation": { "type": "string", "minLength": 1 },
+        "input_extension": { "const": ".in" },
+        "success_policy": { "type": "string", "minLength": 1 },
+        "control_files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["suffix", "role"],
+            "properties": {
+              "suffix": { "type": "string", "minLength": 1 },
+              "role": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}
