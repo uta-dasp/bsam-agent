@@ -49,3 +49,18 @@ BSAM-specific behavior is derived only from local source, local documentation, l
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 
 The source worktree contains four modified first-party SHEFF submodules, so the executable hash is required to identify the compiled artifact. See the [baseline audit](docs/bsam/BASELINE_AUDIT_2026-08-31.md).
+
+## Run the first deterministic slice
+
+The current CLI is read-only: it fingerprints a deck, proves a byte-identical no-op round trip, indexes recognized top-level blocks and cluster commands, and reports conservative current-syntax diagnostics.
+
+From PowerShell in this repository:
+
+```powershell
+$env:PYTHONPATH = "$PWD\src"
+python -m bsam_agent baseline
+python -m bsam_agent inspect "..\projects\notch_v1\notch_v1.in"
+python -m bsam_agent validate "..\projects\notch_v1\notch_v1.in"
+```
+
+Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. This slice does not yet write edits or launch BSAM.

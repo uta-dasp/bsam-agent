@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bsam-agent"
+version = "0.1.0"
+description = "Local deterministic tooling for current-syntax BSAM input decks"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+bsam-agent = "bsam_agent.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
