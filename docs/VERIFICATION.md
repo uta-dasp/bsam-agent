@@ -2,7 +2,7 @@
 
 ## What is runnable now
 
-The deterministic CLI is runnable now. It supports baseline inspection, lossless deck inspection, conservative validation, revision-bound minimal edits to existing registered nested parameters, fresh-plan diff review, non-overwriting applied-change audit sidecars, and synchronous isolated execution. The local HTTP API, general semantic model, structural transformations, mesh import/generation, and model adapters are not implemented yet.
+The deterministic CLI is runnable now. It supports baseline inspection, lossless deck inspection, conservative validation, revision-bound minimal edits to existing registered nested parameters, fresh-plan diff review, non-overwriting applied-change audit sidecars, isolated execution, concurrent run status, and controlled stopping. The local HTTP API, general semantic model, structural transformations, mesh import/generation, and model adapters are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
@@ -13,11 +13,13 @@ python -m bsam_agent validate ..\projects\notch_v1\notch_v1.in
 python -m unittest discover -s tests -v
 ```
 
-The tests protect the pinned baseline, registry generation, byte-identical no-op rendering, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, semantic/unified diff review, no-in-place and no-audit-overwrite policies, audit/output digest binding, executable fingerprint rejection, and run classification.
+The tests protect the pinned baseline, registry generation, byte-identical no-op rendering, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, semantic/unified diff review, no-in-place and no-audit-overwrite policies, audit/output digest binding, executable fingerprint rejection, run classification, atomic status reads, process-liveness reporting, and controlled idempotent stop requests.
 
 ## Execution smoke evidence
 
 On 2026-08-31 the supervisor launched the pinned executable against `projects/notch_v1/notch_v1.in` using separate absolute input and output directories. A two-second timeout deliberately exercised controlled stopping. BSAM created its listing, step, and TP artifacts; the supervisor wrote the `.exit` stop request; the process ended; and the manifest classified it as `stopped` with no fatal marker and no success sentinel. This proves invocation and stop supervision, not successful analysis completion.
+
+A second isolated smoke run on 2026-08-31 exercised concurrent external control in `runs/smoke-notch-external-stop-20260831`. While the pinned executable was active, `status` reported the durable `running` state and a live Windows process. `stop` persisted a user stop request and set BSAM's already-created `.exit` control file to 2. BSAM then exited with code zero; the owning supervisor recorded `classification: stopped`, `stop_reason: user`, `timed_out: false`, no fatal marker, and no success sentinel. This proves the concurrent status and user-stop path. It does not prove successful analysis completion.
 
 Run artifacts are local and ignored beneath `runs/`. A successful acceptance run still requires a reviewed test case allowed to finish and classification `succeeded`.
 
@@ -59,4 +61,4 @@ No single successful BSAM run proves general correctness. Each supported capabil
 
 ## Planned user-facing audit path
 
-The current edit slice provides `inspect`, `plan-change`, `diff`, `apply-change`, and `validate` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work, along with asynchronous `status` and `stop`. This deterministic path is the reference against which local or hosted model behavior is checked.
+The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

@@ -67,7 +67,7 @@ Rendering is deterministic and has two modes. A newly generated model uses canon
 
 ### Run supervisor
 
-Each run receives a unique output directory and a manifest. The supervisor invokes BSAM using separate input/output directory arguments, captures output, monitors `.lst`, `.ssn`, and `.exit`, and classifies the run using explicit messages and the BSAM end sentinel. Process exit code is supporting evidence only because BSAM can report a fatal input error and still return zero.
+Each run receives a unique output directory and an atomically updated manifest. The supervisor invokes BSAM using separate input/output directory arguments, captures output, monitors `.lst`, `.ssn`, and `.exit`, and classifies the run using explicit messages and the BSAM end sentinel. Concurrent status reads the durable manifest and process liveness without mutating the run. Concurrent stop creates an immutable request record and uses BSAM's controlled `.exit` mechanism; only the owning supervisor may escalate termination after its grace period. Process exit code is supporting evidence only because BSAM can report a fatal input error and still return zero.
 
 ### Local Agent API
 

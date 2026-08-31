@@ -11,7 +11,7 @@ from . import __version__
 from .change import ChangeError, apply_plan, plan_parameter_change, review_plan, write_plan
 from .document import SourceDocument
 from .registry import load_registry
-from .run import RunError, run_bsam
+from .run import RunError, request_run_stop, run_bsam, run_status
 
 
 def _document(path_text: str) -> SourceDocument:
@@ -59,6 +59,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--timeout", type=float, default=3600.0, help="seconds before requesting a controlled stop; <=0 disables")
     run_parser.add_argument("--stop-grace", type=float, default=30.0, help="seconds to wait after a controlled stop request")
 
+    status_parser = subparsers.add_parser("status", help="read the durable status of one isolated run")
+    status_parser.add_argument("output_dir")
+    status_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
+
+    stop_parser = subparsers.add_parser("stop", help="request a controlled stop for one active run")
+    stop_parser.add_argument("output_dir")
+
     subparsers.add_parser("baseline", help="print the pinned registry baseline")
     return parser
 
@@ -95,6 +102,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             _print_json(result)
             return 0 if result["classification"] == "succeeded" else 3
+        if args.command == "status":
+            _print_json(run_status(Path(args.output_dir)), args.compact)
+            return 0
+        if args.command == "stop":
+            _print_json(request_run_stop(Path(args.output_dir)))
+            return 0
 
         document = _document(args.deck)
         inspection = document.inspection()

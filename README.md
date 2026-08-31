@@ -68,10 +68,13 @@ python -m bsam_agent diff change.json
 python -m bsam_agent apply-change change.json --out notch_v1.changed.in
 python -m bsam_agent run notch_v1.changed.in `
   --output-dir runs\notch-v1-run --timeout 3600
+# While run is active, from another terminal:
+python -m bsam_agent status runs\notch-v1-run
+python -m bsam_agent stop runs\notch-v1-run
 ```
 
 Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Direct edits are currently limited to an existing, unambiguous key/value inside a registered nested construct; structural mesh or ply changes are not yet implemented.
 
 `diff` revalidates the plan digest and source revision before returning the semantic target, proposed output digest, validation result, and unified source diff. `apply-change` writes `<output>.audit.json` by default; `--audit-out` selects another new path. The audit binds the plan and output digests, changed model paths, validation result, source diff, and registered BSAM baseline. Its null run directory explicitly means the edit has not yet been linked to an execution.
 
-`run` verifies the executable SHA-256, validates the deck, requires a new output directory, uses separate `-I`/`-O` arguments, captures process streams, and writes `run-manifest.json`. Success requires the BSAM end-of-program sentinel, no classified fatal marker, and process exit code zero. A timeout requests a controlled stop through the run `.exit` file before terminating an unresponsive process.
+`run` verifies the executable SHA-256, validates the deck, requires a new output directory, uses separate `-I`/`-O` arguments, captures process streams, and atomically updates `run-manifest.json`. While that command remains active, `status` can read its durable state and OS process liveness from another terminal. `stop` writes an immutable `stop-request.json` and requests BSAM's controlled `.exit` stop; it does not directly terminate the process. Repeated stop requests are idempotent. Success still requires the BSAM end-of-program sentinel, no classified fatal marker, and process exit code zero. If controlled stopping does not finish within the supervisor's grace period, only the owning `run` command escalates process termination.
