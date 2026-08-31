@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
+from .change import ChangeError, apply_plan, plan_parameter_change, write_plan
 from .document import SourceDocument
 from .registry import load_registry
 
@@ -32,6 +33,19 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument("deck")
     validate_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
 
+    plan_parser = subparsers.add_parser("plan-change", help="plan a minimal edit to an existing key/value")
+    plan_parser.add_argument("deck")
+    plan_parser.add_argument("--block", required=True)
+    plan_parser.add_argument("--construct", required=True)
+    plan_parser.add_argument("--parameter", required=True)
+    plan_parser.add_argument("--value", required=True)
+    plan_parser.add_argument("--occurrence", type=int, default=1)
+    plan_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    apply_parser = subparsers.add_parser("apply-change", help="apply a revision-bound plan to a new deck")
+    apply_parser.add_argument("plan")
+    apply_parser.add_argument("--out", required=True, help="new deck path; in-place writes are rejected")
+
     subparsers.add_parser("baseline", help="print the pinned registry baseline")
     return parser
 
@@ -48,6 +62,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json({"registry_version": registry["registry_version"], **registry["target"]})
             return 0
 
+        if args.command == "plan-change":
+            plan = plan_parameter_change(
+                Path(args.deck), args.block, args.construct, args.parameter, args.value, args.occurrence
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "apply-change":
+            _print_json(apply_plan(Path(args.plan), Path(args.out)))
+            return 0
+
         document = _document(args.deck)
         inspection = document.inspection()
         if args.command == "inspect":
@@ -62,7 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             _print_json(result, args.compact)
             return 2 if inspection["summary"]["errors"] else 0
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, ChangeError) as exc:
         _print_json({"error": str(exc)})
         return 2
     return 2

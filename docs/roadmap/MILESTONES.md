@@ -33,7 +33,7 @@ Exit: every active parser dispatch path is accounted for or explicitly blocked.
 
 ## G2 — Deterministic core vertical slice
 
-Status: in progress. A read-only Python CLI now provides `baseline`, `inspect`, and `validate`; retains original bytes; indexes current blocks and cluster commands; and reports stable diagnostics. It has been exercised against the two current project decks without modifying them.
+Status: in progress. The Python CLI provides `baseline`, `inspect`, and `validate`; retains original bytes; indexes current blocks and cluster commands; and reports stable diagnostics. Revision-bound `plan-change` and `apply-change` commands support typed minimal patches to existing registered nested key/value parameters, reject stale plans, and prohibit in-place writes. The slice has been exercised against the two current project decks without modifying them.
 
 Deliverables:
 

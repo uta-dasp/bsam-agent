@@ -52,7 +52,7 @@ The source worktree contains four modified first-party SHEFF submodules, so the 
 
 ## Run the first deterministic slice
 
-The current CLI is read-only: it fingerprints a deck, proves a byte-identical no-op round trip, indexes recognized top-level blocks and cluster commands, and reports conservative current-syntax diagnostics.
+The current CLI fingerprints a deck, proves a byte-identical no-op round trip, indexes recognized top-level blocks and cluster commands, and reports conservative current-syntax diagnostics. It can also create and apply a revision-bound minimal plan for an existing registered key/value parameter. Applying a plan never overwrites the source deck.
 
 From PowerShell in this repository:
 
@@ -61,6 +61,10 @@ $env:PYTHONPATH = "$PWD\src"
 python -m bsam_agent baseline
 python -m bsam_agent inspect "..\projects\notch_v1\notch_v1.in"
 python -m bsam_agent validate "..\projects\notch_v1\notch_v1.in"
+python -m bsam_agent plan-change "..\projects\notch_v1\notch_v1.in" `
+  --block BOUNDARY --construct CONVERGENCE `
+  --parameter d_reduction --value 0.30 --out change.json
+python -m bsam_agent apply-change change.json --out notch_v1.changed.in
 ```
 
-Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. This slice does not yet write edits or launch BSAM.
+Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Direct edits are currently limited to an existing, unambiguous key/value inside a registered nested construct; structural mesh or ply changes are not yet implemented. This slice does not yet launch BSAM.
