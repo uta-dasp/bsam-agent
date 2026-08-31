@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.1.0",
-  "registry_version": "0.3.0",
+  "registry_version": "0.3.1",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -79,6 +79,22 @@
       "line_start": 225,
       "line_end": 1170,
       "claim": "Contains the active first-five-character finite-element command dispatch and line-option handling."
+    },
+    {
+      "id": "evidence.fe-include-open",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 743,
+      "line_end": 766,
+      "claim": "Reads the last FILE option on *INCLUDE, increments the include unit, and prepends the original BSAM input directory when opening the target."
+    },
+    {
+      "id": "evidence.fe-include-unwind",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 1179,
+      "line_end": 1189,
+      "claim": "On included-file EOF, closes the current include unit and resumes the parent include or root FE stream."
     },
     {
       "id": "evidence.fe-core-records",
@@ -1122,18 +1138,18 @@
       "parent_block_id": "block.clusters",
       "canonical": "*INCLUDE",
       "dispatch_prefix": "*INCL",
-      "summary": "Reads additional FE cluster commands from a workspace-local include file.",
+      "summary": "Reads additional FE cluster commands from a nested include stack; every FILE target is resolved from the original BSAM input directory and EOF resumes the parent stream.",
       "coverage": "partially-documented",
       "parameters": [
         {
           "name": "FILE",
           "value_type": "path",
           "required": true,
-          "summary": "Names the include file resolved relative to BSAM's input directory behavior."
+          "summary": "Names an unquoted relative include file resolved against the original BSAM input directory, not the including file; the Agent additionally requires the resolved target to remain inside its configured workspace."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document nesting, cycle behavior, path quoting, return semantics, and source-preserving edit rules."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-include-open", "evidence.fe-include-unwind"],
+      "remaining_work": ["Controlled executable probes remain for cycle failure and non-canonical path spellings; source-preserving edits across included files are not yet supported."]
     },
     {
       "id": "command.shift",

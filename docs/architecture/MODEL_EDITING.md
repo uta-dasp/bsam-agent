@@ -57,8 +57,11 @@ This acceptance scenario applies to documented model patterns. “Correctly” d
 
 - No-op import/render is byte-identical for every file in the source set.
 - Plans are bound to a model revision and content digest.
+- Plans for decks with FE includes are bound to the digest of every source file; a change to any included file makes the plan stale.
 - Applying a stale plan fails without modifying files.
 - Unaffected source spans remain unchanged.
 - Identifiers are unique and all references resolve after a change.
 - Validation errors block rendering and execution.
 - Every applied operation produces a machine-readable audit record and human-readable diff.
+
+The current direct-edit slice patches only the root deck. If that deck has FE includes, the output deck must remain in the original BSAM input directory so unchanged relative include resolution is preserved. Copying or editing a complete source set is blocked until a multi-file change plan can preview and audit every destination file boundary.

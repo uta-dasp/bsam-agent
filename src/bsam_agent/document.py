@@ -46,6 +46,7 @@ class Diagnostic:
     message: str
     line: int | None = None
     replacement: str | None = None
+    source: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -57,6 +58,8 @@ class Diagnostic:
             result["line"] = self.line
         if self.replacement is not None:
             result["replacement"] = self.replacement
+        if self.source is not None:
+            result["source"] = self.source
         return result
 
 

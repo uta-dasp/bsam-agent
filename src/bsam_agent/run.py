@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .document import SourceDocument
 from .registry import load_registry
+from .source_set import SourceSet
 
 
 SUCCESS_SENTINEL = "----- END OF PROGRAM ------"
@@ -291,6 +291,7 @@ def run_bsam(
     executable: Path,
     timeout_seconds: float = 3600.0,
     stop_grace_seconds: float = 30.0,
+    workspace_root: Path | None = None,
 ) -> dict[str, Any]:
     registry = load_registry()
     deck = deck.resolve()
@@ -310,8 +311,9 @@ def run_bsam(
     if output_directory.exists():
         raise RunError(f"output directory already exists: {output_directory}")
 
-    document = SourceDocument.read(deck)
-    errors = [item for item in document.diagnostics() if item.severity == "error"]
+    source_set = SourceSet.read(deck, workspace_root)
+    document = source_set.documents[deck]
+    errors = [item for item in source_set.diagnostics() if item.severity == "error"]
     if errors:
         raise RunError("deck failed preflight: " + "; ".join(item.message for item in errors))
 
@@ -334,6 +336,11 @@ def run_bsam(
         "classification": "pending",
         "deck": str(deck),
         "deck_sha256": document.sha256,
+        "source_set_sha256": source_set.sha256,
+        "source_files": [
+            {"path": str(path), "sha256": source.sha256}
+            for path, source in source_set.documents.items()
+        ],
         "executable": str(executable),
         "executable_sha256": actual_executable_hash,
         "output_directory": str(output_directory),

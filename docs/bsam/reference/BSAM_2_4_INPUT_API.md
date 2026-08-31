@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.3.0`
-- Registry SHA-256: `8DB09FF923A181C1890A902A51CD5A42A4CA174E06D82DB98C871E93BBFA5264`
+- Registry version: `0.3.1`
+- Registry SHA-256: `AC23B4DDD7EABC293E5110E1C941CA51148A594C65FEAD1A2535582A75644FD6`
 - Current inventory: 13 top-level blocks, 29 cluster commands, and 12 nested constructs
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -287,7 +287,7 @@ The parser dispatches on the first five characters (the leading `*` plus four le
 | `*ORIENTATION` | `*ORIE` | documented | `NAME` | Defines nodal or elemental orientation data. |
 | `*BUILD` | `*BUIL` | identified | — | Forces intermediate construction of element information before cluster input ends. |
 | `*STOP` | `*STOP` | partially-documented | — | Finishes the current FE cluster reader after updating element data. |
-| `*INCLUDE` | `*INCL` | partially-documented | `FILE` | Reads additional FE cluster commands from a workspace-local include file. |
+| `*INCLUDE` | `*INCL` | partially-documented | `FILE` | Reads additional FE cluster commands from a nested include stack; every FILE target is resolved from the original BSAM input directory and EOF resumes the parent stream. |
 | `*SHIFT` | `*SHIF` | partially-documented | `ALL`, `NSET` | Translates all nodes or nodes in a named node set. |
 | `*SCALE` | `*SCAL` | partially-documented | `ALL`, `NSET` | Scales all nodes or nodes in a named node set. |
 | `*EXCLUSION` | `*EXCL` | partially-documented | `shape`, `side` | Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable. |
@@ -722,6 +722,10 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
 - `evidence.cluster-parser` — source: `source/libbsam/iap_ini.f90:119-295` — Requires CLUSTERS, accepts solid finite-element cluster type 100, and delegates each cluster to the FE reader.
 <a id="evidencefe-command-dispatch"></a>
 - `evidence.fe-command-dispatch` — source: `source/libbsam/mod_fe_input.f90:225-1170` — Contains the active first-five-character finite-element command dispatch and line-option handling.
+<a id="evidencefe-include-open"></a>
+- `evidence.fe-include-open` — source: `source/libbsam/mod_fe_input.f90:743-766` — Reads the last FILE option on *INCLUDE, increments the include unit, and prepends the original BSAM input directory when opening the target.
+<a id="evidencefe-include-unwind"></a>
+- `evidence.fe-include-unwind` — source: `source/libbsam/mod_fe_input.f90:1179-1189` — On included-file EOF, closes the current include unit and resumes the parent include or root FE stream.
 <a id="evidencefe-core-records"></a>
 - `evidence.fe-core-records` — source: `source/libbsam/mod_fe_input.f90:1556-2651` — Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination.
 <a id="evidencefe-integration-orientation"></a>

@@ -15,7 +15,7 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
-Registry version `0.3.0` records 13 active top-level blocks, 29 finite-element cluster command dispatches, 12 active nested BOUNDARY constructs, and 32 local evidence records. It defines structured bodies and dependencies for core FE commands plus BOUNDARY solver scheduling, connections, loading sequences, convergence controls, and output requests, and generates the [BSAM 2.4 current input API reference](reference/BSAM_2_4_INPUT_API.md). The baseline transition and reproducibility qualification are recorded in [the 2026-08-31 audit](BASELINE_AUDIT_2026-08-31.md).
+Registry version `0.3.1` records 13 active top-level blocks, 29 finite-element cluster command dispatches, 12 active nested BOUNDARY constructs, and 34 local evidence records. It defines structured bodies and dependencies for core FE commands plus BOUNDARY solver scheduling, connections, loading sequences, convergence controls, and output requests. The FE include reader uses a nested unit stack, prepends the original BSAM input directory for every FILE target, and resumes the parent stream at included-file EOF. The Agent preserves this source graph while additionally blocking cycles and workspace escapes. The registry generates the [BSAM 2.4 current input API reference](reference/BSAM_2_4_INPUT_API.md). The baseline transition and reproducibility qualification are recorded in [the 2026-08-31 audit](BASELINE_AUDIT_2026-08-31.md).
 
 This is an active-dispatch inventory, not completed G1 coverage. Records marked `identified` or `partially-documented` still require exact body grammar, types, defaults, dependencies, edit impacts, and tests.
 

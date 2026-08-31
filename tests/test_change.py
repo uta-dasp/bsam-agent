@@ -19,6 +19,7 @@ from bsam_agent.change import (
     review_plan,
     write_plan,
 )
+from bsam_agent.source_set import SourceSet
 
 
 DECK = (
@@ -184,6 +185,71 @@ class ChangePlanTests(unittest.TestCase):
             with self.assertRaisesRegex(ChangeError, "must be positive"):
                 apply_plan(plan_path, output)
             self.assertFalse(output.exists())
+
+    def test_plan_is_bound_to_includes_and_preserves_input_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            include = root / "mesh.inc"
+            plan_path = root / "change.json"
+            output = root / "model.changed.in"
+            source.write_bytes(DECK.replace(
+                b"*STOP\r\n",
+                b"*INCLUDE, FILE=mesh.inc\r\n*STOP\r\n",
+            ))
+            include.write_bytes(b"*NODE\r\n1, 0, 0, 0\r\n")
+            plan = plan_parameter_change(
+                source, "BOUNDARY", "CONVERGENCE", "d_reduction", "0.5"
+            )
+            self.assertIn("base_source_set_sha256", plan)
+            self.assertIn("proposed_source_set_sha256", plan)
+            write_plan(plan, plan_path)
+
+            legacy = dict(plan)
+            for field in (
+                "workspace_root",
+                "base_source_set_sha256",
+                "proposed_source_set_sha256",
+                "plan_digest",
+                "plan_id",
+            ):
+                legacy.pop(field, None)
+            legacy["schema_version"] = "1.1.0"
+            legacy_digest = _plan_digest(legacy)
+            legacy["plan_digest"] = legacy_digest
+            legacy["plan_id"] = legacy_digest[:16]
+            legacy_path = root / "legacy.json"
+            legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
+            with self.assertRaisesRegex(ChangeError, "legacy change plan"):
+                review_plan(legacy_path)
+
+            include.write_bytes(include.read_bytes() + b"** changed\r\n")
+            with self.assertRaisesRegex(ChangeError, "source set changed after planning"):
+                review_plan(plan_path)
+            with self.assertRaisesRegex(ChangeError, "source set changed after planning"):
+                apply_plan(plan_path, output)
+            self.assertFalse(output.exists())
+
+            include.write_bytes(b"*NODE\r\n1, 0, 0, 0\r\n")
+            outside_directory = root / "revision"
+            outside_directory.mkdir()
+            with self.assertRaisesRegex(ChangeError, "original input directory"):
+                apply_plan(plan_path, outside_directory / "model.changed.in")
+
+            result = apply_plan(plan_path, output)
+            self.assertEqual(
+                plan["proposed_source_set_sha256"],
+                result["output_source_set_sha256"],
+            )
+            self.assertEqual(
+                result["output_source_set_sha256"],
+                SourceSet.read(output).sha256,
+            )
+            audit = json.loads(Path(result["audit"]).read_text(encoding="utf-8"))
+            self.assertEqual(
+                result["output_source_set_sha256"],
+                audit["output_source_set_sha256"],
+            )
 
 
 if __name__ == "__main__":

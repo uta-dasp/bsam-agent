@@ -33,7 +33,7 @@ A machine-readable registry of blocks, commands, parameters, types, defaults, co
 
 A typed representation of analysis configuration, clusters, mesh entities, sets, materials, failure definitions, boundary/load data, solution controls, output requests, user functions, moisture, tables, statistical distributions, and cracks. Stable entity identities and dependency links allow coordinated changes rather than fragile line edits.
 
-An imported deck also retains a concrete syntax tree and source-file/include graph. This preserves source location, whitespace, comments, ordering, spelling, and unknown text. New generation uses current canonical names only.
+An imported deck also retains a concrete syntax tree and source-file/include graph. The initial implementation recursively indexes FE `*INCLUDE` files, binds every file into one source-set digest, preserves each file's original bytes and line endings, and blocks missing targets, cycles, unsupported path forms, and workspace escapes. BSAM resolves nested includes from the original input directory rather than the including file's directory. This representation preserves source location, whitespace, comments, ordering, spelling, unknown text, and file boundaries. New generation uses current canonical names only.
 
 ### Parser and importer
 

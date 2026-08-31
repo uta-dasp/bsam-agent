@@ -201,6 +201,8 @@ class RunSupervisorTests(unittest.TestCase):
                 result = run_bsam(deck, output, executable, timeout_seconds=10)
 
             self.assertEqual("stopped", result["classification"])
+            self.assertEqual(64, len(result["source_set_sha256"]))
+            self.assertEqual(1, len(result["source_files"]))
             self.assertEqual("user", result["stop_reason"])
             self.assertFalse(result["timed_out"])
             self.assertFalse(result["stop_escalated"])
@@ -283,6 +285,26 @@ class RunSupervisorTests(unittest.TestCase):
             executable.write_bytes(b"not the pinned executable")
             with self.assertRaisesRegex(RunError, "fingerprint mismatch"):
                 run_bsam(deck, output, executable)
+            self.assertFalse(output.exists())
+
+    def test_missing_include_blocks_run_before_output_directory_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deck = root / "model.in"
+            executable = root / "bsam20.exe"
+            output = root / "output"
+            deck.write_bytes(RUNNABLE_DECK.replace(
+                b"*STOP\n",
+                b"*INCLUDE, FILE=missing.inc\n*STOP\n",
+            ))
+            executable.write_bytes(b"fake")
+            registry = {"target": {"executable_sha256": "A" * 64}}
+            with (
+                patch("bsam_agent.run.load_registry", return_value=registry),
+                patch("bsam_agent.run._sha256", return_value="A" * 64),
+            ):
+                with self.assertRaisesRegex(RunError, "include target was not found"):
+                    run_bsam(deck, output, executable)
             self.assertFalse(output.exists())
 
 

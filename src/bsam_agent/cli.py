@@ -9,16 +9,15 @@ from typing import Sequence
 
 from . import __version__
 from .change import ChangeError, apply_plan, plan_parameter_change, review_plan, write_plan
-from .document import SourceDocument
 from .registry import load_registry
 from .run import RunError, request_run_stop, run_bsam, run_status
+from .source_set import SourceSet
 
 
-def _document(path_text: str) -> SourceDocument:
+def _source_set(path_text: str, workspace_root: str | None = None) -> SourceSet:
     path = Path(path_text)
-    if not path.is_file():
-        raise FileNotFoundError(f"input deck not found: {path}")
-    return SourceDocument.read(path)
+    boundary = Path(workspace_root) if workspace_root else None
+    return SourceSet.read(path, boundary)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,10 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="inspect a deck without changing it")
     inspect_parser.add_argument("deck")
     inspect_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
+    inspect_parser.add_argument("--workspace-root", help="contain the root deck and all include targets")
 
     validate_parser = subparsers.add_parser("validate", help="run conservative current-syntax validation")
     validate_parser.add_argument("deck")
     validate_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
+    validate_parser.add_argument("--workspace-root", help="contain the root deck and all include targets")
 
     plan_parser = subparsers.add_parser("plan-change", help="plan a minimal edit to an existing key/value")
     plan_parser.add_argument("deck")
@@ -41,6 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument("--parameter", required=True)
     plan_parser.add_argument("--value", required=True)
     plan_parser.add_argument("--occurrence", type=int, default=1)
+    plan_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
     plan_parser.add_argument("--out", required=True, help="new JSON plan path")
 
     apply_parser = subparsers.add_parser("apply-change", help="apply a revision-bound plan to a new deck")
@@ -58,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--executable", default=str(Path(__file__).resolve().parents[3] / "projects" / "bsam20.exe"))
     run_parser.add_argument("--timeout", type=float, default=3600.0, help="seconds before requesting a controlled stop; <=0 disables")
     run_parser.add_argument("--stop-grace", type=float, default=30.0, help="seconds to wait after a controlled stop request")
+    run_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
 
     status_parser = subparsers.add_parser("status", help="read the durable status of one isolated run")
     status_parser.add_argument("output_dir")
@@ -84,7 +87,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.command == "plan-change":
             plan = plan_parameter_change(
-                Path(args.deck), args.block, args.construct, args.parameter, args.value, args.occurrence
+                Path(args.deck),
+                args.block,
+                args.construct,
+                args.parameter,
+                args.value,
+                args.occurrence,
+                Path(args.workspace_root) if args.workspace_root else None,
             )
             write_plan(plan, Path(args.out))
             _print_json(plan)
@@ -98,7 +107,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "run":
             result = run_bsam(
-                Path(args.deck), Path(args.output_dir), Path(args.executable), args.timeout, args.stop_grace
+                Path(args.deck),
+                Path(args.output_dir),
+                Path(args.executable),
+                args.timeout,
+                args.stop_grace,
+                Path(args.workspace_root) if args.workspace_root else None,
             )
             _print_json(result)
             return 0 if result["classification"] == "succeeded" else 3
@@ -109,8 +123,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json(request_run_stop(Path(args.output_dir)))
             return 0
 
-        document = _document(args.deck)
-        inspection = document.inspection()
+        source_set = _source_set(args.deck, args.workspace_root)
+        inspection = source_set.inspection()
         if args.command == "inspect":
             _print_json(inspection, args.compact)
             return 0
@@ -118,6 +132,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = {
                 "source": inspection["source"],
                 "sha256": inspection["sha256"],
+                "source_set_sha256": inspection["source_set_sha256"],
                 "diagnostics": inspection["diagnostics"],
                 "summary": inspection["summary"],
             }

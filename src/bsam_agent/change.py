@@ -11,10 +11,11 @@ from typing import Any
 
 from .document import SourceDocument, SourceLine
 from .registry import load_registry
+from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.1.0"
-SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", PLAN_SCHEMA_VERSION}
+PLAN_SCHEMA_VERSION = "1.2.0"
+SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", "1.1.0", PLAN_SCHEMA_VERSION}
 AUDIT_SCHEMA_VERSION = "1.0.0"
 
 
@@ -189,9 +190,12 @@ def plan_parameter_change(
     parameter: str,
     value: str,
     occurrence: int = 1,
+    workspace_root: Path | None = None,
 ) -> dict[str, Any]:
     _validate_raw_value(value)
-    document = SourceDocument.read(source)
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    document = source_set.documents[source]
     construct = _construct_record(block, construct_name)
     _validate_replacement(construct, parameter, value)
     start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
@@ -228,8 +232,11 @@ def plan_parameter_change(
     plan: dict[str, Any] = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "source": str(source.resolve()),
+        "workspace_root": str(source_set.workspace_root),
         "base_sha256": document.sha256,
+        "base_source_set_sha256": source_set.sha256,
         "proposed_sha256": updated_document.sha256,
+        "proposed_source_set_sha256": source_set.digest_with({source: updated}),
         "operation": "set-existing-parameter",
         "selector": {
             "block": block.upper(),
@@ -354,22 +361,45 @@ def _validated_plan_proposal(
     return updated, updated_document, model_path, source_diff, validation
 
 
+def _source_set_for_plan(plan: dict[str, Any], source: Path) -> SourceSet:
+    workspace = plan.get("workspace_root")
+    boundary = Path(workspace) if isinstance(workspace, str) else None
+    source_set = SourceSet.read(source, boundary)
+    document = source_set.documents[source.resolve()]
+    if document.sha256 != plan["base_sha256"]:
+        raise ChangeError("source changed after planning; create a new change plan")
+    expected = plan.get("base_source_set_sha256")
+    if expected is None and len(source_set.documents) > 1:
+        raise ChangeError(
+            "legacy change plan is not bound to the include source set; create a new change plan"
+        )
+    if expected is not None and source_set.sha256 != expected:
+        raise ChangeError("source set changed after planning; create a new change plan")
+    return source_set
+
+
 def review_plan(path: Path) -> dict[str, Any]:
     """Return review data only after revalidating the plan and source revision."""
     plan = load_plan(path)
     source = Path(plan["source"])
-    document = SourceDocument.read(source)
+    source_set = _source_set_for_plan(plan, source)
+    document = source_set.documents[source.resolve()]
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
     _, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
         plan, source, document
     )
+    proposed_source_set_sha256 = source_set.digest_with({source.resolve(): updated_document.raw})
+    if plan.get("proposed_source_set_sha256") not in {None, proposed_source_set_sha256}:
+        raise ChangeError("change plan proposed source-set digest is invalid")
     return {
         "plan_id": plan["plan_id"],
         "plan_digest": plan["plan_digest"],
         "source": str(source.resolve()),
         "base_sha256": document.sha256,
         "proposed_sha256": updated_document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "proposed_source_set_sha256": proposed_source_set_sha256,
         "changed_model_paths": [model_path],
         "affected_files": plan.get("affected_files", [str(source.resolve())]),
         "changes": plan.get("changes", [{
@@ -402,13 +432,22 @@ def apply_plan(
         raise ChangeError(f"audit destination already exists: {audit_destination}")
     if audit_destination.resolve() == destination.resolve():
         raise ChangeError("audit destination must be separate from the output deck")
-    document = SourceDocument.read(source)
+    source_set = _source_set_for_plan(plan, source)
+    if len(source_set.documents) > 1 and destination.resolve().parent != source.resolve().parent:
+        raise ChangeError(
+            "a deck with include files must be written in its original input directory; "
+            "source-set copying is not implemented"
+        )
+    document = source_set.documents[source.resolve()]
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
     patch = plan["patch"]
     updated, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
         plan, source, document
     )
+    output_source_set_sha256 = source_set.digest_with({source.resolve(): updated})
+    if plan.get("proposed_source_set_sha256") not in {None, output_source_set_sha256}:
+        raise ChangeError("updated source set does not match the plan's proposed digest")
 
     registry = load_registry()
     audit: dict[str, Any] = {
@@ -424,6 +463,8 @@ def apply_plan(
         "destination": str(destination.resolve()),
         "base_sha256": document.sha256,
         "output_sha256": updated_document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "output_source_set_sha256": output_source_set_sha256,
         "changed_model_paths": [model_path],
         "affected_files": [str(destination.resolve())],
         "source_diff": source_diff,
@@ -449,6 +490,8 @@ def apply_plan(
         "destination": str(destination.resolve()),
         "base_sha256": document.sha256,
         "output_sha256": updated_document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "output_source_set_sha256": output_source_set_sha256,
         "changed_model_paths": audit["changed_model_paths"],
         "changed_line": patch["line"],
         "validation": validation,

@@ -18,7 +18,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(13, counts["blocks"])
         self.assertEqual(29, counts["commands"])
         self.assertEqual(12, counts["constructs"])
-        self.assertGreaterEqual(counts["evidence"], 32)
+        self.assertEqual(34, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]

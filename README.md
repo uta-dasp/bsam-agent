@@ -52,7 +52,7 @@ The source worktree contains four modified first-party SHEFF submodules, so the 
 
 ## Run the first deterministic slice
 
-The current CLI fingerprints a deck, proves a byte-identical no-op round trip, indexes recognized top-level blocks and cluster commands, and reports conservative current-syntax diagnostics. It can also create, review, and apply a revision-bound minimal plan for an existing registered key/value parameter. Applying a plan never overwrites the source deck and creates a digest-bound audit JSON sidecar without overwriting an existing audit.
+The current CLI fingerprints a deck and its finite-element include source set, proves a byte-identical no-op round trip for every file, indexes recognized top-level blocks and cluster commands, and reports conservative current-syntax and include-graph diagnostics. It can also create, review, and apply a revision-bound minimal plan for an existing registered key/value parameter in the root deck. Applying a plan never overwrites the source deck and creates a digest-bound audit JSON sidecar without overwriting an existing audit.
 
 From PowerShell in this repository:
 
@@ -74,6 +74,8 @@ python -m bsam_agent stop runs\notch-v1-run
 ```
 
 Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Direct edits are currently limited to an existing, unambiguous key/value inside a registered nested construct; structural mesh or ply changes are not yet implemented.
+
+`inspect`, `validate`, `plan-change`, and `run` recursively load `*INCLUDE, FILE=...` commands from CLUSTERS and included FE fragments. Nested targets follow BSAM behavior and resolve from the original deck's input directory, not from the including file. Missing files, malformed or quoted paths, include cycles, and targets outside the configured workspace are blocking diagnostics. The default workspace is the deck directory; `--workspace-root` can explicitly select a broader local boundary. Every imported file retains its own digest, bytes, line endings, and file boundary. New change plans are bound to the complete source-set digest and become stale if any included file changes. Because source-set copying is not implemented, applying a root-deck edit with includes currently requires the new deck to remain in the original input directory.
 
 `diff` revalidates the plan digest and source revision before returning the semantic target, proposed output digest, validation result, and unified source diff. `apply-change` writes `<output>.audit.json` by default; `--audit-out` selects another new path. The audit binds the plan and output digests, changed model paths, validation result, source diff, and registered BSAM baseline. Its null run directory explicitly means the edit has not yet been linked to an execution.
 

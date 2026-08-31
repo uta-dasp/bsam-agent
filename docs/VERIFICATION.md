@@ -2,7 +2,7 @@
 
 ## What is runnable now
 
-The deterministic CLI is runnable now. It supports baseline inspection, lossless deck inspection, conservative validation, revision-bound minimal edits to existing registered nested parameters, fresh-plan diff review, non-overwriting applied-change audit sidecars, isolated execution, concurrent run status, and controlled stopping. The local HTTP API, general semantic model, structural transformations, mesh import/generation, and model adapters are not implemented yet.
+The deterministic CLI is runnable now. It supports baseline inspection, lossless root/include source-set inspection, conservative syntax and include-graph validation, revision-bound minimal edits to existing registered nested parameters in the root deck, fresh-plan diff review, non-overwriting applied-change audit sidecars, isolated execution, concurrent run status, and controlled stopping. The local HTTP API, general semantic model, structural transformations, mesh import/generation, included-file editing, and model adapters are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
@@ -13,7 +13,7 @@ python -m bsam_agent validate ..\projects\notch_v1\notch_v1.in
 python -m unittest discover -s tests -v
 ```
 
-The tests protect the pinned baseline, registry generation, byte-identical no-op rendering, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, semantic/unified diff review, no-in-place and no-audit-overwrite policies, audit/output digest binding, executable fingerprint rejection, run classification, atomic status reads, process-liveness reporting, and controlled idempotent stop requests.
+The tests protect the pinned baseline, registry generation, byte-identical multi-file no-op rendering, original-input-directory nested include resolution, file-boundary and mixed-line-ending retention, cycle/missing/path/workspace diagnostics, include-aware run preflight, source-set-bound plan staleness and output-directory restrictions, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, semantic/unified diff review, no-in-place and no-audit-overwrite policies, audit/output digest binding, executable fingerprint rejection, run classification, atomic status reads, process-liveness reporting, and controlled idempotent stop requests.
 
 ## Execution smoke evidence
 
