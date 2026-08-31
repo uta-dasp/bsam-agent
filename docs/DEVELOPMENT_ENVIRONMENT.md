@@ -2,6 +2,8 @@
 
 Observed on 2026-08-27.
 
+BSAM baseline re-audited on 2026-08-31: source `9954027f1c325c63d58aeb836e8fec41a4b363af`; executable SHA-256 `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`; executable build timestamp 2026-08-27 20:34:14. Four first-party SHEFF submodule worktrees were locally modified, so the executable hash—not the superproject commit alone—is the authoritative compiled-artifact identity. See [the baseline audit](bsam/BASELINE_AUDIT_2026-08-31.md).
+
 ## Machine
 
 - Windows Server 2022 Standard, x64

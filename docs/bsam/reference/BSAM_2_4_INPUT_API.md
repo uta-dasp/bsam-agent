@@ -5,12 +5,12 @@
 ## Baseline
 
 - Product: BSAM 2.4
-- Source commit: `7e414be55abae10e2a648bd39bcc07b4904e9edc`
-- Executable SHA-256: `580B7AF434BF4F453B8137802246FEB292DD89A04FDB3DD54000EC9A225E146F`
+- Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
+- Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.2.0`
-- Registry SHA-256: `5A1EBE46FBC16F0D23E0ECD772410B6AE2C025D2CF5B484D241A06E24104D904`
-- Current inventory: 13 top-level blocks, 29 cluster commands, and 11 nested constructs
+- Registry version: `0.3.0`
+- Registry SHA-256: `8DB09FF923A181C1890A902A51CD5A42A4CA174E06D82DB98C871E93BBFA5264`
+- Current inventory: 13 top-level blocks, 29 cluster commands, and 12 nested constructs
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
 
@@ -19,18 +19,18 @@ Coverage labels describe specification work, not parser availability. `identifie
 | Token | Required | Match rule | Parser | Coverage | Purpose |
 |---|---:|---|---|---|---|
 | `INPUT` | yes | special-input-scan | `INP_INI` | partially-documented | Selects the current non-sequential block input mode; the pinned executable requires type 3. |
-| `SOLVER` | no | first-three | `SOLVE_INI` | partially-documented | Selects the linear solver and solver-specific options; defaults to serial PARDISO when absent. |
-| `UFUNCTIONS` | no | first-three | `UFUNCTION_INI` | identified | Defines named user functions parsed as *end-delimited entries. |
-| `MOISTURE` | no | first-three | `MOI_INI` | partially-documented | Configures optional coupling to the external moisture simulation workflow. |
-| `CLUSTERS` | yes | exact | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
-| `BOUNDARY` | yes | first-three | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
-| `CONSTITUTIVE` | yes | first-three | `CON_INI` | identified | Defines constitutive law records that reference material and failure definitions. |
-| `TABLES` | no | first-three | `TABLE_INI / table initializer` | identified | Defines named lookup tables used by material data. |
-| `STATISTICAL DISTRIBUTIONS` | no | first-three | `STAT_DIST_INI / statistical distribution initializer` | identified | Defines named statistical distributions that modify material data. |
-| `MATERIALS` | yes | exact | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
-| `FAILURE` | no | first-three | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
-| `USER` | no | first-three | `USF_INI` | identified | Defines numeric user-function records, including polynomial and discrete forms. |
-| `CRACK` | no | first-three | `CRK_INI` | identified | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
+| `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | partially-documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
+| `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | identified | Defines named user functions parsed as *end-delimited entries. |
+| `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | partially-documented | Configures optional coupling to the external moisture simulation workflow. |
+| `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
+| `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
+| `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | identified | Defines constitutive law records that reference material and failure definitions. |
+| `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | identified | Defines named lookup tables used by material data. |
+| `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | identified | Defines named statistical distributions that modify material data. |
+| `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
+| `FAILURE` | no | exact-case-sensitive | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
+| `USER` | no | exact-case-sensitive | `USF_INI` | identified | Defines numeric user-function records, including polynomial and discrete forms. |
+| `CRACK` | no | exact-case-sensitive | `CRK_INI` | identified | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
 
 ## Block details
 
@@ -55,10 +55,10 @@ Remaining specification work:
 
 ### `SOLVER`
 
-Selects the linear solver and solver-specific options; defaults to serial PARDISO when absent.
+Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent.
 
 - Registry ID: `block.solver`
-- Lookup token/matcher: `SOLVE` / first-three
+- Lookup token/matcher: `SOLVER` / exact-case-sensitive
 - Required: no
 - Termination: `END SOLVER` (canonical)
 - Coverage: partially-documented
@@ -79,7 +79,6 @@ Known parameters:
 
 Remaining specification work:
 
-- Resolve documentation/parser naming conflict between pc and preconditioner.
 - Document SHEFF value enums and defaults from downstream code.
 - Classify the numeric legacy solver format as diagnostics-only.
 
@@ -88,7 +87,7 @@ Remaining specification work:
 Defines named user functions parsed as *end-delimited entries.
 
 - Registry ID: `block.ufunctions`
-- Lookup token/matcher: `UFUNCTIONS` / first-three
+- Lookup token/matcher: `UFUNCTIONS` / exact-case-sensitive
 - Required: no
 - Termination: `END UFUNCTIONS` (canonical)
 - Coverage: identified
@@ -103,7 +102,7 @@ Remaining specification work:
 Configures optional coupling to the external moisture simulation workflow.
 
 - Registry ID: `block.moisture`
-- Lookup token/matcher: `MOISTURE` / first-three
+- Lookup token/matcher: `MOISTURE` / exact-case-sensitive
 - Required: no
 - Termination: `END MOISTURE` (canonical)
 - Coverage: partially-documented
@@ -127,7 +126,7 @@ Remaining specification work:
 Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls.
 
 - Registry ID: `block.clusters`
-- Lookup token/matcher: `CLUSTERS` / exact
+- Lookup token/matcher: `CLUSTERS` / exact-case-sensitive
 - Required: yes
 - Termination: `*STOP per cluster`, `END CLUSTERS` (canonical)
 - Coverage: partially-documented
@@ -144,7 +143,7 @@ Remaining specification work:
 Defines boundary problems, loads, connections, convergence, stepping, and output controls.
 
 - Registry ID: `block.boundary`
-- Lookup token/matcher: `BOUNDARY` / first-three
+- Lookup token/matcher: `BOUNDARY` / exact-case-sensitive
 - Required: yes
 - Termination: `END BOUNDARY` (accepted-current)
 - Coverage: partially-documented
@@ -160,7 +159,7 @@ Remaining specification work:
 Defines constitutive law records that reference material and failure definitions.
 
 - Registry ID: `block.constitutive`
-- Lookup token/matcher: `CONSTITUTIVE` / first-three
+- Lookup token/matcher: `CONSTITUTIVE` / exact-case-sensitive
 - Required: yes
 - Termination: `END CONSTITUTIVE` (accepted-current)
 - Coverage: identified
@@ -175,7 +174,7 @@ Remaining specification work:
 Defines named lookup tables used by material data.
 
 - Registry ID: `block.tables`
-- Lookup token/matcher: `TABLES` / first-three
+- Lookup token/matcher: `TABLES` / exact-case-sensitive
 - Required: no
 - Termination: `*end per table`, `END TABLES` (canonical)
 - Coverage: identified
@@ -185,12 +184,12 @@ Remaining specification work:
 
 - Document table headers, axes, dimensions, interpolation rules, and material references.
 
-### `STATISTICAL DISTRIBUTIONS`
+### `STATISTICAL`
 
 Defines named statistical distributions that modify material data.
 
 - Registry ID: `block.statistical-distributions`
-- Lookup token/matcher: `STATISTICAL DISTRIBUTIONS` / first-three
+- Lookup token/matcher: `STATISTICAL` / exact-case-sensitive
 - Required: no
 - Termination: `*end per distribution`, `END STATISTICAL DISTRIBUTIONS` (canonical)
 - Coverage: identified
@@ -205,7 +204,7 @@ Remaining specification work:
 Defines bulk and interface material records, including current structured material forms.
 
 - Registry ID: `block.materials`
-- Lookup token/matcher: `MATERIALS` / exact
+- Lookup token/matcher: `MATERIALS` / exact-case-sensitive
 - Required: yes
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
 - Coverage: identified
@@ -222,7 +221,7 @@ Remaining specification work:
 Defines failure criterion records referenced by constitutive laws and damage behavior.
 
 - Registry ID: `block.failure`
-- Lookup token/matcher: `FAILURE` / first-three
+- Lookup token/matcher: `FAILURE` / exact-case-sensitive
 - Required: no
 - Termination: `END FAILURE` (accepted-current)
 - Coverage: identified
@@ -237,7 +236,7 @@ Remaining specification work:
 Defines numeric user-function records, including polynomial and discrete forms.
 
 - Registry ID: `block.user`
-- Lookup token/matcher: `USER` / first-three
+- Lookup token/matcher: `USER` / exact-case-sensitive
 - Required: no
 - Termination: `END USER` (accepted-current)
 - Coverage: identified
@@ -252,7 +251,7 @@ Remaining specification work:
 Defines global finite-element crack insertion controls for crack types 101, 201, and 301.
 
 - Registry ID: `block.crack`
-- Lookup token/matcher: `CRACK` / first-three
+- Lookup token/matcher: `CRACK` / exact-case-sensitive
 - Required: no
 - Termination: `END CRACK` (accepted-current)
 - Coverage: identified
@@ -270,7 +269,7 @@ The parser dispatches on the first five characters (the leading `*` plus four le
 |---|---|---|---|---|
 | `*TYPE` | `*TYPE` | partially-documented | — | Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters. |
 | `*DIMENSIONS` | `*DIME` | documented | — | Allocates cluster dimensions before mesh entities are read. |
-| `*NAME` | `*NAME` | identified | — | Assigns a name to the current cluster. |
+| `*NAME` | `*NAME` | partially-documented | `name` | Assigns a name to the current cluster. |
 | `*CONSTITUTIVE` | `*CONS` | identified | — | Assigns the constitutive record used by the current cluster. |
 | `*NODE` | `*NODE` | documented | `NSET` | Reads explicit node labels and coordinates, optionally adding them to a node set. |
 | `*NGEN` | `*NGEN` | partially-documented | `NSET`, `BIAS`, `ARC` | Generates nodes from compact generation records. |
@@ -307,6 +306,14 @@ Termination: fixed-count. Dependencies: Capacities must cover all entities produ
 - **capacities** (always):
   - `dimensions` [once]: `node_capacity`:integer, `element_capacity`:integer, `selection_count`:integer, `section_capacity`:integer
   - Constraint: Must precede commands that populate the allocated cluster arrays.
+
+### `*NAME` body
+
+Termination: next-command. Dependencies: Every cluster-qualified set reference uses the normalized lowercase cluster name.
+
+- **cluster-name** (*NAME is dispatched):
+  - `name` [once]: `name`:string
+  - Constraint: The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.
 
 ### `*NODE` body
 
@@ -382,14 +389,306 @@ Termination: next-command-or-eof. Dependencies: ELSET must name an existing elem
 | `block.boundary` | `*TYPE` | `*type` | problem-start | partially-documented | Starts a boundary problem and selects mechanical, thermal, or contact dispatch. |
 | `block.boundary` | `*G-CONTROL` | `*g-co` | keyword | partially-documented | Configures damage-increment control, update, damping, iteration, and exit thresholds. |
 | `block.boundary` | `*GEO_NL` | `*geo_` | keyword | documented | Enables geometric nonlinearity for the current mechanical or thermal problem. |
+| `block.boundary` | `*SOLVER` | `*solv` | keyword | documented | Selects how declared solver IDs are assigned to nonlinear iterations for the current boundary problem. |
 | `block.boundary` | `*NAME` | `*name` | keyword | documented | Sets the current boundary-problem name from the following record. |
 | `block.boundary` | `*STATUS` | `*stat` | keyword | partially-documented | Selects restart/new-run handling for the current boundary problem. |
 | `block.boundary` | `*CLUSTERS` | `*clus` | record-group | partially-documented | Restricts the boundary problem to a list of existing cluster names. |
 | `block.boundary` | `*BOUNDARY CONDITION` | `*boun` | record-group | partially-documented | Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets. |
-| `block.boundary` | `*CONNECTIONS` | `*conn` | record-group | identified | Defines penalty and nodal connections between cluster selections. |
+| `block.boundary` | `*CONNECTIONS` | `*conn` | record-group | partially-documented | Defines penalty, nodal, and surface-contact connections between cluster selections. |
 | `block.boundary` | `*LOADING SEQUENCE` | `*load` | record-group | partially-documented | Defines load-step histories, cyclic controls, and optional repeated fatigue blocks. |
 | `block.boundary` | `*CONVERGENCE` | `*conv` | record-group | partially-documented | Configures nonlinear convergence, time-step, iteration, and reattempt controls. |
 | `block.boundary` | `*OUTPUT` | `*outp` | record-group | partially-documented | Defines output types and their target, coordinate-system, and intermediate-output options. |
+
+## Nested construct details
+
+### `*TYPE`
+
+Starts a boundary problem and selects mechanical, thermal, or contact dispatch.
+
+- Registry ID: `construct.boundary-type`
+- Match prefix: `*type`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `problem_type` (enum-record, required): The following cleaned record is matched by its first four characters.
+
+Remaining specification work:
+
+- Document the contact branch and the thermal temperature record in full.
+
+### `*G-CONTROL`
+
+Configures damage-increment control, update, damping, iteration, and exit thresholds.
+
+- Registry ID: `construct.boundary-g-control`
+- Match prefix: `*g-co`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
+
+Remaining specification work:
+
+- Record each option spelling, type, default, mutual dependency, and safe range.
+
+### `*GEO_NL`
+
+Enables geometric nonlinearity for the current mechanical or thermal problem.
+
+- Registry ID: `construct.boundary-geometric-nonlinearity`
+- Match prefix: `*geo_`
+- Coverage: documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
+
+### `*SOLVER`
+
+Selects how declared solver IDs are assigned to nonlinear iterations for the current boundary problem.
+
+- Registry ID: `construct.boundary-solver-schedule`
+- Match prefix: `*solv`
+- Coverage: documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.solver-parser](#evidencesolver-parser)
+
+Known parameters:
+
+- `schedule` (enum-record, required): Schedule 1 always uses solver 1; schedule 2 uses solver 1 at iteration 0 and solver 2 afterward.
+
+### `*NAME`
+
+Sets the current boundary-problem name from the following record.
+
+- Registry ID: `construct.boundary-name`
+- Match prefix: `*name`
+- Coverage: documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `name` (string-record, required): Boundary problem name; defaults to boundname plus the problem index when absent.
+
+Remaining specification work:
+
+- Confirm length, character, and uniqueness constraints.
+
+### `*STATUS`
+
+Selects restart/new-run handling for the current boundary problem.
+
+- Registry ID: `construct.boundary-status`
+- Match prefix: `*stat`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `status` (string-record, optional): The parser recognizes restart by first-four-character matching and treats no as a new run.
+
+Remaining specification work:
+
+- Resolve all accepted status strings and the default branch behavior.
+
+### `*CLUSTERS`
+
+Restricts the boundary problem to a list of existing cluster names.
+
+- Registry ID: `construct.boundary-clusters`
+- Match prefix: `*clus`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
+
+Remaining specification work:
+
+- Document list matching, wildcard behavior, defaults, and duplicate selection.
+
+### `*BOUNDARY CONDITION`
+
+Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets.
+
+- Registry ID: `construct.boundary-conditions`
+- Match prefix: `*boun`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `type` (enum, required): Boundary-condition action matched by a short prefix.
+- `component` (component, required): Degree-of-freedom/component converted by component2id.
+- `name` (string, required): Name of the boundary condition.
+- `value` (real, required): Boundary-condition magnitude.
+- `nset` (cluster-name.node-set-name, optional): Existing node set qualified by its cluster name.
+- `global` (input-relative-path, optional): Loads global/local nodal coordinates, displacements, and forces from a local auxiliary file.
+
+Remaining specification work:
+
+- Document component values and exact per-type required-field rules.
+- Add safe auxiliary-file path validation before implementing global-file edits.
+
+### `*CONNECTIONS`
+
+Defines penalty, nodal, and surface-contact connections between cluster selections.
+
+- Registry ID: `construct.boundary-connections`
+- Match prefix: `*conn`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-connections](#evidenceboundary-connections), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `type` (enum, required): Selects a penalty, nodal, or surface-contact connection.
+- `name` (string, optional): Connection name; defaults to connection plus its one-based index.
+- `tolerance` (positive-real, optional): Penalty-connection search tolerance.
+- `search` (enum, optional): Penalty search implementation.
+- `component` (component, optional): Nodal-connection component selection.
+
+Remaining specification work:
+
+- Establish the engineering distinction between penalty types -2 and -21 and verify SHEFF search behavior.
+
+### `*CONNECTIONS` body
+
+Termination: next-command. Dependencies: Referenced clusters must be selected by the boundary problem.; All node sets and material/constitutive/failure IDs must already exist.; Ply or mesh changes must revalidate both sides of every connection.
+
+- **penalty** (type is -2 or -21):
+  - `header` [once]: `type`:enum(-2,-21), `name`:string, `tolerance`:positive-real, `search`:enum(vtms,sheff)
+  - `set-assignment` [repeated]: `mset`:cluster-name.node-set-name, `sset`:cluster-name.node-set-name, `material`:material-id, `constitutive`:constitutive-id, `failure`:failure-id
+  - `last` [once]: `last`:none-or-cluster-name-list
+  - Constraint: At least one set-assignment row is required before last.
+  - Constraint: Each referenced set must be qualified by an existing cluster name.
+  - Constraint: The last record is the structural sentinel for a penalty connection.
+- **nodal** (type is nodal):
+  - `header` [once]: `type`:const(nodal), `name`:string, `component`:component
+  - `master-sets` [once]: `mset`:selector(all|list)
+  - `slave-sets` [once]: `sset`:selector(all|list)
+  - Constraint: Exactly two subordinate selector rows are consumed: master first and slave second.
+  - Constraint: Both selectors must resolve at least one node set.
+- **surface-contact** (type begins surf):
+  - `header` [once]: `type`:const(surface), `name`:string, `tolerance`:positive-real, `search`:const(sheff)
+  - `contact-pair` [one-or-more-until-next-type]: `mset`:cluster-name.node-set-name, `sset`:cluster-name.node-set-name, `material`:material-id, `constitutive`:constitutive-id, `failure`:failure-id
+  - Constraint: At least one contact-pair row is required.
+  - Constraint: The next row containing a type key starts the next connection; surface contact does not use a last sentinel.
+
+### `*LOADING SEQUENCE`
+
+Defines load-step histories, cyclic controls, and optional repeated fatigue blocks.
+
+- Registry ID: `construct.boundary-loading-sequence`
+- Match prefix: `*load`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-loading](#evidenceboundary-loading), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `type` (enum, required): Selects the load history family by first-four-character matching.
+- `nstep` (positive-integer, required): Number of analysis steps; the parser rejects a load header without it.
+- `name` (string, optional): Name assigned to this load segment.
+- `incr` (real, optional): Load increment for static or fatigue segments.
+- `block` (positive-integer, optional): Marks the start/end of a repeated load block and its repetition count.
+
+Remaining specification work:
+
+- Runtime-verify fatigue, 2D-fatigue, reduced-fatigue, and repeated-block examples and establish defaults/ranges for cyclic values.
+
+### `*LOADING SEQUENCE` body
+
+Termination: next-command. Dependencies: Change records reference names created in BOUNDARY CONDITION.; Step ranges are accumulated in declaration order.; Boundary-condition deletion or renaming must update every load change reference.
+
+- **static-segment** (type begins stat):
+  - `load-header` [once]: `type`:const(static), `name`:string, `nstep`:positive-integer, `incr`:real, `block`:positive-integer
+  - `change` [repeated]: `change`:boundary-condition-name, `type`:enum(displacement,stretch,force,off), `value`:real
+  - Constraint: Change records continue until the next row containing nstep or the next command.
+  - Constraint: Every change target must name an existing boundary condition.
+- **fatigue-segment** (type begins fati, 2dfa, or redu):
+  - `load-header` [once]: `type`:enum(fatigue,2dfatigue,reduced_fatigue), `name`:string, `nstep`:positive-integer, `maxcycle`:integer, `mincycle`:integer, `R`:real, `incr`:real, `inicycle`:integer, `block`:positive-integer
+  - `change` [repeated]: `change`:boundary-condition-name, `type`:enum(displacement,stretch,force,off), `value`:real, `maxcycle`:integer, `mincycle`:integer, `R`:real
+  - Constraint: A load header supports at most nine key/value pairs.
+  - Constraint: Repeated blocks duplicate the enclosed segment sequence and derive suffixed names.
+
+### `*CONVERGENCE`
+
+Configures nonlinear convergence, time-step, iteration, and reattempt controls.
+
+- Registry ID: `construct.boundary-convergence`
+- Match prefix: `*conv`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-convergence](#evidenceboundary-convergence), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `relative` (positive-real, optional): Relative convergence tolerance; may share a row with absolute and divergence.
+- `absolute` (positive-real, optional): Absolute convergence tolerance.
+- `divergence` (positive-real, optional): Residual divergence multiplier parsed from a relative/absolute row.
+- `maxiterations` (positive-integer, optional): Maximum nonlinear iterations; recognized by the maxi prefix.
+- `mintime` (integer, optional): Minimum time control; recognized by the mint prefix.
+- `invert` (integer, optional): Full stiffness-inversion interval; recognized by the inve prefix.
+- `D_AA` (enum, optional): Anderson acceleration: 0 inactive, 1 prediction, 2 correction.
+- `d_in` (real, optional): Initial automatic time increment; full labels such as d_initial match this prefix.
+- `it_restart` (integer, optional): Iteration interval reset control recognized by it_r.
+- `d_reduction` (real, optional): Time-increment reduction ratio recognized by d_re; a negative default disables reset.
+- `d_min` (real, optional): Minimum time increment recognized by d_mi.
+- `it_opt` (integer, optional): Optimum-iteration adjustment control recognized by it_o.
+- `d_max` (real, optional): Maximum time increment recognized by d_ma.
+- `fatigue` (real, optional): 2D/3D fatigue convergence control recognized by fati.
+
+Remaining specification work:
+
+- Resolve safe ranges and runtime behavior for automatic increment and fatigue controls; ini_dtime and fatigue2D3DD do not receive visible defaults in this parser routine.
+- Runtime-probe D_AA modes and automatic time-step interactions before enabling unconstrained model-generated changes.
+
+### `*CONVERGENCE` body
+
+Termination: next-command. Dependencies: Convergence controls apply to the current boundary problem and its ordered loading sequence.; Automatic increment controls must be validated as a coherent group before rendering changes.
+
+- **tolerances** (row begins rela or abso):
+  - `tolerance-row` [repeated]: `relative`:positive-real, `absolute`:positive-real, `divergence`:positive-real
+  - Constraint: At least relative or absolute must be present on a tolerance row.
+  - Constraint: When only absolute is present, the internal relative tolerance is set to 10.
+- **anderson-acceleration** (row contains D_AA):
+  - `D_AA` [repeated]: `D_AA`:enum(0,1,2)
+  - Constraint: D_AA is found by key search before the four-character dispatch.
+- **scalar-control** (row begins a recognized four-character label):
+  - `control` [repeated]: `label`:enum-prefix(mint,d_in,it_r,d_re,d_mi,it_o,d_ma,fati,maxi,inve), `value`:real-or-integer-by-label
+  - Constraint: The parser scans at most twelve convergence records.
+  - Constraint: Long VTMS labels are accepted when their first four characters match, including d_reduction, d_min, d_max, it_opt, and it_restart.
+  - Constraint: An unrecognized record is backspaced for the enclosing BOUNDARY dispatcher rather than accepted as a convergence option.
+
+### `*OUTPUT`
+
+Defines output types and their target, coordinate-system, and intermediate-output options.
+
+- Registry ID: `construct.boundary-output`
+- Match prefix: `*outp`
+- Coverage: partially-documented
+- Evidence: [evidence.boundary-output](#evidenceboundary-output), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+Known parameters:
+
+- `type` (enum, required): Selects the output family by its first three characters.
+- `c_system` (enum, optional): Selects the coordinate system; only the mate prefix changes the default.
+- `intermediate` (integer, optional): Controls intermediate output frequency/selection.
+
+Remaining specification work:
+
+- Enumerate accepted data-file formats and runtime-verify each output family, coordinate system, and intermediate control.
+
+### `*OUTPUT` body
+
+Termination: next-command. Dependencies: All selected clusters and sets must belong to the current boundary problem.; Mesh, set, or cluster edits must revalidate every output selector.
+
+- **data-file** (type begins dat):
+  - `output-header` [once]: `type`:const(data_file), `clusters`:selector(all|list|cluster-name), `format`:string, `intermediate`:integer, `c_system`:enum(global,material)
+  - `cluster-list` [repeated]: `cluster_names`:cluster-name-list
+  - Constraint: Exactly one type key may appear in a header row.
+  - Constraint: A header accepts at most five key/value pairs.
+- **node-set-aggregate** (type begins sum or tra):
+  - `output-header` [once]: `type`:enum(sum_force,traction_average), `nset`:selector(all|list), `intermediate`:integer, `c_system`:enum(global,material)
+  - `node-set-list` [repeated]: `node_sets`:cluster-name.node-set-name-list
+  - Constraint: The selector must resolve at least one existing node set.
+- **element-set-aggregate** (type begins vol or cfv):
+  - `output-header` [once]: `type`:enum(volume_average,cfv), `elset`:selector(all|list), `intermediate`:integer, `c_system`:enum(global,material)
+  - `element-set-list` [repeated]: `element_sets`:cluster-name.element-set-name-list
+  - Constraint: The selector must resolve at least one existing element set.
+  - Constraint: The active implementation reduces multiple selected sets to one entry per distinct cluster.
+
 
 ## Execution contract
 
@@ -408,43 +707,53 @@ Termination: next-command-or-eof. Dependencies: ELSET must name an existing elem
 ## Evidence index
 
 <a id="evidencemain-input-sequence"></a>
-- `evidence.main-input-sequence` — source: `source/bsam/mainf1.f:41-91` — Defines the active initialization order from INPUT through CRACK.
+- `evidence.main-input-sequence` — source: `source/bsam/mainf1.f90:41-91` — Defines the active initialization order from INPUT through CRACK.
 <a id="evidenceinput-parser"></a>
-- `evidence.input-parser` — source: `source/libbsam/inp_ini.f:33-112` — Scans for INPUT and requires current type 3 before converting it to block-input mode.
+- `evidence.input-parser` — source: `source/libbsam/inp_ini.f90:33-112` — Scans for INPUT and requires current type 3 before converting it to block-input mode.
 <a id="evidenceblock-matcher"></a>
-- `evidence.block-matcher` — source: `source/libbsam/inp_block.f:17-60` — Defines required/optional lookup and exact matching for MATERIALS and CLUSTERS versus three-character matching for other blocks.
+- `evidence.block-matcher` — source: `source/libbsam/inp_block.f90:17-60` — Defines required/optional lookup and exact, case-sensitive matching for every requested block token.
 <a id="evidencesolver-parser"></a>
-- `evidence.solver-parser` — source: `source/libbsam/solve_ini.f:181-421` — Documents and parses current solver types and option labels while retaining an old-format path.
+- `evidence.solver-parser` — source: `source/libbsam/solve_ini.f90:1-491` — Defines solver schedules and parses up to 50 current-format solver records and their options while retaining an old-format path.
 <a id="evidenceufunction-parser"></a>
 - `evidence.ufunction-parser` — source: `source/libbsam/ufunction_ini.f90:10-68` — Locates the optional UFUNCTIONS block and divides entries at *end records.
 <a id="evidencemoisture-parser"></a>
 - `evidence.moisture-parser` — source: `source/libbsam/moisture.f90:36-173` — Locates the optional MOISTURE block and dispatches its current key/value labels.
 <a id="evidencecluster-parser"></a>
-- `evidence.cluster-parser` — source: `source/libbsam/iap_ini.f:119-295` — Requires CLUSTERS, accepts solid finite-element cluster type 100, and delegates each cluster to the FE reader.
+- `evidence.cluster-parser` — source: `source/libbsam/iap_ini.f90:119-295` — Requires CLUSTERS, accepts solid finite-element cluster type 100, and delegates each cluster to the FE reader.
 <a id="evidencefe-command-dispatch"></a>
 - `evidence.fe-command-dispatch` — source: `source/libbsam/mod_fe_input.f90:225-1170` — Contains the active first-five-character finite-element command dispatch and line-option handling.
 <a id="evidencefe-core-records"></a>
-- `evidence.fe-core-records` — source: `source/libbsam/mod_fe_input.f90:1556-2677` — Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination.
+- `evidence.fe-core-records` — source: `source/libbsam/mod_fe_input.f90:1556-2651` — Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination.
 <a id="evidencefe-integration-orientation"></a>
-- `evidence.fe-integration-orientation` — source: `source/libbsam/mod_fe_input.f90:3722-4020` — Defines nested integration-point records and nodal or elemental orientation records.
+- `evidence.fe-integration-orientation` — source: `source/libbsam/mod_fe_input.f90:3696-3994` — Defines nested integration-point records and nodal or elemental orientation records.
 <a id="evidencefe-section-reader"></a>
-- `evidence.fe-section-reader` — source: `source/libbsam/mod_fe_input.f90:4029-4128` — Requires one thickness/material row per declared layer, normalizes thicknesses, and applies the section to the selected element set.
+- `evidence.fe-section-reader` — source: `source/libbsam/mod_fe_input.f90:4003-4102` — Requires one thickness/material row per declared layer, normalizes thicknesses, and applies the section to the selected element set.
 <a id="evidenceboundary-parser"></a>
-- `evidence.boundary-parser` — source: `source/libbsam/ibn_ini.f:19-180` — Requires BOUNDARY and begins dispatch of boundary problem types and nested controls.
+- `evidence.boundary-parser` — source: `source/libbsam/ibn_ini.f90:19-180` — Requires BOUNDARY and begins dispatch of boundary problem types and nested controls.
 <a id="evidenceboundary-active-dispatch"></a>
-- `evidence.boundary-active-dispatch` — source: `source/libbsam/ibn_ini.f:123-2167` — Defines mechanical/thermal problem starts and the active nested BOUNDARY command dispatch through convergence and output controls.
+- `evidence.boundary-active-dispatch` — source: `source/libbsam/ibn_ini.f90:123-2048` — Defines mechanical/thermal problem starts and the active nested BOUNDARY command dispatch through convergence and output controls.
+<a id="evidenceboundary-connections"></a>
+- `evidence.boundary-connections` — source: `source/libbsam/ibn_ini.f90:536-941` — Defines penalty types -2/-21, nodal, and surface connection headers, subordinate set rows, defaults, sentinels, and cross-reference checks.
+<a id="evidenceboundary-loading"></a>
+- `evidence.boundary-loading` — source: `source/libbsam/ibn_ini.f90:943-1385` — Defines static, fatigue, 2D-fatigue, reduced-fatigue, block repetition, and boundary-condition change records.
+<a id="evidenceboundary-convergence"></a>
+- `evidence.boundary-convergence` — source: `source/libbsam/ibn_ini.f90:1386-1632` — Defines D_AA, active four-character convergence labels, values, defaults, and the twelve-record scan limit.
+<a id="evidenceboundary-output"></a>
+- `evidence.boundary-output` — source: `source/libbsam/ibn_ini.f90:1634-2014` — Defines data-file, sum-force, volume-average, traction-average, and CFV output records and selectors.
+<a id="evidenceboundary-selectors"></a>
+- `evidence.boundary-selectors` — source: `source/libbsam/ibn_ini_tools.f90:447-905` — Defines all/list/qualified-name selection for clusters and cluster-qualified node or element sets.
 <a id="evidenceconstitutive-parser"></a>
-- `evidence.constitutive-parser` — source: `source/libbsam/con_ini.f:22-150` — Requires CONSTITUTIVE and dispatches constitutive type records.
+- `evidence.constitutive-parser` — source: `source/libbsam/con_ini.f90:22-150` — Requires CONSTITUTIVE, dispatches constitutive type records, and reads the current *MIC value array.
 <a id="evidencetable-parser"></a>
-- `evidence.table-parser` — source: `source/libbsam/table_ini.f:26-84` — Locates optional TABLES and divides table entries at *end records.
+- `evidence.table-parser` — source: `source/libbsam/table_ini.f90:26-84` — Locates optional TABLES and divides table entries at *end records.
 <a id="evidencestat-dist-parser"></a>
-- `evidence.stat-dist-parser` — source: `source/libbsam/stat_dist_ini.f:27-80` — Locates optional STATISTICAL DISTRIBUTIONS and divides entries at *end records.
+- `evidence.stat-dist-parser` — source: `source/libbsam/stat_dist_ini.f90:27-80` — Locates the optional exact STATISTICAL start token and divides entries at *end records until END STATISTICAL DISTRIBUTIONS.
 <a id="evidencematerial-parser"></a>
-- `evidence.material-parser` — source: `source/libbsam/mat_ini.f:62-230` — Requires MATERIALS and begins dispatch of legacy numeric and newer material representations.
+- `evidence.material-parser` — source: `source/libbsam/mat_ini.f90:62-230` — Requires MATERIALS and dispatches legacy numeric and newer representations, including numeric or named Mises material type 50.
 <a id="evidencefailure-parser"></a>
-- `evidence.failure-parser` — source: `source/libbsam/fai_ini.f:20-150` — Locates optional FAILURE and begins dispatch of failure criterion type records.
+- `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-150` — Locates optional FAILURE and dispatches failure criterion records, including interface-family types 34, 35, and 36.
 <a id="evidenceuser-parser"></a>
-- `evidence.user-parser` — source: `source/libbsam/usf_ini.f:13-120` — Locates optional USER and begins dispatch of numeric user-function types.
+- `evidence.user-parser` — source: `source/libbsam/usf_ini.f90:13-120` — Locates optional USER and begins dispatch of numeric user-function types.
 <a id="evidencecrack-parser"></a>
 - `evidence.crack-parser` — source: `source/libbsam/crk_ini.f90:1-220` — Locates optional CRACK and dispatches current FE crack types 101, 201, and 301.
 <a id="evidencecurrent-vtms-deck-tric"></a>
@@ -454,9 +763,9 @@ Termination: next-command-or-eof. Dependencies: ELSET must name an existing elem
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>
-- `evidence.success-sentinel` — source: `source/bsam/mainf1.f:133-142` — Writes the explicit end-of-program timing sentinel after all boundary problems finish.
+- `evidence.success-sentinel` — source: `source/bsam/mainf1.f90:133-142` — Writes the explicit end-of-program timing sentinel after all boundary problems finish.
 <a id="evidenceexit-control"></a>
-- `evidence.exit-control` — source: `source/libbsam/ibn_iter_stop.f:5-39` — Defines .exit values 0 continue, 1 disrupt, and 2 stop.
+- `evidence.exit-control` — source: `source/libbsam/ibn_iter_stop.f90:5-39` — Defines .exit values 0 continue, 1 disrupt, and 2 stop.
 <a id="evidenceruntime-zero-on-fatal"></a>
 - `evidence.runtime-zero-on-fatal` — runtime: `local-probe/2026-08-27/materials-required` — A controlled copied deck produced a fatal missing-MATERIALS message while the Windows process returned exit code zero.
 <a id="evidenceruntime-current-deck-success"></a>

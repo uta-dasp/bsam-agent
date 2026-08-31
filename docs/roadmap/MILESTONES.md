@@ -15,7 +15,7 @@ Exit: documents agree on scope and no implementation decision depends on a missi
 
 ## G1 — Current BSAM input API specification
 
-Status: in progress. Registry `0.2.0` establishes the pinned baseline, top-level and FE command inventories, active BOUNDARY construct inventory, structured bodies for eight core mesh/section commands, execution contract, validation tool, and generated reference.
+Status: in progress. Registry `0.3.0` is reconciled to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the 2026-08-27 executable build. It establishes top-level and FE command inventories, 12 active BOUNDARY constructs, structured core mesh/section and major BOUNDARY record groups, an execution contract, a validation tool, and a generated reference.
 
 Deliverables:
 

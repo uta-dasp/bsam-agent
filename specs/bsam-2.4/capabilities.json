@@ -1,12 +1,12 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.1.0",
-  "registry_version": "0.2.0",
+  "registry_version": "0.3.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
-    "source_commit": "7e414be55abae10e2a648bd39bcc07b4904e9edc",
-    "executable_sha256": "580B7AF434BF4F453B8137802246FEB292DD89A04FDB3DD54000EC9A225E146F",
+    "source_commit": "9954027f1c325c63d58aeb836e8fec41a4b363af",
+    "executable_sha256": "7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A",
     "platform": "windows",
     "execution_mode": "serial"
   },
@@ -19,7 +19,7 @@
     {
       "id": "evidence.main-input-sequence",
       "kind": "source",
-      "locator": "source/bsam/mainf1.f",
+      "locator": "source/bsam/mainf1.f90",
       "line_start": 41,
       "line_end": 91,
       "claim": "Defines the active initialization order from INPUT through CRACK."
@@ -27,7 +27,7 @@
     {
       "id": "evidence.input-parser",
       "kind": "source",
-      "locator": "source/libbsam/inp_ini.f",
+      "locator": "source/libbsam/inp_ini.f90",
       "line_start": 33,
       "line_end": 112,
       "claim": "Scans for INPUT and requires current type 3 before converting it to block-input mode."
@@ -35,18 +35,18 @@
     {
       "id": "evidence.block-matcher",
       "kind": "source",
-      "locator": "source/libbsam/inp_block.f",
+      "locator": "source/libbsam/inp_block.f90",
       "line_start": 17,
       "line_end": 60,
-      "claim": "Defines required/optional lookup and exact matching for MATERIALS and CLUSTERS versus three-character matching for other blocks."
+      "claim": "Defines required/optional lookup and exact, case-sensitive matching for every requested block token."
     },
     {
       "id": "evidence.solver-parser",
       "kind": "source",
-      "locator": "source/libbsam/solve_ini.f",
-      "line_start": 181,
-      "line_end": 421,
-      "claim": "Documents and parses current solver types and option labels while retaining an old-format path."
+      "locator": "source/libbsam/solve_ini.f90",
+      "line_start": 1,
+      "line_end": 491,
+      "claim": "Defines solver schedules and parses up to 50 current-format solver records and their options while retaining an old-format path."
     },
     {
       "id": "evidence.ufunction-parser",
@@ -67,7 +67,7 @@
     {
       "id": "evidence.cluster-parser",
       "kind": "source",
-      "locator": "source/libbsam/iap_ini.f",
+      "locator": "source/libbsam/iap_ini.f90",
       "line_start": 119,
       "line_end": 295,
       "claim": "Requires CLUSTERS, accepts solid finite-element cluster type 100, and delegates each cluster to the FE reader."
@@ -85,29 +85,29 @@
       "kind": "source",
       "locator": "source/libbsam/mod_fe_input.f90",
       "line_start": 1556,
-      "line_end": 2677,
+      "line_end": 2651,
       "claim": "Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination."
     },
     {
       "id": "evidence.fe-integration-orientation",
       "kind": "source",
       "locator": "source/libbsam/mod_fe_input.f90",
-      "line_start": 3722,
-      "line_end": 4020,
+      "line_start": 3696,
+      "line_end": 3994,
       "claim": "Defines nested integration-point records and nodal or elemental orientation records."
     },
     {
       "id": "evidence.fe-section-reader",
       "kind": "source",
       "locator": "source/libbsam/mod_fe_input.f90",
-      "line_start": 4029,
-      "line_end": 4128,
+      "line_start": 4003,
+      "line_end": 4102,
       "claim": "Requires one thickness/material row per declared layer, normalizes thicknesses, and applies the section to the selected element set."
     },
     {
       "id": "evidence.boundary-parser",
       "kind": "source",
-      "locator": "source/libbsam/ibn_ini.f",
+      "locator": "source/libbsam/ibn_ini.f90",
       "line_start": 19,
       "line_end": 180,
       "claim": "Requires BOUNDARY and begins dispatch of boundary problem types and nested controls."
@@ -115,23 +115,63 @@
     {
       "id": "evidence.boundary-active-dispatch",
       "kind": "source",
-      "locator": "source/libbsam/ibn_ini.f",
+      "locator": "source/libbsam/ibn_ini.f90",
       "line_start": 123,
-      "line_end": 2167,
+      "line_end": 2048,
       "claim": "Defines mechanical/thermal problem starts and the active nested BOUNDARY command dispatch through convergence and output controls."
+    },
+    {
+      "id": "evidence.boundary-connections",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini.f90",
+      "line_start": 536,
+      "line_end": 941,
+      "claim": "Defines penalty types -2/-21, nodal, and surface connection headers, subordinate set rows, defaults, sentinels, and cross-reference checks."
+    },
+    {
+      "id": "evidence.boundary-loading",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini.f90",
+      "line_start": 943,
+      "line_end": 1385,
+      "claim": "Defines static, fatigue, 2D-fatigue, reduced-fatigue, block repetition, and boundary-condition change records."
+    },
+    {
+      "id": "evidence.boundary-convergence",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini.f90",
+      "line_start": 1386,
+      "line_end": 1632,
+      "claim": "Defines D_AA, active four-character convergence labels, values, defaults, and the twelve-record scan limit."
+    },
+    {
+      "id": "evidence.boundary-output",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini.f90",
+      "line_start": 1634,
+      "line_end": 2014,
+      "claim": "Defines data-file, sum-force, volume-average, traction-average, and CFV output records and selectors."
+    },
+    {
+      "id": "evidence.boundary-selectors",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini_tools.f90",
+      "line_start": 447,
+      "line_end": 905,
+      "claim": "Defines all/list/qualified-name selection for clusters and cluster-qualified node or element sets."
     },
     {
       "id": "evidence.constitutive-parser",
       "kind": "source",
-      "locator": "source/libbsam/con_ini.f",
+      "locator": "source/libbsam/con_ini.f90",
       "line_start": 22,
       "line_end": 150,
-      "claim": "Requires CONSTITUTIVE and dispatches constitutive type records."
+      "claim": "Requires CONSTITUTIVE, dispatches constitutive type records, and reads the current *MIC value array."
     },
     {
       "id": "evidence.table-parser",
       "kind": "source",
-      "locator": "source/libbsam/table_ini.f",
+      "locator": "source/libbsam/table_ini.f90",
       "line_start": 26,
       "line_end": 84,
       "claim": "Locates optional TABLES and divides table entries at *end records."
@@ -139,31 +179,31 @@
     {
       "id": "evidence.stat-dist-parser",
       "kind": "source",
-      "locator": "source/libbsam/stat_dist_ini.f",
+      "locator": "source/libbsam/stat_dist_ini.f90",
       "line_start": 27,
       "line_end": 80,
-      "claim": "Locates optional STATISTICAL DISTRIBUTIONS and divides entries at *end records."
+      "claim": "Locates the optional exact STATISTICAL start token and divides entries at *end records until END STATISTICAL DISTRIBUTIONS."
     },
     {
       "id": "evidence.material-parser",
       "kind": "source",
-      "locator": "source/libbsam/mat_ini.f",
+      "locator": "source/libbsam/mat_ini.f90",
       "line_start": 62,
       "line_end": 230,
-      "claim": "Requires MATERIALS and begins dispatch of legacy numeric and newer material representations."
+      "claim": "Requires MATERIALS and dispatches legacy numeric and newer representations, including numeric or named Mises material type 50."
     },
     {
       "id": "evidence.failure-parser",
       "kind": "source",
-      "locator": "source/libbsam/fai_ini.f",
+      "locator": "source/libbsam/fai_ini.f90",
       "line_start": 20,
       "line_end": 150,
-      "claim": "Locates optional FAILURE and begins dispatch of failure criterion type records."
+      "claim": "Locates optional FAILURE and dispatches failure criterion records, including interface-family types 34, 35, and 36."
     },
     {
       "id": "evidence.user-parser",
       "kind": "source",
-      "locator": "source/libbsam/usf_ini.f",
+      "locator": "source/libbsam/usf_ini.f90",
       "line_start": 13,
       "line_end": 120,
       "claim": "Locates optional USER and begins dispatch of numeric user-function types."
@@ -199,7 +239,7 @@
     {
       "id": "evidence.success-sentinel",
       "kind": "source",
-      "locator": "source/bsam/mainf1.f",
+      "locator": "source/bsam/mainf1.f90",
       "line_start": 133,
       "line_end": 142,
       "claim": "Writes the explicit end-of-program timing sentinel after all boundary problems finish."
@@ -207,7 +247,7 @@
     {
       "id": "evidence.exit-control",
       "kind": "source",
-      "locator": "source/libbsam/ibn_iter_stop.f",
+      "locator": "source/libbsam/ibn_iter_stop.f90",
       "line_start": 5,
       "line_end": 39,
       "claim": "Defines .exit values 0 continue, 1 disrupt, and 2 stop."
@@ -261,11 +301,11 @@
     {
       "id": "block.solver",
       "canonical": "SOLVER",
-      "lookup_token": "SOLVE",
-      "match_rule": "first-three",
+      "lookup_token": "SOLVER",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "SOLVE_INI",
-      "summary": "Selects the linear solver and solver-specific options; defaults to serial PARDISO when absent.",
+      "summary": "Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent.",
       "termination": {
         "style": "end-line",
         "tokens": ["END SOLVER"],
@@ -339,16 +379,29 @@
       ],
       "evidence_ids": ["evidence.solver-parser"],
       "remaining_work": [
-        "Resolve documentation/parser naming conflict between pc and preconditioner.",
         "Document SHEFF value enums and defaults from downstream code.",
         "Classify the numeric legacy solver format as diagnostics-only."
-      ]
+      ],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "next-top-level-block",
+        "variants": [{
+          "name": "current-solver",
+          "when": "record begins *type",
+          "rows": [
+            {"name": "solver-header", "repetition": "repeated-up-to-50", "fields": [{"name": "*type", "value_type": "enum(pardiso,cpardiso,sheff)", "required": true, "summary": "Begins one solver definition."}]},
+            {"name": "solver-options", "repetition": "repeated-until-end-solver", "fields": [{"name": "option", "value_type": "solver-specific-key-value", "required": false, "summary": "Uses the option labels registered for the selected solver type."}, {"name": "end solver", "value_type": "sentinel", "required": true, "summary": "Terminates the current solver definition."}]}
+          ],
+          "constraints": ["Solver IDs are one-based declaration order.", "A boundary solver schedule may refer to solver 2 only when a second solver is defined."]
+        }],
+        "dependencies": ["*SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs."]
+      }
     },
     {
       "id": "block.ufunctions",
       "canonical": "UFUNCTIONS",
       "lookup_token": "UFUNCTIONS",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "UFUNCTION_INI",
       "summary": "Defines named user functions parsed as *end-delimited entries.",
@@ -368,7 +421,7 @@
       "id": "block.moisture",
       "canonical": "MOISTURE",
       "lookup_token": "MOISTURE",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "MOI_INI",
       "summary": "Configures optional coupling to the external moisture simulation workflow.",
@@ -420,7 +473,7 @@
       "id": "block.clusters",
       "canonical": "CLUSTERS",
       "lookup_token": "CLUSTERS",
-      "match_rule": "exact",
+      "match_rule": "exact-case-sensitive",
       "required": true,
       "parser": "IAP_INI / FE_READ_INPUTFILE",
       "summary": "Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls.",
@@ -447,7 +500,7 @@
       "id": "block.boundary",
       "canonical": "BOUNDARY",
       "lookup_token": "BOUNDARY",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": true,
       "parser": "IBN_INI",
       "summary": "Defines boundary problems, loads, connections, convergence, stepping, and output controls.",
@@ -473,7 +526,7 @@
       "id": "block.constitutive",
       "canonical": "CONSTITUTIVE",
       "lookup_token": "CONSTITUTIVE",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": true,
       "parser": "CON_INI",
       "summary": "Defines constitutive law records that reference material and failure definitions.",
@@ -493,7 +546,7 @@
       "id": "block.tables",
       "canonical": "TABLES",
       "lookup_token": "TABLES",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "TABLE_INI / table initializer",
       "summary": "Defines named lookup tables used by material data.",
@@ -511,9 +564,9 @@
     },
     {
       "id": "block.statistical-distributions",
-      "canonical": "STATISTICAL DISTRIBUTIONS",
-      "lookup_token": "STATISTICAL DISTRIBUTIONS",
-      "match_rule": "first-three",
+      "canonical": "STATISTICAL",
+      "lookup_token": "STATISTICAL",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "STAT_DIST_INI / statistical distribution initializer",
       "summary": "Defines named statistical distributions that modify material data.",
@@ -533,7 +586,7 @@
       "id": "block.materials",
       "canonical": "MATERIALS",
       "lookup_token": "MATERIALS",
-      "match_rule": "exact",
+      "match_rule": "exact-case-sensitive",
       "required": true,
       "parser": "MAT_INI / material initializers",
       "summary": "Defines bulk and interface material records, including current structured material forms.",
@@ -555,7 +608,7 @@
       "id": "block.failure",
       "canonical": "FAILURE",
       "lookup_token": "FAILURE",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "FAI_INI",
       "summary": "Defines failure criterion records referenced by constitutive laws and damage behavior.",
@@ -575,7 +628,7 @@
       "id": "block.user",
       "canonical": "USER",
       "lookup_token": "USER",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "USF_INI",
       "summary": "Defines numeric user-function records, including polynomial and discrete forms.",
@@ -595,7 +648,7 @@
       "id": "block.crack",
       "canonical": "CRACK",
       "lookup_token": "CRACK",
-      "match_rule": "first-three",
+      "match_rule": "exact-case-sensitive",
       "required": false,
       "parser": "CRK_INI",
       "summary": "Defines global finite-element crack insertion controls for crack types 101, 201, and 301.",
@@ -661,10 +714,16 @@
       "canonical": "*NAME",
       "dispatch_prefix": "*NAME",
       "summary": "Assigns a name to the current cluster.",
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document the data-body grammar, length, uniqueness, and reference matching rules."]
+      "coverage": "partially-documented",
+      "parameters": [{"name": "name", "value_type": "string-record", "required": true, "summary": "Cluster name; it is normalized to lowercase by the enclosing cluster parser."}],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.cluster-parser"],
+      "remaining_work": ["Document length and uniqueness behavior across multiple clusters."],
+      "body": {
+        "style": "records",
+        "termination": "next-command",
+        "variants": [{"name": "cluster-name", "when": "*NAME is dispatched", "rows": [{"name": "name", "repetition": "once", "fields": [{"name": "name", "value_type": "string", "required": true, "summary": "Name assigned to the current cluster."}]}], "constraints": ["The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization."]}],
+        "dependencies": ["Every cluster-qualified set reference uses the normalized lowercase cluster name."]
+      }
     },
     {
       "id": "command.constitutive",
@@ -1299,6 +1358,18 @@
       "remaining_work": []
     },
     {
+      "id": "construct.boundary-solver-schedule",
+      "parent_block_id": "block.boundary",
+      "canonical": "*SOLVER",
+      "match_prefix": "*solv",
+      "kind": "keyword",
+      "summary": "Selects how declared solver IDs are assigned to nonlinear iterations for the current boundary problem.",
+      "coverage": "documented",
+      "parameters": [{"name": "schedule", "value_type": "enum-record", "required": true, "allowed_values": [1, 2], "default": 1, "summary": "Schedule 1 always uses solver 1; schedule 2 uses solver 1 at iteration 0 and solver 2 afterward."}],
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.solver-parser"],
+      "remaining_work": []
+    },
+    {
       "id": "construct.boundary-name",
       "parent_block_id": "block.boundary",
       "canonical": "*NAME",
@@ -1343,14 +1414,15 @@
       "summary": "Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets.",
       "coverage": "partially-documented",
       "parameters": [
-        {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["displacement", "shift", "stretch", "force", "off"], "summary": "Boundary-condition action matched by a short prefix."},
+        {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["displacement", "shift", "stretch", "force", "off", "temperature"], "summary": "Boundary-condition action matched by a short prefix."},
         {"name": "component", "value_type": "component", "required": true, "summary": "Degree-of-freedom/component converted by component2id."},
         {"name": "name", "value_type": "string", "required": true, "summary": "Name of the boundary condition."},
         {"name": "value", "value_type": "real", "required": true, "summary": "Boundary-condition magnitude."},
-        {"name": "nset", "value_type": "cluster-name.node-set-name", "required": true, "summary": "Existing node set qualified by its cluster name."}
+        {"name": "nset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Existing node set qualified by its cluster name."},
+        {"name": "global", "value_type": "input-relative-path", "required": false, "summary": "Loads global/local nodal coordinates, displacements, and forces from a local auxiliary file."}
       ],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Document component values, all optional keys, and per-type required-field rules."]
+      "remaining_work": ["Document component values and exact per-type required-field rules.", "Add safe auxiliary-file path validation before implementing global-file edits."]
     },
     {
       "id": "construct.boundary-connections",
@@ -1358,11 +1430,53 @@
       "canonical": "*CONNECTIONS",
       "match_prefix": "*conn",
       "kind": "record-group",
-      "summary": "Defines penalty and nodal connections between cluster selections.",
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Split connection type families and document every multi-line record schema and cluster/set dependency."]
+      "summary": "Defines penalty, nodal, and surface-contact connections between cluster selections.",
+      "coverage": "partially-documented",
+      "parameters": [
+        {"name": "type", "value_type": "enum", "required": true, "allowed_values": [-2, -21, "nodal", "surface"], "summary": "Selects a penalty, nodal, or surface-contact connection."},
+        {"name": "name", "value_type": "string", "required": false, "summary": "Connection name; defaults to connection plus its one-based index."},
+        {"name": "tolerance", "value_type": "positive-real", "required": false, "default": 0.00001, "summary": "Penalty-connection search tolerance."},
+        {"name": "search", "value_type": "enum", "required": false, "allowed_values": ["vtms", "sheff"], "default": "vtms", "summary": "Penalty search implementation."},
+        {"name": "component", "value_type": "component", "required": false, "default": 123, "summary": "Nodal-connection component selection."}
+      ],
+      "evidence_ids": ["evidence.boundary-connections", "evidence.boundary-selectors", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Establish the engineering distinction between penalty types -2 and -21 and verify SHEFF search behavior."],
+      "body": {
+        "style": "nested-records",
+        "termination": "next-command",
+        "variants": [
+          {
+            "name": "penalty",
+            "when": "type is -2 or -21",
+            "rows": [
+              {"name": "header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(-2,-21)", "required": true, "summary": "Penalty connection type."}, {"name": "name", "value_type": "string", "required": false, "summary": "Optional connection name."}, {"name": "tolerance", "value_type": "positive-real", "required": false, "summary": "Optional search tolerance."}, {"name": "search", "value_type": "enum(vtms,sheff)", "required": false, "summary": "Optional search implementation."}]},
+              {"name": "set-assignment", "repetition": "repeated", "fields": [{"name": "mset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Master node set for this row."}, {"name": "sset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Slave node set for this row."}, {"name": "material", "value_type": "material-id", "required": false, "summary": "Material associated with this row."}, {"name": "constitutive", "value_type": "constitutive-id", "required": false, "summary": "Constitutive law associated with this row."}, {"name": "failure", "value_type": "failure-id", "required": false, "summary": "Failure definition associated with this row."}]},
+              {"name": "last", "repetition": "once", "fields": [{"name": "last", "value_type": "none-or-cluster-name-list", "required": true, "summary": "Ends the penalty connection and optionally lists terminal slave clusters."}]}
+            ],
+            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing cluster name.", "The last record is the structural sentinel for a penalty connection."]
+          },
+          {
+            "name": "nodal",
+            "when": "type is nodal",
+            "rows": [
+              {"name": "header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(nodal)", "required": true, "summary": "Selects nodal connection."}, {"name": "name", "value_type": "string", "required": false, "summary": "Optional connection name."}, {"name": "component", "value_type": "component", "required": false, "summary": "Connected components; defaults to 123."}]},
+              {"name": "master-sets", "repetition": "once", "fields": [{"name": "mset", "value_type": "selector(all|list)", "required": true, "summary": "All or a list of cluster-qualified master node sets."}]},
+              {"name": "slave-sets", "repetition": "once", "fields": [{"name": "sset", "value_type": "selector(all|list)", "required": true, "summary": "All or a list of cluster-qualified slave node sets."}]}
+            ],
+            "constraints": ["Exactly two subordinate selector rows are consumed: master first and slave second.", "Both selectors must resolve at least one node set."]
+          },
+          {
+            "name": "surface-contact",
+            "when": "type begins surf",
+            "rows": [
+              {"name": "header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(surface)", "required": true, "summary": "Selects the surface-contact connection."}, {"name": "name", "value_type": "string", "required": false, "summary": "Optional connection name."}, {"name": "tolerance", "value_type": "positive-real", "required": false, "summary": "Search tolerance; defaults to 1e-5."}, {"name": "search", "value_type": "const(sheff)", "required": true, "summary": "Selects the implemented surface-contact search path."}]},
+              {"name": "contact-pair", "repetition": "one-or-more-until-next-type", "fields": [{"name": "mset", "value_type": "cluster-name.node-set-name", "required": true, "summary": "Master node set."}, {"name": "sset", "value_type": "cluster-name.node-set-name", "required": true, "summary": "Slave node set."}, {"name": "material", "value_type": "material-id", "required": false, "summary": "Optional material for the pair."}, {"name": "constitutive", "value_type": "constitutive-id", "required": false, "summary": "Optional constitutive definition for the pair."}, {"name": "failure", "value_type": "failure-id", "required": false, "summary": "Optional failure definition for the pair."}]}
+            ],
+            "constraints": ["At least one contact-pair row is required.", "The next row containing a type key starts the next connection; surface contact does not use a last sentinel."]
+          }
+        ],
+        "dependencies": ["Referenced clusters must be selected by the boundary problem.", "All node sets and material/constitutive/failure IDs must already exist.", "Ply or mesh changes must revalidate both sides of every connection."]
+      }
     },
     {
       "id": "construct.boundary-loading-sequence",
@@ -1372,9 +1486,40 @@
       "kind": "record-group",
       "summary": "Defines load-step histories, cyclic controls, and optional repeated fatigue blocks.",
       "coverage": "partially-documented",
-      "parameters": [],
-      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Document all load type records and the type/name/nstep/maxcycle/mincycle/R/load_incr/block/inicycle option matrix."]
+      "parameters": [
+        {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["static", "fatigue", "2dfatigue", "reduced_fatigue"], "summary": "Selects the load history family by first-four-character matching."},
+        {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of analysis steps; the parser rejects a load header without it."},
+        {"name": "name", "value_type": "string", "required": false, "summary": "Name assigned to this load segment."},
+        {"name": "incr", "value_type": "real", "required": false, "summary": "Load increment for static or fatigue segments."},
+        {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Marks the start/end of a repeated load block and its repetition count."}
+      ],
+      "evidence_ids": ["evidence.boundary-loading", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Runtime-verify fatigue, 2D-fatigue, reduced-fatigue, and repeated-block examples and establish defaults/ranges for cyclic values."],
+      "body": {
+        "style": "nested-records",
+        "termination": "next-command",
+        "variants": [
+          {
+            "name": "static-segment",
+            "when": "type begins stat",
+            "rows": [
+              {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(static)", "required": true, "summary": "Static load segment."}, {"name": "name", "value_type": "string", "required": false, "summary": "Segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "incr", "value_type": "real", "required": false, "summary": "Load increment."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
+              {"name": "change", "repetition": "repeated", "fields": [{"name": "change", "value_type": "boundary-condition-name", "required": true, "summary": "Existing boundary condition to change."}, {"name": "type", "value_type": "enum(displacement,stretch,force,off)", "required": false, "summary": "Replacement action; inherited when absent."}, {"name": "value", "value_type": "real", "required": false, "summary": "Replacement value; inherited when absent."}]}
+            ],
+            "constraints": ["Change records continue until the next row containing nstep or the next command.", "Every change target must name an existing boundary condition."]
+          },
+          {
+            "name": "fatigue-segment",
+            "when": "type begins fati, 2dfa, or redu",
+            "rows": [
+              {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(fatigue,2dfatigue,reduced_fatigue)", "required": true, "summary": "Cyclic load family."}, {"name": "name", "value_type": "string", "required": false, "summary": "Segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "maxcycle", "value_type": "integer", "required": false, "summary": "Maximum cycle control."}, {"name": "mincycle", "value_type": "integer", "required": false, "summary": "Minimum cycle control."}, {"name": "R", "value_type": "real", "required": false, "summary": "Cyclic load ratio."}, {"name": "incr", "value_type": "real", "required": false, "summary": "Load increment."}, {"name": "inicycle", "value_type": "integer", "required": false, "summary": "Initial cycle."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
+              {"name": "change", "repetition": "repeated", "fields": [{"name": "change", "value_type": "boundary-condition-name", "required": true, "summary": "Existing boundary condition to change."}, {"name": "type", "value_type": "enum(displacement,stretch,force,off)", "required": false, "summary": "Replacement action; inherited when absent."}, {"name": "value", "value_type": "real", "required": false, "summary": "Replacement value; inherited when absent."}, {"name": "maxcycle", "value_type": "integer", "required": false, "summary": "Change-specific maximum cycle; its sign selects an internal cycle-change type."}, {"name": "mincycle", "value_type": "integer", "required": false, "summary": "Change-specific minimum cycle."}, {"name": "R", "value_type": "real", "required": false, "summary": "Change-specific cyclic ratio."}]}
+            ],
+            "constraints": ["A load header supports at most nine key/value pairs.", "Repeated blocks duplicate the enclosed segment sequence and derive suffixed names."]
+          }
+        ],
+        "dependencies": ["Change records reference names created in BOUNDARY CONDITION.", "Step ranges are accumulated in declaration order.", "Boundary-condition deletion or renaming must update every load change reference."]
+      }
     },
     {
       "id": "construct.boundary-convergence",
@@ -1384,9 +1529,34 @@
       "kind": "record-group",
       "summary": "Configures nonlinear convergence, time-step, iteration, and reattempt controls.",
       "coverage": "partially-documented",
-      "parameters": [],
-      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Enumerate the eleven scanned labels, defaults, numerical constraints, and interactions."]
+      "parameters": [
+        {"name": "relative", "value_type": "positive-real", "required": false, "default": 0.001, "summary": "Relative convergence tolerance; may share a row with absolute and divergence."},
+        {"name": "absolute", "value_type": "positive-real", "required": false, "default": 100000000, "summary": "Absolute convergence tolerance."},
+        {"name": "divergence", "value_type": "positive-real", "required": false, "default": 1000000, "summary": "Residual divergence multiplier parsed from a relative/absolute row."},
+        {"name": "maxiterations", "value_type": "positive-integer", "required": false, "default": 20, "summary": "Maximum nonlinear iterations; recognized by the maxi prefix."},
+        {"name": "mintime", "value_type": "integer", "required": false, "default": 1, "summary": "Minimum time control; recognized by the mint prefix."},
+        {"name": "invert", "value_type": "integer", "required": false, "default": -1, "summary": "Full stiffness-inversion interval; recognized by the inve prefix."}
+        ,{"name": "D_AA", "value_type": "enum", "required": false, "allowed_values": [0, 1, 2], "default": 0, "summary": "Anderson acceleration: 0 inactive, 1 prediction, 2 correction."}
+        ,{"name": "d_in", "value_type": "real", "required": false, "summary": "Initial automatic time increment; full labels such as d_initial match this prefix."}
+        ,{"name": "it_restart", "value_type": "integer", "required": false, "default": 5000, "summary": "Iteration interval reset control recognized by it_r."}
+        ,{"name": "d_reduction", "value_type": "real", "required": false, "default": -1, "summary": "Time-increment reduction ratio recognized by d_re; a negative default disables reset."}
+        ,{"name": "d_min", "value_type": "real", "required": false, "default": 0, "summary": "Minimum time increment recognized by d_mi."}
+        ,{"name": "it_opt", "value_type": "integer", "required": false, "default": 5000, "summary": "Optimum-iteration adjustment control recognized by it_o."}
+        ,{"name": "d_max", "value_type": "real", "required": false, "default": 1, "summary": "Maximum time increment recognized by d_ma."}
+        ,{"name": "fatigue", "value_type": "real", "required": false, "summary": "2D/3D fatigue convergence control recognized by fati."}
+      ],
+      "evidence_ids": ["evidence.boundary-convergence", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Resolve safe ranges and runtime behavior for automatic increment and fatigue controls; ini_dtime and fatigue2D3DD do not receive visible defaults in this parser routine.", "Runtime-probe D_AA modes and automatic time-step interactions before enabling unconstrained model-generated changes."],
+      "body": {
+        "style": "records",
+        "termination": "next-command",
+        "variants": [
+          {"name": "tolerances", "when": "row begins rela or abso", "rows": [{"name": "tolerance-row", "repetition": "repeated", "fields": [{"name": "relative", "value_type": "positive-real", "required": false, "summary": "Relative convergence tolerance."}, {"name": "absolute", "value_type": "positive-real", "required": false, "summary": "Absolute convergence tolerance."}, {"name": "divergence", "value_type": "positive-real", "required": false, "summary": "Divergence multiplier."}]}], "constraints": ["At least relative or absolute must be present on a tolerance row.", "When only absolute is present, the internal relative tolerance is set to 10."]},
+          {"name": "anderson-acceleration", "when": "row contains D_AA", "rows": [{"name": "D_AA", "repetition": "repeated", "fields": [{"name": "D_AA", "value_type": "enum(0,1,2)", "required": true, "summary": "Sets the Anderson acceleration mode."}]}], "constraints": ["D_AA is found by key search before the four-character dispatch."]},
+          {"name": "scalar-control", "when": "row begins a recognized four-character label", "rows": [{"name": "control", "repetition": "repeated", "fields": [{"name": "label", "value_type": "enum-prefix(mint,d_in,it_r,d_re,d_mi,it_o,d_ma,fati,maxi,inve)", "required": true, "summary": "Active four-character dispatch label."}, {"name": "value", "value_type": "real-or-integer-by-label", "required": true, "summary": "Control value parsed from the second delimited token."}]}], "constraints": ["The parser scans at most twelve convergence records.", "Long VTMS labels are accepted when their first four characters match, including d_reduction, d_min, d_max, it_opt, and it_restart.", "An unrecognized record is backspaced for the enclosing BOUNDARY dispatcher rather than accepted as a convergence option."]}
+        ],
+        "dependencies": ["Convergence controls apply to the current boundary problem and its ordered loading sequence.", "Automatic increment controls must be validated as a coherent group before rendering changes."]
+      }
     },
     {
       "id": "construct.boundary-output",
@@ -1396,9 +1566,47 @@
       "kind": "record-group",
       "summary": "Defines output types and their target, coordinate-system, and intermediate-output options.",
       "coverage": "partially-documented",
-      "parameters": [],
-      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Enumerate output type IDs/names and each type-specific record schema."]
+      "parameters": [
+        {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["data_file", "sum_force", "volume_average", "traction_average", "cfv"], "summary": "Selects the output family by its first three characters."},
+        {"name": "c_system", "value_type": "enum", "required": false, "allowed_values": ["global", "material"], "default": "global", "summary": "Selects the coordinate system; only the mate prefix changes the default."},
+        {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Controls intermediate output frequency/selection."}
+      ],
+      "evidence_ids": ["evidence.boundary-output", "evidence.boundary-selectors", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": ["Enumerate accepted data-file formats and runtime-verify each output family, coordinate system, and intermediate control."],
+      "body": {
+        "style": "nested-records",
+        "termination": "next-command",
+        "variants": [
+          {
+            "name": "data-file",
+            "when": "type begins dat",
+            "rows": [
+              {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(data_file)", "required": true, "summary": "Data-file output."}, {"name": "clusters", "value_type": "selector(all|list|cluster-name)", "required": true, "summary": "Target clusters."}, {"name": "format", "value_type": "string", "required": false, "summary": "Output format; defaults to tecplot."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate control; defaults to 10."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
+              {"name": "cluster-list", "repetition": "repeated", "fields": [{"name": "cluster_names", "value_type": "cluster-name-list", "required": true, "summary": "Continuation values when clusters=list."}]}
+            ],
+            "constraints": ["Exactly one type key may appear in a header row.", "A header accepts at most five key/value pairs."]
+          },
+          {
+            "name": "node-set-aggregate",
+            "when": "type begins sum or tra",
+            "rows": [
+              {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(sum_force,traction_average)", "required": true, "summary": "Sum-force or average-traction output."}, {"name": "nset", "value_type": "selector(all|list)", "required": true, "summary": "Target node sets."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate control; defaults to 0."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
+              {"name": "node-set-list", "repetition": "repeated", "fields": [{"name": "node_sets", "value_type": "cluster-name.node-set-name-list", "required": true, "summary": "Continuation values when nset=list."}]}
+            ],
+            "constraints": ["The selector must resolve at least one existing node set."]
+          },
+          {
+            "name": "element-set-aggregate",
+            "when": "type begins vol or cfv",
+            "rows": [
+              {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(volume_average,cfv)", "required": true, "summary": "Volume-average or CFV output."}, {"name": "elset", "value_type": "selector(all|list)", "required": true, "summary": "Target element sets."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate control; defaults to 0."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
+              {"name": "element-set-list", "repetition": "repeated", "fields": [{"name": "element_sets", "value_type": "cluster-name.element-set-name-list", "required": true, "summary": "Continuation values when elset=list."}]}
+            ],
+            "constraints": ["The selector must resolve at least one existing element set.", "The active implementation reduces multiple selected sets to one entry per distinct cluster."]
+          }
+        ],
+        "dependencies": ["All selected clusters and sets must belong to the current boundary problem.", "Mesh, set, or cluster edits must revalidate every output selector."]
+      }
     }
   ],
   "execution_contract": {

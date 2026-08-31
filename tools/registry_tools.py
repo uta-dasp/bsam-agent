@@ -258,6 +258,25 @@ def _evidence_links(data: dict[str, Any]) -> dict[str, str]:
     return {item["id"]: f"[{item['id']}](#{item['id'].replace('.', '')})" for item in data["evidence"]}
 
 
+def _render_body(lines: list[str], title: str, body: dict[str, Any]) -> None:
+    lines.extend([
+        f"### `{title}` body",
+        "",
+        f"Termination: {body['termination']}. Dependencies: "
+        + ("; ".join(body["dependencies"]) or "none"),
+        "",
+    ])
+    for variant in body["variants"]:
+        lines.append(f"- **{variant['name']}** ({variant['when']}):")
+        for row in variant["rows"]:
+            fields = ", ".join(
+                f"`{field['name']}`:{field['value_type']}" for field in row["fields"]
+            )
+            lines.append(f"  - `{row['name']}` [{row['repetition']}]: {fields}")
+        lines.extend(f"  - Constraint: {item}" for item in variant["constraints"])
+    lines.append("")
+
+
 def render_reference(data: dict[str, Any], registry_path: Path) -> str:
     counts = validate_registry(data)
     target = data["target"]
@@ -354,22 +373,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         body = command.get("body")
         if not body:
             continue
-        lines.extend([
-            f"### `{command['canonical']}` body",
-            "",
-            f"Termination: {body['termination']}. Dependencies: "
-            + ("; ".join(body["dependencies"]) or "none"),
-            "",
-        ])
-        for variant in body["variants"]:
-            lines.append(f"- **{variant['name']}** ({variant['when']}):")
-            for row in variant["rows"]:
-                fields = ", ".join(
-                    f"`{field['name']}`:{field['value_type']}" for field in row["fields"]
-                )
-                lines.append(f"  - `{row['name']}` [{row['repetition']}]: {fields}")
-            lines.extend(f"  - Constraint: {item}" for item in variant["constraints"])
-        lines.append("")
+        _render_body(lines, command["canonical"], body)
 
     lines.extend([
         "## Nested block constructs",
@@ -388,6 +392,33 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
                 _escape_cell(construct["summary"]),
             )
         )
+
+    lines.extend(["", "## Nested construct details", ""])
+    for construct in data["nested_constructs"]:
+        evidence = ", ".join(evidence_links[item] for item in construct["evidence_ids"])
+        lines.extend([
+            f"### `{construct['canonical']}`",
+            "",
+            construct["summary"],
+            "",
+            f"- Registry ID: `{construct['id']}`",
+            f"- Match prefix: `{construct['match_prefix']}`",
+            f"- Coverage: {construct['coverage']}",
+            f"- Evidence: {evidence}",
+        ])
+        if construct["parameters"]:
+            lines.extend(["", "Known parameters:", ""])
+            for parameter in construct["parameters"]:
+                required = "required" if parameter["required"] else "optional"
+                lines.append(
+                    f"- `{parameter['name']}` ({parameter['value_type']}, {required}): {parameter['summary']}"
+                )
+        if construct["remaining_work"]:
+            lines.extend(["", "Remaining specification work:", ""])
+            lines.extend(f"- {item}" for item in construct["remaining_work"])
+        lines.append("")
+        if construct.get("body"):
+            _render_body(lines, construct["canonical"], construct["body"])
 
     lines.extend(["", "## Execution contract", ""])
     execution = data["execution_contract"]

@@ -5,16 +5,17 @@ This is the top-level ledger for the BSAM input API. It prevents “all capabili
 ## Baseline
 
 - Product version reported by executable: BSAM 2.4
-- Local source commit: `7e414be55abae10e2a648bd39bcc07b4904e9edc`
-- Executable SHA-256: `580B7AF434BF4F453B8137802246FEB292DD89A04FDB3DD54000EC9A225E146F`
+- Local source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
+- Executable build: 2026-08-27 20:34:14, Windows Intel unlocked build
+- Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Target execution: Windows serial
 - Generation policy: current canonical syntax only
 
-Exact top-level names observed as required by the current parser include `CLUSTERS` and `MATERIALS`. Older examples using `APPROXIMATION` or singular `MATERIAL` are evidence for diagnostics and migration messages, not generation templates.
+The updated block locator compares every requested token exactly and case-sensitively. Current generation must therefore use the registered tokens verbatim. In particular, the optional statistical block starts with `STATISTICAL` but still terminates with `END STATISTICAL DISTRIBUTIONS`. Older examples using `APPROXIMATION` or singular `MATERIAL` are evidence for diagnostics and migration messages, not generation templates.
 
 ## Initial machine-readable inventory
 
-Registry version `0.2.0` records 13 active top-level blocks, 29 finite-element cluster command dispatches, 11 active nested BOUNDARY constructs, and 27 local evidence records. It also defines structured bodies and dependencies for DIMENSIONS, NODE, ELEMENT, NSET, ELSET, INTEGRATION, ORIENTATION, and SECTION, and generates the [BSAM 2.4 current input API reference](reference/BSAM_2_4_INPUT_API.md).
+Registry version `0.3.0` records 13 active top-level blocks, 29 finite-element cluster command dispatches, 12 active nested BOUNDARY constructs, and 32 local evidence records. It defines structured bodies and dependencies for core FE commands plus BOUNDARY solver scheduling, connections, loading sequences, convergence controls, and output requests, and generates the [BSAM 2.4 current input API reference](reference/BSAM_2_4_INPUT_API.md). The baseline transition and reproducibility qualification are recorded in [the 2026-08-31 audit](BASELINE_AUDIT_2026-08-31.md).
 
 This is an active-dispatch inventory, not completed G1 coverage. Records marked `identified` or `partially-documented` still require exact body grammar, types, defaults, dependencies, edit impacts, and tests.
 
@@ -22,16 +23,16 @@ This is an active-dispatch inventory, not completed G1 coverage. Records marked 
 
 | Category | Primary local entry point | Inventory status | V1 requirement |
 |---|---|---|---|
-| Solver and analysis control | `source/bsam/solve_ini.f` | Entry point identified | Complete |
+| Solver and analysis control | `source/libbsam/solve_ini.f90` | Multiple solver records and boundary schedule identified | Complete |
 | User functions | `source/bsam/mainf1.f`, related input routines | Entry point identified | Complete |
 | Moisture | `source/bsam/mainf1.f`, related input routines | Entry point identified | Complete |
-| Clusters, nodes, elements, sets, orientation | `source/libbsam/iap_ini.f`, `source/libbsam/mod_fe_input.f90` | Dispatch inventoried; eight core bodies structured | Complete |
-| Boundary conditions, loads, connections, convergence, output | `source/libbsam/ibn_ini.f` and callees | Active primary constructs inventoried | Complete |
-| Constitutive controls | `source/libbsam/con_ini.f` | Entry point identified | Complete |
+| Clusters, nodes, elements, sets, orientation | `source/libbsam/iap_ini.f90`, `source/libbsam/mod_fe_input.f90` | Dispatch inventoried; core bodies structured | Complete |
+| Boundary conditions, loads, connections, convergence, output | `source/libbsam/ibn_ini.f90` and callees | Solver schedule, surface contact, VTMS convergence labels, and major record families structured | Complete |
+| Constitutive controls | `source/libbsam/con_ini.f90` | Entry point identified | Complete |
 | Tables | input routines reached from `source/bsam/mainf1.f` | Entry point identified | Complete |
 | Statistical distributions | input routines reached from `source/bsam/mainf1.f` | Entry point identified | Complete |
-| Materials | `source/libbsam/mat_ini.f`, `material.f90`, `interface_material.f90` | Entry points identified | Complete |
-| Failure criteria | `source/libbsam/fai_ini.f` | Entry point identified | Complete |
+| Materials | `source/libbsam/mat_ini.f90`, `material.f90`, `interface_material.f90` | Entry points identified | Complete |
+| Failure criteria | `source/libbsam/fai_ini.f90` | Entry point identified | Complete |
 | User-defined input | input routines reached from `source/bsam/mainf1.f` | Entry point identified | Complete |
 | Crack and damage input | `source/libbsam/crk_ini.f90` | Entry point identified | Complete |
 

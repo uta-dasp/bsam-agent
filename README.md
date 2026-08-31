@@ -2,7 +2,7 @@
 
 BSAM Agent will create, understand, modify, validate, and run current-syntax BSAM input files on Windows. This repository is intentionally separate from the BSAM source tree and will not modify BSAM itself.
 
-Status: groundwork only. The repository currently contains architecture, API contracts, scope decisions, and a staged roadmap. It contains no application implementation or model runtime.
+Status: G1 specification work is in progress. The repository contains architecture and API contracts plus a validated, generated current-syntax capability registry. The deterministic application core begins in G2.
 
 ## Version 1 target
 
@@ -41,11 +41,11 @@ Status: groundwork only. The repository currently contains architecture, API con
 
 BSAM-specific behavior is derived only from local source, local documentation, local examples, and controlled runs of the local executable. BSAM source, real decks, VTMS files, and generated artifacts must not be sent to an external model provider. See the [local-data policy](docs/security/LOCAL_DATA_POLICY.md).
 
-## Pinned starting baseline
+## Active pinned baseline
 
 - Executable: `D:\Partha\BSAM\projects\bsam20.exe`
-- Reported product version: BSAM 2.4, Windows Intel, serial build
-- Source commit observed locally: `7e414be55abae10e2a648bd39bcc07b4904e9edc`
-- Executable SHA-256: `580B7AF434BF4F453B8137802246FEB292DD89A04FDB3DD54000EC9A225E146F`
+- Reported product version: BSAM 2.4, Windows Intel, unlocked build dated 2026-08-27 20:34:14
+- Source commit observed locally: `9954027f1c325c63d58aeb836e8fec41a4b363af`
+- Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 
-These values are evidence for the first specification snapshot, not permanent configuration defaults.
+The source worktree contains four modified first-party SHEFF submodules, so the executable hash is required to identify the compiled artifact. See the [baseline audit](docs/bsam/BASELINE_AUDIT_2026-08-31.md).
