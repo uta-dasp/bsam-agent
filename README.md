@@ -65,6 +65,10 @@ python -m bsam_agent plan-change "..\projects\notch_v1\notch_v1.in" `
   --block BOUNDARY --construct CONVERGENCE `
   --parameter d_reduction --value 0.30 --out change.json
 python -m bsam_agent apply-change change.json --out notch_v1.changed.in
+python -m bsam_agent run notch_v1.changed.in `
+  --output-dir runs\notch-v1-run --timeout 3600
 ```
 
-Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Direct edits are currently limited to an existing, unambiguous key/value inside a registered nested construct; structural mesh or ply changes are not yet implemented. This slice does not yet launch BSAM.
+Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Direct edits are currently limited to an existing, unambiguous key/value inside a registered nested construct; structural mesh or ply changes are not yet implemented.
+
+`run` verifies the executable SHA-256, validates the deck, requires a new output directory, uses separate `-I`/`-O` arguments, captures process streams, and writes `run-manifest.json`. Success requires the BSAM end-of-program sentinel, no classified fatal marker, and process exit code zero. A timeout requests a controlled stop through the run `.exit` file before terminating an unresponsive process.

@@ -2,18 +2,24 @@
 
 ## What is runnable now
 
-The BSAM Agent application is not runnable yet. No deck parser, editor, renderer, run supervisor, local API, or model adapter has been implemented.
-
-The specification tooling is runnable now:
+The deterministic CLI is runnable now. It supports baseline inspection, lossless deck inspection, conservative validation, revision-bound minimal edits to existing registered nested parameters, and synchronous isolated execution. The local HTTP API, general semantic model, structural transformations, mesh import/generation, and model adapters are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
-python tools\registry_tools.py validate
-python tools\registry_tools.py check
+$env:PYTHONPATH = "$PWD\src"
+python -m bsam_agent baseline
+python -m bsam_agent inspect ..\projects\notch_v1\notch_v1.in
+python -m bsam_agent validate ..\projects\notch_v1\notch_v1.in
 python -m unittest discover -s tests -v
 ```
 
-`validate` checks registry identities, evidence references, hierarchy, body variants, fields, and dependencies. `check` proves the generated API reference matches the registry. The tests currently protect the pinned baseline, current block names, command dispatch prefixes, core FE edit grammars, active BOUNDARY inventory, and deterministic reference generation.
+The tests protect the pinned baseline, registry generation, byte-identical no-op rendering, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, no-in-place policy, executable fingerprint rejection, and run classification.
+
+## Execution smoke evidence
+
+On 2026-08-31 the supervisor launched the pinned executable against `projects/notch_v1/notch_v1.in` using separate absolute input and output directories. A two-second timeout deliberately exercised controlled stopping. BSAM created its listing, step, and TP artifacts; the supervisor wrote the `.exit` stop request; the process ended; and the manifest classified it as `stopped` with no fatal marker and no success sentinel. This proves invocation and stop supervision, not successful analysis completion.
+
+Run artifacts are local and ignored beneath `runs/`. A successful acceptance run still requires a reviewed test case allowed to finish and classification `succeeded`.
 
 ## Independently verify the pinned baseline
 

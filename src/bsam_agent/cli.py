@@ -11,6 +11,7 @@ from . import __version__
 from .change import ChangeError, apply_plan, plan_parameter_change, write_plan
 from .document import SourceDocument
 from .registry import load_registry
+from .run import RunError, run_bsam
 
 
 def _document(path_text: str) -> SourceDocument:
@@ -46,6 +47,13 @@ def build_parser() -> argparse.ArgumentParser:
     apply_parser.add_argument("plan")
     apply_parser.add_argument("--out", required=True, help="new deck path; in-place writes are rejected")
 
+    run_parser = subparsers.add_parser("run", help="run a validated deck with the pinned BSAM executable")
+    run_parser.add_argument("deck")
+    run_parser.add_argument("--output-dir", required=True, help="new isolated output directory")
+    run_parser.add_argument("--executable", default=str(Path(__file__).resolve().parents[3] / "projects" / "bsam20.exe"))
+    run_parser.add_argument("--timeout", type=float, default=3600.0, help="seconds before requesting a controlled stop; <=0 disables")
+    run_parser.add_argument("--stop-grace", type=float, default=30.0, help="seconds to wait after a controlled stop request")
+
     subparsers.add_parser("baseline", help="print the pinned registry baseline")
     return parser
 
@@ -72,6 +80,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "apply-change":
             _print_json(apply_plan(Path(args.plan), Path(args.out)))
             return 0
+        if args.command == "run":
+            result = run_bsam(
+                Path(args.deck), Path(args.output_dir), Path(args.executable), args.timeout, args.stop_grace
+            )
+            _print_json(result)
+            return 0 if result["classification"] == "succeeded" else 3
 
         document = _document(args.deck)
         inspection = document.inspection()
@@ -87,7 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             _print_json(result, args.compact)
             return 2 if inspection["summary"]["errors"] else 0
-    except (OSError, ValueError, ChangeError) as exc:
+    except (OSError, ValueError, ChangeError, RunError) as exc:
         _print_json({"error": str(exc)})
         return 2
     return 2

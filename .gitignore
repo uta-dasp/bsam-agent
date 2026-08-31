@@ -1,43 +1,4 @@
-# Secrets and local configuration
-.env
-.env.*
-!.env.example
-*.key
-*.pem
-
-# Python
+/runs/*
+!/runs/.gitkeep
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.venv/
-
-# Node / VS Code extension (later phase)
-node_modules/
-dist/
-out/
-*.vsix
-
-# Local models and provider caches
-*.gguf
-models/
-.ollama/
-
-# BSAM working data and generated artifacts
-workspace/
-runs/
-artifacts/
-*.lst
-*.ssn
-*.exit
-*.tmp
-*_TP.dat
-*.D_Hs
-*.D_HsMIC
-
-# Editor and OS noise
-.vscode/settings.json
-.idea/
-Thumbs.db
-.DS_Store
