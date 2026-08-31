@@ -2,7 +2,7 @@
 
 ## What is runnable now
 
-The deterministic CLI is runnable now. It supports baseline inspection, lossless deck inspection, conservative validation, revision-bound minimal edits to existing registered nested parameters, and synchronous isolated execution. The local HTTP API, general semantic model, structural transformations, mesh import/generation, and model adapters are not implemented yet.
+The deterministic CLI is runnable now. It supports baseline inspection, lossless deck inspection, conservative validation, revision-bound minimal edits to existing registered nested parameters, fresh-plan diff review, non-overwriting applied-change audit sidecars, and synchronous isolated execution. The local HTTP API, general semantic model, structural transformations, mesh import/generation, and model adapters are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
@@ -13,7 +13,7 @@ python -m bsam_agent validate ..\projects\notch_v1\notch_v1.in
 python -m unittest discover -s tests -v
 ```
 
-The tests protect the pinned baseline, registry generation, byte-identical no-op rendering, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, no-in-place policy, executable fingerprint rejection, and run classification.
+The tests protect the pinned baseline, registry generation, byte-identical no-op rendering, block/command indexing, stable diagnostics, typed minimal patches, stale-plan rejection, semantic/unified diff review, no-in-place and no-audit-overwrite policies, audit/output digest binding, executable fingerprint rejection, and run classification.
 
 ## Execution smoke evidence
 
@@ -59,4 +59,4 @@ No single successful BSAM run proves general correctness. Each supported capabil
 
 ## Planned user-facing audit path
 
-When G2 is complete, a user will be able to run `inspect`, `plan-change`, `diff`, `validate`, `run`, and `status` without a language model. Every applied change will carry the source digest, plan digest, changed model paths, affected files, validation result, executable fingerprint, and run directory. This deterministic path is the reference against which local or hosted model behavior is checked.
+The current edit slice provides `inspect`, `plan-change`, `diff`, `apply-change`, and `validate` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work, along with asynchronous `status` and `stop`. This deterministic path is the reference against which local or hosted model behavior is checked.

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
+from difflib import unified_diff
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +13,9 @@ from .document import SourceDocument, SourceLine
 from .registry import load_registry
 
 
-PLAN_SCHEMA_VERSION = "1.0.0"
+PLAN_SCHEMA_VERSION = "1.1.0"
+SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", PLAN_SCHEMA_VERSION}
+AUDIT_SCHEMA_VERSION = "1.0.0"
 
 
 class ChangeError(ValueError):
@@ -24,6 +28,46 @@ def _canonical_json(value: dict[str, Any]) -> bytes:
 
 def _plan_digest(plan_without_digest: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical_json(plan_without_digest)).hexdigest().upper()
+
+
+def _patched_bytes(document: SourceDocument, patch: dict[str, Any]) -> bytes:
+    start, end = int(patch["start"]), int(patch["end"])
+    expected = patch["old"].encode("latin-1")
+    if start < 0 or end < start or end > len(document.raw):
+        raise ChangeError("planned source span is outside the source document")
+    if document.raw[start:end] != expected:
+        raise ChangeError("planned source span no longer contains the expected value")
+    return document.raw[:start] + patch["new"].encode("latin-1") + document.raw[end:]
+
+
+def _source_diff(source: Path, before: bytes, after: bytes) -> str:
+    before_lines = before.decode("latin-1").splitlines()
+    after_lines = after.decode("latin-1").splitlines()
+    return "\n".join(unified_diff(
+        before_lines,
+        after_lines,
+        fromfile=f"a/{source.name}",
+        tofile=f"b/{source.name}",
+        lineterm="",
+    )) + "\n"
+
+
+def _validation_result(document: SourceDocument) -> dict[str, Any]:
+    diagnostics = document.diagnostics()
+    return {
+        "diagnostics": [item.as_dict() for item in diagnostics],
+        "summary": {
+            "errors": sum(item.severity == "error" for item in diagnostics),
+            "warnings": sum(item.severity == "warning" for item in diagnostics),
+        },
+    }
+
+
+def _validate_raw_value(value: str) -> None:
+    if any(character in value for character in "\r\n\x00,"):
+        raise ChangeError("replacement value must be a single non-comma record value")
+    if not value.strip():
+        raise ChangeError("replacement value must not be empty")
 
 
 def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
@@ -146,10 +190,7 @@ def plan_parameter_change(
     value: str,
     occurrence: int = 1,
 ) -> dict[str, Any]:
-    if any(character in value for character in "\r\n\x00,"):
-        raise ChangeError("replacement value must be a single non-comma record value")
-    if not value.strip():
-        raise ChangeError("replacement value must not be empty")
+    _validate_raw_value(value)
     document = SourceDocument.read(source)
     construct = _construct_record(block, construct_name)
     _validate_replacement(construct, parameter, value)
@@ -169,10 +210,26 @@ def plan_parameter_change(
     new_bytes = value.encode("latin-1")
     if old_bytes == new_bytes:
         raise ChangeError("requested value is identical to the existing value")
+    patch = {
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": old_bytes.decode("latin-1"),
+        "new": value,
+    }
+    updated = _patched_bytes(document, patch)
+    updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+    validation = _validation_result(updated_document)
+    if validation["summary"]["errors"]:
+        messages = "; ".join(item["message"] for item in validation["diagnostics"] if item["severity"] == "error")
+        raise ChangeError(f"planned deck failed structural validation: {messages}")
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
+    preview = f"line {line.number}: {parameter} = {old_bytes.decode('latin-1')} -> {value}"
     plan: dict[str, Any] = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "source": str(source.resolve()),
         "base_sha256": document.sha256,
+        "proposed_sha256": updated_document.sha256,
         "operation": "set-existing-parameter",
         "selector": {
             "block": block.upper(),
@@ -180,14 +237,17 @@ def plan_parameter_change(
             "construct_occurrence": occurrence,
             "parameter": parameter,
         },
-        "patch": {
-            "start": start,
-            "end": end,
-            "line": line.number,
-            "old": old_bytes.decode("latin-1"),
-            "new": value,
-        },
-        "preview": f"line {line.number}: {parameter} = {old_bytes.decode('latin-1')} -> {value}",
+        "patch": patch,
+        "changed_model_paths": [model_path],
+        "affected_files": [str(source.resolve())],
+        "changes": [{
+            "operation": "modify",
+            "target": model_path,
+            "summary": preview,
+        }],
+        "source_diff": _source_diff(source, document.raw, updated),
+        "validation": validation,
+        "preview": preview,
     }
     digest = _plan_digest(plan)
     plan["plan_digest"] = digest
@@ -198,7 +258,8 @@ def plan_parameter_change(
 def write_plan(plan: dict[str, Any], destination: Path) -> None:
     if destination.exists():
         raise ChangeError(f"plan destination already exists: {destination}")
-    destination.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with destination.open("x", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(plan, indent=2, sort_keys=True) + "\n")
 
 
 def load_plan(path: Path) -> dict[str, Any]:
@@ -206,8 +267,12 @@ def load_plan(path: Path) -> dict[str, Any]:
         plan = json.load(stream)
     if not isinstance(plan, dict):
         raise ChangeError("change plan must be a JSON object")
-    if plan.get("schema_version") != PLAN_SCHEMA_VERSION:
+    if plan.get("schema_version") not in SUPPORTED_PLAN_SCHEMA_VERSIONS:
         raise ChangeError("unsupported change-plan schema version")
+    required = {"source", "base_sha256", "operation", "selector", "patch", "preview"}
+    missing = sorted(required - plan.keys())
+    if missing:
+        raise ChangeError(f"change plan is missing required fields: {', '.join(missing)}")
     digest = plan.get("plan_digest")
     content = {key: value for key, value in plan.items() if key not in {"plan_digest", "plan_id"}}
     expected = _plan_digest(content)
@@ -216,33 +281,179 @@ def load_plan(path: Path) -> dict[str, Any]:
     return plan
 
 
-def apply_plan(plan_path: Path, destination: Path) -> dict[str, Any]:
+def _validated_plan_proposal(
+    plan: dict[str, Any],
+    source: Path,
+    document: SourceDocument,
+) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
+    """Re-derive a plan through registered typing and exact source selection."""
+    if plan.get("operation") != "set-existing-parameter":
+        raise ChangeError("unsupported change-plan operation")
+    selector = plan.get("selector")
+    patch = plan.get("patch")
+    if not isinstance(selector, dict) or not isinstance(patch, dict):
+        raise ChangeError("change plan is missing its selector or patch")
+    if not isinstance(patch.get("old"), str) or not isinstance(patch.get("new"), str):
+        raise ChangeError("change plan old and new values must be strings")
+    try:
+        block = str(selector["block"])
+        construct_name = str(selector["construct"])
+        occurrence = int(selector["construct_occurrence"])
+        parameter = str(selector["parameter"])
+        new_value = str(patch["new"])
+        planned_start = int(patch["start"])
+        planned_end = int(patch["end"])
+        planned_line = int(patch["line"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ChangeError("change plan selector or patch is malformed") from exc
+
+    _validate_raw_value(new_value)
+    construct = _construct_record(block, construct_name)
+    _validate_replacement(construct, parameter, new_value)
+    start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
+    candidates: list[tuple[SourceLine, int, int]] = []
+    for line in document.lines[start_line:end_line]:
+        candidates.extend((line, *span) for span in _value_spans(line, parameter))
+    if len(candidates) != 1:
+        raise ChangeError("planned parameter no longer resolves to one exact registered value")
+    line, start, end = candidates[0]
+    if (start, end, line.number) != (planned_start, planned_end, planned_line):
+        raise ChangeError("planned patch does not match the registered parameter source span")
+
+    updated = _patched_bytes(document, patch)
+    updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+    if plan.get("proposed_sha256") not in {None, updated_document.sha256}:
+        raise ChangeError("change plan proposed-output digest is invalid")
+    source_diff = _source_diff(source, document.raw, updated)
+    if plan.get("source_diff") is not None and plan["source_diff"] != source_diff:
+        raise ChangeError("change plan source diff does not match its exact patch")
+    validation = _validation_result(updated_document)
+    if plan.get("validation") is not None and plan["validation"] != validation:
+        raise ChangeError("change plan validation preview does not match its exact patch")
+    if validation["summary"]["errors"]:
+        messages = "; ".join(
+            item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
+        )
+        raise ChangeError(f"planned deck failed structural validation: {messages}")
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
+    if plan.get("changed_model_paths") is not None and plan["changed_model_paths"] != [model_path]:
+        raise ChangeError("change plan model path does not match its registered selector")
+    expected_preview = f"line {line.number}: {parameter} = {patch['old']} -> {new_value}"
+    if plan["preview"] != expected_preview:
+        raise ChangeError("change plan preview does not match its registered selector and patch")
+    expected_changes = [{
+        "operation": "modify",
+        "target": model_path,
+        "summary": expected_preview,
+    }]
+    if plan.get("changes") is not None and plan["changes"] != expected_changes:
+        raise ChangeError("change plan semantic changes do not match its registered selector")
+    expected_files = [str(source.resolve())]
+    if plan.get("affected_files") is not None and plan["affected_files"] != expected_files:
+        raise ChangeError("change plan affected files do not match its source")
+    return updated, updated_document, model_path, source_diff, validation
+
+
+def review_plan(path: Path) -> dict[str, Any]:
+    """Return review data only after revalidating the plan and source revision."""
+    plan = load_plan(path)
+    source = Path(plan["source"])
+    document = SourceDocument.read(source)
+    if document.sha256 != plan["base_sha256"]:
+        raise ChangeError("source changed after planning; create a new change plan")
+    _, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
+        plan, source, document
+    )
+    return {
+        "plan_id": plan["plan_id"],
+        "plan_digest": plan["plan_digest"],
+        "source": str(source.resolve()),
+        "base_sha256": document.sha256,
+        "proposed_sha256": updated_document.sha256,
+        "changed_model_paths": [model_path],
+        "affected_files": plan.get("affected_files", [str(source.resolve())]),
+        "changes": plan.get("changes", [{
+            "operation": "modify",
+            "target": model_path,
+            "summary": plan["preview"],
+        }]),
+        "source_diff": source_diff,
+        "validation": validation,
+    }
+
+
+def _default_audit_path(destination: Path) -> Path:
+    return Path(str(destination) + ".audit.json")
+
+
+def apply_plan(
+    plan_path: Path,
+    destination: Path,
+    audit_destination: Path | None = None,
+) -> dict[str, Any]:
     plan = load_plan(plan_path)
     source = Path(plan["source"])
+    audit_destination = audit_destination or _default_audit_path(destination)
     if source.resolve() == destination.resolve():
         raise ChangeError("in-place replacement is not allowed; choose a separate destination")
     if destination.exists():
         raise ChangeError(f"destination already exists: {destination}")
+    if audit_destination.exists():
+        raise ChangeError(f"audit destination already exists: {audit_destination}")
+    if audit_destination.resolve() == destination.resolve():
+        raise ChangeError("audit destination must be separate from the output deck")
     document = SourceDocument.read(source)
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
     patch = plan["patch"]
-    start, end = int(patch["start"]), int(patch["end"])
-    expected = patch["old"].encode("latin-1")
-    if document.raw[start:end] != expected:
-        raise ChangeError("planned source span no longer contains the expected value")
-    updated = document.raw[:start] + patch["new"].encode("latin-1") + document.raw[end:]
-    updated_document = SourceDocument.from_bytes(updated, str(destination.resolve()))
-    errors = [item for item in updated_document.diagnostics() if item.severity == "error"]
-    if errors:
-        raise ChangeError("updated deck failed structural validation: " + "; ".join(item.message for item in errors))
-    destination.write_bytes(updated)
-    return {
-        "plan_id": plan["plan_id"],
+    updated, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
+        plan, source, document
+    )
+
+    registry = load_registry()
+    audit: dict[str, Any] = {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "applied_at": datetime.now(timezone.utc).isoformat(),
+        "operation": plan["operation"],
+        "plan": {
+            "path": str(plan_path.resolve()),
+            "id": plan["plan_id"],
+            "digest": plan["plan_digest"],
+        },
         "source": str(source.resolve()),
         "destination": str(destination.resolve()),
         "base_sha256": document.sha256,
         "output_sha256": updated_document.sha256,
+        "changed_model_paths": [model_path],
+        "affected_files": [str(destination.resolve())],
+        "source_diff": source_diff,
+        "validation": validation,
+        "registered_baseline": registry["target"],
+        "run_directory": None,
+    }
+    audit_digest = _plan_digest(audit)
+    audit["audit_digest"] = audit_digest
+    audit["audit_id"] = audit_digest[:16]
+    with destination.open("xb") as stream:
+        stream.write(updated)
+    try:
+        with audit_destination.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(audit, indent=2, sort_keys=True) + "\n")
+    except OSError:
+        destination.unlink(missing_ok=True)
+        raise
+    return {
+        "plan_id": plan["plan_id"],
+        "plan_digest": plan["plan_digest"],
+        "source": str(source.resolve()),
+        "destination": str(destination.resolve()),
+        "base_sha256": document.sha256,
+        "output_sha256": updated_document.sha256,
+        "changed_model_paths": audit["changed_model_paths"],
         "changed_line": patch["line"],
+        "validation": validation,
+        "audit": str(audit_destination.resolve()),
+        "audit_id": audit["audit_id"],
+        "audit_digest": audit["audit_digest"],
         "preview": plan["preview"],
     }

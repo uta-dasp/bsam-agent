@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
-from .change import ChangeError, apply_plan, plan_parameter_change, write_plan
+from .change import ChangeError, apply_plan, plan_parameter_change, review_plan, write_plan
 from .document import SourceDocument
 from .registry import load_registry
 from .run import RunError, run_bsam
@@ -46,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
     apply_parser = subparsers.add_parser("apply-change", help="apply a revision-bound plan to a new deck")
     apply_parser.add_argument("plan")
     apply_parser.add_argument("--out", required=True, help="new deck path; in-place writes are rejected")
+    apply_parser.add_argument("--audit-out", help="new immutable audit JSON path; defaults beside output")
+
+    diff_parser = subparsers.add_parser("diff", help="review a fresh change plan and its unified source diff")
+    diff_parser.add_argument("plan")
+    diff_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
 
     run_parser = subparsers.add_parser("run", help="run a validated deck with the pinned BSAM executable")
     run_parser.add_argument("deck")
@@ -78,7 +83,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json(plan)
             return 0
         if args.command == "apply-change":
-            _print_json(apply_plan(Path(args.plan), Path(args.out)))
+            audit_path = Path(args.audit_out) if args.audit_out else None
+            _print_json(apply_plan(Path(args.plan), Path(args.out), audit_path))
+            return 0
+        if args.command == "diff":
+            _print_json(review_plan(Path(args.plan)), args.compact)
             return 0
         if args.command == "run":
             result = run_bsam(
