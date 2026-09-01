@@ -102,7 +102,9 @@ Status: in progress.
 - [x] Capture streams and atomically publish state.
 - [x] Classify sentinel, diagnostics, timeout, and stop outcomes.
 - [x] Provide concurrent `status` and idempotent controlled `stop`.
-- [ ] Add end-to-end modified-deck and imported-model acceptance runs.
+- [x] Exercise a revision-bound modified notch deck through preflight, sustained isolated execution, artifacts, and a non-escalated controlled timeout with no fatal markers.
+- [ ] Complete a success-sentinel modified-notch run with an approved longer runtime budget.
+- [ ] Add imported-model executable acceptance after a relevant analysis template is supplied.
 
 ### G2.6 Local Agent API
 
