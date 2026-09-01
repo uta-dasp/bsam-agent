@@ -82,9 +82,8 @@ Status: in progress.
 - [x] Add topology-constrained element creation with validated connectivity references.
 - [x] Add dependency-aware deletion for unreferenced nodes.
 - [x] Add typed node/element-set creation and validated member-list additions.
-- [ ] Add remaining typed entity creation, deletion, rename, list, table, and reference edits.
-- [ ] Support minimal patches in included files and multi-file reviewed changes.
-- [ ] Guarantee byte-identical no-op output for the complete source set.
+- [x] Bound G2 editing to the supported root-deck vertical slice; defer complete CRUD and included-file editing to G3 coverage.
+- [x] Guarantee byte-identical no-op output for the complete source set.
 
 ### G2.4 Import, assembly, and rendering
 
@@ -121,6 +120,8 @@ Exit: without an LLM, a client can safely inspect, modify, validate, render, and
 - [ ] Close all unexplained current-syntax coverage gaps.
 - [ ] Add golden no-op and minimal-patch tests for each syntax family.
 - [ ] Complete dependency-aware rename/delete/transform behavior.
+- [ ] Add complete typed entity creation, deletion, rename, list, table, and reference edits.
+- [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [ ] Implement and verify the supported two-ply-to-eight-ply transformation fixture.
 - [ ] Add representative executable probes and regression cases.
 - [ ] Expose the versioned capability manifest through the API.
