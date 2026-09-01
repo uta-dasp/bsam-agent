@@ -6,6 +6,8 @@ Run `python -m bsam_agent serve --workspace-root <path> --port 8765`. The server
 
 The generic tool route is the first executable API used for model-tool integration. The resource-oriented routes in `openapi.yaml` remain the target once a persistent model-revision store is implemented.
 
+`run_bsam` is asynchronous at this boundary: it reserves the output directory and returns `state: accepted`. Poll `get_run_status` for durable manifest state. `stop_run` can be requested immediately after acceptance; the service delivers the controlled request as soon as the run manifest exists.
+
 The BSAM Agent API is the stable local boundary shared by the CLI, automated tests, and future VS Code extension. The initial contract is documented in [openapi.yaml](openapi.yaml). It is a design draft, not an implemented service.
 
 ## Contract principles

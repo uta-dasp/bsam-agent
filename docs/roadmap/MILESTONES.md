@@ -113,7 +113,7 @@ Status: in progress.
 - [x] Enforce workspace-relative paths, source/plan digests, mutation/run confirmation, and run policy at the API boundary.
 - [x] Generate strict request schemas and required response invariants from one canonical tool-contract source.
 - [x] Add API schema, HTTP-envelope, workspace escape, confirmation, concurrency, and error-normalization tests.
-- [ ] Add API-level cancellation tests when run launch becomes asynchronous.
+- [x] Launch runs asynchronously through the API and test accepted/running status plus early controlled cancellation delivery.
 
 Exit: without an LLM, a client can safely inspect, modify, validate, render, and run the supported model, and combine the accepted `.ele` fixture with explicit analysis data.
 

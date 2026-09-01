@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -41,11 +44,25 @@ class ApiError(ValueError):
         self.code = code
 
 
+@dataclass
+class _RunJob:
+    output_directory: Path
+    source_set_sha256: str
+    state: str = "accepted"
+    classification: str = "pending"
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    cancel_requested: threading.Event = field(default_factory=threading.Event)
+    thread: threading.Thread | None = None
+
+
 class LocalAgentApi:
     def __init__(self, workspace_root: Path) -> None:
         self.workspace_root = workspace_root.resolve()
         if not self.workspace_root.is_dir():
             raise ValueError("API workspace root is not a directory")
+        self._jobs: dict[Path, _RunJob] = {}
+        self._jobs_lock = threading.Lock()
 
     @property
     def tools(self) -> tuple[str, ...]:
@@ -216,20 +233,109 @@ class LocalAgentApi:
             )
             if args["confirm"] is not True:
                 raise ApiError("confirmation_required", "run_bsam requires confirm=true")
-            return run_bsam(
-                self._path(args["source"], "source"),
-                self._path(args["output_dir"], "output_dir"),
-                self._path(args["executable"], "executable"),
-                float(args.get("timeout", 3600.0)), float(args.get("stop_grace", 30.0)),
-                self.workspace_root,
+            return self._start_run(
+                self._path(args["source"], "source"), self._path(args["output_dir"], "output_dir"),
+                self._path(args["executable"], "executable"), float(args.get("timeout", 3600.0)),
+                float(args.get("stop_grace", 30.0)),
             )
         if tool == "get_run_status":
             args = self._args(arguments, {"output_dir"})
-            return run_status(self._path(args["output_dir"], "output_dir"))
+            return self._run_status(self._path(args["output_dir"], "output_dir"))
         args = self._args(arguments, {"output_dir", "confirm"})
         if args["confirm"] is not True:
             raise ApiError("confirmation_required", "stop_run requires confirm=true")
-        return request_run_stop(self._path(args["output_dir"], "output_dir"))
+        return self._stop_run(self._path(args["output_dir"], "output_dir"))
+
+    def _start_run(
+        self,
+        source: Path,
+        output_directory: Path,
+        executable: Path,
+        timeout: float,
+        stop_grace: float,
+    ) -> dict[str, Any]:
+        source_set = SourceSet.read(source, self.workspace_root)
+        if source_set.diagnostics() and any(
+            item.severity == "error" for item in source_set.diagnostics()
+        ):
+            raise ApiError("preflight_failed", "source set has validation errors")
+        with self._jobs_lock:
+            if output_directory in self._jobs or output_directory.exists():
+                raise ApiError("run_conflict", "run output directory is already reserved")
+            job = _RunJob(output_directory, source_set.sha256)
+            self._jobs[output_directory] = job
+
+        def worker() -> None:
+            job.state = "running"
+            try:
+                result = run_bsam(
+                    source, output_directory, executable, timeout, stop_grace, self.workspace_root
+                )
+                job.result = result
+                job.state = str(result.get("state", "terminal"))
+                job.classification = str(result.get("classification", "unknown"))
+            except (OSError, ValueError) as exc:
+                job.error = str(exc)
+                job.state = "terminal"
+                job.classification = "failed"
+
+        job.thread = threading.Thread(target=worker, name=f"bsam-run-{output_directory.name}", daemon=True)
+        job.thread.start()
+        return {
+            "state": "accepted",
+            "classification": "pending",
+            "output_directory": str(output_directory),
+            "source_set_sha256": source_set.sha256,
+        }
+
+    def _run_status(self, output_directory: Path) -> dict[str, Any]:
+        manifest = output_directory / "run-manifest.json"
+        if manifest.is_file():
+            return run_status(output_directory)
+        with self._jobs_lock:
+            job = self._jobs.get(output_directory)
+        if job is None:
+            raise ApiError("run_not_found", "run is not known to this API process")
+        if job.result is not None:
+            return job.result
+        result: dict[str, Any] = {
+            "state": job.state,
+            "classification": job.classification,
+            "output_directory": str(output_directory),
+            "source_set_sha256": job.source_set_sha256,
+            "cancel_requested": job.cancel_requested.is_set(),
+        }
+        if job.error:
+            result["error"] = job.error
+        return result
+
+    def _stop_run(self, output_directory: Path) -> dict[str, Any]:
+        manifest = output_directory / "run-manifest.json"
+        if manifest.is_file():
+            return request_run_stop(output_directory)
+        with self._jobs_lock:
+            job = self._jobs.get(output_directory)
+        if job is None:
+            raise ApiError("run_not_found", "run is not known to this API process")
+        job.cancel_requested.set()
+
+        def deliver() -> None:
+            while job.thread is not None and job.thread.is_alive():
+                if (output_directory / "run-manifest.json").is_file():
+                    try:
+                        request_run_stop(output_directory)
+                    except (OSError, ValueError):
+                        pass
+                    return
+                time.sleep(0.02)
+
+        threading.Thread(target=deliver, name=f"bsam-stop-{output_directory.name}", daemon=True).start()
+        return {
+            "state": "stop-requested",
+            "classification": "pending",
+            "output_directory": str(output_directory),
+            "source_set_sha256": job.source_set_sha256,
+        }
 
 
 def build_server(api: LocalAgentApi, port: int = 8765) -> ThreadingHTTPServer:

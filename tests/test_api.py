@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -26,6 +27,50 @@ DECK = (
 
 
 class LocalApiTests(unittest.TestCase):
+    def test_async_run_launch_status_and_early_cancellation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            (root / "fake.exe").write_bytes(b"fake")
+            api = LocalAgentApi(root)
+            create_manifest = threading.Event()
+            stop_delivered = threading.Event()
+
+            def fake_run(source, output, executable, *_args):
+                create_manifest.wait(timeout=2)
+                output.mkdir()
+                (output / "run-manifest.json").write_text("{}", encoding="ascii")
+                stop_delivered.wait(timeout=2)
+                return {
+                    "state": "terminal",
+                    "classification": "stopped",
+                    "output_directory": str(output),
+                    "source_set_sha256": "A" * 64,
+                }
+
+            def fake_stop(output):
+                stop_delivered.set()
+                return {"state": "running", "output_directory": str(output)}
+
+            with patch("bsam_agent.api.run_bsam", side_effect=fake_run), patch(
+                "bsam_agent.api.request_run_stop", side_effect=fake_stop
+            ):
+                accepted = api.dispatch("run_bsam", {
+                    "source": "model.in", "output_dir": "run", "executable": "fake.exe",
+                    "confirm": True,
+                })
+                self.assertEqual("accepted", accepted["state"])
+                early = api.dispatch("get_run_status", {"output_dir": "run"})
+                self.assertIn(early["state"], {"accepted", "running"})
+                stopped = api.dispatch("stop_run", {"output_dir": "run", "confirm": True})
+                self.assertEqual("stop-requested", stopped["state"])
+                create_manifest.set()
+                self.assertTrue(stop_delivered.wait(timeout=2))
+                job = api._jobs[(root / "run").resolve()]
+                self.assertIsNotNone(job.thread)
+                job.thread.join(timeout=2)  # type: ignore[union-attr]
+                self.assertEqual("stopped", job.classification)
+
     def test_dispatch_enforces_workspace_schemas_and_confirmation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
