@@ -5,7 +5,9 @@ info:
   description: >-
     Documentation-first contract for current-syntax BSAM model import,
     loss-preserving modification, validation, rendering, and supervised serial
-    execution. No service is implemented yet.
+    execution. The initial loopback service exposes deterministic operations at
+    /api/v1/tools/{tool}; resource-oriented revision routes remain the target
+    contract for the later persistent model store.
 servers:
   - url: http://127.0.0.1:{port}
     description: Loopback-only local service
@@ -17,6 +19,28 @@ tags:
   - name: Models
   - name: Runs
 paths:
+  /api/v1/tools/{tool}:
+    post:
+      tags: [System]
+      operationId: invokeDeterministicTool
+      summary: Invoke one strict deterministic tool in the configured workspace
+      parameters:
+        - name: tool
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Tool-specific JSON result
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /api/v1/health:
     get:
       tags: [System]

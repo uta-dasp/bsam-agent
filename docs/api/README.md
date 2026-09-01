@@ -1,5 +1,11 @@
 # BSAM Agent API
 
+## Initial local service
+
+Run `python -m bsam_agent serve --workspace-root <path> --port 8765`. The server binds only to `127.0.0.1`. Health and capabilities are available at `/api/v1/health` and `/api/v1/capabilities`; deterministic tools use `POST /api/v1/tools/{tool}` with strict tool-specific JSON arguments. Paths must be relative to the configured workspace, request bodies are bounded, responses disable caching, and apply/run/stop require `confirm: true`.
+
+The generic tool route is the first executable API used for model-tool integration. The resource-oriented routes in `openapi.yaml` remain the target once a persistent model-revision store is implemented.
+
 The BSAM Agent API is the stable local boundary shared by the CLI, automated tests, and future VS Code extension. The initial contract is documented in [openapi.yaml](openapi.yaml). It is a design draft, not an implemented service.
 
 ## Contract principles

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
+from .api import serve
 from .change import (
     ChangeError,
     apply_plan,
@@ -133,6 +134,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("baseline", help="print the pinned registry baseline")
 
+    serve_parser = subparsers.add_parser("serve", help="serve the loopback-only local tool API")
+    serve_parser.add_argument("--workspace-root", required=True)
+    serve_parser.add_argument("--port", type=int, default=8765)
+
     import_parser = subparsers.add_parser(
         "import-mesh", help="import a manually prepared Abaqus-style .ele mesh"
     )
@@ -160,6 +165,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "baseline":
             registry = load_registry()
             _print_json({"registry_version": registry["registry_version"], **registry["target"]})
+            return 0
+        if args.command == "serve":
+            serve(Path(args.workspace_root), args.port)
             return 0
         if args.command == "import-mesh":
             _print_json(import_ele(Path(args.mesh)).as_dict(), args.compact)

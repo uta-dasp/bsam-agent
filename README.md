@@ -70,6 +70,7 @@ python -m bsam_agent diff change.json
 python -m bsam_agent apply-change change.json --out notch_v1.changed.in
 python -m bsam_agent run notch_v1.changed.in `
   --output-dir runs\notch-v1-run --timeout 3600
+python -m bsam_agent serve --workspace-root ".." --port 8765
 # While run is active, from another terminal:
 python -m bsam_agent status runs\notch-v1-run
 python -m bsam_agent stop runs\notch-v1-run

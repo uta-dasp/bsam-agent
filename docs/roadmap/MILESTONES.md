@@ -106,9 +106,9 @@ Status: in progress.
 
 ### G2.6 Local Agent API
 
-- [ ] Implement the versioned loopback-only API service.
-- [ ] Expose capabilities, inspection, semantic summary, preview/apply/diff, validation, render, and run tools.
-- [ ] Enforce workspace roots, revision tokens, confirmation requirements, and run policy at the API boundary.
+- [x] Implement the initial versioned loopback-only JSON tool API service.
+- [x] Expose capabilities, inspection, semantic validation, mesh import, supported change preview/review/apply, run, status, and stop tools.
+- [x] Enforce workspace-relative paths, source/plan digests, mutation/run confirmation, and run policy at the API boundary.
 - [ ] Generate strict request/response schemas from one source of truth.
 - [ ] Add API contract, concurrency, cancellation, and error-normalization tests.
 
