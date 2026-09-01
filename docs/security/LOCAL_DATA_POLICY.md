@@ -2,7 +2,7 @@
 
 ## Default rule
 
-BSAM source code, full input decks, VTMS files, material libraries, mesh data, output artifacts, filesystem paths, and proprietary engineering descriptions remain local.
+BSAM source code, full input decks, Abaqus-style `.ele` files, VTMS files, material libraries, mesh data, output artifacts, filesystem paths, and proprietary engineering descriptions remain local.
 
 The application must work with model providers disabled.
 

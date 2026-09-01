@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.1.0",
-  "registry_version": "0.3.1",
+  "registry_version": "0.3.2",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -236,13 +236,13 @@
       "id": "evidence.current-vtms-deck-tric",
       "kind": "example",
       "locator": "projects/TriC_v311/TriC_v311.in",
-      "claim": "VTMS-generated current project deck using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands."
+      "claim": "Current project deck assembled from pre-existing mesh data using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands; VTMS may have assembled or visualized the mesh but did not generate it."
     },
     {
       "id": "evidence.current-vtms-deck-notch",
       "kind": "example",
       "locator": "projects/notch_v1/notch_v1.in",
-      "claim": "VTMS-generated multi-cluster project deck that demonstrates repeated solid cluster records."
+      "claim": "Current multi-cluster project deck assembled from pre-existing mesh data that demonstrates repeated solid cluster records; VTMS may have assembled or visualized the mesh but did not generate it."
     },
     {
       "id": "evidence.invocation-parser",

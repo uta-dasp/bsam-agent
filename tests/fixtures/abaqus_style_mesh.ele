@@ -1,0 +1,23 @@
+*DIMENSIONS
+8, 1, 2, 1
+*Node
+1, 0, 0, 0
+2, 1, 0, 0
+3, 1, 1, 0
+4, 0, 1, 0
+5, 0, 0, 1
+6, 1, 0, 1
+7, 1, 1, 1
+8, 0, 1, 1
+*Element, type=C3D8
+1, 1, 2, 3, 4, 5, 6, 7, 8
+*Nset, nset=bottom
+1, 2, 3, 4
+*Nset, nset=top, GENERATE
+5, 8, 1
+*Elset, elset=solid
+1
+*Surface, name=outer, type=Element
+solid, S1
+*Orientation, name=ORI-ELE
+1, 1, 0, 0, 0, 0, 1, 0.5

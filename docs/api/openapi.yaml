@@ -45,7 +45,7 @@ paths:
     post:
       tags: [Models]
       operationId: importModel
-      summary: Import workspace-local VTMS, BSAM, or cluster data
+      summary: Import workspace-local Abaqus-style .ele, BSAM, or cluster data
       requestBody:
         required: true
         content:
@@ -365,7 +365,7 @@ components:
       required: [format, source_path]
       properties:
         format:
-          enum: [vtms-ele, bsam-current-input, cluster-json]
+          enum: [abaqus-style-ele, bsam-current-input, cluster-json]
         source_path:
           type: string
           description: Path relative to the configured workspace root

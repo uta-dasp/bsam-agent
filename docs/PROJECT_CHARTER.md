@@ -18,8 +18,8 @@ They must remain separate so changes in a model vendor cannot alter BSAM syntax 
 
 ## Version 1 scope
 
-- Import VTMS mesh/cluster data, initially from an original `.ele` sample or a documented interchange representation.
-- Generate supported mesh families through a pinned local Gmsh adapter after the VTMS-import vertical slice, then convert them through the same validated mesh/cluster interface.
+- Import manually prepared Abaqus-style mesh/cluster data from `.ele` interchange files. VTMS may assemble or visualize existing meshes but is not treated as the mesh generator or file-format authority.
+- Generate supported mesh families through a pinned local Gmsh adapter after the `.ele`-import vertical slice, then convert them through the same validated mesh/cluster interface.
 - Import current BSAM input files and their include graph into a loss-preserving syntax representation and typed model.
 - Modify any supported model parameter while preserving unrelated source text, ordering, comments, and include structure.
 - Perform dependency-aware structural transformations such as converting a two-ply model to an eight-ply model.
@@ -40,7 +40,7 @@ They must remain separate so changes in a model vendor cannot alter BSAM syntax 
 - General-purpose unstructured mesh generation
 - Modification of BSAM source code
 
-Gmsh-backed embedded mesh generation remains a product requirement, but follows the VTMS-import vertical slice. Its first supported geometries, element mappings, physical-group conventions, ply/orientation rules, and quality gates will be defined only after the current cluster/element contract is complete. General-purpose arbitrary CAD repair and unrestricted unstructured meshing remain deferred.
+Gmsh-backed embedded mesh generation remains a product requirement, but follows the `.ele`-import vertical slice. Its first supported geometries, element mappings, physical-group conventions, ply/orientation rules, and quality gates will be defined only after the current cluster/element contract is complete. General-purpose arbitrary CAD repair and unrestricted unstructured meshing remain deferred.
 
 ## Completion criteria for version 1
 

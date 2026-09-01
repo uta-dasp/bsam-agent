@@ -2,11 +2,13 @@
 
 These items do not block groundwork or the current source-derived API inventory.
 
-## Needed before the VTMS import implementation
+## Abaqus-style `.ele` import decision
 
-- At least one original VTMS `.ele` export that may be used locally as a development fixture or transformed into a small non-sensitive fixture.
-- A VTMS `.mtl` sample only if material-library import is required in the first vertical slice.
-- Confirmation of whether VTMS can export cluster data in another stable text format that should be preferred over `.ele`.
+- Resolved 2026-09-01: `projects/eles/block_hex.ele` is the local development example.
+- For version 1, the user manually creates `.ele` files from Abaqus by retaining mesh-related records and removing unrelated model data.
+- VTMS visualizes or assembles already meshed objects; it does not generate the mesh and is not the `.ele` format authority.
+- Direct Abaqus/Gmsh conversion into this interchange is a later capability.
+- Material-library import is outside the first mesh-import slice unless a separate material fixture and requirement are supplied.
 
 ## Manual availability
 

@@ -21,6 +21,7 @@ from .change import (
     write_plan,
 )
 from .registry import load_registry
+from .mesh import MeshImportError, import_ele
 from .run import RunError, request_run_stop, run_bsam, run_status
 from .source_set import SourceSet
 
@@ -130,6 +131,12 @@ def build_parser() -> argparse.ArgumentParser:
     stop_parser.add_argument("output_dir")
 
     subparsers.add_parser("baseline", help="print the pinned registry baseline")
+
+    import_parser = subparsers.add_parser(
+        "import-mesh", help="import a manually prepared Abaqus-style .ele mesh"
+    )
+    import_parser.add_argument("mesh")
+    import_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
     return parser
 
 
@@ -143,6 +150,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "baseline":
             registry = load_registry()
             _print_json({"registry_version": registry["registry_version"], **registry["target"]})
+            return 0
+        if args.command == "import-mesh":
+            _print_json(import_ele(Path(args.mesh)).as_dict(), args.compact)
             return 0
 
         if args.command == "plan-change":
@@ -232,7 +242,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             _print_json(result, args.compact)
             return 2 if inspection["summary"]["errors"] else 0
-    except (OSError, ValueError, ChangeError, RunError) as exc:
+    except (OSError, ValueError, ChangeError, MeshImportError, RunError) as exc:
         _print_json({"error": str(exc)})
         return 2
     return 2

@@ -4,7 +4,7 @@ This is the execution order. A checkbox means implemented and verified in this r
 
 ## Current product checkpoint
 
-The project is currently building the deterministic BSAM engine underneath the chat experience. It can inspect and validate a losslessly loaded source set, preview and apply a narrow class of revision-bound parameter edits, show diffs and audit records, and supervise isolated serial BSAM runs. It does **not** yet understand all model entities and references, create a complete model, import VTMS, expose the full tool API, or run a chat loop.
+The project is currently building the deterministic BSAM engine underneath the chat experience. It can inspect and validate a losslessly loaded source set, preview and apply a bounded set of revision-bound edits, import a manually prepared Abaqus-style `.ele` mesh, show diffs and audit records, and supervise isolated serial BSAM runs. It does **not** yet assemble a complete model from the imported mesh, expose the full tool API, or run a chat loop.
 
 The language model will be an optional planner and conversational interface. It will never be the BSAM parser, validator, renderer, or process supervisor.
 
@@ -87,8 +87,8 @@ Status: in progress.
 
 ### G2.4 Import, assembly, and rendering
 
-- [ ] Obtain a real non-sensitive VTMS `.ele`/`.mtl` sample or approve a synthetic interchange fixture.
-- [ ] Import VTMS nodes, elements, sets, orientations, and provenance into the canonical model.
+- [x] Establish `projects/eles/block_hex.ele` as the real manually prepared Abaqus-style development example and check in a reduced non-sensitive fixture.
+- [x] Import `.ele` nodes, elements, node/element sets, generated ranges, surfaces, orientations, dimensions, and provenance into the canonical mesh model.
 - [ ] Define typed analysis data needed to turn the mesh into a runnable model.
 - [ ] Assemble a complete canonical model without a language model.
 - [ ] Render deterministic current BSAM syntax.
@@ -112,7 +112,7 @@ Status: in progress.
 - [ ] Generate strict request/response schemas from one source of truth.
 - [ ] Add API contract, concurrency, cancellation, and error-normalization tests.
 
-Exit: without an LLM, a client can safely inspect, modify, validate, render, and run the supported model, and combine the accepted VTMS fixture with explicit analysis data.
+Exit: without an LLM, a client can safely inspect, modify, validate, render, and run the supported model, and combine the accepted `.ele` fixture with explicit analysis data.
 
 ## G3 - Complete deterministic capability layer
 

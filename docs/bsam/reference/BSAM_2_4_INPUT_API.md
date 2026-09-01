@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.3.1`
-- Registry SHA-256: `AC23B4DDD7EABC293E5110E1C941CA51148A594C65FEAD1A2535582A75644FD6`
+- Registry version: `0.3.2`
+- Registry SHA-256: `887F06DA1488E1C6D39EBF9C9049390AA0F0A57283F804B6D648DA2D074D746E`
 - Current inventory: 13 top-level blocks, 29 cluster commands, and 12 nested constructs
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -761,9 +761,9 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
 <a id="evidencecrack-parser"></a>
 - `evidence.crack-parser` — source: `source/libbsam/crk_ini.f90:1-220` — Locates optional CRACK and dispatches current FE crack types 101, 201, and 301.
 <a id="evidencecurrent-vtms-deck-tric"></a>
-- `evidence.current-vtms-deck-tric` — example: `projects/TriC_v311/TriC_v311.in` — VTMS-generated current project deck using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands.
+- `evidence.current-vtms-deck-tric` — example: `projects/TriC_v311/TriC_v311.in` — Current project deck assembled from pre-existing mesh data using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands; VTMS may have assembled or visualized the mesh but did not generate it.
 <a id="evidencecurrent-vtms-deck-notch"></a>
-- `evidence.current-vtms-deck-notch` — example: `projects/notch_v1/notch_v1.in` — VTMS-generated multi-cluster project deck that demonstrates repeated solid cluster records.
+- `evidence.current-vtms-deck-notch` — example: `projects/notch_v1/notch_v1.in` — Current multi-cluster project deck assembled from pre-existing mesh data that demonstrates repeated solid cluster records; VTMS may have assembled or visualized the mesh but did not generate it.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>

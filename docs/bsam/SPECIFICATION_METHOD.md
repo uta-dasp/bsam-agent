@@ -8,7 +8,7 @@ The current BSAM input API will be documented from local evidence only. No BSAM-
 2. Local comments and documentation adjacent to those paths.
 3. Current local input examples.
 4. Controlled runs of copied inputs in isolated temporary directories.
-5. VTMS documentation and original VTMS export samples supplied locally.
+5. Manually prepared Abaqus-style `.ele` samples supplied locally, plus VTMS documentation only for behavior actually owned by VTMS.
 
 Conflicts are recorded; lower-ranked evidence does not silently override active source behavior.
 

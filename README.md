@@ -8,8 +8,8 @@ Status: G1 specification work is in progress. The repository contains architectu
 
 - BSAM 2.4 current syntax only
 - Serial Windows execution through the existing `bsam20.exe`
-- VTMS mesh/cluster data as the first mesh input
-- Gmsh-backed generation for scoped geometry families after the VTMS import slice
+- Manually prepared Abaqus-style `.ele` mesh/cluster data as the first mesh input
+- Gmsh-backed generation for scoped geometry families after the `.ele` import slice
 - Loss-preserving import and modification of existing current-syntax input files
 - Dependency-aware structural transformations, including changing a model's ply count
 - Complete coverage of active, documented BSAM input capabilities
@@ -39,7 +39,7 @@ Status: G1 specification work is in progress. The repository contains architectu
 
 ## Authority and privacy
 
-BSAM-specific behavior is derived only from local source, local documentation, local examples, and controlled runs of the local executable. BSAM source, real decks, VTMS files, and generated artifacts must not be sent to an external model provider. See the [local-data policy](docs/security/LOCAL_DATA_POLICY.md).
+BSAM-specific behavior is derived only from local source, local documentation, local examples, and controlled runs of the local executable. BSAM source, real decks, mesh interchange files, and generated artifacts must not be sent to an external model provider. See the [local-data policy](docs/security/LOCAL_DATA_POLICY.md).
 
 ## Active pinned baseline
 
@@ -61,6 +61,7 @@ $env:PYTHONPATH = "$PWD\src"
 python -m bsam_agent baseline
 python -m bsam_agent inspect "..\projects\notch_v1\notch_v1.in"
 python -m bsam_agent validate "..\projects\notch_v1\notch_v1.in"
+python -m bsam_agent import-mesh "..\projects\eles\block_hex.ele"
 python -m bsam_agent plan-change "..\projects\notch_v1\notch_v1.in" `
   --block BOUNDARY --construct CONVERGENCE `
   --parameter d_reduction --value 0.30 --out change.json

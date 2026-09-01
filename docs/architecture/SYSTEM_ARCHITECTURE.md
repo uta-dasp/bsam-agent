@@ -37,7 +37,7 @@ An imported deck also retains a concrete syntax tree and source-file/include gra
 
 ### Parser and importer
 
-Adapters convert current BSAM decks, VTMS data, and later Gmsh-backed embedded-mesh requests into the canonical model. Import formats are independent plugins behind a narrow interface; VTMS source code is not required.
+Adapters convert current BSAM decks, manually prepared Abaqus-style `.ele` mesh data, and later Gmsh-backed embedded-mesh requests into the canonical model. Import formats are independent plugins behind a narrow interface. VTMS is a possible downstream assembler/visualizer, not the mesh generator or interchange-format authority.
 
 The Gmsh path uses a typed geometry/meshing request, a pinned local Gmsh adapter, and a neutral intermediate mesh model. Gmsh physical groups map to candidate BSAM clusters, node sets, and element sets. A deterministic converter then validates supported element types, assigns stable labels, derives required sets/orientations, and inserts the cluster into the BSAM domain model. The language model can propose geometry-tool arguments but cannot write connectivity or bypass mesh and BSAM validation.
 
@@ -90,7 +90,7 @@ bsam agent/
   docs/
   schemas/            # versioned JSON Schemas and BSAM capability registry
   src/bsam_agent/     # Python core and local API
-    mesh/              # neutral mesh model, VTMS importer, and future Gmsh adapter
+    mesh/              # neutral mesh model, Abaqus-style .ele importer, and future Gmsh adapter
   tests/
     fixtures/         # small, reviewed, non-sensitive fixtures
     contract/
