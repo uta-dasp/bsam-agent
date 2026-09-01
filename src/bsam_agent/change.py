@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
@@ -16,9 +17,10 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.6.0"
+PLAN_SCHEMA_VERSION = "1.7.0"
 SUPPORTED_PLAN_SCHEMA_VERSIONS = {
-    "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", PLAN_SCHEMA_VERSION
+    "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0",
+    PLAN_SCHEMA_VERSION,
 }
 AUDIT_SCHEMA_VERSION = "1.0.0"
 
@@ -43,6 +45,28 @@ def _patched_bytes(document: SourceDocument, patch: dict[str, Any]) -> bytes:
     if document.raw[start:end] != expected:
         raise ChangeError("planned source span no longer contains the expected value")
     return document.raw[:start] + patch["new"].encode("latin-1") + document.raw[end:]
+
+
+def _patched_bytes_many(document: SourceDocument, patches: list[dict[str, Any]]) -> bytes:
+    """Apply non-overlapping revision-bound patches without offset drift."""
+    if not patches:
+        raise ChangeError("change plan must contain at least one patch")
+    ordered = sorted(patches, key=lambda item: (int(item["start"]), int(item["end"])))
+    prior_end = -1
+    for patch in ordered:
+        start, end = int(patch["start"]), int(patch["end"])
+        if start < prior_end:
+            raise ChangeError("planned source patches overlap")
+        if start < 0 or end < start or end > len(document.raw):
+            raise ChangeError("planned source span is outside the source document")
+        if document.raw[start:end] != patch["old"].encode("latin-1"):
+            raise ChangeError("planned source span no longer contains the expected value")
+        prior_end = end
+    updated = document.raw
+    for patch in reversed(ordered):
+        start, end = int(patch["start"]), int(patch["end"])
+        updated = updated[:start] + patch["new"].encode("latin-1") + updated[end:]
+    return updated
 
 
 def _source_diff(source: Path, before: bytes, after: bytes) -> str:
@@ -618,6 +642,301 @@ def _value_spans(line: SourceLine, parameter: str) -> list[tuple[int, int]]:
         cursor = found + 1
 
 
+def _block_span(document: SourceDocument, name: str) -> tuple[int, int]:
+    matches = [item for item in document.blocks() if item["name"] == name]
+    if len(matches) != 1 or matches[0]["end_line"] is None:
+        raise ChangeError(f"notch expansion requires one terminated {name} block")
+    block = matches[0]
+    return int(block["start_line"]), int(block["end_line"])
+
+
+def _nested_body_patch(
+    document: SourceDocument, block: str, command_prefix: str, replacement: str
+) -> dict[str, Any]:
+    block_start, block_end = _block_span(document, block)
+    candidates = [
+        line for line in document.lines[block_start:block_end - 1]
+        if line.stripped.casefold().startswith(command_prefix.casefold())
+    ]
+    if len(candidates) != 1:
+        raise ChangeError(f"notch expansion requires one {command_prefix} command in {block}")
+    command = candidates[0]
+    start = command.end
+    end = next(
+        (
+            line.start for line in document.lines[command.number:block_end - 1]
+            if line.stripped.startswith("*") and not line.stripped.startswith("**")
+        ),
+        document.lines[block_end - 1].start,
+    )
+    return {
+        "start": start,
+        "end": end,
+        "line": command.number + 1,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": replacement,
+    }
+
+
+def _block_body_patch(document: SourceDocument, block: str, replacement: str) -> dict[str, Any]:
+    start_line, end_line = _block_span(document, block)
+    start = document.lines[start_line - 1].end
+    end = document.lines[end_line - 1].start
+    return {
+        "start": start,
+        "end": end,
+        "line": start_line + 1,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": replacement,
+    }
+
+
+def _notch_newline(document: SourceDocument) -> str:
+    newline = next((line.newline for line in document.lines if line.newline), b"\n")
+    return newline.decode("latin-1")
+
+
+def _notch_boundary_bodies(newline: str) -> tuple[str, str, str]:
+    boundary = [
+        "type=disp, comp=z, name=bc1-1, value=0.000, nset=PLY1.ZMIN",
+    ]
+    loads: list[str] = []
+    for ply in range(1, 9):
+        first = 2 + 3 * (ply - 1)
+        boundary.extend([
+            f"type=disp, comp=x, name=bc{first}-1, value=0., nset=PLY{ply}.XMAX",
+            f"type=disp, comp=x, name=bc{first + 1}-1, value=0.0, nset=PLY{ply}.XMIN",
+            f"type=disp, comp=y, name=bc{first + 2}-1, value=0.00, nset=PLY{ply}.XMIN",
+        ])
+        loads.append(f"change=bc{first}-1, type=disp, value=0.1")
+
+    connections = ["type=-2, name=penalty, tolerance=1.e-5"]
+    for lower in range(1, 8):
+        connections.append(f"mset=PLY{lower}.ZMAX, Constitutive=3")
+    connections.append("last=PLY8")
+    boundary_body = newline.join(boundary) + newline * 2
+    connection_body = newline.join(connections) + newline * 2
+    loading_body = (
+        "type=Static, name=n/a,nstep=200,incr=0.1" + newline * 2
+        + newline.join(loads) + newline * 2
+    )
+    return boundary_body, connection_body, loading_body
+
+
+def _notch_crack_body(document: SourceDocument) -> str:
+    start_line, end_line = _block_span(document, "CRACK")
+    body = document.raw[
+        document.lines[start_line - 1].end:document.lines[end_line - 1].start
+    ].decode("latin-1")
+    matches = list(re.finditer(r"(?mi)^301\s+arbitrary self-cracks\s*$", body))
+    if len(matches) != 2:
+        raise ChangeError("notch expansion requires exactly two established crack templates")
+    segments: list[str] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        segments.append(body[match.start():end])
+    rendered: list[str] = [body[:matches[0].start()]]
+    for ply in range(1, 9):
+        template = segments[(ply - 1) % 2]
+        updated, count = re.subn(
+            r"(?mi)^(\s*)[12](\s+-approximation\s*)$",
+            rf"\g<1>{ply}\g<2>",
+            template,
+            count=1,
+        )
+        if count != 1:
+            raise ChangeError("notch crack template has no unique approximation selector")
+        rendered.append(updated)
+    return "".join(rendered)
+
+
+def _notch_template_compatibility(source_set: SourceSet) -> None:
+    semantic = source_set.semantic_index()
+    for kind in ("node", "element"):
+        first = {
+            item.key.rsplit(":", 1)[-1]: item
+            for item in semantic.entities
+            if item.key.startswith(f"cluster:ply1/{kind}:")
+        }
+        second = {
+            item.key.rsplit(":", 1)[-1]: item
+            for item in semantic.entities
+            if item.key.startswith(f"cluster:ply2/{kind}:")
+        }
+        expected_count = 5222 if kind == "node" else 2502
+        if len(first) != expected_count or len(second) != expected_count:
+            raise ChangeError(
+                f"notch templates require {expected_count} {kind} records per ply"
+            )
+        if first.keys() != second.keys():
+            raise ChangeError(f"PLY1 and PLY2 {kind} labels do not match")
+        for label, left in first.items():
+            right = second[label]
+            if kind == "node":
+                left_values = left.attributes.get("coordinates", [])
+                right_values = right.attributes.get("coordinates", [])
+                comparable = left_values[:2] == right_values[:2]
+            else:
+                comparable = (
+                    left.attributes.get("element_type") == right.attributes.get("element_type")
+                    and left.attributes.get("connectivity") == right.attributes.get("connectivity")
+                )
+            if not comparable:
+                raise ChangeError(f"PLY1 and PLY2 {kind} {label} are not compatible templates")
+    entity_keys = {item.key for item in semantic.entities}
+    for ply in (1, 2):
+        for set_name in ("xmin", "xmax", "zmin", "zmax"):
+            key = f"cluster:ply{ply}/node-set:{set_name}"
+            if key not in entity_keys:
+                raise ChangeError(f"notch template is missing required set PLY{ply}.{set_name.upper()}")
+
+
+def _transform_notch_cluster(segment: str, source_ply: int, target_ply: int) -> str:
+    segment = re.sub(rf"(?i)\bply{source_ply}\b", f"ply{target_ply}", segment)
+    lines = segment.splitlines(keepends=True)
+    in_nodes = False
+    found_nodes = 0
+    result: list[str] = []
+    source_base = float(source_ply - 1)
+    target_base = 0.25 * (target_ply - 1)
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("*") and not stripped.startswith("**"):
+            in_nodes = stripped[:5].upper() == "*NODE"
+            result.append(line)
+            continue
+        if not in_nodes or not stripped or stripped.startswith("**"):
+            result.append(line)
+            continue
+        ending = ""
+        content = line
+        if line.endswith("\r\n"):
+            content, ending = line[:-2], "\r\n"
+        elif line.endswith(("\n", "\r")):
+            content, ending = line[:-1], line[-1]
+        fields = content.split(",")
+        if len(fields) != 4:
+            raise ChangeError("notch node template contains a non-four-field node record")
+        try:
+            source_z = float(fields[3].strip())
+        except ValueError as exc:
+            raise ChangeError("notch node template contains an invalid Z coordinate") from exc
+        local_z = source_z - source_base
+        if local_z < -1e-10 or local_z > 1.0 + 1e-10:
+            raise ChangeError("notch template Z extent is not the established unit-thickness ply")
+        leading = fields[3][:len(fields[3]) - len(fields[3].lstrip())]
+        trailing = fields[3][len(fields[3].rstrip()):]
+        fields[3] = leading + f"{target_base + 0.25 * local_z:.17e}" + trailing
+        result.append(",".join(fields) + ending)
+        found_nodes += 1
+    if found_nodes != 5222:
+        raise ChangeError(f"notch ply template contains {found_nodes} nodes; expected 5222")
+    return "".join(result)
+
+
+def _notch_cluster_body(document: SourceDocument) -> str:
+    start_line, end_line = _block_span(document, "CLUSTERS")
+    start = document.lines[start_line - 1].end
+    end = document.lines[end_line - 1].start
+    body = document.raw[start:end].decode("latin-1")
+    starts = [match.start() for match in re.finditer(r"(?mi)^\s*\*TYPE\s*$", body)]
+    if len(starts) != 2:
+        raise ChangeError("notch expansion requires exactly two cluster templates")
+    templates = [body[starts[0]:starts[1]], body[starts[1]:]]
+    for index, template in enumerate(templates, start=1):
+        match = re.search(r"(?mi)^\s*\*constitutive\s*\r?\n\s*(\d+)\s*$", template)
+        if match is None or int(match.group(1)) != index:
+            raise ChangeError(f"notch PLY{index} template must use constitutive {index}")
+    prefix = body[:starts[0]]
+    rendered = [prefix]
+    for ply in range(1, 9):
+        source_ply = 1 if ply % 2 else 2
+        rendered.append(_transform_notch_cluster(templates[source_ply - 1], source_ply, ply))
+    return "".join(rendered)
+
+
+def _notch_expansion_patches(source_set: SourceSet) -> list[dict[str, Any]]:
+    document = source_set.documents[source_set.root]
+    _notch_template_compatibility(source_set)
+    newline = _notch_newline(document)
+    boundary, connections, loading = _notch_boundary_bodies(newline)
+    return [
+        _nested_body_patch(document, "BOUNDARY", "*boundary condition", boundary),
+        _nested_body_patch(document, "BOUNDARY", "*connections", connections),
+        _nested_body_patch(document, "BOUNDARY", "*loading sequence", loading),
+        _block_body_patch(document, "CRACK", _notch_crack_body(document)),
+        _block_body_patch(document, "CLUSTERS", _notch_cluster_body(document)),
+    ]
+
+
+def plan_expand_notch_plies(
+    source: Path, workspace_root: Path | None = None
+) -> dict[str, Any]:
+    """Plan the approved notch_v1 two-to-eight-ply transformation."""
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    document = source_set.documents[source]
+    patches = _notch_expansion_patches(source_set)
+    updated = _patched_bytes_many(document, patches)
+    updated_document = SourceDocument.from_bytes(updated, str(source))
+    validation = _validation_result(source_set, {source: updated})
+    if validation["summary"]["errors"]:
+        messages = "; ".join(
+            item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
+        )
+        raise ChangeError(f"planned notch expansion failed dependency validation: {messages}")
+    model_paths = [
+        "CLUSTERS.plies", "BOUNDARY.*BOUNDARY CONDITION", "BOUNDARY.*CONNECTIONS",
+        "BOUNDARY.*LOADING SEQUENCE", "CRACK.approximations",
+    ]
+    preview = (
+        "expand notch_v1 from 2 to 8 plies at constant total thickness 2.0; "
+        "repeat [75,15], add seven constitutive-3 interfaces, and replicate in-plane loading"
+    )
+    selector = {
+        "transformation_id": "notch-v1-expand-plies/1.0.0",
+        "source_profile": "notch_v1-two-ply",
+        "input_plies": 2,
+        "output_plies": 8,
+        "total_thickness": 2.0,
+        "ply_thickness": 0.25,
+        "layup_degrees": [75, 15, 75, 15, 75, 15, 75, 15],
+        "ply_constitutives": [1, 2, 1, 2, 1, 2, 1, 2],
+        "interface_constitutive": 3,
+        "z_restraint": "PLY1.ZMIN only",
+        "in_plane_policy": "replicate to every ply",
+    }
+    changes = [
+        {"operation": "expand", "target": model_paths[0], "summary": "2 plies -> 8 plies, 0.25 thick each"},
+        {"operation": "replicate", "target": model_paths[1], "summary": "in-plane constraints on all plies; Z restraint on PLY1 only"},
+        {"operation": "expand", "target": model_paths[2], "summary": "one chained penalty group with 7 constitutive-3 master surfaces"},
+        {"operation": "replicate", "target": model_paths[3], "summary": "XMAX displacement loading on all 8 plies"},
+        {"operation": "replicate", "target": model_paths[4], "summary": "alternating 75/15 crack definitions for approximations 1-8"},
+    ]
+    plan: dict[str, Any] = {
+        "schema_version": PLAN_SCHEMA_VERSION,
+        "source": str(source),
+        "workspace_root": str(source_set.workspace_root),
+        "base_sha256": document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "proposed_sha256": updated_document.sha256,
+        "proposed_source_set_sha256": source_set.digest_with({source: updated}),
+        "operation": "expand-notch-plies",
+        "selector": selector,
+        "patches": patches,
+        "changed_model_paths": model_paths,
+        "affected_files": [str(source)],
+        "changes": changes,
+        "source_diff": _source_diff(source, document.raw, updated),
+        "validation": validation,
+        "preview": preview,
+    }
+    digest = _plan_digest(plan)
+    plan["plan_digest"] = digest
+    plan["plan_id"] = digest[:16]
+    return plan
+
+
 def plan_parameter_change(
     source: Path,
     block: str,
@@ -711,10 +1030,14 @@ def load_plan(path: Path) -> dict[str, Any]:
         raise ChangeError("change plan must be a JSON object")
     if plan.get("schema_version") not in SUPPORTED_PLAN_SCHEMA_VERSIONS:
         raise ChangeError("unsupported change-plan schema version")
-    required = {"source", "base_sha256", "operation", "selector", "patch", "preview"}
+    required = {"source", "base_sha256", "operation", "selector", "preview"}
     missing = sorted(required - plan.keys())
     if missing:
         raise ChangeError(f"change plan is missing required fields: {', '.join(missing)}")
+    has_patch = isinstance(plan.get("patch"), dict)
+    has_patches = isinstance(plan.get("patches"), list) and bool(plan["patches"])
+    if has_patch == has_patches:
+        raise ChangeError("change plan must contain exactly one of patch or patches")
     digest = plan.get("plan_digest")
     content = {key: value for key, value in plan.items() if key not in {"plan_digest", "plan_id"}}
     expected = _plan_digest(content)
@@ -728,9 +1051,30 @@ def _validated_plan_proposal(
     source: Path,
     document: SourceDocument,
     source_set: SourceSet,
-) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
+) -> tuple[bytes, SourceDocument, list[str], str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
     operation = plan.get("operation")
+    if operation == "expand-notch-plies":
+        expected = plan_expand_notch_plies(source, source_set.workspace_root)
+        checked_fields = (
+            "selector", "patches", "changed_model_paths", "affected_files", "changes",
+            "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(f"notch expansion plan {field} does not match its typed selector")
+        patches = expected["patches"]
+        updated = _patched_bytes_many(document, patches)
+        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+        return (
+            updated,
+            updated_document,
+            expected["changed_model_paths"],
+            expected["source_diff"],
+            expected["validation"],
+        )
+
     if operation in {
         "add-node", "add-element", "delete-node", "create-set", "add-set-members", "import-mesh"
     }:
@@ -860,7 +1204,7 @@ def _validated_plan_proposal(
             raise ChangeError("change plan semantic changes do not match its typed selector")
         if plan.get("affected_files") != [str(source.resolve())]:
             raise ChangeError("change plan affected files do not match its source")
-        return updated, updated_document, model_path, source_diff, validation
+        return updated, updated_document, [model_path], source_diff, validation
 
     if plan.get("operation") != "set-existing-parameter":
         raise ChangeError("unsupported change-plan operation")
@@ -930,7 +1274,7 @@ def _validated_plan_proposal(
     expected_files = [str(source.resolve())]
     if plan.get("affected_files") is not None and plan["affected_files"] != expected_files:
         raise ChangeError("change plan affected files do not match its source")
-    return updated, updated_document, model_path, source_diff, validation
+    return updated, updated_document, [model_path], source_diff, validation
 
 
 def _source_set_for_plan(plan: dict[str, Any], source: Path) -> SourceSet:
@@ -958,7 +1302,7 @@ def review_plan(path: Path) -> dict[str, Any]:
     document = source_set.documents[source.resolve()]
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
-    _, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
+    _, updated_document, model_paths, source_diff, validation = _validated_plan_proposal(
         plan, source, document, source_set
     )
     proposed_source_set_sha256 = source_set.digest_with({source.resolve(): updated_document.raw})
@@ -972,11 +1316,11 @@ def review_plan(path: Path) -> dict[str, Any]:
         "proposed_sha256": updated_document.sha256,
         "base_source_set_sha256": source_set.sha256,
         "proposed_source_set_sha256": proposed_source_set_sha256,
-        "changed_model_paths": [model_path],
+        "changed_model_paths": model_paths,
         "affected_files": plan.get("affected_files", [str(source.resolve())]),
         "changes": plan.get("changes", [{
             "operation": "modify",
-            "target": model_path,
+            "target": model_paths[0],
             "summary": plan["preview"],
         }]),
         "source_diff": source_diff,
@@ -1013,8 +1357,8 @@ def apply_plan(
     document = source_set.documents[source.resolve()]
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
-    patch = plan["patch"]
-    updated, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
+    patches = plan.get("patches") or [plan["patch"]]
+    updated, updated_document, model_paths, source_diff, validation = _validated_plan_proposal(
         plan, source, document, source_set
     )
     output_source_set_sha256 = source_set.digest_with({source.resolve(): updated})
@@ -1037,7 +1381,7 @@ def apply_plan(
         "output_sha256": updated_document.sha256,
         "base_source_set_sha256": source_set.sha256,
         "output_source_set_sha256": output_source_set_sha256,
-        "changed_model_paths": [model_path],
+        "changed_model_paths": model_paths,
         "affected_files": [str(destination.resolve())],
         "inputs": plan.get("inputs", []),
         "source_diff": source_diff,
@@ -1066,7 +1410,8 @@ def apply_plan(
         "base_source_set_sha256": source_set.sha256,
         "output_source_set_sha256": output_source_set_sha256,
         "changed_model_paths": audit["changed_model_paths"],
-        "changed_line": patch["line"],
+        "changed_line": patches[0]["line"],
+        "changed_lines": [patch["line"] for patch in patches],
         "inputs": audit["inputs"],
         "validation": validation,
         "audit": str(audit_destination.resolve()),

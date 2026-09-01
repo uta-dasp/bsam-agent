@@ -4,7 +4,7 @@ This is the execution order. A checkbox means implemented and verified in this r
 
 ## Current product checkpoint
 
-The project is currently building the deterministic BSAM engine underneath the chat experience. It can inspect and validate a losslessly loaded source set, preview and apply a bounded set of revision-bound edits, import a manually prepared Abaqus-style `.ele` mesh, show diffs and audit records, and supervise isolated serial BSAM runs. It does **not** yet assemble a complete model from the imported mesh, expose the full tool API, or run a chat loop.
+The project is currently expanding the deterministic BSAM engine underneath the chat experience. It can inspect and validate a losslessly loaded source set, preview and apply bounded revision-bound edits, assemble a manually prepared Abaqus-style `.ele` mesh into an explicit template, perform the approved notch 2-to-8-ply transformation, expose those operations through the local API, show diffs and audits, and supervise isolated serial BSAM runs. It does **not** yet cover every BSAM capability or run a chat loop.
 
 The language model will be an optional planner and conversational interface. It will never be the BSAM parser, validator, renderer, or process supervisor.
 
@@ -34,7 +34,7 @@ Exit: documents agree on scope and no implementation decision depends on a missi
 
 ## G1 - Current BSAM input specification
 
-Status: in progress. Registry `0.3.1` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
+Status: in progress. Registry `0.3.3` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
 
 - [x] Inventory top-level blocks, FE cluster commands, core mesh/section records, and active BOUNDARY constructs.
 - [x] Record executable invocation and completion classification.
@@ -125,7 +125,7 @@ Exit: without an LLM, a client can safely inspect, modify, validate, render, and
 - [ ] Complete dependency-aware rename/delete/transform behavior.
 - [ ] Add complete typed entity creation, deletion, rename, list, table, and reference edits.
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
-- [ ] Implement and verify the supported two-ply-to-eight-ply transformation fixture.
+- [x] Implement and verify the supported notch two-ply-to-eight-ply transformation fixture, including a 120-second nonfatal controlled executable probe.
 - [ ] Add representative executable probes and regression cases.
 - [x] Expose the pinned versioned capability and tool-schema manifest through the API.
 - [ ] Ensure unsupported or ambiguous requests fail with actionable diagnostics.

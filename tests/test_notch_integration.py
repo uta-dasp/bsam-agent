@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bsam_agent.change import plan_parameter_change
+from bsam_agent.change import (
+    apply_plan,
+    plan_expand_notch_plies,
+    plan_parameter_change,
+    review_plan,
+    write_plan,
+)
 from bsam_agent.source_set import SourceSet
 
 
@@ -34,6 +41,38 @@ class NotchProjectIntegrationTests(unittest.TestCase):
         self.assertEqual("0.25", plan["patch"]["old"])
         self.assertEqual(0, plan["validation"]["summary"]["errors"])
         self.assertIn("+d_reduction =0.30", plan["source_diff"])
+
+    def test_approved_two_to_eight_ply_notch_transformation(self) -> None:
+        plan = plan_expand_notch_plies(NOTCH)
+
+        self.assertEqual("expand-notch-plies", plan["operation"])
+        self.assertEqual(8, plan["selector"]["output_plies"])
+        self.assertEqual(0.25, plan["selector"]["ply_thickness"])
+        self.assertEqual([75, 15] * 4, plan["selector"]["layup_degrees"])
+        self.assertEqual(5, len(plan["patches"]))
+        self.assertEqual(0, plan["validation"]["summary"]["errors"])
+        self.assertEqual(61920, plan["validation"]["semantic_summary"]["entities"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan_path = root / "expand.json"
+            output = root / "notch_v1_8ply.in"
+            write_plan(plan, plan_path)
+            review = review_plan(plan_path)
+            self.assertEqual(plan["proposed_sha256"], review["proposed_sha256"])
+            result = apply_plan(plan_path, output)
+            self.assertEqual(plan["proposed_sha256"], result["output_sha256"])
+
+            text = output.read_text(encoding="latin-1")
+            self.assertEqual(1, text.count("type=-2, name=penalty"))
+            self.assertEqual(7, text.count("mset=PLY"))
+            self.assertIn("last=PLY8", text)
+            self.assertEqual(8, text.count("-approximation"))
+            self.assertEqual(8, text.count("type=disp, value=0.1"))
+            self.assertEqual(1, text.count("comp=z"))
+            inspection = SourceSet.read(output).inspection()
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(61920, inspection["semantic_model"]["summary"]["entities"])
 
 
 if __name__ == "__main__":

@@ -33,6 +33,17 @@
       }
     },
     {
+      "id": "preview-approved-notch-expansion",
+      "user": "Preview the approved two-to-eight-ply transformation for notch_v1.in.",
+      "expected": {
+        "tool": "preview_expand_notch_plies",
+        "arguments": {
+          "source": "notch_v1.in", "plan_path": "plans/notch_v1_8ply.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
       "id": "run-needs-confirmation",
       "user": "Run the deck without asking me.",
       "expected": {

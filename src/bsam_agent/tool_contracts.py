@@ -77,6 +77,9 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
     "preview_import_mesh": ToolContract({
         "template": S, "mesh": S, "cluster": S, "plan_path": S,
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_expand_notch_plies": ToolContract({
+        "source": S, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "review_change": ToolContract({"plan_path": S}, ("plan_id", "plan_digest", "source_diff", "validation")),
     "apply_change": ToolContract({
         "plan_path": S, "destination": S, "confirm": B,

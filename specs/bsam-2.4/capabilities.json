@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.1.0",
-  "registry_version": "0.3.2",
+  "registry_version": "0.3.3",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1469,7 +1469,7 @@
               {"name": "set-assignment", "repetition": "repeated", "fields": [{"name": "mset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Master node set for this row."}, {"name": "sset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Slave node set for this row."}, {"name": "material", "value_type": "material-id", "required": false, "summary": "Material associated with this row."}, {"name": "constitutive", "value_type": "constitutive-id", "required": false, "summary": "Constitutive law associated with this row."}, {"name": "failure", "value_type": "failure-id", "required": false, "summary": "Failure definition associated with this row."}]},
               {"name": "last", "repetition": "once", "fields": [{"name": "last", "value_type": "none-or-cluster-name-list", "required": true, "summary": "Ends the penalty connection and optionally lists terminal slave clusters."}]}
             ],
-            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing cluster name.", "The last record is the structural sentinel for a penalty connection."]
+            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing cluster name.", "The last record is the structural sentinel for a penalty connection.", "A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup."]
           },
           {
             "name": "nodal",

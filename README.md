@@ -2,7 +2,7 @@
 
 BSAM Agent will create, understand, modify, validate, and run current-syntax BSAM input files on Windows. This repository is intentionally separate from the BSAM source tree and will not modify BSAM itself.
 
-Status: G1 specification work is in progress. The repository contains architecture and API contracts plus a validated, generated current-syntax capability registry. The deterministic application core begins in G2.
+Status: G1 coverage and G3 deterministic capability expansion remain in progress. The runnable core now includes lossless inspection, semantic validation, reviewed typed edits, mesh-template assembly, the approved notch 2-to-8-ply transformation, and supervised BSAM execution.
 
 ## Version 1 target
 
@@ -68,6 +68,10 @@ python -m bsam_agent plan-change "..\projects\notch_v1\notch_v1.in" `
   --parameter d_reduction --value 0.30 --out change.json
 python -m bsam_agent diff change.json
 python -m bsam_agent apply-change change.json --out notch_v1.changed.in
+python -m bsam_agent plan-expand-notch-plies "..\projects\notch_v1\notch_v1.in" `
+  --out "..\projects\notch_v1\notch_v1_8ply.plan.json"
+python -m bsam_agent apply-change "..\projects\notch_v1\notch_v1_8ply.plan.json" `
+  --out "..\projects\notch_v1\notch_v1_8ply.in"
 python -m bsam_agent run notch_v1.changed.in `
   --output-dir runs\notch-v1-run --timeout 3600
 python -m bsam_agent serve --workspace-root ".." --port 8765
@@ -76,7 +80,7 @@ python -m bsam_agent status runs\notch-v1-run
 python -m bsam_agent stop runs\notch-v1-run
 ```
 
-Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Direct edits are currently limited to an existing, unambiguous key/value inside a registered nested construct; structural mesh or ply changes are not yet implemented.
+Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Typed edits remain deliberately bounded; structural support currently covers template-based mesh assembly and the applicability-checked notch 2-to-8-ply transformation.
 
 `inspect`, `validate`, `plan-change`, and `run` recursively load `*INCLUDE, FILE=...` commands from CLUSTERS and included FE fragments. Nested targets follow BSAM behavior and resolve from the original deck's input directory, not from the including file. Missing files, malformed or quoted paths, include cycles, and targets outside the configured workspace are blocking diagnostics. The default workspace is the deck directory; `--workspace-root` can explicitly select a broader local boundary. Every imported file retains its own digest, bytes, line endings, and file boundary. New change plans are bound to the complete source-set digest and become stale if any included file changes. Because source-set copying is not implemented, applying a root-deck edit with includes currently requires the new deck to remain in the original input directory.
 

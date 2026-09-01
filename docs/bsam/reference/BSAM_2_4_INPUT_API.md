@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.3.2`
-- Registry SHA-256: `887F06DA1488E1C6D39EBF9C9049390AA0F0A57283F804B6D648DA2D074D746E`
+- Registry version: `0.3.3`
+- Registry SHA-256: `23A254FDCFA71E0256086DDFC0533375DC678A49BA05A85E91AF5CCA607FE526`
 - Current inventory: 13 top-level blocks, 29 cluster commands, and 12 nested constructs
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -555,6 +555,7 @@ Termination: next-command. Dependencies: Referenced clusters must be selected by
   - Constraint: At least one set-assignment row is required before last.
   - Constraint: Each referenced set must be qualified by an existing cluster name.
   - Constraint: The last record is the structural sentinel for a penalty connection.
+  - Constraint: A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup.
 - **nodal** (type is nodal):
   - `header` [once]: `type`:const(nodal), `name`:string, `component`:component
   - `master-sets` [once]: `mset`:selector(all|list)

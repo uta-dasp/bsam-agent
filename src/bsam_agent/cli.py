@@ -17,6 +17,7 @@ from .change import (
     plan_add_node,
     plan_delete_node,
     plan_create_set,
+    plan_expand_notch_plies,
     plan_import_mesh,
     plan_parameter_change,
     review_plan,
@@ -152,6 +153,14 @@ def build_parser() -> argparse.ArgumentParser:
     import_plan_parser.add_argument("--cluster", required=True)
     import_plan_parser.add_argument("--workspace-root", help="contain the template and mesh")
     import_plan_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    notch_parser = subparsers.add_parser(
+        "plan-expand-notch-plies",
+        help="plan the approved notch_v1 two-to-eight-ply transformation",
+    )
+    notch_parser.add_argument("deck")
+    notch_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    notch_parser.add_argument("--out", required=True, help="new JSON plan path")
     return parser
 
 
@@ -176,6 +185,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             plan = plan_import_mesh(
                 Path(args.template), Path(args.mesh), args.cluster,
                 Path(args.workspace_root) if args.workspace_root else None,
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "plan-expand-notch-plies":
+            plan = plan_expand_notch_plies(
+                Path(args.deck), Path(args.workspace_root) if args.workspace_root else None
             )
             write_plan(plan, Path(args.out))
             _print_json(plan)

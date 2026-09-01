@@ -2,7 +2,7 @@
 
 ## What is runnable now
 
-The deterministic CLI is runnable now. It supports baseline inspection, lossless root/include source-set inspection, conservative syntax and include-graph validation, revision-bound minimal edits to existing registered nested parameters in the root deck, fresh-plan diff review, non-overwriting applied-change audit sidecars, isolated execution, concurrent run status, and controlled stopping. The local HTTP API, general semantic model, structural transformations, mesh import/generation, included-file editing, and model adapters are not implemented yet.
+The deterministic CLI and loopback HTTP API are runnable now. They support lossless source-set inspection, semantic validation, revision-bound parameter and typed FE edits, `.ele` template assembly, the approved notch 2-to-8-ply transformation, reviewed multi-patch plans, non-overwriting audit sidecars, isolated execution, concurrent run status, and controlled stopping. Complete syntax coverage, general structural transformations, included-file editing, Gmsh generation, and model adapters are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
@@ -22,6 +22,8 @@ On 2026-08-31 the supervisor launched the pinned executable against `projects/no
 A second isolated smoke run on 2026-08-31 exercised concurrent external control in `runs/smoke-notch-external-stop-20260831`. While the pinned executable was active, `status` reported the durable `running` state and a live Windows process. `stop` persisted a user stop request and set BSAM's already-created `.exit` control file to 2. BSAM then exited with code zero; the owning supervisor recorded `classification: stopped`, `stop_reason: user`, `timed_out: false`, no fatal marker, and no success sentinel. This proves the concurrent status and user-stop path. It does not prove successful analysis completion.
 
 Run artifacts are local and ignored beneath `runs/`. A successful acceptance run still requires a reviewed test case allowed to finish and classification `succeeded`.
+
+On 2026-09-01 the approved notch transformation produced eight 0.25-thick plies, alternating 75/15-degree constitutive assignments, seven chained constitutive-3 interfaces, replicated in-plane controls, and bottom-only Z restraint. Static validation resolved all 214,760 semantic references with zero errors. The pinned executable completed input and connection setup, produced step/TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker. This is sustained nonfatal transformation evidence, not a success-sentinel completion.
 
 ## Independently verify the pinned baseline
 

@@ -17,6 +17,7 @@ from .change import (
     plan_add_set_members,
     plan_create_set,
     plan_delete_node,
+    plan_expand_notch_plies,
     plan_import_mesh,
     plan_parameter_change,
     review_plan,
@@ -211,6 +212,13 @@ class LocalAgentApi:
             plan = plan_import_mesh(
                 self._path(args["template"], "template"), self._path(args["mesh"], "mesh"),
                 str(args["cluster"]), self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_expand_notch_plies":
+            args = self._args(arguments, {"source", "plan_path"})
+            plan = plan_expand_notch_plies(
+                self._path(args["source"], "source"), self.workspace_root
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))
             return plan

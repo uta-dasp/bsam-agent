@@ -22,12 +22,16 @@ The separate BSAM-FE user's manual is not currently available. The first specifi
 
 An existing supported two-ply current-syntax model must be transformable into an eight-ply model and then run. The agent will derive what it can from the source and ask only for engineering choices the deck cannot determine, such as total-versus-ply thickness preservation and the intended eight-ply stacking sequence. A suitable non-sensitive input will be needed before this transformation can become an executable acceptance fixture.
 
-The notch model is now the accepted source fixture. Its two clusters occupy Z=0..1 and Z=1..2, use constitutive/orientation pairs 1/75 degrees and 2/15 degrees, connect `PLY1.ZMAX` to `PLY2` with connection constitutive 3, restrain in-plane sets on both plies, and restrain Z only on the bottom ply. Before implementing the eight-ply transformation, confirm:
+The notch model is now the accepted source fixture. Its two clusters occupy Z=0..1 and Z=1..2, use constitutive/orientation pairs 1/75 degrees and 2/15 degrees, connect `PLY1.ZMAX` to `PLY2` with connection constitutive 3, restrain in-plane sets on both plies, and restrain Z only on the bottom ply.
 
-- whether total thickness remains 2.0 (eight 0.25-thick plies) or each ply remains 1.0;
-- the eight-ply constitutive/orientation sequence;
-- whether all seven adjacent interfaces use the current connection constitutive 3;
-- whether in-plane boundary/loading controls replicate to every ply while the Z restraint remains bottom-only.
+Resolved 2026-09-01. The approved transformation:
+
+- preserves total thickness 2.0, producing eight 0.25-thick plies;
+- repeats the constitutive/orientation sequence `[1/75 degrees, 2/15 degrees]` four times;
+- uses connection constitutive 3 at all seven adjacent interfaces;
+- replicates in-plane boundary and loading controls to every ply and retains Z restraint only on `PLY1.ZMIN`.
+
+The local penalty parser and connection implementation require those interfaces to be represented as one chained penalty connection: seven `mset=PLYn.ZMAX` rows followed by `last=PLY8`. Separate penalty headers attempt to allocate the same boundary connection arrays repeatedly and fail. The chained representation completed input processing and ran for 120 seconds without fatal markers before a controlled timeout stop.
 
 ## Decision needed after G1
 
