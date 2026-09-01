@@ -15,7 +15,9 @@ from bsam_agent.change import (
     ChangeError,
     _plan_digest,
     apply_plan,
+    plan_add_element,
     plan_add_node,
+    plan_delete_node,
     plan_parameter_change,
     review_plan,
     write_plan,
@@ -34,6 +36,51 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_typed_element_creation_uses_established_topology(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            source.write_bytes(
+                (Path(__file__).parent / "fixtures" / "semantic_two_cluster.in").read_bytes()
+            )
+            plan_path = root / "add-element.json"
+            output = root / "changed.in"
+
+            plan = plan_add_element(
+                source, "lower_ply", 2, "C3D4", [1, 2, 3, 4], "added"
+            )
+            write_plan(plan, plan_path)
+            apply_plan(plan_path, output)
+
+            semantic = SourceSet.read(output).semantic_index()
+            self.assertIn(
+                "cluster:lower_ply/element:2", {item.key for item in semantic.entities}
+            )
+            with self.assertRaisesRegex(ChangeError, "not established"):
+                plan_add_element(source, "lower_ply", 3, "C3D8", [1, 2, 3, 4])
+            with self.assertRaisesRegex(ChangeError, "missing nodes"):
+                plan_add_element(source, "lower_ply", 3, "C3D4", [1, 2, 3, 99])
+
+    def test_typed_node_deletion_blocks_dependents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            plan_path = root / "delete-node.json"
+            output = root / "changed.in"
+            source.write_bytes(DECK.replace(
+                b"*STOP\r\n",
+                b"*NAME\r\nply1\r\n*NODE\r\n1,0,0,0\r\n2,1,0,0\r\n"
+                b"*ELEMENT,TYPE=C3D4\r\n1,1,1,1,1\r\n*STOP\r\n",
+            ))
+
+            with self.assertRaisesRegex(ChangeError, "dependent references"):
+                plan_delete_node(source, "ply1", 1)
+            write_plan(plan_delete_node(source, "ply1", 2), plan_path)
+            apply_plan(plan_path, output)
+
+            self.assertNotIn(b"2,1,0,0", output.read_bytes())
+            self.assertEqual(0, SourceSet.read(output).inspection()["summary"]["errors"])
+
     def test_plan_and_apply_typed_node_creation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

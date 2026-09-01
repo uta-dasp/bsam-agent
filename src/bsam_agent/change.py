@@ -15,8 +15,8 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.3.0"
-SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", "1.1.0", "1.2.0", PLAN_SCHEMA_VERSION}
+PLAN_SCHEMA_VERSION = "1.4.0"
+SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", "1.1.0", "1.2.0", "1.3.0", PLAN_SCHEMA_VERSION}
 AUDIT_SCHEMA_VERSION = "1.0.0"
 
 
@@ -74,30 +74,9 @@ def _validate_raw_value(value: str) -> None:
         raise ChangeError("replacement value must not be empty")
 
 
-def _node_patch(
-    source_set: SourceSet,
-    cluster: str,
-    label: int,
-    coordinates: tuple[str, str, str],
-) -> dict[str, Any]:
-    if label <= 0:
-        raise ChangeError("node label must be positive")
+def _cluster_boundary(document: SourceDocument, cluster: str) -> SourceLine:
     if not cluster.strip():
         raise ChangeError("cluster name must not be empty")
-    for value in coordinates:
-        _validate_raw_value(value)
-        try:
-            parsed = float(value)
-        except ValueError as exc:
-            raise ChangeError(f"node coordinate {value!r} is not a real number") from exc
-        if not math.isfinite(parsed):
-            raise ChangeError(f"node coordinate {value!r} must be finite")
-
-    key = f"cluster:{cluster.casefold()}/node:{label}"
-    if any(item.key == key for item in source_set.semantic_index().entities):
-        raise ChangeError(f"node {label} already exists in cluster {cluster}")
-
-    document = source_set.documents[source_set.root]
     matches: list[SourceLine] = []
     for block in (item for item in document.blocks() if item["name"] == "CLUSTERS"):
         final = block["end_line"] or len(document.lines)
@@ -128,8 +107,32 @@ def _node_patch(
         raise ChangeError(f"cluster {cluster} was not found in the root deck")
     if len(matches) > 1:
         raise ChangeError(f"cluster name {cluster} is ambiguous in the root deck")
+    return matches[0]
 
-    boundary = matches[0]
+
+def _node_patch(
+    source_set: SourceSet,
+    cluster: str,
+    label: int,
+    coordinates: tuple[str, str, str],
+) -> dict[str, Any]:
+    if label <= 0:
+        raise ChangeError("node label must be positive")
+    for value in coordinates:
+        _validate_raw_value(value)
+        try:
+            parsed = float(value)
+        except ValueError as exc:
+            raise ChangeError(f"node coordinate {value!r} is not a real number") from exc
+        if not math.isfinite(parsed):
+            raise ChangeError(f"node coordinate {value!r} must be finite")
+
+    key = f"cluster:{cluster.casefold()}/node:{label}"
+    if any(item.key == key for item in source_set.semantic_index().entities):
+        raise ChangeError(f"node {label} already exists in cluster {cluster}")
+
+    document = source_set.documents[source_set.root]
+    boundary = _cluster_boundary(document, cluster)
     newline = next((line.newline for line in document.lines if line.newline), b"\n")
     record = (
         b"*NODE" + newline
@@ -159,6 +162,26 @@ def plan_add_node(
     document = source_set.documents[source]
     coordinates = (x, y, z)
     patch = _node_patch(source_set, cluster, label, coordinates)
+    model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
+    preview = f"line {patch['line']}: add node {label} to cluster {cluster} at ({x}, {y}, {z})"
+    return _typed_plan(
+        source_set, patch, "add-node",
+        {"cluster": cluster, "label": label, "coordinates": list(coordinates)},
+        model_path, preview, "create",
+    )
+
+
+def _typed_plan(
+    source_set: SourceSet,
+    patch: dict[str, Any],
+    operation: str,
+    selector: dict[str, Any],
+    model_path: str,
+    preview: str,
+    change_operation: str,
+) -> dict[str, Any]:
+    source = source_set.root
+    document = source_set.documents[source]
     updated = _patched_bytes(document, patch)
     updated_document = SourceDocument.from_bytes(updated, str(source))
     validation = _validation_result(source_set, {source: updated})
@@ -167,8 +190,6 @@ def plan_add_node(
             item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
         )
         raise ChangeError(f"planned source set failed dependency validation: {messages}")
-    model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
-    preview = f"line {patch['line']}: add node {label} to cluster {cluster} at ({x}, {y}, {z})"
     plan: dict[str, Any] = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "source": str(source),
@@ -177,16 +198,12 @@ def plan_add_node(
         "base_source_set_sha256": source_set.sha256,
         "proposed_sha256": updated_document.sha256,
         "proposed_source_set_sha256": source_set.digest_with({source: updated}),
-        "operation": "add-node",
-        "selector": {
-            "cluster": cluster,
-            "label": label,
-            "coordinates": list(coordinates),
-        },
+        "operation": operation,
+        "selector": selector,
         "patch": patch,
         "changed_model_paths": [model_path],
         "affected_files": [str(source)],
-        "changes": [{"operation": "create", "target": model_path, "summary": preview}],
+        "changes": [{"operation": change_operation, "target": model_path, "summary": preview}],
         "source_diff": _source_diff(source, document.raw, updated),
         "validation": validation,
         "preview": preview,
@@ -195,6 +212,133 @@ def plan_add_node(
     plan["plan_digest"] = digest
     plan["plan_id"] = digest[:16]
     return plan
+
+
+def _element_patch(
+    source_set: SourceSet,
+    cluster: str,
+    label: int,
+    element_type: str,
+    node_labels: tuple[int, ...],
+    elset: str | None,
+) -> dict[str, Any]:
+    if label <= 0:
+        raise ChangeError("element label must be positive")
+    requested_type = element_type.upper()
+    semantic = source_set.semantic_index()
+    prefix = f"cluster:{cluster.casefold()}/"
+    element_key = f"{prefix}element:{label}"
+    if any(item.key == element_key for item in semantic.entities):
+        raise ChangeError(f"element {label} already exists in cluster {cluster}")
+    peers = [
+        item for item in semantic.entities
+        if item.kind == "element" and item.key.startswith(prefix)
+        and str(item.attributes.get("element_type", "")).upper() == requested_type
+    ]
+    if not peers:
+        raise ChangeError(
+            f"element type {requested_type} is not established in cluster {cluster}; "
+            "adding a new topology is blocked"
+        )
+    widths = {len(item.attributes.get("connectivity", [])) for item in peers}
+    if len(widths) != 1 or len(node_labels) not in widths:
+        expected = ", ".join(str(item) for item in sorted(widths))
+        raise ChangeError(f"{requested_type} connectivity must contain {expected} node labels")
+    if any(label_value <= 0 for label_value in node_labels):
+        raise ChangeError("connectivity node labels must be positive")
+    entity_keys = {item.key for item in semantic.entities}
+    missing = [value for value in node_labels if f"{prefix}node:{value}" not in entity_keys]
+    if missing:
+        raise ChangeError(f"connectivity references missing nodes: {', '.join(map(str, missing))}")
+    if elset is not None:
+        _validate_raw_value(elset)
+
+    document = source_set.documents[source_set.root]
+    boundary = _cluster_boundary(document, cluster)
+    newline = next((line.newline for line in document.lines if line.newline), b"\n")
+    options = f"*ELEMENT,TYPE={requested_type}"
+    if elset:
+        options += f",ELSET={elset}"
+    record = (
+        options.encode("latin-1") + newline
+        + (str(label) + "," + ",".join(map(str, node_labels))).encode("ascii") + newline
+    )
+    return {
+        "start": boundary.start,
+        "end": boundary.start,
+        "line": boundary.number,
+        "old": "",
+        "new": record.decode("latin-1"),
+    }
+
+
+def plan_add_element(
+    source: Path,
+    cluster: str,
+    label: int,
+    element_type: str,
+    node_labels: list[int],
+    elset: str | None = None,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    nodes = tuple(node_labels)
+    patch = _element_patch(source_set, cluster, label, element_type, nodes, elset)
+    model_path = f"CLUSTERS[{cluster.casefold()}].elements[{label}]"
+    preview = f"line {patch['line']}: add {element_type.upper()} element {label} to cluster {cluster}"
+    return _typed_plan(
+        source_set, patch, "add-element",
+        {
+            "cluster": cluster,
+            "label": label,
+            "element_type": element_type.upper(),
+            "node_labels": list(nodes),
+            "elset": elset,
+        },
+        model_path, preview, "create",
+    )
+
+
+def _delete_node_patch(source_set: SourceSet, cluster: str, label: int) -> dict[str, Any]:
+    key = f"cluster:{cluster.casefold()}/node:{label}"
+    semantic = source_set.semantic_index()
+    matches = [item for item in semantic.entities if item.key == key]
+    if not matches:
+        raise ChangeError(f"node {label} was not found in cluster {cluster}")
+    if len(matches) > 1:
+        raise ChangeError(f"node {label} is ambiguous in cluster {cluster}")
+    entity = matches[0]
+    if entity.location.source != "<root>":
+        raise ChangeError("deleting entities from included files is not yet supported")
+    dependents = [item for item in semantic.references if item.target_key == key]
+    if dependents:
+        kinds = ", ".join(sorted({item.kind for item in dependents}))
+        raise ChangeError(f"node {label} has dependent references ({kinds}); deletion is blocked")
+    document = source_set.documents[source_set.root]
+    line = document.lines[entity.location.line - 1]
+    return {
+        "start": line.start,
+        "end": line.end,
+        "line": line.number,
+        "old": document.raw[line.start:line.end].decode("latin-1"),
+        "new": "",
+    }
+
+
+def plan_delete_node(
+    source: Path,
+    cluster: str,
+    label: int,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch = _delete_node_patch(source_set, cluster, label)
+    model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
+    preview = f"line {patch['line']}: delete unreferenced node {label} from cluster {cluster}"
+    return _typed_plan(
+        source_set, patch, "delete-node", {"cluster": cluster, "label": label},
+        model_path, preview, "delete",
+    )
 
 
 def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
@@ -421,32 +565,61 @@ def _validated_plan_proposal(
     source_set: SourceSet,
 ) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
-    if plan.get("operation") == "add-node":
+    operation = plan.get("operation")
+    if operation in {"add-node", "add-element", "delete-node"}:
         selector = plan.get("selector")
         if not isinstance(selector, dict):
             raise ChangeError("change plan is missing its selector")
         try:
             cluster = str(selector["cluster"])
             label = int(selector["label"])
-            values = selector["coordinates"]
-            if not isinstance(values, list) or len(values) != 3:
-                raise ValueError
-            coordinates = tuple(str(item) for item in values)
         except (KeyError, TypeError, ValueError) as exc:
-            raise ChangeError("add-node selector is malformed") from exc
-        patch = _node_patch(source_set, cluster, label, coordinates)  # type: ignore[arg-type]
+            raise ChangeError(f"{operation} selector is malformed") from exc
+        if operation == "add-node":
+            values = selector.get("coordinates")
+            if not isinstance(values, list) or len(values) != 3:
+                raise ChangeError("add-node selector is malformed")
+            coordinates = (str(values[0]), str(values[1]), str(values[2]))
+            patch = _node_patch(source_set, cluster, label, coordinates)
+            model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
+            preview = (
+                f"line {patch['line']}: add node {label} to cluster {cluster} at "
+                f"({coordinates[0]}, {coordinates[1]}, {coordinates[2]})"
+            )
+            change_operation = "create"
+        elif operation == "add-element":
+            values = selector.get("node_labels")
+            if not isinstance(values, list) or not values:
+                raise ChangeError("add-element selector is malformed")
+            try:
+                node_labels = tuple(int(item) for item in values)
+            except (TypeError, ValueError) as exc:
+                raise ChangeError("add-element node labels are malformed") from exc
+            element_type = str(selector.get("element_type", ""))
+            elset_value = selector.get("elset")
+            if elset_value is not None and not isinstance(elset_value, str):
+                raise ChangeError("add-element ELSET is malformed")
+            patch = _element_patch(
+                source_set, cluster, label, element_type, node_labels, elset_value
+            )
+            model_path = f"CLUSTERS[{cluster.casefold()}].elements[{label}]"
+            preview = (
+                f"line {patch['line']}: add {element_type.upper()} element {label} "
+                f"to cluster {cluster}"
+            )
+            change_operation = "create"
+        else:
+            patch = _delete_node_patch(source_set, cluster, label)
+            model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
+            preview = f"line {patch['line']}: delete unreferenced node {label} from cluster {cluster}"
+            change_operation = "delete"
         if plan.get("patch") != patch:
-            raise ChangeError("change plan patch does not match its typed add-node selector")
+            raise ChangeError(f"change plan patch does not match its typed {operation} selector")
         updated = _patched_bytes(document, patch)
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         source_diff = _source_diff(source, document.raw, updated)
         validation = _validation_result(source_set, {source.resolve(): updated})
-        model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
-        preview = (
-            f"line {patch['line']}: add node {label} to cluster {cluster} at "
-            f"({coordinates[0]}, {coordinates[1]}, {coordinates[2]})"
-        )
-        expected_changes = [{"operation": "create", "target": model_path, "summary": preview}]
+        expected_changes = [{"operation": change_operation, "target": model_path, "summary": preview}]
         if plan.get("proposed_sha256") not in {None, updated_document.sha256}:
             raise ChangeError("change plan proposed-output digest is invalid")
         if plan.get("source_diff") != source_diff:

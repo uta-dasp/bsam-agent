@@ -79,6 +79,8 @@ Status: in progress.
 - [x] Persist digest-bound, non-overwriting audit records.
 - [x] Validate complete source-set semantic dependencies during planning, review, and apply.
 - [x] Add typed node creation with revision-bound preview, validation, apply, and audit.
+- [x] Add topology-constrained element creation with validated connectivity references.
+- [x] Add dependency-aware deletion for unreferenced nodes.
 - [ ] Add remaining typed entity creation, deletion, rename, list, table, and reference edits.
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [ ] Guarantee byte-identical no-op output for the complete source set.
