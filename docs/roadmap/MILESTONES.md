@@ -143,10 +143,11 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 
 ### G4.2 Evaluation and policy gate
 
-- [ ] Create synthetic conversations for inspection, explanation, editing, validation, rendering, running, status, and stop.
-- [ ] Specify expected tools, arguments, confirmations, refusals, and final answers.
-- [ ] Test prompt injection, path escape, raw-deck generation, unsupported capability invention, stale revisions, and unauthorized runs.
-- [ ] Define pass thresholds for schema validity, tool accuracy, refusal behavior, latency, and memory.
+- [x] Create the initial synthetic conversations for inspection, editing, validation, and run policy.
+- [x] Specify strict expected tools, arguments, confirmation refusals, and unsupported-capability behavior.
+- [x] Cover path escape, raw-deck generation, unsupported capability invention, and unauthorized apply/run in the initial policy cases.
+- [ ] Add prompt-injection, stale-revision, render, status, stop, and final-answer evaluation cases.
+- [x] Define initial pass thresholds for schema validity, tool accuracy, refusal behavior, latency, and memory.
 
 ### G4.3 Acquire and benchmark the Meta model
 

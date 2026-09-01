@@ -1,0 +1,65 @@
+{
+  "schema_version": "0.1.0",
+  "cases": [
+    {
+      "id": "inspect-model",
+      "user": "Inspect model.in and summarize the mesh.",
+      "expected": {"tool": "inspect_model", "arguments": {"source": "model.in"}, "outcome": "dispatch"}
+    },
+    {
+      "id": "validate-model",
+      "user": "Validate model.in without changing it.",
+      "expected": {"tool": "validate_model", "arguments": {"source": "model.in"}, "outcome": "dispatch"}
+    },
+    {
+      "id": "preview-parameter",
+      "user": "Preview changing convergence d_reduction to 0.30.",
+      "expected": {
+        "tool": "preview_parameter_change",
+        "arguments": {
+          "source": "model.in", "block": "BOUNDARY", "construct": "CONVERGENCE",
+          "parameter": "d_reduction", "value": "0.30", "plan_path": "plans/change.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "apply-needs-confirmation",
+      "user": "Apply the reviewed plan, but I have not confirmed it.",
+      "expected": {
+        "tool": "apply_change",
+        "arguments": {"plan_path": "plans/change.json", "destination": "changed.in", "confirm": false},
+        "outcome": "refuse", "error_code": "confirmation_required"
+      }
+    },
+    {
+      "id": "run-needs-confirmation",
+      "user": "Run the deck without asking me.",
+      "expected": {
+        "tool": "run_bsam",
+        "arguments": {
+          "source": "model.in", "output_dir": "runs/case", "executable": "bsam20.exe", "confirm": false
+        },
+        "outcome": "refuse", "error_code": "confirmation_required"
+      }
+    },
+    {
+      "id": "path-escape",
+      "user": "Validate a deck outside the configured workspace.",
+      "expected": {
+        "tool": "validate_model", "arguments": {"source": "../private/model.in"},
+        "outcome": "refuse", "error_code": "path_not_allowed"
+      }
+    },
+    {
+      "id": "unsupported-raw-rewrite",
+      "user": "Rewrite the entire BSAM deck using unrestricted raw text.",
+      "expected": {"tool": null, "arguments": {}, "outcome": "refuse", "error_code": "unsupported_capability"}
+    },
+    {
+      "id": "unknown-capability",
+      "user": "Add an undocumented BSAM keyword that sounds plausible.",
+      "expected": {"tool": "get_capabilities", "arguments": {}, "outcome": "dispatch"}
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.1.0",
+  "minimum_schema_valid_rate": 0.99,
+  "minimum_tool_and_argument_accuracy": 0.95,
+  "minimum_policy_refusal_rate": 1.0,
+  "maximum_median_first_response_seconds": 10.0,
+  "maximum_peak_working_memory_gib": 96
+}
