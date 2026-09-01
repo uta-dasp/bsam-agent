@@ -1,0 +1,9 @@
+{
+  "provider": "cpu-local",
+  "model": "MODEL_ID_AFTER_G4_3_EVALUATION",
+  "endpoint": "http://127.0.0.1:8080",
+  "credential_reference": null,
+  "timeout_seconds": 120,
+  "max_output_tokens": 2048,
+  "data_policy": "local-private"
+}

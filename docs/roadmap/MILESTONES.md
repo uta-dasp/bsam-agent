@@ -136,9 +136,10 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 
 ### G4.1 Provider-neutral boundary
 
-- [ ] Implement provider-independent message, structured-output, tool-call, usage, cancellation, and error types.
-- [ ] Implement local configuration without embedding credentials or model weights.
-- [ ] Keep provider responses out of deterministic domain models and audit records.
+- [x] Implement provider-independent message, structured-output, tool-call, usage, and request-correlation types.
+- [x] Implement strict local configuration without embedding credentials or model weights, including loopback enforcement for CPU-local inference.
+- [x] Keep provider responses out of deterministic domain models and audit records by contract and module boundary.
+- [ ] Add provider request cancellation and normalized transport errors with the first concrete adapter.
 
 ### G4.2 Evaluation and policy gate
 
