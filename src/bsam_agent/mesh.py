@@ -365,3 +365,49 @@ def _validate_mesh(
         actual = (len(nodes), len(elements), sum(item.kind == "node" for item in sets), int(bool(orientations)))
         if dimensions != actual:
             raise MeshImportError(f"*DIMENSIONS declares {dimensions}, but imported counts are {actual}")
+
+
+def render_bsam_commands(model: MeshModel, newline: bytes = b"\n") -> bytes:
+    """Render a validated canonical mesh as current FE cluster commands."""
+    lines: list[str] = []
+    dimensions = model.dimensions or (
+        len(model.nodes),
+        len(model.elements),
+        sum(item.kind == "node" for item in model.sets),
+        int(bool(model.orientations)),
+    )
+    lines.extend(["*DIMENSIONS", ",".join(map(str, dimensions)), "*NODE"])
+    for node in model.nodes:
+        lines.append(",".join([
+            str(node.label), *(format(value, ".17g") for value in node.coordinates)
+        ]))
+
+    active_type: str | None = None
+    for element in model.elements:
+        if element.element_type != active_type:
+            active_type = element.element_type
+            lines.append(f"*ELEMENT,TYPE={active_type}")
+        lines.append(",".join([str(element.label), *map(str, element.connectivity)]))
+
+    for mesh_set in model.sets:
+        command = "*NSET,NSET=" if mesh_set.kind == "node" else "*ELSET,ELSET="
+        lines.append(command + mesh_set.name)
+        for start in range(0, len(mesh_set.members), 16):
+            lines.append(",".join(map(str, mesh_set.members[start:start + 16])))
+
+    for surface in model.surfaces:
+        lines.append(f"*SURFACE,NAME={surface.name},TYPE={surface.surface_type}")
+        lines.extend(f"{element_set},{side}" for element_set, side in surface.facets)
+
+    if model.orientation_name is not None:
+        lines.append(f"*ORIENTATION,NAME={model.orientation_name}")
+        for orientation in model.orientations:
+            values = [
+                *orientation.v1,
+                *orientation.v3,
+                orientation.fiber_volume,
+            ]
+            lines.append(",".join([
+                str(orientation.element_label), *(format(value, ".17g") for value in values)
+            ]))
+    return newline.join(item.encode("latin-1") for item in lines) + newline

@@ -89,10 +89,10 @@ Status: in progress.
 
 - [x] Establish `projects/eles/block_hex.ele` as the real manually prepared Abaqus-style development example and check in a reduced non-sensitive fixture.
 - [x] Import `.ele` nodes, elements, node/element sets, generated ranges, surfaces, orientations, dimensions, and provenance into the canonical mesh model.
-- [ ] Define typed analysis data needed to turn the mesh into a runnable model.
-- [ ] Assemble a complete canonical model without a language model.
-- [ ] Render deterministic current BSAM syntax.
-- [ ] Provide source and semantic render previews.
+- [x] Define the v1 assembly contract: the validated `.ele` supplies mesh data and an existing `.in` template supplies explicit analysis data through an empty named solid cluster.
+- [x] Assemble the imported canonical mesh into a revision-bound complete template source set without a language model.
+- [x] Render imported mesh data as deterministic current BSAM cluster syntax.
+- [x] Provide reviewed source diffs, semantic validation, mesh provenance, and stale-input protection.
 - [ ] Round-trip and executable-test the representative model.
 
 ### G2.5 Run supervision

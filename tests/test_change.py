@@ -20,6 +20,7 @@ from bsam_agent.change import (
     plan_add_set_members,
     plan_create_set,
     plan_delete_node,
+    plan_import_mesh,
     plan_parameter_change,
     review_plan,
     write_plan,
@@ -38,6 +39,59 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_plan_and_apply_mesh_import_into_empty_template_cluster(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "template.in"
+            mesh = root / "mesh.ele"
+            plan_path = root / "import.json"
+            output = root / "assembled.in"
+            template.write_bytes(DECK.replace(
+                b"*STOP\r\n", b"*NAME\r\nmesh_cluster\r\n*STOP\r\n"
+            ))
+            mesh.write_bytes(
+                (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes()
+            )
+
+            plan = plan_import_mesh(template, mesh, "mesh_cluster")
+            self.assertEqual("import-mesh", plan["operation"])
+            self.assertEqual(mesh.resolve(), Path(plan["inputs"][0]["path"]))
+            write_plan(plan, plan_path)
+            review_plan(plan_path)
+            result = apply_plan(plan_path, output)
+
+            inspection = SourceSet.read(output).inspection()
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(8, inspection["semantic_model"]["summary"]["entities_by_kind"]["node"])
+            self.assertIn(b"*DIMENSIONS\r\n8,1,2,1\r\n", output.read_bytes())
+            self.assertEqual(plan["inputs"], result["inputs"])
+
+    def test_mesh_import_plan_is_bound_to_mesh_digest_and_empty_cluster(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            template = root / "template.in"
+            mesh = root / "mesh.ele"
+            plan_path = root / "import.json"
+            template.write_bytes(DECK.replace(
+                b"*STOP\r\n", b"*NAME\r\nmesh_cluster\r\n*STOP\r\n"
+            ))
+            fixture = (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes()
+            mesh.write_bytes(fixture)
+            write_plan(plan_import_mesh(template, mesh, "mesh_cluster"), plan_path)
+            mesh.write_bytes(fixture + b"** changed\n")
+
+            with self.assertRaisesRegex(ChangeError, "mesh input changed"):
+                review_plan(plan_path)
+
+            occupied = root / "occupied.in"
+            occupied.write_bytes(DECK.replace(
+                b"*STOP\r\n",
+                b"*NAME\r\nmesh_cluster\r\n*NODE\r\n1,0,0,0\r\n*STOP\r\n",
+            ))
+            mesh.write_bytes(fixture)
+            with self.assertRaisesRegex(ChangeError, "not empty"):
+                plan_import_mesh(occupied, mesh, "mesh_cluster")
+
     def test_typed_set_creation_and_member_addition(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -16,6 +16,7 @@ from .change import (
     plan_add_node,
     plan_delete_node,
     plan_create_set,
+    plan_import_mesh,
     plan_parameter_change,
     review_plan,
     write_plan,
@@ -137,6 +138,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     import_parser.add_argument("mesh")
     import_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
+
+    import_plan_parser = subparsers.add_parser(
+        "plan-import-mesh", help="plan import of a .ele mesh into an empty template cluster"
+    )
+    import_plan_parser.add_argument("template")
+    import_plan_parser.add_argument("mesh")
+    import_plan_parser.add_argument("--cluster", required=True)
+    import_plan_parser.add_argument("--workspace-root", help="contain the template and mesh")
+    import_plan_parser.add_argument("--out", required=True, help="new JSON plan path")
     return parser
 
 
@@ -153,6 +163,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "import-mesh":
             _print_json(import_ele(Path(args.mesh)).as_dict(), args.compact)
+            return 0
+        if args.command == "plan-import-mesh":
+            plan = plan_import_mesh(
+                Path(args.template), Path(args.mesh), args.cluster,
+                Path(args.workspace_root) if args.workspace_root else None,
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
             return 0
 
         if args.command == "plan-change":

@@ -11,13 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from .document import SourceDocument, SourceLine
+from .mesh import MeshModel, import_ele, render_bsam_commands
 from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.5.0"
+PLAN_SCHEMA_VERSION = "1.6.0"
 SUPPORTED_PLAN_SCHEMA_VERSIONS = {
-    "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", PLAN_SCHEMA_VERSION
+    "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", PLAN_SCHEMA_VERSION
 }
 AUDIT_SCHEMA_VERSION = "1.0.0"
 
@@ -181,6 +182,7 @@ def _typed_plan(
     model_path: str,
     preview: str,
     change_operation: str,
+    inputs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     source = source_set.root
     document = source_set.documents[source]
@@ -210,6 +212,8 @@ def _typed_plan(
         "validation": validation,
         "preview": preview,
     }
+    if inputs:
+        plan["inputs"] = inputs
     digest = _plan_digest(plan)
     plan["plan_digest"] = digest
     plan["plan_id"] = digest[:16]
@@ -441,6 +445,67 @@ def plan_add_set_members(
     )
 
 
+def _mesh_import_patch(
+    source_set: SourceSet,
+    cluster: str,
+    mesh_path: Path,
+    expected_sha256: str | None = None,
+) -> tuple[dict[str, Any], MeshModel]:
+    mesh_path = mesh_path.resolve()
+    if not mesh_path.is_relative_to(source_set.workspace_root):
+        raise ChangeError("mesh input is outside the configured workspace root")
+    mesh = import_ele(mesh_path)
+    if expected_sha256 is not None and mesh.sha256 != expected_sha256:
+        raise ChangeError("mesh input changed after planning; create a new import plan")
+    prefix = f"cluster:{cluster.casefold()}/"
+    existing = [
+        item for item in source_set.semantic_index().entities
+        if item.key.startswith(prefix) and item.kind in {
+            "node", "element", "node-set", "element-set", "section"
+        }
+    ]
+    if existing:
+        raise ChangeError(f"target cluster {cluster} is not empty")
+    document = source_set.documents[source_set.root]
+    boundary = _cluster_boundary(document, cluster)
+    newline = next((line.newline for line in document.lines if line.newline), b"\n")
+    rendered = render_bsam_commands(mesh, newline)
+    return ({
+        "start": boundary.start,
+        "end": boundary.start,
+        "line": boundary.number,
+        "old": "",
+        "new": rendered.decode("latin-1"),
+    }, mesh)
+
+
+def plan_import_mesh(
+    template: Path,
+    mesh_path: Path,
+    cluster: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(template.resolve(), workspace_root)
+    patch, mesh = _mesh_import_patch(source_set, cluster, mesh_path)
+    model_path = f"CLUSTERS[{cluster.casefold()}].mesh"
+    summary = mesh.as_dict()["summary"]
+    preview = (
+        f"line {patch['line']}: import {summary['nodes']} nodes and "
+        f"{summary['elements']} elements into cluster {cluster}"
+    )
+    mesh_input = {
+        "role": "mesh",
+        "format": "abaqus-style-ele",
+        "path": mesh.source,
+        "sha256": mesh.sha256,
+    }
+    return _typed_plan(
+        source_set, patch, "import-mesh",
+        {"cluster": cluster, "mesh": mesh_input},
+        model_path, preview, "create", [mesh_input],
+    )
+
+
 def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
     registry = load_registry()
     block_by_name = {item["canonical"].upper(): item["id"] for item in registry["top_level_blocks"]}
@@ -666,7 +731,9 @@ def _validated_plan_proposal(
 ) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
     operation = plan.get("operation")
-    if operation in {"add-node", "add-element", "delete-node", "create-set", "add-set-members"}:
+    if operation in {
+        "add-node", "add-element", "delete-node", "create-set", "add-set-members", "import-mesh"
+    }:
         selector = plan.get("selector")
         if not isinstance(selector, dict):
             raise ChangeError("change plan is missing its selector")
@@ -717,7 +784,7 @@ def _validated_plan_proposal(
             model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
             preview = f"line {patch['line']}: delete unreferenced node {label} from cluster {cluster}"
             change_operation = "delete"
-        else:
+        elif operation in {"create-set", "add-set-members"}:
             member_kind = str(selector.get("member_kind", ""))
             name = str(selector.get("name", ""))
             values = selector.get("members")
@@ -746,6 +813,32 @@ def _validated_plan_proposal(
                     f"{member_kind} set {name}"
                 )
                 change_operation = "modify"
+        else:
+            mesh_input = selector.get("mesh")
+            if not isinstance(mesh_input, dict):
+                raise ChangeError("import-mesh selector is malformed")
+            mesh_path = mesh_input.get("path")
+            mesh_sha256 = mesh_input.get("sha256")
+            if not isinstance(mesh_path, str) or not isinstance(mesh_sha256, str):
+                raise ChangeError("import-mesh selector is malformed")
+            patch, mesh = _mesh_import_patch(
+                source_set, cluster, Path(mesh_path), mesh_sha256
+            )
+            model_path = f"CLUSTERS[{cluster.casefold()}].mesh"
+            summary = mesh.as_dict()["summary"]
+            preview = (
+                f"line {patch['line']}: import {summary['nodes']} nodes and "
+                f"{summary['elements']} elements into cluster {cluster}"
+            )
+            change_operation = "create"
+            expected_input = {
+                "role": "mesh",
+                "format": "abaqus-style-ele",
+                "path": mesh.source,
+                "sha256": mesh.sha256,
+            }
+            if mesh_input != expected_input or plan.get("inputs") != [expected_input]:
+                raise ChangeError("change plan mesh provenance does not match its input")
         if plan.get("patch") != patch:
             raise ChangeError(f"change plan patch does not match its typed {operation} selector")
         updated = _patched_bytes(document, patch)
@@ -946,6 +1039,7 @@ def apply_plan(
         "output_source_set_sha256": output_source_set_sha256,
         "changed_model_paths": [model_path],
         "affected_files": [str(destination.resolve())],
+        "inputs": plan.get("inputs", []),
         "source_diff": source_diff,
         "validation": validation,
         "registered_baseline": registry["target"],
@@ -973,6 +1067,7 @@ def apply_plan(
         "output_source_set_sha256": output_source_set_sha256,
         "changed_model_paths": audit["changed_model_paths"],
         "changed_line": patch["line"],
+        "inputs": audit["inputs"],
         "validation": validation,
         "audit": str(audit_destination.resolve()),
         "audit_id": audit["audit_id"],

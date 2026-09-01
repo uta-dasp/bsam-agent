@@ -24,6 +24,7 @@ Status: G1 specification work is in progress. The repository contains architectu
 - [Verification and trust model](docs/VERIFICATION.md)
 - [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)
 - [Existing-model editing architecture](docs/architecture/MODEL_EDITING.md)
+- [Abaqus-style mesh import and template assembly](docs/architecture/MESH_IMPORT.md)
 - [Agent API documentation](docs/api/README.md)
 - [Draft OpenAPI contract](docs/api/openapi.yaml)
 - [Model tool contracts](docs/api/MODEL_TOOL_CONTRACTS.md)

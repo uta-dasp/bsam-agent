@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bsam_agent.mesh import MeshImportError, import_ele
+from bsam_agent.mesh import MeshImportError, import_ele, render_bsam_commands
 
 
 class MeshImportTests(unittest.TestCase):
@@ -33,6 +33,9 @@ class MeshImportTests(unittest.TestCase):
         top = next(item for item in value["sets"] if item["name"] == "top")
         self.assertEqual([5, 6, 7, 8], top["members"])
         self.assertEqual(64, len(value["provenance"]["sha256"]))
+        rendered = render_bsam_commands(model, b"\r\n")
+        self.assertIn(b"*ELEMENT,TYPE=C3D8\r\n", rendered)
+        self.assertTrue(rendered.endswith(b"\r\n"))
 
     def test_rejects_missing_connectivity_and_dimension_mismatch(self) -> None:
         fixture = Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele"
