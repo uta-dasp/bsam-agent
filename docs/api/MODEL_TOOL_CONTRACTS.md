@@ -1,6 +1,6 @@
 # Model tool contracts
 
-These are the only operations an optional language model should be allowed to request. Exact JSON Schemas will be generated from the canonical domain types during implementation.
+These are the only operations an optional language model should be allowed to request. The executable initial schemas are generated from `src/bsam_agent/tool_contracts.py` and exposed by `get_capabilities`; later domain expansion must update that source rather than duplicating schemas in prompts or adapters.
 
 | Tool | Purpose | Mutates local state |
 |---|---|---:|

@@ -23,6 +23,12 @@ from .mesh import import_ele
 from .registry import load_registry
 from .run import request_run_stop, run_bsam, run_status
 from .source_set import SourceSet
+from .tool_contracts import (
+    TOOL_CONTRACTS,
+    contract_manifest,
+    validate_arguments,
+    validate_response,
+)
 
 
 API_VERSION = "0.1.0"
@@ -43,13 +49,7 @@ class LocalAgentApi:
 
     @property
     def tools(self) -> tuple[str, ...]:
-        return (
-            "get_capabilities", "inspect_model", "validate_model", "import_mesh",
-            "preview_parameter_change", "preview_add_node", "preview_add_element",
-            "preview_delete_node", "preview_create_set", "preview_add_set_members",
-            "preview_import_mesh", "review_change", "apply_change", "run_bsam",
-            "get_run_status", "stop_run",
-        )
+        return tuple(TOOL_CONTRACTS)
 
     def _path(self, value: Any, role: str) -> Path:
         if not isinstance(value, str) or not value.strip():
@@ -68,19 +68,25 @@ class LocalAgentApi:
         required: set[str] = frozenset(),
         optional: set[str] = frozenset(),
     ) -> dict[str, Any]:
+        # Canonical validation is performed by tool_contracts before dispatch.
+        # These parameters remain only to keep each handler self-documenting.
         if not isinstance(value, dict):
             raise ApiError("invalid_arguments", "tool arguments must be a JSON object")
-        missing = sorted(required - value.keys())
-        extra = sorted(value.keys() - required - optional)
-        if missing:
-            raise ApiError("invalid_arguments", f"missing arguments: {', '.join(missing)}")
-        if extra:
-            raise ApiError("invalid_arguments", f"unknown arguments: {', '.join(extra)}")
         return value
 
     def dispatch(self, tool: str, arguments: Any) -> dict[str, Any]:
         if tool not in self.tools:
             raise ApiError("unknown_tool", f"unknown tool: {tool}")
+        try:
+            checked = validate_arguments(tool, arguments)
+            result = self._dispatch(tool, checked)
+            return validate_response(tool, result)
+        except ApiError:
+            raise
+        except (TypeError, ValueError) as exc:
+            raise ApiError("invalid_arguments", str(exc)) from exc
+
+    def _dispatch(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if tool == "get_capabilities":
             self._args(arguments)
             registry = load_registry()
@@ -88,7 +94,22 @@ class LocalAgentApi:
                 "api_version": API_VERSION,
                 "registry_version": registry["registry_version"],
                 "bsam": registry["target"],
+                "capabilities": {
+                    "top_level_blocks": [
+                        {key: item[key] for key in ("id", "canonical", "coverage")}
+                        for item in registry["top_level_blocks"]
+                    ],
+                    "cluster_commands": [
+                        {key: item[key] for key in ("id", "canonical", "coverage")}
+                        for item in registry["cluster_commands"]
+                    ],
+                    "nested_constructs": [
+                        {key: item[key] for key in ("id", "canonical", "coverage")}
+                        for item in registry["nested_constructs"]
+                    ],
+                },
                 "tools": list(self.tools),
+                "tool_contracts": contract_manifest(),
             }
         if tool in {"inspect_model", "validate_model"}:
             args = self._args(arguments, {"source"})

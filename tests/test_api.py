@@ -5,6 +5,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -12,6 +13,7 @@ from urllib.request import Request, urlopen
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi, build_server
+from bsam_agent.tool_contracts import TOOL_CONTRACTS, contract_manifest
 
 
 DECK = (
@@ -29,6 +31,11 @@ class LocalApiTests(unittest.TestCase):
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
             api = LocalAgentApi(root)
+
+            capabilities = api.dispatch("get_capabilities", {})
+            self.assertEqual(set(api.tools), set(TOOL_CONTRACTS))
+            self.assertEqual(contract_manifest(), capabilities["tool_contracts"])
+            self.assertGreater(len(capabilities["capabilities"]["cluster_commands"]), 10)
 
             validation = api.dispatch("validate_model", {"source": "model.in"})
             self.assertEqual(0, validation["summary"]["errors"])
@@ -56,6 +63,17 @@ class LocalApiTests(unittest.TestCase):
                 api.dispatch("validate_model", {"source": "../outside.in"})
             with self.assertRaisesRegex(ApiError, "unknown arguments"):
                 api.dispatch("validate_model", {"source": "model.in", "extra": True})
+            with self.assertRaisesRegex(ApiError, "type integer"):
+                api.dispatch("preview_delete_node", {
+                    "source": "model.in", "cluster": "x", "label": "1", "plan_path": "x.json",
+                })
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                results = list(pool.map(
+                    lambda _item: api.dispatch("validate_model", {"source": "model.in"}),
+                    range(16),
+                ))
+            self.assertTrue(all(item["summary"]["errors"] == 0 for item in results))
 
     def test_http_server_is_loopback_and_returns_json_errors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

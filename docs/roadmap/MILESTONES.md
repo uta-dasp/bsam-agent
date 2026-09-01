@@ -103,7 +103,7 @@ Status: in progress.
 - [x] Classify sentinel, diagnostics, timeout, and stop outcomes.
 - [x] Provide concurrent `status` and idempotent controlled `stop`.
 - [x] Exercise a revision-bound modified notch deck through preflight, sustained isolated execution, artifacts, and a non-escalated controlled timeout with no fatal markers.
-- [ ] Complete a success-sentinel modified-notch run with an approved longer runtime budget.
+- [x] Accept sustained nonfatal modified-notch execution with controlled stop as sufficient for the current stage; defer a full success-sentinel run per user direction.
 - [ ] Add imported-model executable acceptance after a relevant analysis template is supplied.
 
 ### G2.6 Local Agent API
@@ -111,8 +111,9 @@ Status: in progress.
 - [x] Implement the initial versioned loopback-only JSON tool API service.
 - [x] Expose capabilities, inspection, semantic validation, mesh import, supported change preview/review/apply, run, status, and stop tools.
 - [x] Enforce workspace-relative paths, source/plan digests, mutation/run confirmation, and run policy at the API boundary.
-- [ ] Generate strict request/response schemas from one source of truth.
-- [ ] Add API contract, concurrency, cancellation, and error-normalization tests.
+- [x] Generate strict request schemas and required response invariants from one canonical tool-contract source.
+- [x] Add API schema, HTTP-envelope, workspace escape, confirmation, concurrency, and error-normalization tests.
+- [ ] Add API-level cancellation tests when run launch becomes asynchronous.
 
 Exit: without an LLM, a client can safely inspect, modify, validate, render, and run the supported model, and combine the accepted `.ele` fixture with explicit analysis data.
 
@@ -126,7 +127,7 @@ Exit: without an LLM, a client can safely inspect, modify, validate, render, and
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [ ] Implement and verify the supported two-ply-to-eight-ply transformation fixture.
 - [ ] Add representative executable probes and regression cases.
-- [ ] Expose the versioned capability manifest through the API.
+- [x] Expose the pinned versioned capability and tool-schema manifest through the API.
 - [ ] Ensure unsupported or ambiguous requests fail with actionable diagnostics.
 
 Exit: supported edits cannot leave unresolved dependent references, and the API is sufficient authority for a model-assisted client.
