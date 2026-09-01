@@ -21,6 +21,20 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_representative_two_cluster_fixture_regression(self) -> None:
+        fixture = Path(__file__).parent / "fixtures" / "semantic_two_cluster.in"
+
+        inspection = SourceSet.read(fixture).inspection()
+        semantic = inspection["semantic_model"]
+
+        self.assertEqual(0, inspection["summary"]["errors"])
+        self.assertEqual(16, semantic["summary"]["entities"])
+        self.assertEqual(20, semantic["summary"]["references"])
+        self.assertEqual(20, semantic["summary"]["resolved_references"])
+        keys = {item["key"] for item in semantic["entities"]}
+        self.assertIn("cluster:lower_ply/node:1", keys)
+        self.assertIn("cluster:upper_ply/node:1", keys)
+
     def test_explicit_fe_entities_and_references_have_stable_locations(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

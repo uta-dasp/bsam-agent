@@ -69,7 +69,7 @@ Status: in progress.
 - [x] Emit deterministic duplicate, unresolved, ambiguous, and type-mismatch diagnostics.
 - [x] Expose the semantic records and summary through `inspect`.
 - [x] Add synthetic semantic-index unit tests.
-- [ ] Add representative-project semantic regression fixtures and tests.
+- [x] Add a non-sensitive representative two-cluster semantic regression fixture and test.
 
 ### G2.3 Validation and safe editing
 
