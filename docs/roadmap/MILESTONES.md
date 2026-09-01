@@ -1,112 +1,198 @@
-# Milestones
+# Milestones to a usable BSAM chat agent
 
-## G0 — Groundwork
+This is the execution order. A checkbox means implemented and verified in this repository, not merely designed.
 
-Deliverables:
+## Current product checkpoint
 
-- independent Git repository;
-- scope and architecture;
-- API lifecycle and draft OpenAPI contract;
-- source-derived specification method and coverage ledger;
-- privacy/provider policy;
-- environment inventory and recorded unknowns.
+The project is currently building the deterministic BSAM engine underneath the chat experience. It can inspect and validate a losslessly loaded source set, preview and apply a narrow class of revision-bound parameter edits, show diffs and audit records, and supervise isolated serial BSAM runs. It does **not** yet understand all model entities and references, create a complete model, import VTMS, expose the full tool API, or run a chat loop.
+
+The language model will be an optional planner and conversational interface. It will never be the BSAM parser, validator, renderer, or process supervisor.
+
+## When the Meta model is needed
+
+Do not download model weights during G0-G3. The first model file is acquired at **G4.3**, after all of these gates pass:
+
+- the deterministic engine can inspect, modify, validate, render, and run the supported vertical slice;
+- the local Agent tool schemas and authorization rules are executable;
+- synthetic evaluation conversations and expected tool calls are checked in;
+- local-model storage, licensing, checksum, loopback-only networking, and resource limits are configured.
+
+At G4.3, the user accepts Meta's applicable license and obtains an approved quantized model. Weights stay outside Git and outside project data directories. A local configuration records only the model path, model identifier, checksum, runtime endpoint, and limits. The first benchmark should use a small interactive model before spending time on a much larger model. Model selection is an evaluation result, not an architectural dependency.
+
+## G0 - Groundwork
+
+Status: complete.
+
+- [x] Create the independent Git repository and repository boundary.
+- [x] Record product scope, deterministic-core architecture, and current-syntax policy.
+- [x] Draft the local API lifecycle and OpenAPI contract.
+- [x] Define the source-derived specification and coverage method.
+- [x] Record local-data and provider policy.
+- [x] Inventory the Windows development host and unresolved inputs.
 
 Exit: documents agree on scope and no implementation decision depends on a missing manual.
 
-## G1 — Current BSAM input API specification
+## G1 - Current BSAM input specification
 
-Status: in progress. Registry `0.3.0` is reconciled to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the 2026-08-27 executable build. It establishes top-level and FE command inventories, 12 active BOUNDARY constructs, structured core mesh/section and major BOUNDARY record groups, an execution contract, a validation tool, and a generated reference.
+Status: in progress. Registry `0.3.1` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
 
-Deliverables:
+- [x] Inventory top-level blocks, FE cluster commands, core mesh/section records, and active BOUNDARY constructs.
+- [x] Record executable invocation and completion classification.
+- [x] Define lossless source-set and include-graph behavior.
+- [x] Generate and validate the human-readable API reference.
+- [ ] Account for every reachable active parser dispatch path.
+- [ ] Complete parameter grammars, units, defaults, ranges, and repeatability.
+- [ ] Record entity definitions and references for every supported construct.
+- [ ] Complete obsolete-token diagnostics and current replacements.
+- [ ] Register transformation applicability and dependency rules.
+- [ ] Regenerate the coverage ledger and reference after every registry increment.
 
-- machine-readable capability registry;
-- current block/command/parameter documentation;
-- lossless concrete-syntax and include-graph requirements;
-- entity/reference dependency map for safe modifications;
-- registered transformation contract and applicability rules;
-- provenance links to pinned local source and examples;
-- obsolete-token diagnostic registry;
-- executable invocation and run-classification contract;
-- generated human-readable API reference.
+Exit: every active parser dispatch path is supported or explicitly blocked with a reason.
 
-Exit: every active parser dispatch path is accounted for or explicitly blocked.
+## G2 - Deterministic core vertical slice
 
-## G2 — Deterministic core vertical slice
+Status: in progress.
 
-Status: in progress. The Python CLI provides `baseline`, `inspect`, and `validate`; retains original bytes and line endings across a recursively loaded FE include graph; binds the source set to one digest; indexes current blocks and cluster commands; and reports stable syntax, missing-file, cycle, path-form, and workspace-boundary diagnostics. Revision-bound `plan-change`, `diff`, and `apply-change` commands support typed minimal patches to existing registered nested key/value parameters in the root deck, reject stale plans, prohibit in-place writes, display semantic and unified source diffs, and persist non-overwriting digest-bound audit sidecars. The owning `run` command fingerprints the executable, preflights the complete source set, isolates artifacts, captures streams, atomically publishes state, handles timeouts through `.exit`, and classifies completion by sentinel plus diagnostics. Concurrent `status` and idempotent controlled `stop` commands operate through the isolated run directory without exposing direct process termination. The slice has been exercised against the two current project decks without modifying them, including deliberately stopped isolated smoke runs.
+### G2.1 Lossless source foundation
 
-Deliverables:
+- [x] Implement the Python package and CLI.
+- [x] Preserve original bytes and line endings.
+- [x] Load recursively reachable FE include files with cycle and workspace-boundary checks.
+- [x] Bind the complete source set to a stable digest.
+- [x] Index top-level blocks and registered cluster commands.
 
-- Python package and CLI;
-- canonical model schema;
-- lossless import of a representative current `.in` source set;
-- preview/apply/diff support for direct parameter edits;
-- import of one real VTMS `.ele` sample or agreed cluster interchange format;
-- validation and deterministic rendering;
-- isolated Windows serial run supervision;
-- contract and integration tests.
+### G2.2 Semantic model and reference graph - next
 
-Initial commands: `inspect`, `import`, `plan-change`, `apply-change`, `diff`, `validate`, `render`, `run`, `status`, and `stop`.
+- [x] Define stable semantic entity and reference records with source locations.
+- [x] Index explicit node, element, node-set, element-set, and section records across root and included files.
+- [ ] Resolve references without discarding unresolved or ambiguous references.
+- [ ] Emit deterministic duplicate, unresolved, and type-mismatch diagnostics.
+- [x] Expose the semantic records and summary through `inspect`.
+- [x] Add synthetic semantic-index unit tests.
+- [ ] Add representative-project semantic regression fixtures and tests.
 
-Exit: an existing deck can be safely modified and run, and a supplied VTMS mesh can be combined with explicit analysis data, rendered, and run without a language model.
+### G2.3 Validation and safe editing
 
-## G3 — Full current-capability implementation
+- [x] Validate structural and include-graph errors.
+- [x] Plan, diff, and apply narrow registered nested key/value edits.
+- [x] Reject stale plans and prohibit in-place writes.
+- [x] Persist digest-bound, non-overwriting audit records.
+- [ ] Validate semantic dependencies before applying a change.
+- [ ] Add typed creation, deletion, rename, list, table, and reference edits.
+- [ ] Support minimal patches in included files and multi-file reviewed changes.
+- [ ] Guarantee byte-identical no-op output for the complete source set.
 
-Deliverables:
+### G2.4 Import, assembly, and rendering
 
-- typed support for all G1 capabilities;
-- byte-identical no-op round-trip and minimal-patch golden tests;
-- dependency-aware transformation framework;
-- supported two-ply-to-eight-ply transformation acceptance fixture;
-- representative executable tests;
-- versioned capability manifest exposed by the API.
+- [ ] Obtain a real non-sensitive VTMS `.ele`/`.mtl` sample or approve a synthetic interchange fixture.
+- [ ] Import VTMS nodes, elements, sets, orientations, and provenance into the canonical model.
+- [ ] Define typed analysis data needed to turn the mesh into a runnable model.
+- [ ] Assemble a complete canonical model without a language model.
+- [ ] Render deterministic current BSAM syntax.
+- [ ] Provide source and semantic render previews.
+- [ ] Round-trip and executable-test the representative model.
 
-Exit: the coverage ledger has no unexplained current-syntax gaps, and supported edits cannot leave unresolved dependent references.
+### G2.5 Run supervision
 
-## G4 — Model-assisted authoring
+- [x] Fingerprint and preflight the executable and full source set.
+- [x] Run serial BSAM in an isolated artifact directory.
+- [x] Capture streams and atomically publish state.
+- [x] Classify sentinel, diagnostics, timeout, and stop outcomes.
+- [x] Provide concurrent `status` and idempotent controlled `stop`.
+- [ ] Add end-to-end modified-deck and imported-model acceptance runs.
 
-Deliverables:
+### G2.6 Local Agent API
 
-- provider-neutral structured-output/tool interface;
-- CPU-local benchmark and selected allowed local model;
-- Gemini adapter for sanitized or synthetic payloads;
-- OpenAI adapter under an explicit data policy;
-- prompt-injection, schema, and tool-policy tests.
+- [ ] Implement the versioned loopback-only API service.
+- [ ] Expose capabilities, inspection, semantic summary, preview/apply/diff, validation, render, and run tools.
+- [ ] Enforce workspace roots, revision tokens, confirmation requirements, and run policy at the API boundary.
+- [ ] Generate strict request/response schemas from one source of truth.
+- [ ] Add API contract, concurrency, cancellation, and error-normalization tests.
 
-Exit: the model improves authoring while invalid or unauthorized calls remain blocked by the deterministic core.
+Exit: without an LLM, a client can safely inspect, modify, validate, render, and run the supported model, and combine the accepted VTMS fixture with explicit analysis data.
 
-## G5 — Gmsh-backed embedded mesh generation
+## G3 - Complete deterministic capability layer
 
-Deliverables:
+- [ ] Implement typed support for every capability admitted by G1.
+- [ ] Close all unexplained current-syntax coverage gaps.
+- [ ] Add golden no-op and minimal-patch tests for each syntax family.
+- [ ] Complete dependency-aware rename/delete/transform behavior.
+- [ ] Implement and verify the supported two-ply-to-eight-ply transformation fixture.
+- [ ] Add representative executable probes and regression cases.
+- [ ] Expose the versioned capability manifest through the API.
+- [ ] Ensure unsupported or ambiguous requests fail with actionable diagnostics.
 
-- pinned local Gmsh executable/library adapter with no network dependency;
-- typed, explicitly scoped geometry and meshing recipes exposed through Agent tools;
-- deterministic `.msh` import into an intermediate mesh model;
-- mapping of Gmsh physical groups to BSAM clusters, node sets, and element sets;
-- supported-element conversion, label allocation, orientation, ply, and interface rules;
-- deterministic node/element/set/orientation generation and BSAM cluster insertion;
-- topology and quality validation;
-- previewable geometry/mesh parameters and provenance manifests;
-- equivalence tests against trusted small models and pinned-executable probes.
+Exit: supported edits cannot leave unresolved dependent references, and the API is sufficient authority for a model-assisted client.
 
-The optional language model may translate user intent into the typed geometry tools, but it will not generate authoritative node/connectivity text or invoke Gmsh directly. The deterministic Gmsh adapter owns geometry construction, meshing, import, validation, and conversion.
+## G4 - Local model and first chat agent
 
-Exit: the initial supported geometry families generate validated, executable current-syntax clusters without VTMS, while unsupported element/topology requests fail with explicit diagnostics.
+### G4.1 Provider-neutral boundary
 
-## G6 — VS Code extension
+- [ ] Implement provider-independent message, structured-output, tool-call, usage, cancellation, and error types.
+- [ ] Implement local configuration without embedding credentials or model weights.
+- [ ] Keep provider responses out of deterministic domain models and audit records.
 
-Deliverables:
+### G4.2 Evaluation and policy gate
 
-- thin TypeScript client of the local API;
-- schema-aware editor assistance and diagnostics;
-- model form/preview, render diff, run controls, and status display;
-- packaging and Windows setup documentation.
+- [ ] Create synthetic conversations for inspection, explanation, editing, validation, rendering, running, status, and stop.
+- [ ] Specify expected tools, arguments, confirmations, refusals, and final answers.
+- [ ] Test prompt injection, path escape, raw-deck generation, unsupported capability invention, stale revisions, and unauthorized runs.
+- [ ] Define pass thresholds for schema validity, tool accuracy, refusal behavior, latency, and memory.
 
-Exit: core behavior remains usable and testable without VS Code.
+### G4.3 Acquire and benchmark the Meta model
+
+- [ ] Select a llama.cpp-compatible Windows CPU runtime and pin its version/checksum.
+- [ ] Create an ignored external model directory and local configuration template.
+- [ ] Have the user accept the Meta license and download the approved quantized model weights.
+- [ ] Record model identity, quantization, file checksum, context limit, and provenance outside the capability registry.
+- [ ] Bind the runtime to loopback only and disable telemetry/network model fetching.
+- [ ] Benchmark the small interactive candidate against the checked-in evaluation suite.
+- [ ] Benchmark larger candidates only if the small model misses accuracy thresholds.
+- [ ] Select the smallest model meeting safety, accuracy, and latency thresholds.
+
+### G4.4 Local adapter and orchestrator
+
+- [ ] Implement the loopback model adapter with bounded context and structured tool calls.
+- [ ] Validate every model response and tool argument before dispatch.
+- [ ] Implement the conversation state machine: understand, inspect, propose, confirm, execute, verify, explain.
+- [ ] Require explicit confirmation for mutations and runs according to policy.
+- [ ] Summarize tool results without treating model text as authoritative state.
+- [ ] Persist privacy-safe conversation and tool audit metadata with opt-out controls.
+
+### G4.5 First usable chat client
+
+- [ ] Add a local `bsam-agent chat` terminal client.
+- [ ] Support new/resume conversation, model selection, project binding, and cancellation.
+- [ ] Display proposed semantic/source diffs and confirmation prompts.
+- [ ] Display validation and run progress with links/paths to artifacts.
+- [ ] Add end-to-end scripted conversation tests with a fake provider.
+- [ ] Run local-model acceptance conversations on synthetic and approved project fixtures.
+- [ ] Document installation, model placement, configuration, startup, limitations, and recovery.
+
+Exit: a user can converse locally with BSAM Agent to inspect a project, request a supported change, review and confirm it, validate it, and run BSAM; all authoritative work is performed by deterministic tools.
+
+## G5 - Optional hosted providers
+
+- [ ] Add Gemini and OpenAI adapters behind the same contract.
+- [ ] Enforce payload classification and explicit provider enablement.
+- [ ] Use only synthetic/sanitized data until the configured data policy permits otherwise.
+- [ ] Run the same provider conformance and tool-policy suite.
+
+## G6 - Gmsh-backed embedded mesh generation
+
+- [ ] Pin a local Gmsh executable/library with no network dependency.
+- [ ] Add typed geometry and meshing recipes, deterministic import/conversion, physical-group mapping, and quality validation.
+- [ ] Generate current-syntax clusters with provenance and trusted equivalence tests.
+
+## G7 - VS Code client
+
+- [ ] Build a thin TypeScript client of the local API.
+- [ ] Add schema-aware diagnostics, model forms, chat, reviewed diffs, run controls, and status.
+- [ ] Package it with Windows setup documentation while retaining CLI parity.
 
 ## Later
 
-- MPI support
+- MPI supervision
 - result interpretation and reporting
 - broader mesh generation
 - controlled obsolete-input migration

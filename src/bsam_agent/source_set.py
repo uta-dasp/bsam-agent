@@ -9,6 +9,7 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from .document import Diagnostic, SourceDocument, SourceLine
+from .semantic import SemanticIndex, build_semantic_index
 
 
 @dataclass(frozen=True)
@@ -241,9 +242,19 @@ class SourceSet:
         ) for item in self.documents[self.root].diagnostics()]
         return [*root_diagnostics, *self._graph_diagnostics]
 
+    def semantic_index(self) -> SemanticIndex:
+        sources = []
+        for path, document in self.documents.items():
+            relative = "<root>" if path == self.root else os.path.relpath(
+                path, self.input_directory
+            ).replace("\\", "/")
+            sources.append((path, relative, self._candidate_lines(path, document)))
+        return build_semantic_index(sources)
+
     def inspection(self) -> dict[str, Any]:
         root_inspection = self.documents[self.root].inspection()
         diagnostics = self.diagnostics()
+        semantic_index = self.semantic_index()
         files = []
         for path, document in self.documents.items():
             files.append({
@@ -269,6 +280,7 @@ class SourceSet:
                 "files": files,
                 "include_references": [item.as_dict() for item in self.references],
             },
+            "semantic_model": semantic_index.as_dict(),
             "diagnostics": [item.as_dict() for item in diagnostics],
             "summary": {
                 "errors": sum(item.severity == "error" for item in diagnostics),
