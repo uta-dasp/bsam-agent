@@ -15,8 +15,10 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.4.0"
-SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", "1.1.0", "1.2.0", "1.3.0", PLAN_SCHEMA_VERSION}
+PLAN_SCHEMA_VERSION = "1.5.0"
+SUPPORTED_PLAN_SCHEMA_VERSIONS = {
+    "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", PLAN_SCHEMA_VERSION
+}
 AUDIT_SCHEMA_VERSION = "1.0.0"
 
 
@@ -341,6 +343,104 @@ def plan_delete_node(
     )
 
 
+def _set_patch(
+    source_set: SourceSet,
+    cluster: str,
+    member_kind: str,
+    name: str,
+    members: tuple[int, ...],
+    require_new: bool,
+) -> dict[str, Any]:
+    if member_kind not in {"node", "element"}:
+        raise ChangeError("set kind must be node or element")
+    _validate_raw_value(name)
+    if not members or any(item <= 0 for item in members):
+        raise ChangeError("set members must be a non-empty list of positive labels")
+    if len(set(members)) != len(members):
+        raise ChangeError("set member list contains duplicates")
+    semantic = source_set.semantic_index()
+    prefix = f"cluster:{cluster.casefold()}/"
+    set_kind = f"{member_kind}-set"
+    set_key = f"{prefix}{set_kind}:{name.casefold()}"
+    existing = [item for item in semantic.entities if item.key == set_key]
+    if require_new and existing:
+        raise ChangeError(f"{set_kind} {name} already exists in cluster {cluster}")
+    if not require_new and not existing:
+        raise ChangeError(f"{set_kind} {name} was not found in cluster {cluster}")
+    entity_keys = {item.key for item in semantic.entities}
+    missing = [item for item in members if f"{prefix}{member_kind}:{item}" not in entity_keys]
+    if missing:
+        raise ChangeError(f"set references missing {member_kind}s: {', '.join(map(str, missing))}")
+    if not require_new:
+        current = {
+            int(reference.target_key.rsplit(":", 1)[1])
+            for entity in existing
+            for reference in semantic.references
+            if reference.source_entity_id == entity.id and reference.kind == "contains"
+        }
+        duplicates = sorted(current.intersection(members))
+        if duplicates:
+            raise ChangeError(f"set already contains members: {', '.join(map(str, duplicates))}")
+
+    document = source_set.documents[source_set.root]
+    boundary = _cluster_boundary(document, cluster)
+    newline = next((line.newline for line in document.lines if line.newline), b"\n")
+    command = "*NSET,NSET=" if member_kind == "node" else "*ELSET,ELSET="
+    record = (
+        (command + name).encode("latin-1") + newline
+        + ",".join(map(str, members)).encode("ascii") + newline
+    )
+    return {
+        "start": boundary.start,
+        "end": boundary.start,
+        "line": boundary.number,
+        "old": "",
+        "new": record.decode("latin-1"),
+    }
+
+
+def plan_create_set(
+    source: Path,
+    cluster: str,
+    member_kind: str,
+    name: str,
+    members: list[int],
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    values = tuple(members)
+    patch = _set_patch(source_set, cluster, member_kind, name, values, True)
+    set_kind = f"{member_kind}-sets"
+    model_path = f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}]"
+    preview = f"line {patch['line']}: create {member_kind} set {name} with {len(values)} members"
+    return _typed_plan(
+        source_set, patch, "create-set",
+        {"cluster": cluster, "member_kind": member_kind, "name": name, "members": list(values)},
+        model_path, preview, "create",
+    )
+
+
+def plan_add_set_members(
+    source: Path,
+    cluster: str,
+    member_kind: str,
+    name: str,
+    members: list[int],
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    values = tuple(members)
+    patch = _set_patch(source_set, cluster, member_kind, name, values, False)
+    set_kind = f"{member_kind}-sets"
+    model_path = f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}].members"
+    preview = f"line {patch['line']}: add {len(values)} members to {member_kind} set {name}"
+    return _typed_plan(
+        source_set, patch, "add-set-members",
+        {"cluster": cluster, "member_kind": member_kind, "name": name, "members": list(values)},
+        model_path, preview, "modify",
+    )
+
+
 def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
     registry = load_registry()
     block_by_name = {item["canonical"].upper(): item["id"] for item in registry["top_level_blocks"]}
@@ -566,15 +666,19 @@ def _validated_plan_proposal(
 ) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
     operation = plan.get("operation")
-    if operation in {"add-node", "add-element", "delete-node"}:
+    if operation in {"add-node", "add-element", "delete-node", "create-set", "add-set-members"}:
         selector = plan.get("selector")
         if not isinstance(selector, dict):
             raise ChangeError("change plan is missing its selector")
         try:
             cluster = str(selector["cluster"])
-            label = int(selector["label"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ChangeError(f"{operation} selector is malformed") from exc
+        if operation in {"add-node", "add-element", "delete-node"}:
+            try:
+                label = int(selector["label"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ChangeError(f"{operation} selector is malformed") from exc
         if operation == "add-node":
             values = selector.get("coordinates")
             if not isinstance(values, list) or len(values) != 3:
@@ -608,11 +712,40 @@ def _validated_plan_proposal(
                 f"to cluster {cluster}"
             )
             change_operation = "create"
-        else:
+        elif operation == "delete-node":
             patch = _delete_node_patch(source_set, cluster, label)
             model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
             preview = f"line {patch['line']}: delete unreferenced node {label} from cluster {cluster}"
             change_operation = "delete"
+        else:
+            member_kind = str(selector.get("member_kind", ""))
+            name = str(selector.get("name", ""))
+            values = selector.get("members")
+            if not isinstance(values, list) or not values:
+                raise ChangeError(f"{operation} member list is malformed")
+            try:
+                members = tuple(int(item) for item in values)
+            except (TypeError, ValueError) as exc:
+                raise ChangeError(f"{operation} member list is malformed") from exc
+            creating = operation == "create-set"
+            patch = _set_patch(
+                source_set, cluster, member_kind, name, members, creating
+            )
+            set_kind = f"{member_kind}-sets"
+            model_path = f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}]"
+            if creating:
+                preview = (
+                    f"line {patch['line']}: create {member_kind} set {name} "
+                    f"with {len(members)} members"
+                )
+                change_operation = "create"
+            else:
+                model_path += ".members"
+                preview = (
+                    f"line {patch['line']}: add {len(members)} members to "
+                    f"{member_kind} set {name}"
+                )
+                change_operation = "modify"
         if plan.get("patch") != patch:
             raise ChangeError(f"change plan patch does not match its typed {operation} selector")
         updated = _patched_bytes(document, patch)

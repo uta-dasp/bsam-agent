@@ -17,6 +17,8 @@ from bsam_agent.change import (
     apply_plan,
     plan_add_element,
     plan_add_node,
+    plan_add_set_members,
+    plan_create_set,
     plan_delete_node,
     plan_parameter_change,
     review_plan,
@@ -36,6 +38,42 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_typed_set_creation_and_member_addition(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            first_plan = root / "create-set.json"
+            first_output = root / "with-set.in"
+            second_plan = root / "add-members.json"
+            second_output = root / "with-members.in"
+            source.write_bytes(
+                (Path(__file__).parent / "fixtures" / "semantic_two_cluster.in").read_bytes()
+            )
+
+            create = plan_create_set(source, "lower_ply", "node", "edge", [1, 2])
+            write_plan(create, first_plan)
+            apply_plan(first_plan, first_output)
+            add = plan_add_set_members(first_output, "lower_ply", "node", "edge", [3, 4])
+            write_plan(add, second_plan)
+            apply_plan(second_plan, second_output)
+
+            semantic = SourceSet.read(second_output).semantic_index()
+            set_entities = [
+                item for item in semantic.entities
+                if item.key == "cluster:lower_ply/node-set:edge"
+            ]
+            members = {
+                item.target_key for entity in set_entities for item in semantic.references
+                if item.source_entity_id == entity.id and item.kind == "contains"
+            }
+            self.assertEqual(
+                {f"cluster:lower_ply/node:{label}" for label in range(1, 5)}, members
+            )
+            with self.assertRaisesRegex(ChangeError, "already contains"):
+                plan_add_set_members(second_output, "lower_ply", "node", "edge", [4])
+            with self.assertRaisesRegex(ChangeError, "missing nodes"):
+                plan_create_set(source, "lower_ply", "node", "bad", [99])
+
     def test_typed_element_creation_uses_established_topology(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

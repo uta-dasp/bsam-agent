@@ -11,9 +11,11 @@ from . import __version__
 from .change import (
     ChangeError,
     apply_plan,
+    plan_add_set_members,
     plan_add_element,
     plan_add_node,
     plan_delete_node,
+    plan_create_set,
     plan_parameter_change,
     review_plan,
     write_plan,
@@ -82,6 +84,26 @@ def build_parser() -> argparse.ArgumentParser:
     delete_node_parser.add_argument("--label", required=True, type=int)
     delete_node_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
     delete_node_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    create_set_parser = subparsers.add_parser("plan-create-set", help="plan a typed FE set")
+    create_set_parser.add_argument("deck")
+    create_set_parser.add_argument("--cluster", required=True)
+    create_set_parser.add_argument("--kind", required=True, choices=("node", "element"))
+    create_set_parser.add_argument("--name", required=True)
+    create_set_parser.add_argument("--members", required=True, nargs="+", type=int)
+    create_set_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    create_set_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    add_members_parser = subparsers.add_parser(
+        "plan-add-set-members", help="plan typed additions to an existing FE set"
+    )
+    add_members_parser.add_argument("deck")
+    add_members_parser.add_argument("--cluster", required=True)
+    add_members_parser.add_argument("--kind", required=True, choices=("node", "element"))
+    add_members_parser.add_argument("--name", required=True)
+    add_members_parser.add_argument("--members", required=True, nargs="+", type=int)
+    add_members_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    add_members_parser.add_argument("--out", required=True, help="new JSON plan path")
 
     apply_parser = subparsers.add_parser("apply-change", help="apply a revision-bound plan to a new deck")
     apply_parser.add_argument("plan")
@@ -156,6 +178,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "plan-delete-node":
             plan = plan_delete_node(
                 Path(args.deck), args.cluster, args.label,
+                Path(args.workspace_root) if args.workspace_root else None,
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command in {"plan-create-set", "plan-add-set-members"}:
+            planner = plan_create_set if args.command == "plan-create-set" else plan_add_set_members
+            plan = planner(
+                Path(args.deck), args.cluster, args.kind, args.name, args.members,
                 Path(args.workspace_root) if args.workspace_root else None,
             )
             write_plan(plan, Path(args.out))

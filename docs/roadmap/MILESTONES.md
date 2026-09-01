@@ -81,6 +81,7 @@ Status: in progress.
 - [x] Add typed node creation with revision-bound preview, validation, apply, and audit.
 - [x] Add topology-constrained element creation with validated connectivity references.
 - [x] Add dependency-aware deletion for unreferenced nodes.
+- [x] Add typed node/element-set creation and validated member-list additions.
 - [ ] Add remaining typed entity creation, deletion, rename, list, table, and reference edits.
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [ ] Guarantee byte-identical no-op output for the complete source set.
