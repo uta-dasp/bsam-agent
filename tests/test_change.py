@@ -15,6 +15,7 @@ from bsam_agent.change import (
     ChangeError,
     _plan_digest,
     apply_plan,
+    plan_add_node,
     plan_parameter_change,
     review_plan,
     write_plan,
@@ -33,6 +34,28 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_plan_and_apply_typed_node_creation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            plan_path = root / "add-node.json"
+            output = root / "changed.in"
+            named = DECK.replace(b"*STOP\r\n", b"*NAME\r\nply1\r\n*STOP\r\n")
+            source.write_bytes(named)
+
+            plan = plan_add_node(source, "ply1", 7, "1.0", "2.0", "3.0")
+            self.assertEqual("add-node", plan["operation"])
+            self.assertEqual(["CLUSTERS[ply1].nodes[7]"], plan["changed_model_paths"])
+            write_plan(plan, plan_path)
+            result = apply_plan(plan_path, output)
+
+            self.assertIn(b"*NODE\r\n7,1.0,2.0,3.0\r\n*STOP", output.read_bytes())
+            self.assertEqual(0, result["validation"]["summary"]["errors"])
+            with self.assertRaisesRegex(ChangeError, "already exists"):
+                plan_add_node(output, "ply1", 7, "0", "0", "0")
+            with self.assertRaisesRegex(ChangeError, "finite"):
+                plan_add_node(source, "ply1", 8, "nan", "0", "0")
+
     def test_plan_and_apply_patch_only_value_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

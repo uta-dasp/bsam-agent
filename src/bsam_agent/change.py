@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
@@ -71,6 +72,129 @@ def _validate_raw_value(value: str) -> None:
         raise ChangeError("replacement value must be a single non-comma record value")
     if not value.strip():
         raise ChangeError("replacement value must not be empty")
+
+
+def _node_patch(
+    source_set: SourceSet,
+    cluster: str,
+    label: int,
+    coordinates: tuple[str, str, str],
+) -> dict[str, Any]:
+    if label <= 0:
+        raise ChangeError("node label must be positive")
+    if not cluster.strip():
+        raise ChangeError("cluster name must not be empty")
+    for value in coordinates:
+        _validate_raw_value(value)
+        try:
+            parsed = float(value)
+        except ValueError as exc:
+            raise ChangeError(f"node coordinate {value!r} is not a real number") from exc
+        if not math.isfinite(parsed):
+            raise ChangeError(f"node coordinate {value!r} must be finite")
+
+    key = f"cluster:{cluster.casefold()}/node:{label}"
+    if any(item.key == key for item in source_set.semantic_index().entities):
+        raise ChangeError(f"node {label} already exists in cluster {cluster}")
+
+    document = source_set.documents[source_set.root]
+    matches: list[SourceLine] = []
+    for block in (item for item in document.blocks() if item["name"] == "CLUSTERS"):
+        final = block["end_line"] or len(document.lines)
+        for index in range(block["start_line"], final):
+            line = document.lines[index]
+            if line.text.lstrip().upper()[:5] != "*NAME":
+                continue
+            name_line = next(
+                (
+                    item for item in document.lines[index + 1:final]
+                    if item.stripped and not item.stripped.startswith("**")
+                ),
+                None,
+            )
+            if name_line is None or name_line.stripped.casefold() != cluster.casefold():
+                continue
+            boundary = next(
+                (
+                    item for item in document.lines[name_line.number:final]
+                    if item.text.lstrip().upper()[:5] in {"*TYPE", "*STOP"}
+                ),
+                None,
+            )
+            if boundary is None:
+                raise ChangeError(f"cluster {cluster} has no following *TYPE or *STOP boundary")
+            matches.append(boundary)
+    if not matches:
+        raise ChangeError(f"cluster {cluster} was not found in the root deck")
+    if len(matches) > 1:
+        raise ChangeError(f"cluster name {cluster} is ambiguous in the root deck")
+
+    boundary = matches[0]
+    newline = next((line.newline for line in document.lines if line.newline), b"\n")
+    record = (
+        b"*NODE" + newline
+        + f"{label},{coordinates[0]},{coordinates[1]},{coordinates[2]}".encode("latin-1")
+        + newline
+    )
+    return {
+        "start": boundary.start,
+        "end": boundary.start,
+        "line": boundary.number,
+        "old": "",
+        "new": record.decode("latin-1"),
+    }
+
+
+def plan_add_node(
+    source: Path,
+    cluster: str,
+    label: int,
+    x: str,
+    y: str,
+    z: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    document = source_set.documents[source]
+    coordinates = (x, y, z)
+    patch = _node_patch(source_set, cluster, label, coordinates)
+    updated = _patched_bytes(document, patch)
+    updated_document = SourceDocument.from_bytes(updated, str(source))
+    validation = _validation_result(source_set, {source: updated})
+    if validation["summary"]["errors"]:
+        messages = "; ".join(
+            item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
+        )
+        raise ChangeError(f"planned source set failed dependency validation: {messages}")
+    model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
+    preview = f"line {patch['line']}: add node {label} to cluster {cluster} at ({x}, {y}, {z})"
+    plan: dict[str, Any] = {
+        "schema_version": PLAN_SCHEMA_VERSION,
+        "source": str(source),
+        "workspace_root": str(source_set.workspace_root),
+        "base_sha256": document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "proposed_sha256": updated_document.sha256,
+        "proposed_source_set_sha256": source_set.digest_with({source: updated}),
+        "operation": "add-node",
+        "selector": {
+            "cluster": cluster,
+            "label": label,
+            "coordinates": list(coordinates),
+        },
+        "patch": patch,
+        "changed_model_paths": [model_path],
+        "affected_files": [str(source)],
+        "changes": [{"operation": "create", "target": model_path, "summary": preview}],
+        "source_diff": _source_diff(source, document.raw, updated),
+        "validation": validation,
+        "preview": preview,
+    }
+    digest = _plan_digest(plan)
+    plan["plan_digest"] = digest
+    plan["plan_id"] = digest[:16]
+    return plan
 
 
 def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
@@ -297,6 +421,48 @@ def _validated_plan_proposal(
     source_set: SourceSet,
 ) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
+    if plan.get("operation") == "add-node":
+        selector = plan.get("selector")
+        if not isinstance(selector, dict):
+            raise ChangeError("change plan is missing its selector")
+        try:
+            cluster = str(selector["cluster"])
+            label = int(selector["label"])
+            values = selector["coordinates"]
+            if not isinstance(values, list) or len(values) != 3:
+                raise ValueError
+            coordinates = tuple(str(item) for item in values)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ChangeError("add-node selector is malformed") from exc
+        patch = _node_patch(source_set, cluster, label, coordinates)  # type: ignore[arg-type]
+        if plan.get("patch") != patch:
+            raise ChangeError("change plan patch does not match its typed add-node selector")
+        updated = _patched_bytes(document, patch)
+        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+        source_diff = _source_diff(source, document.raw, updated)
+        validation = _validation_result(source_set, {source.resolve(): updated})
+        model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
+        preview = (
+            f"line {patch['line']}: add node {label} to cluster {cluster} at "
+            f"({coordinates[0]}, {coordinates[1]}, {coordinates[2]})"
+        )
+        expected_changes = [{"operation": "create", "target": model_path, "summary": preview}]
+        if plan.get("proposed_sha256") not in {None, updated_document.sha256}:
+            raise ChangeError("change plan proposed-output digest is invalid")
+        if plan.get("source_diff") != source_diff:
+            raise ChangeError("change plan source diff does not match its exact patch")
+        if plan.get("validation") != validation:
+            raise ChangeError("change plan validation preview does not match its exact patch")
+        if validation["summary"]["errors"]:
+            raise ChangeError("planned source set failed dependency validation")
+        if plan.get("changed_model_paths") != [model_path]:
+            raise ChangeError("change plan model path does not match its typed selector")
+        if plan.get("changes") != expected_changes or plan.get("preview") != preview:
+            raise ChangeError("change plan semantic changes do not match its typed selector")
+        if plan.get("affected_files") != [str(source.resolve())]:
+            raise ChangeError("change plan affected files do not match its source")
+        return updated, updated_document, model_path, source_diff, validation
+
     if plan.get("operation") != "set-existing-parameter":
         raise ChangeError("unsupported change-plan operation")
     selector = plan.get("selector")

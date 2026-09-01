@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from . import __version__
-from .change import ChangeError, apply_plan, plan_parameter_change, review_plan, write_plan
+from .change import ChangeError, apply_plan, plan_add_node, plan_parameter_change, review_plan, write_plan
 from .registry import load_registry
 from .run import RunError, request_run_stop, run_bsam, run_status
 from .source_set import SourceSet
@@ -44,6 +44,16 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument("--occurrence", type=int, default=1)
     plan_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
     plan_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    node_parser = subparsers.add_parser("plan-add-node", help="plan a typed node insertion")
+    node_parser.add_argument("deck")
+    node_parser.add_argument("--cluster", required=True)
+    node_parser.add_argument("--label", required=True, type=int)
+    node_parser.add_argument("--x", required=True)
+    node_parser.add_argument("--y", required=True)
+    node_parser.add_argument("--z", required=True)
+    node_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    node_parser.add_argument("--out", required=True, help="new JSON plan path")
 
     apply_parser = subparsers.add_parser("apply-change", help="apply a revision-bound plan to a new deck")
     apply_parser.add_argument("plan")
@@ -93,6 +103,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.parameter,
                 args.value,
                 args.occurrence,
+                Path(args.workspace_root) if args.workspace_root else None,
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "plan-add-node":
+            plan = plan_add_node(
+                Path(args.deck), args.cluster, args.label, args.x, args.y, args.z,
                 Path(args.workspace_root) if args.workspace_root else None,
             )
             write_plan(plan, Path(args.out))

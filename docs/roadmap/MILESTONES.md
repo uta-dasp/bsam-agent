@@ -78,7 +78,8 @@ Status: in progress.
 - [x] Reject stale plans and prohibit in-place writes.
 - [x] Persist digest-bound, non-overwriting audit records.
 - [x] Validate complete source-set semantic dependencies during planning, review, and apply.
-- [ ] Add typed creation, deletion, rename, list, table, and reference edits.
+- [x] Add typed node creation with revision-bound preview, validation, apply, and audit.
+- [ ] Add remaining typed entity creation, deletion, rename, list, table, and reference edits.
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [ ] Guarantee byte-identical no-op output for the complete source set.
 
