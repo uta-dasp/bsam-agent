@@ -22,6 +22,13 @@ The separate BSAM-FE user's manual is not currently available. The first specifi
 
 An existing supported two-ply current-syntax model must be transformable into an eight-ply model and then run. The agent will derive what it can from the source and ask only for engineering choices the deck cannot determine, such as total-versus-ply thickness preservation and the intended eight-ply stacking sequence. A suitable non-sensitive input will be needed before this transformation can become an executable acceptance fixture.
 
+The notch model is now the accepted source fixture. Its two clusters occupy Z=0..1 and Z=1..2, use constitutive/orientation pairs 1/75 degrees and 2/15 degrees, connect `PLY1.ZMAX` to `PLY2` with connection constitutive 3, restrain in-plane sets on both plies, and restrain Z only on the bottom ply. Before implementing the eight-ply transformation, confirm:
+
+- whether total thickness remains 2.0 (eight 0.25-thick plies) or each ply remains 1.0;
+- the eight-ply constitutive/orientation sequence;
+- whether all seven adjacent interfaces use the current connection constitutive 3;
+- whether in-plane boundary/loading controls replicate to every ply while the Z restraint remains bottom-only.
+
 ## Decision needed after G1
 
 Choose the first Gmsh-backed geometry families and their acceptance tolerances after the cluster, element, set, orientation, connection, and crack contracts are understood. This avoids designing a mesh API around incomplete syntax knowledge.
