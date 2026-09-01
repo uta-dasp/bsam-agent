@@ -62,7 +62,7 @@ $env:PYTHONPATH = "$PWD\src"
 python -m bsam_agent baseline
 python -m bsam_agent inspect "..\projects\notch_v1\notch_v1.in"
 python -m bsam_agent validate "..\projects\notch_v1\notch_v1.in"
-python -m bsam_agent import-mesh "..\projects\eles\block_hex.ele"
+python -m bsam_agent import-mesh "path\to\manually-prepared-mesh.ele"
 python -m bsam_agent plan-change "..\projects\notch_v1\notch_v1.in" `
   --block BOUNDARY --construct CONVERGENCE `
   --parameter d_reduction --value 0.30 --out change.json

@@ -87,7 +87,7 @@ Status: in progress.
 
 ### G2.4 Import, assembly, and rendering
 
-- [x] Establish `projects/eles/block_hex.ele` as the real manually prepared Abaqus-style development example and check in a reduced non-sensitive fixture.
+- [x] Use a supplied `.ele` only to establish the generic interchange structure and check in an independent reduced synthetic fixture.
 - [x] Import `.ele` nodes, elements, node/element sets, generated ranges, surfaces, orientations, dimensions, and provenance into the canonical mesh model.
 - [x] Define the v1 assembly contract: the validated `.ele` supplies mesh data and an existing `.in` template supplies explicit analysis data through an empty named solid cluster.
 - [x] Assemble the imported canonical mesh into a revision-bound complete template source set without a language model.

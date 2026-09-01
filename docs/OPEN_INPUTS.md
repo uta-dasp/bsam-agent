@@ -4,7 +4,7 @@ These items do not block groundwork or the current source-derived API inventory.
 
 ## Abaqus-style `.ele` import decision
 
-- Resolved 2026-09-01: `projects/eles/block_hex.ele` is the local development example.
+- Resolved 2026-09-01: a user-supplied `.ele` example established the interchange structure; product behavior and acceptance testing must not be specialized around that example.
 - For version 1, the user manually creates `.ele` files from Abaqus by retaining mesh-related records and removing unrelated model data.
 - VTMS visualizes or assembles already meshed objects; it does not generate the mesh and is not the `.ele` format authority.
 - Direct Abaqus/Gmsh conversion into this interchange is a later capability.
