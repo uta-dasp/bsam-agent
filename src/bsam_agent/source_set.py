@@ -231,7 +231,15 @@ class SourceSet:
         """Render every unchanged source file byte-for-byte."""
         return {path: document.render_bytes() for path, document in self.documents.items()}
 
-    def diagnostics(self, semantic_index: SemanticIndex | None = None) -> list[Diagnostic]:
+    def diagnostics(
+        self,
+        semantic_index: SemanticIndex | None = None,
+        replacements: dict[Path, bytes] | None = None,
+    ) -> list[Diagnostic]:
+        replacements = replacements or {}
+        root_document = self.documents[self.root]
+        if self.root in replacements:
+            root_document = SourceDocument.from_bytes(replacements[self.root], str(self.root))
         root_diagnostics = [Diagnostic(
             code=item.code,
             severity=item.severity,
@@ -239,13 +247,16 @@ class SourceSet:
             line=item.line,
             replacement=item.replacement,
             source=str(self.root),
-        ) for item in self.documents[self.root].diagnostics()]
-        semantic = semantic_index or self.semantic_index()
+        ) for item in root_document.diagnostics()]
+        semantic = semantic_index or self.semantic_index(replacements)
         return [*root_diagnostics, *self._graph_diagnostics, *semantic.diagnostics]
 
-    def semantic_index(self) -> SemanticIndex:
+    def semantic_index(self, replacements: dict[Path, bytes] | None = None) -> SemanticIndex:
+        replacements = replacements or {}
         sources = []
         for path, document in self.documents.items():
+            if path in replacements:
+                document = SourceDocument.from_bytes(replacements[path], str(path))
             relative = "<root>" if path == self.root else os.path.relpath(
                 path, self.input_directory
             ).replace("\\", "/")

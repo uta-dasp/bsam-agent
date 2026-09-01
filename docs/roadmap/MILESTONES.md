@@ -77,7 +77,7 @@ Status: in progress.
 - [x] Plan, diff, and apply narrow registered nested key/value edits.
 - [x] Reject stale plans and prohibit in-place writes.
 - [x] Persist digest-bound, non-overwriting audit records.
-- [ ] Validate semantic dependencies before applying a change.
+- [x] Validate complete source-set semantic dependencies during planning, review, and apply.
 - [ ] Add typed creation, deletion, rename, list, table, and reference edits.
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [ ] Guarantee byte-identical no-op output for the complete source set.

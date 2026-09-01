@@ -155,6 +155,20 @@ class ChangePlanTests(unittest.TestCase):
                 plan_parameter_change(
                     source, "BOUNDARY", "CONVERGENCE", "mystery", "1"
                 )
+
+    def test_change_planning_rejects_unresolved_semantic_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "model.in"
+            invalid = DECK.replace(
+                b"*STOP\r\n",
+                b"*ELEMENT,TYPE=C3D4\r\n1,99,99,99,99\r\n*STOP\r\n",
+            )
+            source.write_bytes(invalid)
+
+            with self.assertRaisesRegex(ChangeError, "dependency validation"):
+                plan_parameter_change(
+                    source, "BOUNDARY", "CONVERGENCE", "absolute", "2"
+                )
             with self.assertRaisesRegex(ChangeError, "must be positive"):
                 plan_parameter_change(
                     source, "BOUNDARY", "CONVERGENCE", "absolute", "-1"

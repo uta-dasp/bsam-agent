@@ -14,8 +14,8 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.2.0"
-SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", "1.1.0", PLAN_SCHEMA_VERSION}
+PLAN_SCHEMA_VERSION = "1.3.0"
+SUPPORTED_PLAN_SCHEMA_VERSIONS = {"1.0.0", "1.1.0", "1.2.0", PLAN_SCHEMA_VERSION}
 AUDIT_SCHEMA_VERSION = "1.0.0"
 
 
@@ -53,10 +53,12 @@ def _source_diff(source: Path, before: bytes, after: bytes) -> str:
     )) + "\n"
 
 
-def _validation_result(document: SourceDocument) -> dict[str, Any]:
-    diagnostics = document.diagnostics()
+def _validation_result(source_set: SourceSet, replacements: dict[Path, bytes]) -> dict[str, Any]:
+    semantic = source_set.semantic_index(replacements)
+    diagnostics = source_set.diagnostics(semantic, replacements)
     return {
         "diagnostics": [item.as_dict() for item in diagnostics],
+        "semantic_summary": semantic.as_dict()["summary"],
         "summary": {
             "errors": sum(item.severity == "error" for item in diagnostics),
             "warnings": sum(item.severity == "warning" for item in diagnostics),
@@ -223,10 +225,10 @@ def plan_parameter_change(
     }
     updated = _patched_bytes(document, patch)
     updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
-    validation = _validation_result(updated_document)
+    validation = _validation_result(source_set, {source: updated})
     if validation["summary"]["errors"]:
         messages = "; ".join(item["message"] for item in validation["diagnostics"] if item["severity"] == "error")
-        raise ChangeError(f"planned deck failed structural validation: {messages}")
+        raise ChangeError(f"planned source set failed dependency validation: {messages}")
     model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
     preview = f"line {line.number}: {parameter} = {old_bytes.decode('latin-1')} -> {value}"
     plan: dict[str, Any] = {
@@ -292,6 +294,7 @@ def _validated_plan_proposal(
     plan: dict[str, Any],
     source: Path,
     document: SourceDocument,
+    source_set: SourceSet,
 ) -> tuple[bytes, SourceDocument, str, str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
     if plan.get("operation") != "set-existing-parameter":
@@ -334,14 +337,18 @@ def _validated_plan_proposal(
     source_diff = _source_diff(source, document.raw, updated)
     if plan.get("source_diff") is not None and plan["source_diff"] != source_diff:
         raise ChangeError("change plan source diff does not match its exact patch")
-    validation = _validation_result(updated_document)
-    if plan.get("validation") is not None and plan["validation"] != validation:
+    validation = _validation_result(source_set, {source.resolve(): updated})
+    if (
+        plan.get("schema_version") == PLAN_SCHEMA_VERSION
+        and plan.get("validation") is not None
+        and plan["validation"] != validation
+    ):
         raise ChangeError("change plan validation preview does not match its exact patch")
     if validation["summary"]["errors"]:
         messages = "; ".join(
             item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
         )
-        raise ChangeError(f"planned deck failed structural validation: {messages}")
+        raise ChangeError(f"planned source set failed dependency validation: {messages}")
     model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
     if plan.get("changed_model_paths") is not None and plan["changed_model_paths"] != [model_path]:
         raise ChangeError("change plan model path does not match its registered selector")
@@ -387,7 +394,7 @@ def review_plan(path: Path) -> dict[str, Any]:
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
     _, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
-        plan, source, document
+        plan, source, document, source_set
     )
     proposed_source_set_sha256 = source_set.digest_with({source.resolve(): updated_document.raw})
     if plan.get("proposed_source_set_sha256") not in {None, proposed_source_set_sha256}:
@@ -443,7 +450,7 @@ def apply_plan(
         raise ChangeError("source changed after planning; create a new change plan")
     patch = plan["patch"]
     updated, updated_document, model_path, source_diff, validation = _validated_plan_proposal(
-        plan, source, document
+        plan, source, document, source_set
     )
     output_source_set_sha256 = source_set.digest_with({source.resolve(): updated})
     if plan.get("proposed_source_set_sha256") not in {None, output_source_set_sha256}:
