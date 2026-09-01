@@ -48,6 +48,7 @@ class SemanticIndexTests(unittest.TestCase):
             targets = {item["target_key"] for item in semantic["references"]}
             self.assertIn("node-set:all_nodes", targets)
             self.assertIn("element-set:solid", targets)
+            self.assertEqual(11, semantic["summary"]["resolved_references"])
 
     def test_include_entities_use_workspace_independent_source_labels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -62,6 +63,28 @@ class SemanticIndexTests(unittest.TestCase):
             node = next(item for item in semantic["entities"] if item["key"] == "node:7")
             self.assertEqual("mesh.inc", node["location"]["source"])
             self.assertIn("@mesh.inc:2", node["id"])
+
+    def test_cluster_scope_and_resolution_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nfirst\n*NODE\n1,0,0,0\n1,1,0,0\n"
+                b"*ELEMENT,TYPE=C3D4\n10,1,2,1,1\n"
+                b"*NAME\nsecond\n*NODE\n1,0,0,0\n"
+                b"*ELEMENT,TYPE=C3D4\n20,1,1,1,1\n"
+                b"*NSET,NSET=wrong\n99\n*ELSET,ELSET=99\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            codes = [item["code"] for item in inspection["diagnostics"]]
+
+            self.assertIn("cluster:first/node:1", {item["key"] for item in semantic["entities"]})
+            self.assertIn("cluster:second/node:1", {item["key"] for item in semantic["entities"]})
+            self.assertEqual(1, codes.count("BSAM-E300"))
+            self.assertIn("BSAM-E301", codes)
+            self.assertIn("BSAM-E302", codes)
+            self.assertIn("BSAM-E303", codes)
 
 
 if __name__ == "__main__":

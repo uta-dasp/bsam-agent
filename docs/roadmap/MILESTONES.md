@@ -65,8 +65,8 @@ Status: in progress.
 
 - [x] Define stable semantic entity and reference records with source locations.
 - [x] Index explicit node, element, node-set, element-set, and section records across root and included files.
-- [ ] Resolve references without discarding unresolved or ambiguous references.
-- [ ] Emit deterministic duplicate, unresolved, and type-mismatch diagnostics.
+- [x] Resolve references while retaining unresolved, ambiguous, and type-mismatched records.
+- [x] Emit deterministic duplicate, unresolved, ambiguous, and type-mismatch diagnostics.
 - [x] Expose the semantic records and summary through `inspect`.
 - [x] Add synthetic semantic-index unit tests.
 - [ ] Add representative-project semantic regression fixtures and tests.

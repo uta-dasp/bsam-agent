@@ -231,7 +231,7 @@ class SourceSet:
         """Render every unchanged source file byte-for-byte."""
         return {path: document.render_bytes() for path, document in self.documents.items()}
 
-    def diagnostics(self) -> list[Diagnostic]:
+    def diagnostics(self, semantic_index: SemanticIndex | None = None) -> list[Diagnostic]:
         root_diagnostics = [Diagnostic(
             code=item.code,
             severity=item.severity,
@@ -240,7 +240,8 @@ class SourceSet:
             replacement=item.replacement,
             source=str(self.root),
         ) for item in self.documents[self.root].diagnostics()]
-        return [*root_diagnostics, *self._graph_diagnostics]
+        semantic = semantic_index or self.semantic_index()
+        return [*root_diagnostics, *self._graph_diagnostics, *semantic.diagnostics]
 
     def semantic_index(self) -> SemanticIndex:
         sources = []
@@ -253,8 +254,8 @@ class SourceSet:
 
     def inspection(self) -> dict[str, Any]:
         root_inspection = self.documents[self.root].inspection()
-        diagnostics = self.diagnostics()
         semantic_index = self.semantic_index()
+        diagnostics = self.diagnostics(semantic_index)
         files = []
         for path, document in self.documents.items():
             files.append({
