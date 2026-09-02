@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.8.0",
+  "registry_version": "0.9.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -90,7 +90,7 @@
       "locator": "source/libbsam/interface_material.f90",
       "line_start": 295,
       "line_end": 465,
-      "claim": "Resolves interface-material parameter values of the forms table_<name> and ufunc_<name> and binds them to the corresponding objects."
+      "claim": "Resolves interface-material parameter values of the forms table_<name>, stat_<name>_<initial>, and ufunc_<name> and binds them to the corresponding objects."
     },
     {
       "id": "evidence.moisture-parser",
@@ -259,6 +259,14 @@
       "line_start": 27,
       "line_end": 80,
       "claim": "Locates the optional exact STATISTICAL start token and divides entries at *end records until END STATISTICAL DISTRIBUTIONS."
+    },
+    {
+      "id": "evidence.stat-dist-initializer",
+      "kind": "source",
+      "locator": "source/libbsam/statistical_dist.f90",
+      "line_start": 80,
+      "line_end": 565,
+      "claim": "Parses statistical distribution attributes and implements active type-3 Weibull scaling for coordinate- or fiber-aligned three-dimensional seeding."
     },
     {
       "id": "evidence.material-parser",
@@ -805,12 +813,90 @@
         "tokens": ["*end per distribution", "END STATISTICAL DISTRIBUTIONS"],
         "certainty": "canonical"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.stat-dist-parser"],
-      "remaining_work": [
-        "Document distribution types, seeding modes, coordinates, parameters, and material references."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "name",
+          "value_type": "normalized-name",
+          "required": true,
+          "summary": "Names the distribution after stat-; safe generation uses one unique lowercase token without hyphens or underscores."
+        },
+        {
+          "name": "type",
+          "value_type": "const(3)",
+          "required": true,
+          "allowed_values": [3],
+          "summary": "Selects the only active generated distribution: finite-element-based Weibull scaling."
+        },
+        {
+          "name": "approx",
+          "value_type": "positive-cluster-id",
+          "required": true,
+          "summary": "References the one-based CLUSTERS declaration whose geometry, elements, integration points, and orientation drive seeding."
+        },
+        {
+          "name": "seeding",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": ["coordinates", "fiber", "fibers"],
+          "summary": "Selects global-coordinate or element-fiber-aligned seed cells."
+        },
+        {
+          "name": "seed_dimensions",
+          "value_type": "three-positive-reals",
+          "required": true,
+          "summary": "Uses a key exactly equal to the preceding seeding value and supplies positive seed spacing in three directions."
+        },
+        {
+          "name": "seed_window_section",
+          "value_type": "positive-section-id",
+          "required": false,
+          "summary": "Required for fiber/fibers seeding and must not exceed the referenced cluster's section count."
+        },
+        {
+          "name": "alpha",
+          "value_type": "positive-real",
+          "required": true,
+          "summary": "Sets the Weibull shape parameter."
+        },
+        {
+          "name": "v0",
+          "value_type": "positive-real",
+          "required": true,
+          "summary": "Sets the reference volume used to scale element-seed strength."
+        },
+        {
+          "name": "generation",
+          "value_type": "positive-integer",
+          "required": true,
+          "summary": "Seeds the deterministic MKL MT19937 stream; zero selects a diagnostic dummy distribution and is not generated."
+        }
+      ],
+      "evidence_ids": ["evidence.stat-dist-parser", "evidence.stat-dist-initializer", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "next-top-level-block",
+        "variants": [
+          {
+            "name": "type-3-weibull",
+            "when": "each entry starts with stat-<name>",
+            "rows": [
+              {"name": "distribution-name", "repetition": "once", "fields": [{"name": "name", "value_type": "stat-<normalized-name>", "required": true, "summary": "Defines the statistical distribution entity."}]},
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(3)", "required": true, "summary": "Selects FE Weibull scaling."}]},
+              {"name": "cluster", "repetition": "once", "fields": [{"name": "approx", "value_type": "positive-cluster-id", "required": true, "summary": "References the source cluster."}]},
+              {"name": "seed-mode", "repetition": "once", "fields": [{"name": "seeding", "value_type": "enum(coordinates,fiber,fibers)", "required": true, "summary": "Must precede the dynamic seed-dimension key."}]},
+              {"name": "seed-grid", "repetition": "once", "fields": [{"name": "<seeding-value>", "value_type": "three-positive-reals", "required": true, "summary": "Defines three seed-cell dimensions using a key equal to seeding."}]},
+              {"name": "fiber-section", "repetition": "once", "fields": [{"name": "seed_window_section", "value_type": "positive-section-id", "required": false, "summary": "Required only for fiber/fibers mode."}]},
+              {"name": "weibull", "repetition": "once", "fields": [{"name": "alpha", "value_type": "positive-real", "required": true, "summary": "Sets Weibull shape."}, {"name": "v0", "value_type": "positive-real", "required": true, "summary": "Sets reference volume."}]},
+              {"name": "random-stream", "repetition": "once", "fields": [{"name": "generation", "value_type": "positive-integer", "required": true, "summary": "Sets the deterministic random-stream seed."}]},
+              {"name": "distribution-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-sentinel", "required": true, "summary": "Terminates the entry and must be lowercase for the outer block splitter."}]}
+            ],
+            "constraints": ["Canonical generation uses stat-, type, approx, seeding, alpha, v0, and generation; accepted aliases dist-, approximation, seed, and gen are preservation/diagnostic forms.", "Generation emits one key/value setting per line even though the initializer can distribute multiple keys and values around one equals sign.", "The seed-dimension key is dynamic and must follow seeding because it is recognized only after seed_type is stored.", "Exactly three positive seed dimensions are required by the three-dimensional array operations.", "Only type 3 is implemented when generation is nonzero; other values print a not-implemented diagnostic.", "generation=0 creates a 100-entry zero dummy distribution for unit testing and is not a production generation target.", "Duplicate normalized names are unsafe because material consumers select the first match."]
+          }
+        ],
+        "dependencies": ["approx references an existing one-based solid CLUSTERS declaration.", "fiber/fibers mode requires a valid section and element orientations in that cluster.", "Structured material parameters reference this entity as stat_<name>_<initial-value>; table and statistical references may be combined in one parameter value.", "Distribution values are indexed by integration-point IDs and multiply the consuming material parameter."]
+      }
     },
     {
       "id": "block.materials",

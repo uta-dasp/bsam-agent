@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.8.0`
-- Registry SHA-256: `09FDC4C9F4397B4DDB227F0A2C8D6008C5D3A0CA59A62BA53C0C2622779A833A`
+- Registry version: `0.9.0`
+- Registry SHA-256: `235851E1BDAAAAE5A0CA26F33463CA39BA151B881C2B64CFFCA1D5A3F1E7276A`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -26,7 +26,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | identified | Defines constitutive law records that reference material and failure definitions. |
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
-| `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | identified | Defines named statistical distributions that modify material data. |
+| `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
 | `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
 | `FAILURE` | no | exact-case-sensitive | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
 | `USER` | no | exact-case-sensitive | `USF_INI` | identified | Defines numeric user-function records, including polynomial and discrete forms. |
@@ -267,12 +267,42 @@ Defines named statistical distributions that modify material data.
 - Lookup token/matcher: `STATISTICAL` / exact-case-sensitive
 - Required: no
 - Termination: `*end per distribution`, `END STATISTICAL DISTRIBUTIONS` (canonical)
-- Coverage: identified
-- Evidence: [evidence.stat-dist-parser](#evidencestat-dist-parser)
+- Coverage: documented
+- Evidence: [evidence.stat-dist-parser](#evidencestat-dist-parser), [evidence.stat-dist-initializer](#evidencestat-dist-initializer), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
 
-Remaining specification work:
+Known parameters:
 
-- Document distribution types, seeding modes, coordinates, parameters, and material references.
+- `name` (normalized-name, required): Names the distribution after stat-; safe generation uses one unique lowercase token without hyphens or underscores.
+- `type` (const(3), required) (allowed: `3`): Selects the only active generated distribution: finite-element-based Weibull scaling.
+- `approx` (positive-cluster-id, required): References the one-based CLUSTERS declaration whose geometry, elements, integration points, and orientation drive seeding.
+- `seeding` (enum, required) (allowed: `coordinates`, `fiber`, `fibers`): Selects global-coordinate or element-fiber-aligned seed cells.
+- `seed_dimensions` (three-positive-reals, required): Uses a key exactly equal to the preceding seeding value and supplies positive seed spacing in three directions.
+- `seed_window_section` (positive-section-id, optional): Required for fiber/fibers seeding and must not exceed the referenced cluster's section count.
+- `alpha` (positive-real, required): Sets the Weibull shape parameter.
+- `v0` (positive-real, required): Sets the reference volume used to scale element-seed strength.
+- `generation` (positive-integer, required): Seeds the deterministic MKL MT19937 stream; zero selects a diagnostic dummy distribution and is not generated.
+
+### `STATISTICAL` body
+
+Termination: next-top-level-block. Dependencies: approx references an existing one-based solid CLUSTERS declaration.; fiber/fibers mode requires a valid section and element orientations in that cluster.; Structured material parameters reference this entity as stat_<name>_<initial-value>; table and statistical references may be combined in one parameter value.; Distribution values are indexed by integration-point IDs and multiply the consuming material parameter.
+
+- **type-3-weibull** (each entry starts with stat-<name>):
+  - `distribution-name` [once]: `name`:stat-<normalized-name>
+  - `type` [once]: `type`:const(3)
+  - `cluster` [once]: `approx`:positive-cluster-id
+  - `seed-mode` [once]: `seeding`:enum(coordinates,fiber,fibers)
+  - `seed-grid` [once]: `<seeding-value>`:three-positive-reals
+  - `fiber-section` [once]: `seed_window_section`:positive-section-id
+  - `weibull` [once]: `alpha`:positive-real, `v0`:positive-real
+  - `random-stream` [once]: `generation`:positive-integer
+  - `distribution-end` [once]: `*end`:exact-sentinel
+  - Constraint: Canonical generation uses stat-, type, approx, seeding, alpha, v0, and generation; accepted aliases dist-, approximation, seed, and gen are preservation/diagnostic forms.
+  - Constraint: Generation emits one key/value setting per line even though the initializer can distribute multiple keys and values around one equals sign.
+  - Constraint: The seed-dimension key is dynamic and must follow seeding because it is recognized only after seed_type is stored.
+  - Constraint: Exactly three positive seed dimensions are required by the three-dimensional array operations.
+  - Constraint: Only type 3 is implemented when generation is nonzero; other values print a not-implemented diagnostic.
+  - Constraint: generation=0 creates a 100-entry zero dummy distribution for unit testing and is not a production generation target.
+  - Constraint: Duplicate normalized names are unsafe because material consumers select the first match.
 
 ### `MATERIALS`
 
@@ -848,7 +878,7 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidenceufunction-material-reference"></a>
 - `evidence.ufunction-material-reference` — source: `source/libbsam/material.f90:417-500` — Resolves material parameter values of the form ufunc_<name> to the first matching normalized UFUNCTION name.
 <a id="evidenceufunction-interface-material-reference"></a>
-- `evidence.ufunction-interface-material-reference` — source: `source/libbsam/interface_material.f90:295-465` — Resolves interface-material parameter values of the forms table_<name> and ufunc_<name> and binds them to the corresponding objects.
+- `evidence.ufunction-interface-material-reference` — source: `source/libbsam/interface_material.f90:295-465` — Resolves interface-material parameter values of the forms table_<name>, stat_<name>_<initial>, and ufunc_<name> and binds them to the corresponding objects.
 <a id="evidencemoisture-parser"></a>
 - `evidence.moisture-parser` — source: `source/libbsam/moisture.f90:36-338` — Parses MOISTURE key/value labels, resolves and checks its external environment, disables coupling on missing prerequisites, and executes the converter/program workflow.
 <a id="evidencemoisture-step-dispatch"></a>
@@ -891,6 +921,8 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 - `evidence.table-material-reference` — source: `source/libbsam/material.f90:417-630` — Resolves table_<name>, statistical-table, and polynomial table references from structured material parameters.
 <a id="evidencestat-dist-parser"></a>
 - `evidence.stat-dist-parser` — source: `source/libbsam/stat_dist_ini.f90:27-80` — Locates the optional exact STATISTICAL start token and divides entries at *end records until END STATISTICAL DISTRIBUTIONS.
+<a id="evidencestat-dist-initializer"></a>
+- `evidence.stat-dist-initializer` — source: `source/libbsam/statistical_dist.f90:80-565` — Parses statistical distribution attributes and implements active type-3 Weibull scaling for coordinate- or fiber-aligned three-dimensional seeding.
 <a id="evidencematerial-parser"></a>
 - `evidence.material-parser` — source: `source/libbsam/mat_ini.f90:62-230` — Requires MATERIALS and dispatches legacy numeric and newer representations, including numeric or named Mises material type 50.
 <a id="evidencefailure-parser"></a>

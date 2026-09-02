@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(43, counts["evidence"])
+        self.assertEqual(44, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -144,6 +144,22 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("bilinear interpolation", contract)
         self.assertIn("table_<name>", contract)
         self.assertIn("clamp", contract)
+
+    def test_statistical_weibull_contract_is_registered(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "STATISTICAL")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual([3], parameters["type"]["allowed_values"])
+        self.assertEqual(["coordinates", "fiber", "fibers"], parameters["seeding"]["allowed_values"])
+        variant = block["body"]["variants"][0]
+        rows = {item["name"]: item for item in variant["rows"]}
+        self.assertEqual("<seeding-value>", rows["seed-grid"]["fields"][0]["name"])
+        contract = json.dumps(block).lower()
+        self.assertIn("must follow seeding", contract)
+        self.assertIn("exactly three positive", contract)
+        self.assertIn("stat_<name>_<initial-value>", contract)
+        self.assertIn("generation=0", contract)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
