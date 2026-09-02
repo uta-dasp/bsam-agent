@@ -34,7 +34,7 @@ Exit: documents agree on scope and no implementation decision depends on a missi
 
 ## G1 - Current BSAM input specification
 
-Status: in progress. Registry `0.12.0` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
+Status: in progress. Registry `0.13.0` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
 
 - [x] Inventory top-level blocks, FE cluster commands, core mesh/section records, and active BOUNDARY constructs.
 - [x] Record executable invocation and completion classification.

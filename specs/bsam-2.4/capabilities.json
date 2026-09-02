@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.12.0",
+  "registry_version": "0.13.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -305,8 +305,24 @@
       "kind": "source",
       "locator": "source/libbsam/fai_ini.f90",
       "line_start": 20,
-      "line_end": 150,
-      "claim": "Locates optional FAILURE and dispatches failure criterion records, including interface-family types 34, 35, and 36."
+      "line_end": 339,
+      "claim": "Locates optional FAILURE and parses every accepted no-data, degradation-table, wrapper, CFV, and LARC04 criterion record, including interface types 34, 35, and 36."
+    },
+    {
+      "id": "evidence.failure-storage",
+      "kind": "source",
+      "locator": "source/libbsam/module4.f90",
+      "line_start": 270,
+      "line_end": 329,
+      "claim": "Defines the 50-entry declaration-order FAILURE array and records the criterion families stored in it."
+    },
+    {
+      "id": "evidence.failure-evaluator",
+      "kind": "source",
+      "locator": "source/libbsam/fai_crt.f90",
+      "line_start": 190,
+      "line_end": 2250,
+      "claim": "Dispatches bulk, interface-initiation, CFV, static, contact, and fatigue-initiation criteria using material strengths and the parser-owned failure records."
     },
     {
       "id": "evidence.user-parser",
@@ -1159,12 +1175,113 @@
         "tokens": ["END FAILURE"],
         "certainty": "accepted-current"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.failure-parser", "evidence.current-vtms-deck-tric"],
-      "remaining_work": [
-        "Enumerate all active criterion type IDs, coefficient layouts, modes, and cross-block constraints."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "type",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 45],
+          "summary": "Selects one accepted bulk, interface, contact, critical-volume, static, or fatigue criterion."
+        },
+        {
+          "name": "base_failure_id",
+          "value_type": "positive-failure-id",
+          "required": false,
+          "summary": "References the underlying static or surface criterion for wrapper types 22, 23, 25, 29, and 30."
+        },
+        {
+          "name": "cfactor",
+          "value_type": "real",
+          "required": false,
+          "default": 10,
+          "summary": "Sets the type-26 LARC04 compression cutoff and must appear on the type line."
+        }
+      ],
+      "evidence_ids": ["evidence.failure-parser", "evidence.failure-storage", "evidence.failure-evaluator", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "END FAILURE after a complete declaration",
+        "variants": [
+          {
+            "name": "maximum-stress-degradation-types-1-and-2",
+            "when": "type is 1 or 2",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(1,2)", "required": true, "summary": "Selects maximum-stress degradation with ten or eleven modes."}]},
+              {"name": "mode", "repetition": "10-times-for-type-1-or-11-times-for-type-2", "fields": [{"name": "c1", "value_type": "real", "required": true, "summary": "First degradation coefficient."}, {"name": "c2", "value_type": "real", "required": true, "summary": "Second degradation coefficient."}, {"name": "c3", "value_type": "real", "required": true, "summary": "Third degradation coefficient."}, {"name": "c4", "value_type": "real", "required": true, "summary": "Fourth degradation coefficient."}, {"name": "c5", "value_type": "real", "required": true, "summary": "Fifth degradation coefficient."}, {"name": "c6", "value_type": "real", "required": true, "summary": "Sixth degradation coefficient."}, {"name": "c7", "value_type": "real", "required": true, "summary": "Seventh degradation coefficient."}, {"name": "c8", "value_type": "real", "required": true, "summary": "Eighth degradation coefficient."}]}
+            ],
+            "constraints": ["Type 1 allocates ten failure-mode rows; type 2 allocates eleven.", "Each row contains exactly eight stiffness-degradation coefficients in consumer-defined mode order."]
+          },
+          {
+            "name": "no-data-interface-family",
+            "when": "type is 3, 8, 9, 14, 15, 16, 17, 24, 28, or 31-36",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(3,8,9,14,15,16,17,24,28,31,32,33,34,35,36)", "required": true, "summary": "Selects an interface or cohesive criterion whose coefficients come from the referenced material."}]}
+            ],
+            "constraints": ["3=Ye interface strength; 8=V-integral surface strength; 9=cohesive surface strength; 14=Wisnom; 15-16=EVI fracture forms; 17=Davila-Camanho; 24,28,31-33=Turon variants; 34=PLIGCOE; 35=vector Turon; 36=direct Davila.", "These declarations have no subordinate FAILURE records; their required strengths and fracture/fatigue data come from compatible MATERIALS and analysis controls."]
+          },
+          {
+            "name": "no-data-bulk-and-contact-family",
+            "when": "type is 4-7, 10-13, 19-21, 27, or 45",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(4,5,6,7,10,11,12,13,19,20,21,27,45)", "required": true, "summary": "Selects a criterion with no subordinate FAILURE data."}]}
+            ],
+            "constraints": ["4=max principal stress/orientation; 45=max principal compression; 5=SIFT; 6=Hashin; 7=Gcrack; 10=maximum strain; 11=Raghava; 12=stress invariants; 13=Doyoyo-Wierzbicki; 19=strain Doyoyo-Wierzbicki; 20=LaRC03 static; 21=Camanho decohesion initiation; 27=Coulomb friction.", "Applicability and required strength components are determined jointly by the criterion, the referenced material type, element/interface path, and loading mode."]
+          },
+          {
+            "name": "critical-failure-volume-type-18",
+            "when": "type is 18",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(18)", "required": true, "summary": "Selects critical failure volume."}]},
+              {"name": "header", "repetition": "once", "fields": [{"name": "base_failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Underlying pointwise failure criterion."}, {"name": "failure_mode_count", "value_type": "positive-integer", "required": true, "summary": "Sets CFV mode-row count."}, {"name": "load_levels", "value_type": "positive-integer", "required": true, "summary": "Sets internal CFV load levels."}]},
+              {"name": "mode", "repetition": "failure_mode_count-times", "fields": [{"name": "label", "value_type": "integer", "required": true, "summary": "Parsed but discarded mode label; canonical form equals the row index."}, {"name": "alpha", "value_type": "real", "required": true, "summary": "CFV alpha."}, {"name": "beta", "value_type": "real", "required": true, "summary": "CFV beta."}, {"name": "reference_volume", "value_type": "positive-real", "required": true, "summary": "Reference volume."}, {"name": "minimum_distance", "value_type": "nonnegative-real", "required": true, "summary": "Minimum distance control."}]}
+            ],
+            "constraints": ["base_failure_id must resolve and must not create a wrapper cycle.", "CFV uses shared global accumulation state; executable acceptance is required for each supported parallel/execution profile."]
+          },
+          {
+            "name": "fatigue-initiation-wrappers-23-and-30",
+            "when": "type is 23 or 30",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(23,30)", "required": true, "summary": "Selects fatigue initiation based on a static criterion; type 30 adds strength tracking."}]},
+              {"name": "base", "repetition": "once", "fields": [{"name": "base_failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Referenced static criterion."}]}
+            ],
+            "constraints": ["The base criterion must resolve and be compatible with the selected volume-failure path."]
+          },
+          {
+            "name": "cohesive-fatigue-wrappers-22-and-29",
+            "when": "type is 22 or 29",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(22,29)", "required": true, "summary": "Selects cohesive-fatigue propagation; type 29 adds strength tracking."}]},
+              {"name": "base", "repetition": "once", "fields": [{"name": "base_failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Referenced static cohesive criterion."}]}
+            ],
+            "constraints": ["The base criterion must resolve and be compatible with the interface/MIC fatigue path."]
+          },
+          {
+            "name": "larc04-type-26",
+            "when": "type is 26",
+            "rows": [
+              {"name": "type-line", "repetition": "once", "fields": [{"name": "type", "value_type": "const(26)", "required": true, "summary": "Selects LaRC-3D/LARC04 static failure."}, {"name": "CFACTOR", "value_type": "optional-real", "required": false, "summary": "Compression cutoff factor parsed from this same line."}]}
+            ],
+            "constraints": ["CFACTOR must be on the type line because the parser backspaces and re-reads that line only.", "The executable initializes CFACTOR to 10 when absent, despite an adjacent source comment describing different historical defaults."]
+          },
+          {
+            "name": "surface-volume-wrapper-type-25",
+            "when": "type is 25",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(25)", "required": true, "summary": "Selects surface-contact-law-based volume failure."}]},
+              {"name": "base", "repetition": "once", "fields": [{"name": "base_failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Referenced surface failure criterion."}]}
+            ],
+            "constraints": ["The referenced criterion must resolve and be an applicable surface/interface failure law."]
+          }
+        ],
+        "dependencies": [
+          "Failure IDs are one-based declaration order and are referenced by direct CONSTITUTIVE records, connection-created constitutive records, and failure wrappers.",
+          "Wrapper base_failure_id references must resolve without cycles and retain compatible bulk, interface, fatigue, or contact domains.",
+          "Most no-data criteria obtain strengths and other coefficients from their referenced MATERIALS declaration rather than from FAILURE rows.",
+          "At most 50 entries are stored; canonical generation reserves END FAILURE by emitting fewer than 50 declarations."
+        ]
+      }
     },
     {
       "id": "block.user",

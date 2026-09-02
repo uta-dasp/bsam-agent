@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.12.0`
-- Registry SHA-256: `64B6E1BB751B78F53E26CF29BA0B71F9875A05838B870D5EB11560D91FA02E99`
+- Registry version: `0.13.0`
+- Registry SHA-256: `5F69F06AAD103EE9B43D411D674DCBFF439ED958F306AD56DC4562B4D540EE27`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -28,7 +28,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
 | `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
-| `FAILURE` | no | exact-case-sensitive | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
+| `FAILURE` | no | exact-case-sensitive | `FAI_INI` | documented | Defines failure criterion records referenced by constitutive laws and damage behavior. |
 | `USER` | no | exact-case-sensitive | `USF_INI` | documented | Defines numeric user-function records, including polynomial and discrete forms. |
 | `CRACK` | no | exact-case-sensitive | `CRK_INI` | documented | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
 
@@ -390,12 +390,54 @@ Defines failure criterion records referenced by constitutive laws and damage beh
 - Lookup token/matcher: `FAILURE` / exact-case-sensitive
 - Required: no
 - Termination: `END FAILURE` (accepted-current)
-- Coverage: identified
-- Evidence: [evidence.failure-parser](#evidencefailure-parser), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Coverage: documented
+- Evidence: [evidence.failure-parser](#evidencefailure-parser), [evidence.failure-storage](#evidencefailure-storage), [evidence.failure-evaluator](#evidencefailure-evaluator), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
-Remaining specification work:
+Known parameters:
 
-- Enumerate all active criterion type IDs, coefficient layouts, modes, and cross-block constraints.
+- `type` (enum, required) (allowed: `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`, `11`, `12`, `13`, `14`, `15`, `16`, `17`, `18`, `19`, `20`, `21`, `22`, `23`, `24`, `25`, `26`, `27`, `28`, `29`, `30`, `31`, `32`, `33`, `34`, `35`, `36`, `45`): Selects one accepted bulk, interface, contact, critical-volume, static, or fatigue criterion.
+- `base_failure_id` (positive-failure-id, optional): References the underlying static or surface criterion for wrapper types 22, 23, 25, 29, and 30.
+- `cfactor` (real, optional) (default: `10`): Sets the type-26 LARC04 compression cutoff and must appear on the type line.
+
+### `FAILURE` body
+
+Termination: END FAILURE after a complete declaration. Dependencies: Failure IDs are one-based declaration order and are referenced by direct CONSTITUTIVE records, connection-created constitutive records, and failure wrappers.; Wrapper base_failure_id references must resolve without cycles and retain compatible bulk, interface, fatigue, or contact domains.; Most no-data criteria obtain strengths and other coefficients from their referenced MATERIALS declaration rather than from FAILURE rows.; At most 50 entries are stored; canonical generation reserves END FAILURE by emitting fewer than 50 declarations.
+
+- **maximum-stress-degradation-types-1-and-2** (type is 1 or 2):
+  - `type` [once]: `type`:enum(1,2)
+  - `mode` [10-times-for-type-1-or-11-times-for-type-2]: `c1`:real, `c2`:real, `c3`:real, `c4`:real, `c5`:real, `c6`:real, `c7`:real, `c8`:real
+  - Constraint: Type 1 allocates ten failure-mode rows; type 2 allocates eleven.
+  - Constraint: Each row contains exactly eight stiffness-degradation coefficients in consumer-defined mode order.
+- **no-data-interface-family** (type is 3, 8, 9, 14, 15, 16, 17, 24, 28, or 31-36):
+  - `type` [once]: `type`:enum(3,8,9,14,15,16,17,24,28,31,32,33,34,35,36)
+  - Constraint: 3=Ye interface strength; 8=V-integral surface strength; 9=cohesive surface strength; 14=Wisnom; 15-16=EVI fracture forms; 17=Davila-Camanho; 24,28,31-33=Turon variants; 34=PLIGCOE; 35=vector Turon; 36=direct Davila.
+  - Constraint: These declarations have no subordinate FAILURE records; their required strengths and fracture/fatigue data come from compatible MATERIALS and analysis controls.
+- **no-data-bulk-and-contact-family** (type is 4-7, 10-13, 19-21, 27, or 45):
+  - `type` [once]: `type`:enum(4,5,6,7,10,11,12,13,19,20,21,27,45)
+  - Constraint: 4=max principal stress/orientation; 45=max principal compression; 5=SIFT; 6=Hashin; 7=Gcrack; 10=maximum strain; 11=Raghava; 12=stress invariants; 13=Doyoyo-Wierzbicki; 19=strain Doyoyo-Wierzbicki; 20=LaRC03 static; 21=Camanho decohesion initiation; 27=Coulomb friction.
+  - Constraint: Applicability and required strength components are determined jointly by the criterion, the referenced material type, element/interface path, and loading mode.
+- **critical-failure-volume-type-18** (type is 18):
+  - `type` [once]: `type`:const(18)
+  - `header` [once]: `base_failure_id`:positive-failure-id, `failure_mode_count`:positive-integer, `load_levels`:positive-integer
+  - `mode` [failure_mode_count-times]: `label`:integer, `alpha`:real, `beta`:real, `reference_volume`:positive-real, `minimum_distance`:nonnegative-real
+  - Constraint: base_failure_id must resolve and must not create a wrapper cycle.
+  - Constraint: CFV uses shared global accumulation state; executable acceptance is required for each supported parallel/execution profile.
+- **fatigue-initiation-wrappers-23-and-30** (type is 23 or 30):
+  - `type` [once]: `type`:enum(23,30)
+  - `base` [once]: `base_failure_id`:positive-failure-id
+  - Constraint: The base criterion must resolve and be compatible with the selected volume-failure path.
+- **cohesive-fatigue-wrappers-22-and-29** (type is 22 or 29):
+  - `type` [once]: `type`:enum(22,29)
+  - `base` [once]: `base_failure_id`:positive-failure-id
+  - Constraint: The base criterion must resolve and be compatible with the interface/MIC fatigue path.
+- **larc04-type-26** (type is 26):
+  - `type-line` [once]: `type`:const(26), `CFACTOR`:optional-real
+  - Constraint: CFACTOR must be on the type line because the parser backspaces and re-reads that line only.
+  - Constraint: The executable initializes CFACTOR to 10 when absent, despite an adjacent source comment describing different historical defaults.
+- **surface-volume-wrapper-type-25** (type is 25):
+  - `type` [once]: `type`:const(25)
+  - `base` [once]: `base_failure_id`:positive-failure-id
+  - Constraint: The referenced criterion must resolve and be an applicable surface/interface failure law.
 
 ### `USER`
 
@@ -1076,7 +1118,11 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidencematerial-parser"></a>
 - `evidence.material-parser` — source: `source/libbsam/mat_ini.f90:62-230` — Requires MATERIALS and dispatches legacy numeric and newer representations, including numeric or named Mises material type 50.
 <a id="evidencefailure-parser"></a>
-- `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-150` — Locates optional FAILURE and dispatches failure criterion records, including interface-family types 34, 35, and 36.
+- `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-339` — Locates optional FAILURE and parses every accepted no-data, degradation-table, wrapper, CFV, and LARC04 criterion record, including interface types 34, 35, and 36.
+<a id="evidencefailure-storage"></a>
+- `evidence.failure-storage` — source: `source/libbsam/module4.f90:270-329` — Defines the 50-entry declaration-order FAILURE array and records the criterion families stored in it.
+<a id="evidencefailure-evaluator"></a>
+- `evidence.failure-evaluator` — source: `source/libbsam/fai_crt.f90:190-2250` — Dispatches bulk, interface-initiation, CFV, static, contact, and fatigue-initiation criteria using material strengths and the parser-owned failure records.
 <a id="evidenceuser-parser"></a>
 - `evidence.user-parser` — source: `source/libbsam/usf_ini.f90:13-270` — Locates optional USER and parses numeric types 1-5, 100, 101, 201, and 301 with declaration-order IDs.
 <a id="evidenceuser-evaluator"></a>

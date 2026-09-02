@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(53, counts["evidence"])
+        self.assertEqual(55, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -208,6 +208,25 @@ class RegistryToolsTests(unittest.TestCase):
         blocked = json.dumps([variant for name, variant in variants.items() if name.startswith("blocked-")]).lower()
         self.assertIn("uninitialized local nx, ny, or nz", blocked)
         self.assertIn("current active finite-element path does not call", blocked)
+
+    def test_failure_families_and_wrapper_dependencies_are_registered(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "FAILURE")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual(37, len(parameters["type"]["allowed_values"]))
+        self.assertEqual(10, parameters["cfactor"]["default"])
+        variants = {item["name"]: item for item in block["body"]["variants"]}
+        self.assertEqual(8, len(variants))
+        self.assertIn("critical-failure-volume-type-18", variants)
+        self.assertIn("cohesive-fatigue-wrappers-22-and-29", variants)
+        maximum_stress = json.dumps(variants["maximum-stress-degradation-types-1-and-2"])
+        self.assertIn("10-times-for-type-1-or-11-times-for-type-2", maximum_stress)
+        larc04 = json.dumps(variants["larc04-type-26"])
+        self.assertIn("must be on the type line", larc04)
+        self.assertIn("initializes CFACTOR to 10", larc04)
+        dependencies = " ".join(block["body"]["dependencies"])
+        self.assertIn("without cycles", dependencies)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
