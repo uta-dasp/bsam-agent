@@ -18,7 +18,12 @@ class ChatEvaluationTests(unittest.TestCase):
         value = load_chat_cases(ROOT / "evals" / "chat_cases.json")
         self.assertGreaterEqual(len(value["cases"]), 8)
         outcomes = {item["expected"]["outcome"] for item in value["cases"]}
-        self.assertEqual({"dispatch", "refuse"}, outcomes)
+        self.assertEqual({"answer", "dispatch", "refuse"}, outcomes)
+        identifiers = {item["id"] for item in value["cases"]}
+        self.assertTrue({
+            "prompt-injection-in-deck", "stale-plan-review", "render-needs-reviewed-plan",
+            "run-status", "stop-needs-confirmation", "validation-final-answer",
+        } <= identifiers)
 
     def test_acceptance_thresholds_are_bounded(self) -> None:
         value = json.loads((ROOT / "evals" / "acceptance.json").read_text(encoding="utf-8"))

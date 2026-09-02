@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.1.0",
-  "registry_version": "0.3.3",
+  "schema_version": "1.2.0",
+  "registry_version": "0.4.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -39,6 +39,12 @@
       "line_start": 17,
       "line_end": 60,
       "claim": "Defines required/optional lookup and exact, case-sensitive matching for every requested block token."
+    },
+    {
+      "id": "evidence.baseline-syntax-transition",
+      "kind": "documentation",
+      "locator": "docs/bsam/BASELINE_AUDIT_2026-08-31.md",
+      "claim": "Records the verified transition to exact SOLVER, STATISTICAL, MATERIALS, and CLUSTERS generation tokens while retaining END APPROXIMATION only as compatibility input."
     },
     {
       "id": "evidence.solver-parser",
@@ -245,6 +251,12 @@
       "claim": "Current multi-cluster project deck assembled from pre-existing mesh data that demonstrates repeated solid cluster records; VTMS may have assembled or visualized the mesh but did not generate it."
     },
     {
+      "id": "evidence.runtime-notch-eight-ply",
+      "kind": "runtime",
+      "locator": "local-probe/2026-09-01/notch-v1-eight-ply-controlled-acceptance",
+      "claim": "The transformed eight-ply notch deck completed input and connection setup, produced step and TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker."
+    },
+    {
       "id": "evidence.invocation-parser",
       "kind": "source",
       "locator": "source/libbsam/varnam.f90",
@@ -295,7 +307,7 @@
         "tokens": ["END INPUT"],
         "certainty": "canonical"
       },
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "type",
@@ -310,9 +322,22 @@
         "evidence.current-vtms-deck-tric",
         "evidence.current-vtms-deck-notch"
       ],
-      "remaining_work": [
-        "Confirm whether additional records can legally follow type 3 in a current deck."
-      ]
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [
+          {
+            "name": "current-block-input",
+            "when": "the first INPUT record is type 3",
+            "rows": [
+              {"name": "input-type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(3)", "required": true, "summary": "Selects the only current input format accepted by the pinned executable."}]}
+            ],
+            "constraints": ["Current generation emits exactly one type record before END INPUT.", "Although the reader loop can parse later type 1 or 2 records, the active main program uses only input_id 1; additional records have no current generation role."]
+          }
+        ],
+        "dependencies": ["The first parsed type must equal 3; the parser then normalizes input_id 1 to internal non-sequential block mode."]
+      }
     },
     {
       "id": "block.solver",
@@ -1623,6 +1648,96 @@
         ],
         "dependencies": ["All selected clusters and sets must belong to the current boundary problem.", "Mesh, set, or cluster edits must revalidate every output selector."]
       }
+    }
+  ],
+  "transformations": [
+    {
+      "id": "transformation.notch-expand-plies",
+      "algorithm_version": "1.0.0",
+      "summary": "Expands the established notch_v1 two-ply source profile into the approved eight-ply laminate while preserving total thickness and dependent controls.",
+      "coverage": "runtime-verified",
+      "tool": "preview_expand_notch_plies",
+      "operation": "expand-notch-plies",
+      "applicability": [
+        {"path": "CLUSTERS.count", "operator": "equals", "value": 2, "failure": "The source profile must contain exactly two cluster templates."},
+        {"path": "CLUSTERS.names", "operator": "equals", "value": ["ply1", "ply2"], "failure": "The template clusters must be named PLY1 and PLY2."},
+        {"path": "CLUSTERS[*].nodes.count", "operator": "equals", "value": 5222, "failure": "Each notch ply template must contain 5222 explicit nodes."},
+        {"path": "CLUSTERS[*].elements.count", "operator": "equals", "value": 2502, "failure": "Each notch ply template must contain 2502 explicit elements."},
+        {"path": "CLUSTERS[*].entity_labels", "operator": "same-labels", "value": true, "failure": "PLY1 and PLY2 node and element labels must match."},
+        {"path": "CLUSTERS[*].element_topology", "operator": "same-topology", "value": true, "failure": "PLY1 and PLY2 element types and connectivity must match."},
+        {"path": "CLUSTERS[*].required_node_sets", "operator": "contains-all", "value": ["XMIN", "XMAX", "ZMIN", "ZMAX"], "failure": "Both templates require XMIN, XMAX, ZMIN, and ZMAX node sets."},
+        {"path": "CLUSTERS.constitutives", "operator": "equals", "value": [1, 2], "failure": "PLY1 and PLY2 must retain constitutives 1 and 2 respectively."},
+        {"path": "CLUSTERS.z_extents", "operator": "within-tolerance", "value": [[0.0, 1.0], [1.0, 2.0]], "failure": "The source plies must establish contiguous unit-thickness Z extents from 0 through 2."}
+      ],
+      "parameters": [
+        {"name": "output_plies", "value_type": "integer", "required": true, "allowed_values": [8], "default": 8, "summary": "The only output ply count supported by this versioned transformation."}
+      ],
+      "decisions": [
+        {"name": "total_thickness", "value": 2.0, "source": "user-approved"},
+        {"name": "ply_thickness", "value": 0.25, "source": "source-derived"},
+        {"name": "layup_degrees", "value": [75, 15, 75, 15, 75, 15, 75, 15], "source": "user-approved"},
+        {"name": "ply_constitutives", "value": [1, 2, 1, 2, 1, 2, 1, 2], "source": "source-derived"},
+        {"name": "interface_constitutive", "value": 3, "source": "user-approved"},
+        {"name": "boundary_policy", "value": "replicate in-plane controls to every ply; retain Z restraint on PLY1.ZMIN only", "source": "user-approved"}
+      ],
+      "impacts": [
+        "Replicate and rescale cluster nodes while retaining in-plane coordinates, labels, topology, sets, selections, and alternating orientations.",
+        "Replicate crack definitions for approximation IDs 1 through 8.",
+        "Render one chained penalty group with seven constitutive-3 master surfaces and PLY8 as the terminal slave.",
+        "Replicate in-plane boundary conditions and XMAX loading to every ply while keeping one bottom Z restraint."
+      ],
+      "dependencies": [
+        "The complete output source set must pass semantic validation with no unresolved, ambiguous, or type-mismatched references.",
+        "The plan must be rebound to the exact source-set digest during review and apply.",
+        "The output must be written separately from the source with an immutable audit sidecar."
+      ],
+      "evidence_ids": [
+        "evidence.current-vtms-deck-notch",
+        "evidence.boundary-connections",
+        "evidence.runtime-notch-eight-ply"
+      ]
+    }
+  ],
+  "obsolete_tokens": [
+    {
+      "token": "SOLVE",
+      "replacement": "SOLVER",
+      "context": "top-level-block",
+      "behavior": "not-accepted",
+      "diagnostic": "BSAM-W110",
+      "evidence_ids": ["evidence.block-matcher", "evidence.baseline-syntax-transition"]
+    },
+    {
+      "token": "MATERIAL",
+      "replacement": "MATERIALS",
+      "context": "top-level-block",
+      "behavior": "not-accepted",
+      "diagnostic": "BSAM-W110",
+      "evidence_ids": ["evidence.block-matcher", "evidence.baseline-syntax-transition", "evidence.runtime-current-deck-success"]
+    },
+    {
+      "token": "APPROXIMATION",
+      "replacement": "CLUSTERS",
+      "context": "top-level-block",
+      "behavior": "not-accepted",
+      "diagnostic": "BSAM-W110",
+      "evidence_ids": ["evidence.block-matcher", "evidence.baseline-syntax-transition"]
+    },
+    {
+      "token": "STATISTICAL DISTRIBUTIONS",
+      "replacement": "STATISTICAL",
+      "context": "top-level-block",
+      "behavior": "not-accepted",
+      "diagnostic": "BSAM-W110",
+      "evidence_ids": ["evidence.block-matcher", "evidence.baseline-syntax-transition"]
+    },
+    {
+      "token": "END APPROXIMATION",
+      "replacement": "END CLUSTERS",
+      "context": "top-level-terminator",
+      "behavior": "accepted-compatibility",
+      "diagnostic": "BSAM-W111",
+      "evidence_ids": ["evidence.current-vtms-deck-notch", "evidence.baseline-syntax-transition"]
     }
   ],
   "execution_contract": {

@@ -81,6 +81,10 @@ class LocalApiTests(unittest.TestCase):
             self.assertEqual(set(api.tools), set(TOOL_CONTRACTS))
             self.assertEqual(contract_manifest(), capabilities["tool_contracts"])
             self.assertGreater(len(capabilities["capabilities"]["cluster_commands"]), 10)
+            transformations = capabilities["capabilities"]["transformations"]
+            self.assertEqual("transformation.notch-expand-plies", transformations[0]["id"])
+            self.assertTrue(transformations[0]["applicability"])
+            self.assertEqual(5, len(capabilities["capabilities"]["obsolete_tokens"]))
 
             validation = api.dispatch("validate_model", {"source": "model.in"})
             self.assertEqual(0, validation["summary"]["errors"])

@@ -52,6 +52,29 @@ class SourceDocumentTests(unittest.TestCase):
         self.assertIn("STATISTICAL", [item["name"] for item in inspection["blocks"]])
         self.assertIn("BSAM-W110", [item["code"] for item in inspection["diagnostics"]])
 
+    def test_registered_obsolete_and_compatibility_tokens_emit_replacements(self) -> None:
+        raw = (
+            CURRENT_DECK
+            .replace(b"SOLVER\r\n", b"SOLVE\r\n", 1)
+            .replace(b"MATERIALS\r\n", b"MATERIAL\r\n", 1)
+            .replace(b"CLUSTERS\r\n", b"APPROXIMATION\r\n", 1)
+            .replace(b"END CLUSTERS\r\n", b"END APPROXIMATION\r\n", 1)
+        )
+        diagnostics = SourceDocument.from_bytes(raw).inspection()["diagnostics"]
+        replacements = {
+            (item.get("replacement"), item["code"])
+            for item in diagnostics if item["code"].startswith("BSAM-W11")
+        }
+        self.assertEqual(
+            {
+                ("SOLVER", "BSAM-W110"),
+                ("MATERIALS", "BSAM-W110"),
+                ("CLUSTERS", "BSAM-W110"),
+                ("END CLUSTERS", "BSAM-W111"),
+            },
+            replacements,
+        )
+
     def test_baseline_command_is_runnable(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

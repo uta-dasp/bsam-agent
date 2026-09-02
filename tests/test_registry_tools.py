@@ -18,7 +18,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(13, counts["blocks"])
         self.assertEqual(29, counts["commands"])
         self.assertEqual(12, counts["constructs"])
-        self.assertEqual(34, counts["evidence"])
+        self.assertEqual(1, counts["transformations"])
+        self.assertEqual(5, counts["obsolete_tokens"])
+        self.assertEqual(36, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -44,6 +46,13 @@ class RegistryToolsTests(unittest.TestCase):
         for name, block in blocks.items():
             if name != "INPUT":
                 self.assertEqual("exact-case-sensitive", block["match_rule"], name)
+
+    def test_current_input_mode_is_fully_bounded(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "INPUT")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        variant = block["body"]["variants"][0]
+        self.assertEqual("const(3)", variant["rows"][0]["fields"][0]["value_type"])
 
     def test_command_dispatch_prefixes_are_five_characters(self) -> None:
         for command in self.registry["cluster_commands"]:
@@ -80,6 +89,28 @@ class RegistryToolsTests(unittest.TestCase):
         constructs = {item["canonical"]: item for item in self.registry["nested_constructs"]}
         schedule = constructs["*SOLVER"]
         self.assertEqual([1, 2], schedule["parameters"][0]["allowed_values"])
+
+    def test_notch_transformation_rules_are_registered(self) -> None:
+        transformations = self.registry["transformations"]
+        self.assertEqual(1, len(transformations))
+        transformation = transformations[0]
+        self.assertEqual("transformation.notch-expand-plies", transformation["id"])
+        self.assertEqual("1.0.0", transformation["algorithm_version"])
+        self.assertEqual("runtime-verified", transformation["coverage"])
+        self.assertEqual("preview_expand_notch_plies", transformation["tool"])
+        paths = {item["path"] for item in transformation["applicability"]}
+        self.assertIn("CLUSTERS.z_extents", paths)
+        decisions = {item["name"]: item for item in transformation["decisions"]}
+        self.assertEqual(2.0, decisions["total_thickness"]["value"])
+        self.assertEqual("user-approved", decisions["interface_constitutive"]["source"])
+
+    def test_obsolete_tokens_have_current_replacements(self) -> None:
+        obsolete = {item["token"]: item for item in self.registry["obsolete_tokens"]}
+        self.assertEqual("SOLVER", obsolete["SOLVE"]["replacement"])
+        self.assertEqual("MATERIALS", obsolete["MATERIAL"]["replacement"])
+        self.assertEqual("CLUSTERS", obsolete["APPROXIMATION"]["replacement"])
+        self.assertEqual("STATISTICAL", obsolete["STATISTICAL DISTRIBUTIONS"]["replacement"])
+        self.assertEqual("accepted-compatibility", obsolete["END APPROXIMATION"]["behavior"])
 
     def test_json_schema_is_local_and_parseable(self) -> None:
         schema_path = (self.registry_path.parent / self.registry["$schema"]).resolve()

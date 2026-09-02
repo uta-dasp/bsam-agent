@@ -71,11 +71,13 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "top_level_blocks",
             "cluster_commands",
             "nested_constructs",
+            "transformations",
+            "obsolete_tokens",
             "execution_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "1.1.0":
+    if data["schema_version"] != "1.2.0":
         raise RegistryError("unsupported schema_version")
 
     target = data["target"]
@@ -219,6 +221,58 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
                             f"body field in {item['id']}/{variant['name']}/{row['name']}",
                         )
 
+    transformations = data["transformations"]
+    _unique([item["id"] for item in transformations], "transformation id")
+    _unique(
+        [f"{item['id']}@{item['algorithm_version']}" for item in transformations],
+        "transformation version",
+    )
+    for item in transformations:
+        _require_keys(
+            item,
+            {
+                "id", "algorithm_version", "summary", "coverage", "tool", "operation",
+                "applicability", "parameters", "decisions", "impacts", "dependencies",
+                "evidence_ids",
+            },
+            item["id"],
+        )
+        if item["coverage"] not in VALID_COVERAGE:
+            raise RegistryError(f"{item['id']} has invalid coverage {item['coverage']}")
+        _unique([rule["path"] for rule in item["applicability"]], f"applicability path in {item['id']}")
+        for rule in item["applicability"]:
+            _require_keys(rule, {"path", "operator", "value", "failure"}, f"rule in {item['id']}")
+        _unique([parameter["name"].lower() for parameter in item["parameters"]], f"parameter in {item['id']}")
+        for parameter in item["parameters"]:
+            _require_keys(
+                parameter,
+                {"name", "value_type", "required", "summary"},
+                f"parameter in {item['id']}",
+            )
+        _unique([decision["name"].lower() for decision in item["decisions"]], f"decision in {item['id']}")
+        for decision in item["decisions"]:
+            _require_keys(decision, {"name", "value", "source"}, f"decision in {item['id']}")
+        missing_evidence = sorted(set(item["evidence_ids"]) - set(evidence_by_id))
+        if missing_evidence:
+            raise RegistryError(
+                f"{item['id']} references missing evidence: {', '.join(missing_evidence)}"
+            )
+
+    obsolete_tokens = data["obsolete_tokens"]
+    _unique([item["token"] for item in obsolete_tokens], "obsolete token")
+    for item in obsolete_tokens:
+        _require_keys(
+            item,
+            {"token", "replacement", "context", "behavior", "diagnostic", "evidence_ids"},
+            f"obsolete token {item['token']}",
+        )
+        missing_evidence = sorted(set(item["evidence_ids"]) - set(evidence_by_id))
+        if missing_evidence:
+            raise RegistryError(
+                f"obsolete token {item['token']} references missing evidence: "
+                + ", ".join(missing_evidence)
+            )
+
     execution = data["execution_contract"]
     _require_keys(
         execution,
@@ -243,6 +297,8 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "blocks": len(blocks),
         "commands": len(commands),
         "constructs": len(constructs),
+        "transformations": len(transformations),
+        "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
             item["coverage"] in {"documented", "runtime-verified"}
             for _, item in records
@@ -295,7 +351,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, and {counts['constructs']} nested constructs",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, and {counts['transformations']} registered transformations",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.",
         "",
@@ -420,6 +476,50 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         if construct.get("body"):
             _render_body(lines, construct["canonical"], construct["body"])
 
+    lines.extend(["", "## Registered transformations", ""])
+    for item in data["transformations"]:
+        evidence = ", ".join(evidence_links[value] for value in item["evidence_ids"])
+        lines.extend([
+            f"### `{item['id']}@{item['algorithm_version']}`",
+            "",
+            item["summary"],
+            "",
+            f"- Coverage: {item['coverage']}",
+            f"- Tool/operation: `{item['tool']}` / `{item['operation']}`",
+            f"- Evidence: {evidence}",
+            "- Applicability:",
+        ])
+        lines.extend(
+            f"  - `{rule['path']}` {rule['operator']} `{json.dumps(rule['value'], ensure_ascii=False)}`; otherwise: {rule['failure']}"
+            for rule in item["applicability"]
+        )
+        lines.append("- Approved/source-derived decisions:")
+        lines.extend(
+            f"  - `{decision['name']}` = `{json.dumps(decision['value'], ensure_ascii=False)}` ({decision['source']})"
+            for decision in item["decisions"]
+        )
+        lines.append("- Impacts:")
+        lines.extend(f"  - {value}" for value in item["impacts"])
+        lines.append("- Dependencies:")
+        lines.extend(f"  - {value}" for value in item["dependencies"])
+        lines.append("")
+
+    lines.extend([
+        "", "## Obsolete and compatibility tokens", "",
+        "| Token | Current replacement | Context | Behavior | Diagnostic |",
+        "|---|---|---|---|---|",
+    ])
+    for item in data["obsolete_tokens"]:
+        lines.append(
+            "| `{}` | `{}` | {} | {} | `{}` |".format(
+                _escape_cell(item["token"]),
+                _escape_cell(item["replacement"]),
+                _escape_cell(item["context"]),
+                _escape_cell(item["behavior"]),
+                _escape_cell(item["diagnostic"]),
+            )
+        )
+
     lines.extend(["", "## Execution contract", ""])
     execution = data["execution_contract"]
     lines.extend(
@@ -481,6 +581,8 @@ def main(argv: list[str] | None = None) -> int:
             "valid registry: "
             f"{counts['blocks']} blocks, {counts['commands']} cluster commands, "
             f"{counts['constructs']} nested constructs, "
+            f"{counts['transformations']} transformations, "
+            f"{counts['obsolete_tokens']} obsolete/compatibility tokens, "
             f"{counts['evidence']} evidence records"
         )
         return 0

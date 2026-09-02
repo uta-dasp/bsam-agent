@@ -34,7 +34,7 @@ Exit: documents agree on scope and no implementation decision depends on a missi
 
 ## G1 - Current BSAM input specification
 
-Status: in progress. Registry `0.3.3` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
+Status: in progress. Registry `0.4.0` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
 
 - [x] Inventory top-level blocks, FE cluster commands, core mesh/section records, and active BOUNDARY constructs.
 - [x] Record executable invocation and completion classification.
@@ -43,9 +43,9 @@ Status: in progress. Registry `0.3.3` is pinned to source commit `9954027f1c325c
 - [ ] Account for every reachable active parser dispatch path.
 - [ ] Complete parameter grammars, units, defaults, ranges, and repeatability.
 - [ ] Record entity definitions and references for every supported construct.
-- [ ] Complete obsolete-token diagnostics and current replacements.
-- [ ] Register transformation applicability and dependency rules.
-- [ ] Regenerate the coverage ledger and reference after every registry increment.
+- [x] Register obsolete/compatibility tokens and generate current replacements used by diagnostics.
+- [x] Register the supported notch transformation's applicability, approved decisions, impacts, dependencies, tool binding, version, and runtime evidence.
+- [x] Regenerate and deterministically check the coverage ledger/reference after every registry increment.
 
 Exit: every active parser dispatch path is supported or explicitly blocked with a reason.
 
@@ -146,7 +146,7 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 - [x] Create the initial synthetic conversations for inspection, editing, validation, and run policy.
 - [x] Specify strict expected tools, arguments, confirmation refusals, and unsupported-capability behavior.
 - [x] Cover path escape, raw-deck generation, unsupported capability invention, and unauthorized apply/run in the initial policy cases.
-- [ ] Add prompt-injection, stale-revision, render, status, stop, and final-answer evaluation cases.
+- [x] Add prompt-injection, stale-revision, render, status, stop, and final-answer evaluation cases.
 - [x] Define initial pass thresholds for schema validity, tool accuracy, refusal behavior, latency, and memory.
 
 ### G4.3 Acquire and benchmark the Meta model

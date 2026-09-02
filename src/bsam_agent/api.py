@@ -125,6 +125,8 @@ class LocalAgentApi:
                         {key: item[key] for key in ("id", "canonical", "coverage")}
                         for item in registry["nested_constructs"]
                     ],
+                    "transformations": registry["transformations"],
+                    "obsolete_tokens": registry["obsolete_tokens"],
                 },
                 "tools": list(self.tools),
                 "tool_contracts": contract_manifest(),

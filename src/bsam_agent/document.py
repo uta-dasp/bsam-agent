@@ -173,30 +173,25 @@ class SourceDocument:
                     message=f"required exact top-level block {block['canonical']} was not found",
                 ))
 
-        obsolete = {
-            "SOLVE": "SOLVER",
-            "MATERIAL": "MATERIALS",
-            "APPROXIMATION": "CLUSTERS",
-            "STATISTICAL DISTRIBUTIONS": "STATISTICAL",
-        }
+        obsolete = {item["token"]: item for item in registry["obsolete_tokens"]}
         for line in self.lines:
-            replacement = obsolete.get(line.stripped)
-            if replacement:
-                diagnostics.append(Diagnostic(
-                    code="BSAM-W110",
-                    severity="warning",
-                    line=line.number,
-                    replacement=replacement,
-                    message=f"obsolete top-level token {line.stripped}; current generation uses {replacement}",
-                ))
-            if line.stripped == "END APPROXIMATION":
-                diagnostics.append(Diagnostic(
-                    code="BSAM-W111",
-                    severity="warning",
-                    line=line.number,
-                    replacement="END CLUSTERS",
-                    message="compatibility terminator END APPROXIMATION is preserved; current generation uses END CLUSTERS",
-                ))
+            record = obsolete.get(line.stripped)
+            if record is None:
+                continue
+            replacement = record["replacement"]
+            compatibility = record["behavior"] == "accepted-compatibility"
+            message = (
+                f"compatibility token {line.stripped} is accepted; current generation uses {replacement}"
+                if compatibility
+                else f"obsolete top-level token {line.stripped}; current generation uses {replacement}"
+            )
+            diagnostics.append(Diagnostic(
+                code=record["diagnostic"],
+                severity="warning",
+                line=line.number,
+                replacement=replacement,
+                message=message,
+            ))
 
         counts = Counter(block_names)
         for name, count in counts.items():

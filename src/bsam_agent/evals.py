@@ -27,10 +27,10 @@ def load_chat_cases(path: Path) -> dict[str, Any]:
         expected = case["expected"]
         if not isinstance(expected, dict):
             raise ValueError(f"case {identifier} expected result must be an object")
-        allowed = {"tool", "arguments", "outcome", "error_code"}
+        allowed = {"tool", "arguments", "outcome", "error_code", "response_contains"}
         if set(expected) - allowed or not {"tool", "arguments", "outcome"} <= set(expected):
             raise ValueError(f"case {identifier} expected result fields are invalid")
-        if expected["outcome"] not in {"dispatch", "refuse"}:
+        if expected["outcome"] not in {"dispatch", "refuse", "answer"}:
             raise ValueError(f"case {identifier} outcome is invalid")
         tool = expected["tool"]
         if tool is not None:
@@ -41,4 +41,14 @@ def load_chat_cases(path: Path) -> dict[str, Any]:
             raise ValueError(f"case {identifier} without a tool must have empty arguments")
         if expected["outcome"] == "refuse" and "error_code" not in expected:
             raise ValueError(f"case {identifier} refusal requires an error code")
+        if expected["outcome"] == "answer":
+            phrases = expected.get("response_contains")
+            if tool is not None or expected["arguments"] != {}:
+                raise ValueError(f"case {identifier} final answer must not dispatch a tool")
+            if not isinstance(phrases, list) or not phrases or any(
+                not isinstance(item, str) or not item for item in phrases
+            ):
+                raise ValueError(f"case {identifier} final answer requires response_contains")
+        elif "response_contains" in expected:
+            raise ValueError(f"case {identifier} response_contains is only valid for final answers")
     return value

@@ -13,11 +13,13 @@
     "top_level_blocks",
     "cluster_commands",
     "nested_constructs",
+    "transformations",
+    "obsolete_tokens",
     "execution_contract"
   ],
   "properties": {
     "schema_version": {
-      "const": "1.1.0"
+      "const": "1.2.0"
     },
     "registry_version": {
       "type": "string",
@@ -52,6 +54,14 @@
       "items": {
         "$ref": "#/$defs/nestedConstruct"
       }
+    },
+    "transformations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/transformation" }
+    },
+    "obsolete_tokens": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/obsoleteToken" }
     },
     "execution_contract": {
       "$ref": "#/$defs/executionContract"
@@ -305,6 +315,90 @@
           "items": { "type": "string", "minLength": 1 }
         },
         "body": { "$ref": "#/$defs/body" }
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "algorithm_version", "summary", "coverage", "tool", "operation",
+        "applicability", "parameters", "decisions", "impacts", "dependencies",
+        "evidence_ids"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^transformation\\.[a-z0-9-]+$" },
+        "algorithm_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "summary": { "type": "string", "minLength": 1 },
+        "coverage": { "$ref": "#/$defs/coverage" },
+        "tool": { "type": "string", "minLength": 1 },
+        "operation": { "type": "string", "minLength": 1 },
+        "applicability": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/applicabilityRule" }
+        },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/transformationDecision" }
+        },
+        "impacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "dependencies": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "applicabilityRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "operator", "value", "failure"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "operator": { "enum": ["equals", "contains-all", "same-labels", "same-topology", "within-tolerance"] },
+        "value": {},
+        "failure": { "type": "string", "minLength": 1 }
+      }
+    },
+    "transformationDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "source"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "value": {},
+        "source": { "enum": ["user-approved", "source-derived"] }
+      }
+    },
+    "obsoleteToken": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "replacement", "context", "behavior", "diagnostic", "evidence_ids"],
+      "properties": {
+        "token": { "type": "string", "minLength": 1 },
+        "replacement": { "type": "string", "minLength": 1 },
+        "context": { "enum": ["top-level-block", "top-level-terminator"] },
+        "behavior": { "enum": ["not-accepted", "accepted-compatibility"] },
+        "diagnostic": { "type": "string", "pattern": "^BSAM-W[0-9]{3}$" },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
       }
     },
     "executionContract": {

@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.3.3`
-- Registry SHA-256: `23A254FDCFA71E0256086DDFC0533375DC678A49BA05A85E91AF5CCA607FE526`
-- Current inventory: 13 top-level blocks, 29 cluster commands, and 12 nested constructs
+- Registry version: `0.4.0`
+- Registry SHA-256: `841E6B2ACE3E87E45A82D64A05F299773529C153B8BC9807F8850D773767A3E3`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
 
@@ -18,7 +18,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 
 | Token | Required | Match rule | Parser | Coverage | Purpose |
 |---|---:|---|---|---|---|
-| `INPUT` | yes | special-input-scan | `INP_INI` | partially-documented | Selects the current non-sequential block input mode; the pinned executable requires type 3. |
+| `INPUT` | yes | special-input-scan | `INP_INI` | documented | Selects the current non-sequential block input mode; the pinned executable requires type 3. |
 | `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | partially-documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
 | `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | identified | Defines named user functions parsed as *end-delimited entries. |
 | `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | partially-documented | Configures optional coupling to the external moisture simulation workflow. |
@@ -42,16 +42,12 @@ Selects the current non-sequential block input mode; the pinned executable requi
 - Lookup token/matcher: `INPUT` / special-input-scan
 - Required: yes
 - Termination: `END INPUT` (canonical)
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.input-parser](#evidenceinput-parser), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
 - `type` (integer record, required): Activates the current single-thread non-sequential input format before internal conversion to block mode.
-
-Remaining specification work:
-
-- Confirm whether additional records can legally follow type 3 in a current deck.
 
 ### `SOLVER`
 
@@ -691,6 +687,53 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
   - Constraint: The active implementation reduces multiple selected sets to one entry per distinct cluster.
 
 
+## Registered transformations
+
+### `transformation.notch-expand-plies@1.0.0`
+
+Expands the established notch_v1 two-ply source profile into the approved eight-ply laminate while preserving total thickness and dependent controls.
+
+- Coverage: runtime-verified
+- Tool/operation: `preview_expand_notch_plies` / `expand-notch-plies`
+- Evidence: [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch), [evidence.boundary-connections](#evidenceboundary-connections), [evidence.runtime-notch-eight-ply](#evidenceruntime-notch-eight-ply)
+- Applicability:
+  - `CLUSTERS.count` equals `2`; otherwise: The source profile must contain exactly two cluster templates.
+  - `CLUSTERS.names` equals `["ply1", "ply2"]`; otherwise: The template clusters must be named PLY1 and PLY2.
+  - `CLUSTERS[*].nodes.count` equals `5222`; otherwise: Each notch ply template must contain 5222 explicit nodes.
+  - `CLUSTERS[*].elements.count` equals `2502`; otherwise: Each notch ply template must contain 2502 explicit elements.
+  - `CLUSTERS[*].entity_labels` same-labels `true`; otherwise: PLY1 and PLY2 node and element labels must match.
+  - `CLUSTERS[*].element_topology` same-topology `true`; otherwise: PLY1 and PLY2 element types and connectivity must match.
+  - `CLUSTERS[*].required_node_sets` contains-all `["XMIN", "XMAX", "ZMIN", "ZMAX"]`; otherwise: Both templates require XMIN, XMAX, ZMIN, and ZMAX node sets.
+  - `CLUSTERS.constitutives` equals `[1, 2]`; otherwise: PLY1 and PLY2 must retain constitutives 1 and 2 respectively.
+  - `CLUSTERS.z_extents` within-tolerance `[[0.0, 1.0], [1.0, 2.0]]`; otherwise: The source plies must establish contiguous unit-thickness Z extents from 0 through 2.
+- Approved/source-derived decisions:
+  - `total_thickness` = `2.0` (user-approved)
+  - `ply_thickness` = `0.25` (source-derived)
+  - `layup_degrees` = `[75, 15, 75, 15, 75, 15, 75, 15]` (user-approved)
+  - `ply_constitutives` = `[1, 2, 1, 2, 1, 2, 1, 2]` (source-derived)
+  - `interface_constitutive` = `3` (user-approved)
+  - `boundary_policy` = `"replicate in-plane controls to every ply; retain Z restraint on PLY1.ZMIN only"` (user-approved)
+- Impacts:
+  - Replicate and rescale cluster nodes while retaining in-plane coordinates, labels, topology, sets, selections, and alternating orientations.
+  - Replicate crack definitions for approximation IDs 1 through 8.
+  - Render one chained penalty group with seven constitutive-3 master surfaces and PLY8 as the terminal slave.
+  - Replicate in-plane boundary conditions and XMAX loading to every ply while keeping one bottom Z restraint.
+- Dependencies:
+  - The complete output source set must pass semantic validation with no unresolved, ambiguous, or type-mismatched references.
+  - The plan must be rebound to the exact source-set digest during review and apply.
+  - The output must be written separately from the source with an immutable audit sidecar.
+
+
+## Obsolete and compatibility tokens
+
+| Token | Current replacement | Context | Behavior | Diagnostic |
+|---|---|---|---|---|
+| `SOLVE` | `SOLVER` | top-level-block | not-accepted | `BSAM-W110` |
+| `MATERIAL` | `MATERIALS` | top-level-block | not-accepted | `BSAM-W110` |
+| `APPROXIMATION` | `CLUSTERS` | top-level-block | not-accepted | `BSAM-W110` |
+| `STATISTICAL DISTRIBUTIONS` | `STATISTICAL` | top-level-block | not-accepted | `BSAM-W110` |
+| `END APPROXIMATION` | `END CLUSTERS` | top-level-terminator | accepted-compatibility | `BSAM-W111` |
+
 ## Execution contract
 
 - Invocation: `bsam20.exe -I <input-directory> -O <unique-output-directory> <deck-basename>`
@@ -713,6 +756,8 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
 - `evidence.input-parser` — source: `source/libbsam/inp_ini.f90:33-112` — Scans for INPUT and requires current type 3 before converting it to block-input mode.
 <a id="evidenceblock-matcher"></a>
 - `evidence.block-matcher` — source: `source/libbsam/inp_block.f90:17-60` — Defines required/optional lookup and exact, case-sensitive matching for every requested block token.
+<a id="evidencebaseline-syntax-transition"></a>
+- `evidence.baseline-syntax-transition` — documentation: `docs/bsam/BASELINE_AUDIT_2026-08-31.md` — Records the verified transition to exact SOLVER, STATISTICAL, MATERIALS, and CLUSTERS generation tokens while retaining END APPROXIMATION only as compatibility input.
 <a id="evidencesolver-parser"></a>
 - `evidence.solver-parser` — source: `source/libbsam/solve_ini.f90:1-491` — Defines solver schedules and parses up to 50 current-format solver records and their options while retaining an old-format path.
 <a id="evidenceufunction-parser"></a>
@@ -765,6 +810,8 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
 - `evidence.current-vtms-deck-tric` — example: `projects/TriC_v311/TriC_v311.in` — Current project deck assembled from pre-existing mesh data using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands; VTMS may have assembled or visualized the mesh but did not generate it.
 <a id="evidencecurrent-vtms-deck-notch"></a>
 - `evidence.current-vtms-deck-notch` — example: `projects/notch_v1/notch_v1.in` — Current multi-cluster project deck assembled from pre-existing mesh data that demonstrates repeated solid cluster records; VTMS may have assembled or visualized the mesh but did not generate it.
+<a id="evidenceruntime-notch-eight-ply"></a>
+- `evidence.runtime-notch-eight-ply` — runtime: `local-probe/2026-09-01/notch-v1-eight-ply-controlled-acceptance` — The transformed eight-ply notch deck completed input and connection setup, produced step and TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>
