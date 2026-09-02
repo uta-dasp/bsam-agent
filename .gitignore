@@ -23,6 +23,9 @@ out/
 *.gguf
 models/
 .ollama/
+config/provider.local.json
+evals/results/*.json
+!evals/results/.gitkeep
 
 # BSAM working data and generated artifacts
 workspace/

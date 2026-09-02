@@ -142,7 +142,7 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 - [x] Implement provider-independent message, structured-output, tool-call, usage, and request-correlation types.
 - [x] Implement strict local configuration without embedding credentials or model weights, including loopback enforcement for CPU-local inference.
 - [x] Keep provider responses out of deterministic domain models and audit records by contract and module boundary.
-- [ ] Add provider request cancellation and normalized transport errors with the first concrete adapter.
+- [x] Add provider request cancellation and normalized transport errors with the first concrete adapter.
 
 ### G4.2 Evaluation and policy gate
 
@@ -154,19 +154,19 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 
 ### G4.3 Acquire and benchmark the Meta model
 
-- [ ] Select a llama.cpp-compatible Windows CPU runtime and pin its version/checksum.
-- [ ] Create an ignored external model directory and local configuration template.
-- [ ] Have the user accept the Meta license and download the approved quantized model weights.
-- [ ] Record model identity, quantization, file checksum, context limit, and provenance outside the capability registry.
-- [ ] Bind the runtime to loopback only and disable telemetry/network model fetching.
-- [ ] Benchmark the small interactive candidate against the checked-in evaluation suite.
+- [x] Select a llama.cpp-compatible Windows CPU runtime and pin its version/checksum.
+- [x] Create an ignored external model directory and local configuration template.
+- [x] Have the user accept the Meta license and download the approved model weights.
+- [x] Record model identity, quantization, file checksum, context limit, and provenance outside the capability registry.
+- [x] Bind the runtime to loopback only and disable telemetry/network model fetching.
+- [x] Benchmark the small interactive candidate against the checked-in evaluation suite (failed the accuracy and refusal gates; larger-candidate decision required).
 - [ ] Benchmark larger candidates only if the small model misses accuracy thresholds.
 - [ ] Select the smallest model meeting safety, accuracy, and latency thresholds.
 
 ### G4.4 Local adapter and orchestrator
 
-- [ ] Implement the loopback model adapter with bounded context and structured tool calls.
-- [ ] Validate every model response and tool argument before dispatch.
+- [x] Implement the loopback model adapter with bounded context and structured tool calls.
+- [x] Validate every model response and tool argument before dispatch.
 - [ ] Implement the conversation state machine: understand, inspect, propose, confirm, execute, verify, explain.
 - [ ] Require explicit confirmation for mutations and runs according to policy.
 - [ ] Summarize tool results without treating model text as authoritative state.

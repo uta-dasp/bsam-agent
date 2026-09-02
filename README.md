@@ -2,7 +2,7 @@
 
 BSAM Agent will create, understand, modify, validate, and run current-syntax BSAM input files on Windows. This repository is intentionally separate from the BSAM source tree and will not modify BSAM itself.
 
-Status: G1 coverage and G3 deterministic capability expansion remain in progress. The runnable core now includes lossless inspection, semantic validation, reviewed typed edits, mesh-template assembly, the approved notch 2-to-8-ply transformation, and supervised BSAM execution.
+Status: G4 local-model benchmarking is in progress while G1 coverage and G3 deterministic capability expansion continue. The runnable core includes lossless inspection, semantic validation, reviewed typed edits, mesh-template assembly, the approved notch 2-to-8-ply transformation, supervised BSAM execution, and a validated llama.cpp loopback adapter. The initial 8B model failed the chat accuracy gates, so it is not selected for the client.
 
 ## Version 1 target
 
@@ -29,6 +29,7 @@ Status: G1 coverage and G3 deterministic capability expansion remain in progress
 - [Draft OpenAPI contract](docs/api/openapi.yaml)
 - [Model tool contracts](docs/api/MODEL_TOOL_CONTRACTS.md)
 - [Model-provider adapters](docs/api/PROVIDER_ADAPTERS.md)
+- [Local model runtime](docs/api/LOCAL_MODEL_RUNTIME.md)
 - [BSAM syntax coverage ledger](docs/bsam/CURRENT_SYNTAX_COVERAGE.md)
 - [Generated BSAM 2.4 input API reference](docs/bsam/reference/BSAM_2_4_INPUT_API.md)
 - [Machine-readable BSAM 2.4 registry](specs/bsam-2.4/capabilities.json)

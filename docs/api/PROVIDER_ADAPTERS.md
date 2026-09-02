@@ -66,6 +66,6 @@ Official references:
 
 ## Configuration boundary
 
-Provider settings are local configuration, not model data. The planned configuration schema contains provider identifier, model identifier, endpoint, credential reference, timeout, maximum output, and data-policy mode. It never contains an API key value.
+Provider settings are local configuration, not model data. The configuration schema contains provider identifier, model identifier, endpoint, credential reference, timeout, maximum input characters, maximum output tokens, and data-policy mode. It never contains an API key value.
 
 No provider is enabled by default, and switching providers cannot change the BSAM capability registry, validation rules, renderer, or run policy.

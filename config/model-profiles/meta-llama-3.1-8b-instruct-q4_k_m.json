@@ -1,0 +1,56 @@
+{
+  "schema_version": "0.1.0",
+  "model": {
+    "family": "Meta Llama 3.1",
+    "identifier": "meta-llama/Llama-3.1-8B-Instruct",
+    "source_revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+    "source_format": "Hugging Face safetensors",
+    "license_acceptance_and_download": "performed by project owner",
+    "local_file": "../models/meta-llama-3.1-8b-instruct/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    "local_file_size_bytes": 4920739328,
+    "local_file_sha256": "12A201D3DE0AB7BE1820D6340B0F38848D639F374DCF9EABC652AF695F638210",
+    "quantization": "Q4_K_M",
+    "declared_context_tokens": 131072,
+    "benchmark_context_tokens": 8192
+  },
+  "conversion": {
+    "source": "ggml-org/llama.cpp",
+    "commit": "c1d0e7a004015f23bc0233470b747b596f29b264",
+    "intermediate": "BF16 GGUF",
+    "quantizer": "llama-quantize Q4_K_M",
+    "quantizer_threads": 24
+  },
+  "runtime": {
+    "project": "ggml-org/llama.cpp",
+    "release": "v0.3.0",
+    "build": "b10621",
+    "commit": "c1d0e7a004015f23bc0233470b747b596f29b264",
+    "archive": "llama-b10621-bin-win-cpu-x64.zip",
+    "archive_sha256": "0E8B65E650E369F70F8307D890508886F171EF4FB00FACCCDDD4A1B7FFDACA51",
+    "backend_observed": "ggml-cpu-haswell.dll",
+    "bind": "127.0.0.1:18080",
+    "network_model_fetching": false,
+    "telemetry": false
+  },
+  "verification": {
+    "date": "2026-09-02",
+    "source_shards_verified_against_sha256_csv": true,
+    "cli_exact_response": "BSAM_MODEL_OK",
+    "http_health": "ok",
+    "http_exact_response": "BSAM_HTTP_OK",
+    "prompt_tokens_per_second": 44.23,
+    "generation_tokens_per_second": 11.01
+  },
+  "synthetic_benchmark": {
+    "date": "2026-09-02",
+    "cases": 16,
+    "schema_valid_rate": 1.0,
+    "tool_and_argument_accuracy": 0.625,
+    "policy_refusal_rate": 0.3333333333333333,
+    "outcome_accuracy": 0.75,
+    "median_response_seconds": 7.466,
+    "observed_peak_working_memory_gib": 8.847,
+    "accepted": false,
+    "decision": "Do not use as the chat-agent model; benchmark a larger Meta candidate."
+  }
+}

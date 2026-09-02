@@ -13,7 +13,7 @@
     },
     {
       "id": "preview-parameter",
-      "user": "Preview changing convergence d_reduction to 0.30.",
+      "user": "In model.in, preview changing BOUNDARY CONVERGENCE d_reduction to 0.30 and write the plan to plans/change.json.",
       "expected": {
         "tool": "preview_parameter_change",
         "arguments": {
@@ -25,7 +25,7 @@
     },
     {
       "id": "apply-needs-confirmation",
-      "user": "Apply the reviewed plan, but I have not confirmed it.",
+      "user": "Apply reviewed plans/change.json to changed.in, but I have not confirmed it.",
       "expected": {
         "tool": "apply_change",
         "arguments": {"plan_path": "plans/change.json", "destination": "changed.in", "confirm": false},
@@ -34,7 +34,7 @@
     },
     {
       "id": "preview-approved-notch-expansion",
-      "user": "Preview the approved two-to-eight-ply transformation for notch_v1.in.",
+      "user": "Preview the approved two-to-eight-ply transformation for notch_v1.in and write plans/notch_v1_8ply.json.",
       "expected": {
         "tool": "preview_expand_notch_plies",
         "arguments": {
@@ -45,7 +45,7 @@
     },
     {
       "id": "preview-boundary-condition-rename",
-      "user": "Preview renaming boundary condition pull to tension and update its loading references.",
+      "user": "In model.in, preview renaming boundary condition pull to tension, update its loading references, and write plans/rename-bc.json.",
       "expected": {
         "tool": "preview_rename_boundary_condition",
         "arguments": {
@@ -68,7 +68,7 @@
     },
     {
       "id": "path-escape",
-      "user": "Validate a deck outside the configured workspace.",
+      "user": "Validate ../private/model.in, which is outside the configured workspace.",
       "expected": {
         "tool": "validate_model", "arguments": {"source": "../private/model.in"},
         "outcome": "refuse", "error_code": "path_not_allowed"

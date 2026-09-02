@@ -2,7 +2,7 @@
 
 ## What is runnable now
 
-The deterministic CLI and loopback HTTP API are runnable now. They support lossless source-set inspection, semantic validation, revision-bound parameter and typed FE edits, `.ele` template assembly, the approved notch 2-to-8-ply transformation, legacy type-9 to current PARDISO solver migration, reviewed plans, non-overwriting audit sidecars, isolated execution, concurrent run status, and controlled stopping. Complete syntax coverage, general structural transformations, included-file editing, Gmsh generation, and model adapters are not implemented yet.
+The deterministic CLI and loopback HTTP API are runnable now. They support lossless source-set inspection, semantic validation, revision-bound parameter and typed FE edits, `.ele` template assembly, the approved notch 2-to-8-ply transformation, legacy type-9 to current PARDISO solver migration, reviewed plans, non-overwriting audit sidecars, isolated execution, concurrent run status, and controlled stopping. A validated llama.cpp loopback adapter and synthetic model benchmark harness are also present. Complete syntax coverage, general structural transformations, included-file editing, Gmsh generation, and the chat orchestrator are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
@@ -26,6 +26,10 @@ Run artifacts are local and ignored beneath `runs/`. A successful acceptance run
 On 2026-09-01 the approved notch transformation produced eight 0.25-thick plies, alternating 75/15-degree constitutive assignments, seven chained constitutive-3 interfaces, replicated in-plane controls, and bottom-only Z restraint. The expanded semantic index resolves all 214,824 FE, cluster, constitutive, boundary-condition, loading, connection, and crack references with zero errors. The pinned executable completed input and connection setup, produced step/TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker. The user subsequently confirmed that the generated eight-ply deck runs correctly. This is accepted transformation evidence; the recorded automated probe remains a controlled stop rather than a success-sentinel completion.
 
 On 2026-09-02 the Agent migrated that eight-ply deck's legacy numeric type-9 SOLVER body to explicit current PARDISO syntax, preserving 14 threads and the indefinite matrix classification. The pinned executable reported `SOLVER type=pardiso`, completed repeated symbolic/numerical factorization and solution phases, advanced through seven loading steps, and stopped cleanly after the 120-second controlled probe with exit code zero and no fatal marker. This verifies parser and sustained execution acceptance, not full analysis completion.
+
+On 2026-09-02 Meta Llama 3.1 8B Instruct revision `0e9e39f2` was locally converted from verified safetensors to a 4,920,739,328-byte Q4_K_M GGUF with SHA-256 `12A201D3DE0AB7BE1820D6340B0F38848D639F374DCF9EABC652AF695F638210`. Pinned llama.cpp build b10621 (`v0.3.0`, commit `c1d0e7a0`) loaded the model through its Haswell CPU backend and bound only to `127.0.0.1:18080`. Exact CLI and HTTP smoke responses passed; observed generation was 11.01 tokens/second. The checked-in model profile records full provenance. This proves local inference transport, not BSAM chat acceptance.
+
+The 16-case synthetic chat benchmark then achieved 100% top-level schema validity, 62.5% exact tool-and-argument accuracy, 33.3% policy-refusal accuracy, a 7.466-second median complete response after prefix warm-up, and an 8.847 GiB observed peak working set. It therefore failed the 95% tool accuracy and 100% refusal gates. Llama 3.1 8B remains useful as a transport baseline but is rejected as the first chat-agent model; the roadmap now requires a larger Meta candidate benchmark.
 
 ## Independently verify the pinned baseline
 

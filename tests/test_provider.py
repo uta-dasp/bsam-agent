@@ -52,6 +52,13 @@ class ProviderBoundaryTests(unittest.TestCase):
             with self.assertRaises(ProviderConfigError):
                 load_provider_config(path)
 
+            path.write_text(json.dumps({
+                "provider": "cpu-local", "model": "test",
+                "endpoint": "https://127.0.0.1:8080/v1",
+            }), encoding="utf-8")
+            with self.assertRaises(ProviderConfigError):
+                load_provider_config(path)
+
 
 if __name__ == "__main__":
     unittest.main()

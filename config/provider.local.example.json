@@ -1,0 +1,10 @@
+{
+  "provider": "cpu-local",
+  "model": "Meta-Llama-3.1-8B-Instruct-Q4_K_M",
+  "endpoint": "http://127.0.0.1:18080",
+  "credential_reference": "env:BSAM_LOCAL_API_KEY",
+  "timeout_seconds": 120,
+  "max_input_characters": 24000,
+  "max_output_tokens": 2048,
+  "data_policy": "local-private"
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -55,7 +56,11 @@ class ProviderResponse:
 
 
 class Provider(Protocol):
-    def complete(self, request: ProviderRequest) -> ProviderResponse: ...
+    def complete(
+        self,
+        request: ProviderRequest,
+        cancel: threading.Event | None = None,
+    ) -> ProviderResponse: ...
 
 
 @dataclass(frozen=True)
@@ -65,6 +70,7 @@ class ProviderConfig:
     endpoint: str
     credential_reference: str | None
     timeout_seconds: float
+    max_input_characters: int
     max_output_tokens: int
     data_policy: str
 
@@ -75,7 +81,7 @@ def load_provider_config(path: Path) -> ProviderConfig:
         raise ProviderConfigError("provider configuration must be an object")
     allowed = {
         "provider", "model", "endpoint", "credential_reference", "timeout_seconds",
-        "max_output_tokens", "data_policy",
+        "max_input_characters", "max_output_tokens", "data_policy",
     }
     extra = sorted(value.keys() - allowed)
     missing = sorted({"provider", "model", "endpoint"} - value.keys())
@@ -92,11 +98,17 @@ def load_provider_config(path: Path) -> ProviderConfig:
     provider = str(value["provider"])
     endpoint = str(value["endpoint"])
     parsed = urlparse(endpoint)
-    if provider == "cpu-local" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        raise ProviderConfigError("cpu-local provider endpoint must be loopback")
+    if provider == "cpu-local":
+        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            raise ProviderConfigError("cpu-local provider endpoint must be loopback HTTP")
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ProviderConfigError("cpu-local provider endpoint cannot embed credentials or options")
+        if parsed.path not in {"", "/"}:
+            raise ProviderConfigError("cpu-local provider endpoint must not include an API path")
     timeout = float(value.get("timeout_seconds", 120.0))
+    max_input = int(value.get("max_input_characters", 24000))
     maximum = int(value.get("max_output_tokens", 2048))
-    if timeout <= 0 or maximum <= 0:
+    if timeout <= 0 or max_input <= 0 or maximum <= 0:
         raise ProviderConfigError("provider limits must be positive")
     policy = str(value.get("data_policy", "synthetic-only"))
     if policy not in {"local-private", "synthetic-only", "sanitized"}:
@@ -104,5 +116,5 @@ def load_provider_config(path: Path) -> ProviderConfig:
     return ProviderConfig(
         provider, str(value["model"]), endpoint,
         str(value["credential_reference"]) if value.get("credential_reference") else None,
-        timeout, maximum, policy,
+        timeout, max_input, maximum, policy,
     )
