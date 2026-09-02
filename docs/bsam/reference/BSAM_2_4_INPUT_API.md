@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.9.0`
-- Registry SHA-256: `235851E1BDAAAAE5A0CA26F33463CA39BA151B881C2B64CFFCA1D5A3F1E7276A`
+- Registry version: `0.10.0`
+- Registry SHA-256: `FAAA8E128B4906C2A2E24D0103070BE29C6D0B24CD3F63E4806194DD65E74BBF`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -29,7 +29,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
 | `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
 | `FAILURE` | no | exact-case-sensitive | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
-| `USER` | no | exact-case-sensitive | `USF_INI` | identified | Defines numeric user-function records, including polynomial and discrete forms. |
+| `USER` | no | exact-case-sensitive | `USF_INI` | documented | Defines numeric user-function records, including polynomial and discrete forms. |
 | `CRACK` | no | exact-case-sensitive | `CRK_INI` | identified | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
 
 ## Block details
@@ -344,12 +344,65 @@ Defines numeric user-function records, including polynomial and discrete forms.
 - Lookup token/matcher: `USER` / exact-case-sensitive
 - Required: no
 - Termination: `END USER` (accepted-current)
-- Coverage: identified
-- Evidence: [evidence.user-parser](#evidenceuser-parser)
+- Coverage: documented
+- Evidence: [evidence.user-parser](#evidenceuser-parser), [evidence.user-evaluator](#evidenceuser-evaluator), [evidence.user-spline](#evidenceuser-spline), [evidence.user-sparse-matrix](#evidenceuser-sparse-matrix), [evidence.user-active-consumer](#evidenceuser-active-consumer)
 
-Remaining specification work:
+Known parameters:
 
-- Enumerate all active function types, record dimensions, external file formats, and consumers.
+- `type` (enum, required) (allowed: `1`, `2`, `3`, `4`, `5`, `101`, `201`): Selects a safely generatable analytic, inline scalar spline, or three-component spline record; parsed external-file type 100 and sparse type 301 are explicitly blocked.
+- `count` (nonnegative-integer, required): Sets polynomial order for type 1, term/segment count for types 2-5, or point count for types 101 and 201.
+- `coefficient` (real, optional): Supplies type-specific analytic coefficients in consumer-defined units.
+- `external_file` (input-relative-path-30, optional): For parsed type 100, selects a 30-character input-relative data file containing point count followed by x/y pairs.
+
+### `USER` body
+
+Termination: next-top-level-block. Dependencies: USER function IDs are one-based declaration order and are referenced numerically by constitutive/material selection records.; At most 10,000 entries are stored.; END USER terminates the block after a complete function record; a nonpositive next type also returns.; Function and coefficient units are determined by each consumer.
+
+- **polynomial-type-1** (type is 1):
+  - `type` [once]: `type`:const(1)
+  - `order` [once]: `order`:nonnegative-integer
+  - `coefficient` [count-from-previous-field]: `a_i`:real
+  - Constraint: The coefficient row count is order+1.
+  - Constraint: Evaluation is the sum of a_i*x^i.
+- **two-coefficient-analytic-types** (type is 2, 3, or 4):
+  - `type` [once]: `type`:enum(2,3,4)
+  - `term-count` [once]: `count`:positive-integer
+  - `term` [count-from-previous-field]: `a`:real, `b`:real
+  - Constraint: Type 2 evaluates sum(a*exp(b*x)); type 3 evaluates sum(a*log(b*x)); type 4 evaluates sum(a*x**b).
+  - Constraint: Type 3 requires x>0 and a positive log argument at evaluation time.
+- **piecewise-linear-type-5** (type is 5):
+  - `type` [once]: `type`:const(5)
+  - `segment-count` [once]: `count`:positive-integer
+  - `start` [once]: `x0`:real, `y0`:real
+  - `segment` [count-from-previous-field]: `slope`:real, `x_end`:strictly-increasing-real
+  - Constraint: Segment endpoints must increase from x0.
+  - Constraint: Evaluation outside [x0,last x_end] stops with an error.
+- **external-spline-type-100** (type is 100):
+  - `type` [once]: `type`:const(100)
+  - `file` [once]: `external_file`:input-relative-path-30
+  - `external-header` [once]: `point_count`:integer
+  - `external-point` [count-from-previous-field]: `x`:real, `y`:real
+  - Constraint: At least two points with strictly monotonic x are required.
+  - Constraint: The path is prepended with the root input directory.
+  - Constraint: Type 100 is parsed but blocked from Agent generation until non-FE external files join the lossless source graph; use type 101 for inline data.
+- **inline-spline-type-101** (type is 101):
+  - `type` [once]: `type`:const(101)
+  - `point-count` [once]: `count`:integer
+  - `point` [count-from-previous-field]: `x`:real, `y`:real
+  - Constraint: At least two points with strictly monotonic x are required.
+  - Constraint: Out-of-range evaluation clamps to the nearest endpoint and sets the global out_of_bounds flag.
+- **inline-curve-type-201** (type is 201):
+  - `type` [once]: `type`:const(201)
+  - `point-count` [once]: `count`:integer
+  - `point` [count-from-previous-field]: `x`:real, `y1`:real, `y2`:real, `y3`:real
+  - Constraint: At least two points with strictly monotonic x are required.
+  - Constraint: Three independent natural cubic splines share the x coordinates.
+- **blocked-sparse-matrix-type-301** (type is 301):
+  - `type` [once]: `type`:const(301)
+  - `matrix-header` [once]: `n`:positive-integer, `m`:positive-integer, `coeff`:nonnegative-integer
+  - `row-pointers` [count-from-previous-field]: `ic`:integer-list(n+1)
+  - `column-indices` [count-from-previous-field]: `jc`:integer-list(coeff)
+  - Constraint: Type 301 is blocked from generation: after reading the matrix, USF_INI continues with uninitialized nparam/ncoeff dimensions, and no active evaluator consumes the stored matrix.
 
 ### `CRACK`
 
@@ -928,7 +981,15 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidencefailure-parser"></a>
 - `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-150` — Locates optional FAILURE and dispatches failure criterion records, including interface-family types 34, 35, and 36.
 <a id="evidenceuser-parser"></a>
-- `evidence.user-parser` — source: `source/libbsam/usf_ini.f90:13-120` — Locates optional USER and begins dispatch of numeric user-function types.
+- `evidence.user-parser` — source: `source/libbsam/usf_ini.f90:13-270` — Locates optional USER and parses numeric types 1-5, 100, 101, 201, and 301 with declaration-order IDs.
+<a id="evidenceuser-evaluator"></a>
+- `evidence.user-evaluator` — source: `source/libbsam/usf_val.f90:10-168` — Evaluates scalar analytic, piecewise, and spline USER functions and three-component type-201 curves.
+<a id="evidenceuser-spline"></a>
+- `evidence.user-spline` — source: `source/libbsam/spline_fit_m.f90:92-295` — Builds natural cubic splines from at least two strictly monotonic data points and evaluates scalar or three-component curves.
+<a id="evidenceuser-sparse-matrix"></a>
+- `evidence.user-sparse-matrix` — source: `source/libbsam/sprmat.f90:1140-1200` — Defines the integer CSR-like record read by USER type 301 and assigns every stored matrix value to one.
+<a id="evidenceuser-active-consumer"></a>
+- `evidence.user-active-consumer` — source: `source/libbsam/mat_stiffness.f90:150-330` — Uses declaration-order USER function IDs from material selections to evaluate stiffness and related properties.
 <a id="evidencecrack-parser"></a>
 - `evidence.crack-parser` — source: `source/libbsam/crk_ini.f90:1-220` — Locates optional CRACK and dispatches current FE crack types 101, 201, and 301.
 <a id="evidencecurrent-vtms-deck-tric"></a>

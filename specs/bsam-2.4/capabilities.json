@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.9.0",
+  "registry_version": "0.10.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -289,8 +289,40 @@
       "kind": "source",
       "locator": "source/libbsam/usf_ini.f90",
       "line_start": 13,
-      "line_end": 120,
-      "claim": "Locates optional USER and begins dispatch of numeric user-function types."
+      "line_end": 270,
+      "claim": "Locates optional USER and parses numeric types 1-5, 100, 101, 201, and 301 with declaration-order IDs."
+    },
+    {
+      "id": "evidence.user-evaluator",
+      "kind": "source",
+      "locator": "source/libbsam/usf_val.f90",
+      "line_start": 10,
+      "line_end": 168,
+      "claim": "Evaluates scalar analytic, piecewise, and spline USER functions and three-component type-201 curves."
+    },
+    {
+      "id": "evidence.user-spline",
+      "kind": "source",
+      "locator": "source/libbsam/spline_fit_m.f90",
+      "line_start": 92,
+      "line_end": 295,
+      "claim": "Builds natural cubic splines from at least two strictly monotonic data points and evaluates scalar or three-component curves."
+    },
+    {
+      "id": "evidence.user-sparse-matrix",
+      "kind": "source",
+      "locator": "source/libbsam/sprmat.f90",
+      "line_start": 1140,
+      "line_end": 1200,
+      "claim": "Defines the integer CSR-like record read by USER type 301 and assigns every stored matrix value to one."
+    },
+    {
+      "id": "evidence.user-active-consumer",
+      "kind": "source",
+      "locator": "source/libbsam/mat_stiffness.f90",
+      "line_start": 150,
+      "line_end": 330,
+      "claim": "Uses declaration-order USER function IDs from material selections to evaluate stiffness and related properties."
     },
     {
       "id": "evidence.crack-parser",
@@ -953,12 +985,116 @@
         "tokens": ["END USER"],
         "certainty": "accepted-current"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.user-parser"],
-      "remaining_work": [
-        "Enumerate all active function types, record dimensions, external file formats, and consumers."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "type",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": [1, 2, 3, 4, 5, 101, 201],
+          "summary": "Selects a safely generatable analytic, inline scalar spline, or three-component spline record; parsed external-file type 100 and sparse type 301 are explicitly blocked."
+        },
+        {
+          "name": "count",
+          "value_type": "nonnegative-integer",
+          "required": true,
+          "summary": "Sets polynomial order for type 1, term/segment count for types 2-5, or point count for types 101 and 201."
+        },
+        {
+          "name": "coefficient",
+          "value_type": "real",
+          "required": false,
+          "summary": "Supplies type-specific analytic coefficients in consumer-defined units."
+        },
+        {
+          "name": "external_file",
+          "value_type": "input-relative-path-30",
+          "required": false,
+          "summary": "For parsed type 100, selects a 30-character input-relative data file containing point count followed by x/y pairs."
+        }
+      ],
+      "evidence_ids": ["evidence.user-parser", "evidence.user-evaluator", "evidence.user-spline", "evidence.user-sparse-matrix", "evidence.user-active-consumer"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "next-top-level-block",
+        "variants": [
+          {
+            "name": "polynomial-type-1",
+            "when": "type is 1",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(1)", "required": true, "summary": "Selects a polynomial."}]},
+              {"name": "order", "repetition": "once", "fields": [{"name": "order", "value_type": "nonnegative-integer", "required": true, "summary": "Sets polynomial order."}]},
+              {"name": "coefficient", "repetition": "count-from-previous-field", "fields": [{"name": "a_i", "value_type": "real", "required": true, "summary": "Provides order+1 coefficients from constant through highest power."}]}
+            ],
+            "constraints": ["The coefficient row count is order+1.", "Evaluation is the sum of a_i*x^i."]
+          },
+          {
+            "name": "two-coefficient-analytic-types",
+            "when": "type is 2, 3, or 4",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(2,3,4)", "required": true, "summary": "Selects exponential, logarithmic, or power terms."}]},
+              {"name": "term-count", "repetition": "once", "fields": [{"name": "count", "value_type": "positive-integer", "required": true, "summary": "Sets the number of terms."}]},
+              {"name": "term", "repetition": "count-from-previous-field", "fields": [{"name": "a", "value_type": "real", "required": true, "summary": "Sets the leading/base coefficient."}, {"name": "b", "value_type": "real", "required": true, "summary": "Sets exponential multiplier, log argument multiplier, or power exponent."}]}
+            ],
+            "constraints": ["Type 2 evaluates sum(a*exp(b*x)); type 3 evaluates sum(a*log(b*x)); type 4 evaluates sum(a*x**b).", "Type 3 requires x>0 and a positive log argument at evaluation time."]
+          },
+          {
+            "name": "piecewise-linear-type-5",
+            "when": "type is 5",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(5)", "required": true, "summary": "Selects a continuous piecewise-linear function."}]},
+              {"name": "segment-count", "repetition": "once", "fields": [{"name": "count", "value_type": "positive-integer", "required": true, "summary": "Sets the number of linear segments."}]},
+              {"name": "start", "repetition": "once", "fields": [{"name": "x0", "value_type": "real", "required": true, "summary": "Sets the starting coordinate."}, {"name": "y0", "value_type": "real", "required": true, "summary": "Sets the starting value."}]},
+              {"name": "segment", "repetition": "count-from-previous-field", "fields": [{"name": "slope", "value_type": "real", "required": true, "summary": "Sets segment slope."}, {"name": "x_end", "value_type": "strictly-increasing-real", "required": true, "summary": "Sets the segment endpoint."}]}
+            ],
+            "constraints": ["Segment endpoints must increase from x0.", "Evaluation outside [x0,last x_end] stops with an error."]
+          },
+          {
+            "name": "external-spline-type-100",
+            "when": "type is 100",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(100)", "required": true, "summary": "Selects scalar spline points from an external file."}]},
+              {"name": "file", "repetition": "once", "fields": [{"name": "external_file", "value_type": "input-relative-path-30", "required": true, "summary": "Names the external point file."}]},
+              {"name": "external-header", "repetition": "once", "fields": [{"name": "point_count", "value_type": "integer", "required": true, "summary": "First external-file record."}]},
+              {"name": "external-point", "repetition": "count-from-previous-field", "fields": [{"name": "x", "value_type": "real", "required": true, "summary": "Strictly monotonic coordinate."}, {"name": "y", "value_type": "real", "required": true, "summary": "Function value."}]}
+            ],
+            "constraints": ["At least two points with strictly monotonic x are required.", "The path is prepended with the root input directory.", "Type 100 is parsed but blocked from Agent generation until non-FE external files join the lossless source graph; use type 101 for inline data."]
+          },
+          {
+            "name": "inline-spline-type-101",
+            "when": "type is 101",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(101)", "required": true, "summary": "Selects inline scalar spline data."}]},
+              {"name": "point-count", "repetition": "once", "fields": [{"name": "count", "value_type": "integer", "required": true, "summary": "Sets point count."}]},
+              {"name": "point", "repetition": "count-from-previous-field", "fields": [{"name": "x", "value_type": "real", "required": true, "summary": "Strictly monotonic coordinate."}, {"name": "y", "value_type": "real", "required": true, "summary": "Function value."}]}
+            ],
+            "constraints": ["At least two points with strictly monotonic x are required.", "Out-of-range evaluation clamps to the nearest endpoint and sets the global out_of_bounds flag."]
+          },
+          {
+            "name": "inline-curve-type-201",
+            "when": "type is 201",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(201)", "required": true, "summary": "Selects an inline three-component spline curve."}]},
+              {"name": "point-count", "repetition": "once", "fields": [{"name": "count", "value_type": "integer", "required": true, "summary": "Sets point count."}]},
+              {"name": "point", "repetition": "count-from-previous-field", "fields": [{"name": "x", "value_type": "real", "required": true, "summary": "Strictly monotonic curve parameter."}, {"name": "y1", "value_type": "real", "required": true, "summary": "First component."}, {"name": "y2", "value_type": "real", "required": true, "summary": "Second component."}, {"name": "y3", "value_type": "real", "required": true, "summary": "Third component."}]}
+            ],
+            "constraints": ["At least two points with strictly monotonic x are required.", "Three independent natural cubic splines share the x coordinates."]
+          },
+          {
+            "name": "blocked-sparse-matrix-type-301",
+            "when": "type is 301",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(301)", "required": true, "summary": "Selects a parsed sparse matrix record."}]},
+              {"name": "matrix-header", "repetition": "once", "fields": [{"name": "n", "value_type": "positive-integer", "required": true, "summary": "Sets rows."}, {"name": "m", "value_type": "positive-integer", "required": true, "summary": "Sets columns."}, {"name": "coeff", "value_type": "nonnegative-integer", "required": true, "summary": "Sets stored column-index count."}]},
+              {"name": "row-pointers", "repetition": "count-from-previous-field", "fields": [{"name": "ic", "value_type": "integer-list(n+1)", "required": true, "summary": "Provides row pointers."}]},
+              {"name": "column-indices", "repetition": "count-from-previous-field", "fields": [{"name": "jc", "value_type": "integer-list(coeff)", "required": true, "summary": "Provides column indices; all values are implicitly one."}]}
+            ],
+            "constraints": ["Type 301 is blocked from generation: after reading the matrix, USF_INI continues with uninitialized nparam/ncoeff dimensions, and no active evaluator consumes the stored matrix."]
+          }
+        ],
+        "dependencies": ["USER function IDs are one-based declaration order and are referenced numerically by constitutive/material selection records.", "At most 10,000 entries are stored.", "END USER terminates the block after a complete function record; a nonpositive next type also returns.", "Function and coefficient units are determined by each consumer."]
+      }
     },
     {
       "id": "block.crack",

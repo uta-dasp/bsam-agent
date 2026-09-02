@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(44, counts["evidence"])
+        self.assertEqual(48, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -160,6 +160,22 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("exactly three positive", contract)
         self.assertIn("stat_<name>_<initial-value>", contract)
         self.assertIn("generation=0", contract)
+
+    def test_numeric_user_function_variants_are_bounded(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "USER")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual([1, 2, 3, 4, 5, 101, 201], parameters["type"]["allowed_values"])
+        variants = {item["name"]: item for item in block["body"]["variants"]}
+        self.assertEqual(7, len(variants))
+        self.assertIn("inline-spline-type-101", variants)
+        self.assertIn("inline-curve-type-201", variants)
+        blocked_external = json.dumps(variants["external-spline-type-100"]).lower()
+        blocked_sparse = json.dumps(variants["blocked-sparse-matrix-type-301"]).lower()
+        self.assertIn("blocked from agent generation", blocked_external)
+        self.assertIn("blocked from generation", blocked_sparse)
+        self.assertIn("uninitialized nparam/ncoeff", blocked_sparse)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
