@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(36, counts["evidence"])
+        self.assertEqual(37, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -90,6 +90,22 @@ class RegistryToolsTests(unittest.TestCase):
         schedule = constructs["*SOLVER"]
         self.assertEqual([1, 2], schedule["parameters"][0]["allowed_values"])
 
+    def test_solver_grammar_and_legacy_policy_are_registered(self) -> None:
+        solver = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "SOLVER")
+        self.assertEqual("documented", solver["coverage"])
+        self.assertEqual([], solver["remaining_work"])
+        parameters = {item["name"]: item for item in solver["parameters"]}
+        self.assertEqual(["mkl", "petsc"], parameters["backend"]["allowed_values"])
+        self.assertEqual("cg", parameters["solver"]["default"])
+        self.assertIn("gmes", parameters["solver"]["allowed_values"])
+        self.assertNotIn("gmres", parameters["solver"]["allowed_values"])
+        variants = {item["name"]: item for item in solver["body"]["variants"]}
+        self.assertIn("current-pardiso", variants)
+        self.assertIn("current-sheff", variants)
+        legacy = json.dumps(variants["legacy-numeric"]).lower()
+        self.assertIn("diagnostics only", legacy)
+        self.assertIn("notch_v1", legacy)
+
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
         self.assertEqual(1, len(transformations))
@@ -134,7 +150,7 @@ class RegistryToolsTests(unittest.TestCase):
             locator = Path(evidence["locator"])
             self.assertFalse(locator.is_absolute())
             self.assertNotIn("..", locator.parts)
-            self.assertEqual("source", locator.parts[0])
+            self.assertIn(locator.parts[0], {"source", "sheff_modules"})
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.4.0",
+  "registry_version": "0.5.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -53,6 +53,12 @@
       "line_start": 1,
       "line_end": 491,
       "claim": "Defines solver schedules and parses up to 50 current-format solver records and their options while retaining an old-format path."
+    },
+    {
+      "id": "evidence.sheff-solver-dispatch",
+      "kind": "source",
+      "locator": "sheff_modules/first_party/bsam_sheff_interface@836d8037b5cbb1fa89126da3652bbafc75253ab9:source/Solvers.cpp",
+      "claim": "Defines the case-insensitive SHEFF backend, solver, and preconditioner values accepted by the submodule revision pinned by the BSAM source commit."
     },
     {
       "id": "evidence.ufunction-parser",
@@ -352,7 +358,7 @@
         "tokens": ["END SOLVER"],
         "certainty": "canonical"
       },
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "*type",
@@ -365,77 +371,107 @@
           "name": "n_threads",
           "value_type": "integer",
           "required": false,
-          "summary": "Requests the OpenMP thread count for PARDISO."
+          "summary": "Requests the OpenMP thread count for PARDISO/CPARDISO; values above the available maximum are capped. Current-format generation must emit this option because that path does not explicitly initialize a default."
         },
         {
           "name": "matrix_type",
           "value_type": "enum",
           "required": false,
           "allowed_values": ["definite", "indefinite", "unsymmetric"],
-          "default": "definite",
-          "summary": "Selects the matrix classification passed to supported solvers."
+          "summary": "Selects the matrix classification passed to PARDISO/CPARDISO. Numeric legacy input defaults to definite; current-format generation must emit the intended value because that path does not explicitly initialize a default."
         },
         {
           "name": "backend",
-          "value_type": "string",
+          "value_type": "enum",
           "required": false,
-          "summary": "Selects the SHEFF backend."
+          "allowed_values": ["mkl", "petsc"],
+          "default": "mkl",
+          "summary": "Selects the case-insensitive SHEFF backend; availability depends on how the executable was built."
         },
         {
           "name": "solver",
-          "value_type": "string",
+          "value_type": "enum",
           "required": false,
-          "summary": "Selects the SHEFF iterative solver."
+          "allowed_values": ["none", "cg", "gmes", "fgmes", "direct"],
+          "default": "cg",
+          "summary": "Selects the case-insensitive SHEFF solver. The pinned dispatcher accepts the spellings gmes/fgmes, not gmres; none is PETSc-only."
         },
         {
           "name": "preconditioner",
-          "value_type": "string",
+          "value_type": "enum",
           "required": false,
-          "summary": "Selects the SHEFF preconditioner using the active parser label."
+          "allowed_values": ["none", "jacobi", "ilu", "ilut", "ilu0"],
+          "default": "jacobi",
+          "summary": "Selects the case-insensitive SHEFF preconditioner using the active parser label; ilu and ilut select the same ILUT category."
         },
         {
           "name": "relative_tolerance",
           "value_type": "real",
           "required": false,
+          "default": 1e-8,
           "summary": "Sets the SHEFF relative tolerance."
         },
         {
           "name": "maximum_iterations",
           "value_type": "integer",
           "required": false,
+          "default": 1000,
           "summary": "Sets the SHEFF maximum iteration count."
         },
         {
           "name": "petsc_opts",
           "value_type": "string",
           "required": false,
+          "default": "",
           "summary": "Passes PETSc options to a SHEFF PETSc backend."
         },
         {
           "name": "debug_opts",
           "value_type": "string",
           "required": false,
-          "summary": "Passes debug options to SHEFF."
+          "default": "",
+          "summary": "Passes SHEFF debug flags; recognized flags include -pause, -write_sparsity, and PETSc-only -reorder and -save_to_binary."
         }
       ],
-      "evidence_ids": ["evidence.solver-parser"],
-      "remaining_work": [
-        "Document SHEFF value enums and defaults from downstream code.",
-        "Classify the numeric legacy solver format as diagnostics-only."
-      ],
+      "evidence_ids": ["evidence.solver-parser", "evidence.sheff-solver-dispatch"],
+      "remaining_work": [],
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
-        "variants": [{
-          "name": "current-solver",
-          "when": "record begins *type",
-          "rows": [
-            {"name": "solver-header", "repetition": "repeated-up-to-50", "fields": [{"name": "*type", "value_type": "enum(pardiso,cpardiso,sheff)", "required": true, "summary": "Begins one solver definition."}]},
-            {"name": "solver-options", "repetition": "repeated-until-end-solver", "fields": [{"name": "option", "value_type": "solver-specific-key-value", "required": false, "summary": "Uses the option labels registered for the selected solver type."}, {"name": "end solver", "value_type": "sentinel", "required": true, "summary": "Terminates the current solver definition."}]}
-          ],
-          "constraints": ["Solver IDs are one-based declaration order.", "A boundary solver schedule may refer to solver 2 only when a second solver is defined."]
-        }],
-        "dependencies": ["*SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs."]
+        "variants": [
+          {
+            "name": "current-pardiso",
+            "when": "record begins *type=pardiso or *type=cpardiso",
+            "rows": [
+              {"name": "solver-header", "repetition": "once", "fields": [{"name": "*type", "value_type": "enum(pardiso,cpardiso)", "required": true, "summary": "Begins a PARDISO or MPI cluster-PARDISO definition."}]},
+              {"name": "thread-option", "repetition": "once", "fields": [{"name": "n_threads", "value_type": "integer", "required": true, "summary": "Sets the OpenMP thread count; emit explicitly in current syntax."}]},
+              {"name": "matrix-option", "repetition": "once", "fields": [{"name": "matrix_type", "value_type": "enum(definite,indefinite,unsymmetric)", "required": true, "summary": "Sets the matrix classification; emit explicitly in current syntax."}]},
+              {"name": "solver-end", "repetition": "once", "fields": [{"name": "end solver", "value_type": "sentinel", "required": true, "summary": "Terminates this solver definition."}]}
+            ],
+            "constraints": ["Up to 50 current-format solver definitions are accepted.", "cpardiso is replaced by pardiso with a warning in a non-MPI build.", "Unknown option labels warn and are ignored."]
+          },
+          {
+            "name": "current-sheff",
+            "when": "record begins *type=sheff",
+            "rows": [
+              {"name": "solver-header", "repetition": "once", "fields": [{"name": "*type", "value_type": "const(sheff)", "required": true, "summary": "Begins a SHEFF definition."}]},
+              {"name": "sheff-options", "repetition": "repeated", "fields": [{"name": "option", "value_type": "one-of(backend,solver,preconditioner,relative_tolerance,maximum_iterations,petsc_opts,debug_opts)", "required": false, "summary": "Overrides a registered SHEFF default."}]},
+              {"name": "solver-end", "repetition": "once", "fields": [{"name": "end solver", "value_type": "sentinel", "required": true, "summary": "Terminates this solver definition."}]}
+            ],
+            "constraints": ["Backend, solver, and preconditioner comparisons are case-insensitive in the pinned SHEFF dispatcher.", "The parser itself accepts arbitrary numeric tolerances and iteration counts; downstream solver validity is build/backend dependent.", "The implementation accepts gmes and fgmes, while the source comment's gmres spelling is rejected."]
+          },
+          {
+            "name": "legacy-numeric",
+            "when": "the first record does not parse as *type",
+            "rows": [
+              {"name": "solver-type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(8,9)", "required": true, "summary": "Selects PARDISO (8) or cluster PARDISO (9)."}]},
+              {"name": "thread-count", "repetition": "once", "fields": [{"name": "n_threads", "value_type": "integer", "required": true, "summary": "Sets threads for type 8 and is read as a dummy/thread value for type 9."}]},
+              {"name": "matrix-marker", "repetition": "once", "fields": [{"name": "marker", "value_type": "optional-prefix(*in,*un)", "required": false, "summary": "Selects indefinite or unsymmetric; omission retains the initialized definite default."}]}
+            ],
+            "constraints": ["Accepted for compatibility and preservation diagnostics only; new solver definitions must use *type key/value syntax.", "Type 9 is replaced by type 8 with a warning in a non-MPI build.", "The notch_v1 deck uses this preserved legacy form."]
+          }
+        ],
+        "dependencies": ["Solver IDs are one-based declaration order.", "*SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs.", "A boundary schedule 2 requires a second current-format solver definition."]
       }
     },
     {

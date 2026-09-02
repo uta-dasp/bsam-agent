@@ -154,8 +154,8 @@
       "additionalProperties": false,
       "required": ["style", "termination", "variants", "dependencies"],
       "properties": {
-        "style": { "enum": ["none", "single-record", "records", "nested-records"] },
-        "termination": { "enum": ["next-command", "fixed-count", "next-command-or-eof"] },
+        "style": { "enum": ["none", "single-record", "records", "nested-records", "repeated-record-groups"] },
+        "termination": { "enum": ["next-command", "fixed-count", "next-command-or-eof", "next-top-level-block"] },
         "variants": {
           "type": "array",
           "items": { "$ref": "#/$defs/bodyVariant" }
@@ -190,7 +190,7 @@
       "required": ["name", "repetition", "fields"],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
-        "repetition": { "enum": ["once", "repeated", "count-from-previous-field", "count-from-command-parameter"] },
+        "repetition": { "enum": ["once", "repeated", "count-from-previous-field", "count-from-command-parameter", "one-or-more-until-next-type", "repeated-until-end-solver", "repeated-up-to-50"] },
         "fields": {
           "type": "array",
           "minItems": 1,
@@ -219,7 +219,7 @@
         "id": { "type": "string", "pattern": "^block\\.[a-z0-9-]+$" },
         "canonical": { "type": "string", "minLength": 1 },
         "lookup_token": { "type": "string", "minLength": 1 },
-        "match_rule": { "enum": ["exact", "first-three", "special-input-scan"] },
+        "match_rule": { "enum": ["exact-case-sensitive", "special-input-scan"] },
         "required": { "type": "boolean" },
         "parser": { "type": "string", "minLength": 1 },
         "summary": { "type": "string", "minLength": 1 },

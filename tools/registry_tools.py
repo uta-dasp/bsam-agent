@@ -111,8 +111,11 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         _require_keys(item, {"id", "kind", "locator", "claim"}, item["id"])
         locator = item["locator"]
         if item["kind"] == "source":
-            if not locator.startswith("source/"):
-                raise RegistryError(f"{item['id']} source locator must start with source/")
+            source_roots = ("source/", "sheff_modules/first_party/")
+            if not locator.startswith(source_roots):
+                raise RegistryError(
+                    f"{item['id']} source locator must identify BSAM source or a pinned first-party submodule"
+                )
             if ".." in Path(locator).parts or Path(locator).is_absolute():
                 raise RegistryError(f"{item['id']} source locator must be relative and contained")
         if "line_end" in item and "line_start" not in item:
@@ -314,6 +317,22 @@ def _evidence_links(data: dict[str, Any]) -> dict[str, str]:
     return {item["id"]: f"[{item['id']}](#{item['id'].replace('.', '')})" for item in data["evidence"]}
 
 
+def _render_parameter(parameter: dict[str, Any]) -> str:
+    required = "required" if parameter["required"] else "optional"
+    details: list[str] = []
+    if "allowed_values" in parameter:
+        details.append(
+            "allowed: " + ", ".join(f"`{value}`" for value in parameter["allowed_values"])
+        )
+    if "default" in parameter:
+        details.append(f"default: `{json.dumps(parameter['default'], ensure_ascii=False)}`")
+    suffix = f" ({'; '.join(details)})" if details else ""
+    return (
+        f"- `{parameter['name']}` ({parameter['value_type']}, {required}){suffix}: "
+        f"{parameter['summary']}"
+    )
+
+
 def _render_body(lines: list[str], title: str, body: dict[str, Any]) -> None:
     lines.extend([
         f"### `{title}` body",
@@ -393,14 +412,13 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         if block["parameters"]:
             lines.extend(["", "Known parameters:", ""])
             for parameter in block["parameters"]:
-                required = "required" if parameter["required"] else "optional"
-                lines.append(
-                    f"- `{parameter['name']}` ({parameter['value_type']}, {required}): {parameter['summary']}"
-                )
+                lines.append(_render_parameter(parameter))
         if block["remaining_work"]:
             lines.extend(["", "Remaining specification work:", ""])
             lines.extend(f"- {item}" for item in block["remaining_work"])
         lines.append("")
+        if block.get("body"):
+            _render_body(lines, block["canonical"], block["body"])
 
     lines.extend(
         [
@@ -465,10 +483,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         if construct["parameters"]:
             lines.extend(["", "Known parameters:", ""])
             for parameter in construct["parameters"]:
-                required = "required" if parameter["required"] else "optional"
-                lines.append(
-                    f"- `{parameter['name']}` ({parameter['value_type']}, {required}): {parameter['summary']}"
-                )
+                lines.append(_render_parameter(parameter))
         if construct["remaining_work"]:
             lines.extend(["", "Remaining specification work:", ""])
             lines.extend(f"- {item}" for item in construct["remaining_work"])

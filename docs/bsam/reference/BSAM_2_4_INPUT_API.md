@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.4.0`
-- Registry SHA-256: `841E6B2ACE3E87E45A82D64A05F299773529C153B8BC9807F8850D773767A3E3`
+- Registry version: `0.5.0`
+- Registry SHA-256: `32EB69CDA1A21B845D61EF78862FA45B5AA59885D10C22FA071CC1782815F7C7`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -19,7 +19,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | Token | Required | Match rule | Parser | Coverage | Purpose |
 |---|---:|---|---|---|---|
 | `INPUT` | yes | special-input-scan | `INP_INI` | documented | Selects the current non-sequential block input mode; the pinned executable requires type 3. |
-| `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | partially-documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
+| `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
 | `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | identified | Defines named user functions parsed as *end-delimited entries. |
 | `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | partially-documented | Configures optional coupling to the external moisture simulation workflow. |
 | `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
@@ -47,7 +47,16 @@ Selects the current non-sequential block input mode; the pinned executable requi
 
 Known parameters:
 
-- `type` (integer record, required): Activates the current single-thread non-sequential input format before internal conversion to block mode.
+- `type` (integer record, required) (allowed: `3`): Activates the current single-thread non-sequential input format before internal conversion to block mode.
+
+### `INPUT` body
+
+Termination: fixed-count. Dependencies: The first parsed type must equal 3; the parser then normalizes input_id 1 to internal non-sequential block mode.
+
+- **current-block-input** (the first INPUT record is type 3):
+  - `input-type` [once]: `type`:const(3)
+  - Constraint: Current generation emits exactly one type record before END INPUT.
+  - Constraint: Although the reader loop can parse later type 1 or 2 records, the active main program uses only input_id 1; additional records have no current generation role.
 
 ### `SOLVER`
 
@@ -57,26 +66,48 @@ Defines one or more linear solvers and solver-specific options; defaults to seri
 - Lookup token/matcher: `SOLVER` / exact-case-sensitive
 - Required: no
 - Termination: `END SOLVER` (canonical)
-- Coverage: partially-documented
-- Evidence: [evidence.solver-parser](#evidencesolver-parser)
+- Coverage: documented
+- Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.sheff-solver-dispatch](#evidencesheff-solver-dispatch)
 
 Known parameters:
 
-- `*type` (enum, required): Selects the current-format solver family.
-- `n_threads` (integer, optional): Requests the OpenMP thread count for PARDISO.
-- `matrix_type` (enum, optional): Selects the matrix classification passed to supported solvers.
-- `backend` (string, optional): Selects the SHEFF backend.
-- `solver` (string, optional): Selects the SHEFF iterative solver.
-- `preconditioner` (string, optional): Selects the SHEFF preconditioner using the active parser label.
-- `relative_tolerance` (real, optional): Sets the SHEFF relative tolerance.
-- `maximum_iterations` (integer, optional): Sets the SHEFF maximum iteration count.
-- `petsc_opts` (string, optional): Passes PETSc options to a SHEFF PETSc backend.
-- `debug_opts` (string, optional): Passes debug options to SHEFF.
+- `*type` (enum, required) (allowed: `pardiso`, `cpardiso`, `sheff`): Selects the current-format solver family.
+- `n_threads` (integer, optional): Requests the OpenMP thread count for PARDISO/CPARDISO; values above the available maximum are capped. Current-format generation must emit this option because that path does not explicitly initialize a default.
+- `matrix_type` (enum, optional) (allowed: `definite`, `indefinite`, `unsymmetric`): Selects the matrix classification passed to PARDISO/CPARDISO. Numeric legacy input defaults to definite; current-format generation must emit the intended value because that path does not explicitly initialize a default.
+- `backend` (enum, optional) (allowed: `mkl`, `petsc`; default: `"mkl"`): Selects the case-insensitive SHEFF backend; availability depends on how the executable was built.
+- `solver` (enum, optional) (allowed: `none`, `cg`, `gmes`, `fgmes`, `direct`; default: `"cg"`): Selects the case-insensitive SHEFF solver. The pinned dispatcher accepts the spellings gmes/fgmes, not gmres; none is PETSc-only.
+- `preconditioner` (enum, optional) (allowed: `none`, `jacobi`, `ilu`, `ilut`, `ilu0`; default: `"jacobi"`): Selects the case-insensitive SHEFF preconditioner using the active parser label; ilu and ilut select the same ILUT category.
+- `relative_tolerance` (real, optional) (default: `1e-08`): Sets the SHEFF relative tolerance.
+- `maximum_iterations` (integer, optional) (default: `1000`): Sets the SHEFF maximum iteration count.
+- `petsc_opts` (string, optional) (default: `""`): Passes PETSc options to a SHEFF PETSc backend.
+- `debug_opts` (string, optional) (default: `""`): Passes SHEFF debug flags; recognized flags include -pause, -write_sparsity, and PETSc-only -reorder and -save_to_binary.
 
-Remaining specification work:
+### `SOLVER` body
 
-- Document SHEFF value enums and defaults from downstream code.
-- Classify the numeric legacy solver format as diagnostics-only.
+Termination: next-top-level-block. Dependencies: Solver IDs are one-based declaration order.; *SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs.; A boundary schedule 2 requires a second current-format solver definition.
+
+- **current-pardiso** (record begins *type=pardiso or *type=cpardiso):
+  - `solver-header` [once]: `*type`:enum(pardiso,cpardiso)
+  - `thread-option` [once]: `n_threads`:integer
+  - `matrix-option` [once]: `matrix_type`:enum(definite,indefinite,unsymmetric)
+  - `solver-end` [once]: `end solver`:sentinel
+  - Constraint: Up to 50 current-format solver definitions are accepted.
+  - Constraint: cpardiso is replaced by pardiso with a warning in a non-MPI build.
+  - Constraint: Unknown option labels warn and are ignored.
+- **current-sheff** (record begins *type=sheff):
+  - `solver-header` [once]: `*type`:const(sheff)
+  - `sheff-options` [repeated]: `option`:one-of(backend,solver,preconditioner,relative_tolerance,maximum_iterations,petsc_opts,debug_opts)
+  - `solver-end` [once]: `end solver`:sentinel
+  - Constraint: Backend, solver, and preconditioner comparisons are case-insensitive in the pinned SHEFF dispatcher.
+  - Constraint: The parser itself accepts arbitrary numeric tolerances and iteration counts; downstream solver validity is build/backend dependent.
+  - Constraint: The implementation accepts gmes and fgmes, while the source comment's gmres spelling is rejected.
+- **legacy-numeric** (the first record does not parse as *type):
+  - `solver-type` [once]: `type`:enum(8,9)
+  - `thread-count` [once]: `n_threads`:integer
+  - `matrix-marker` [once]: `marker`:optional-prefix(*in,*un)
+  - Constraint: Accepted for compatibility and preservation diagnostics only; new solver definitions must use *type key/value syntax.
+  - Constraint: Type 9 is replaced by type 8 with a warning in a non-MPI build.
+  - Constraint: The notch_v1 deck uses this preserved legacy form.
 
 ### `UFUNCTIONS`
 
@@ -408,7 +439,7 @@ Starts a boundary problem and selects mechanical, thermal, or contact dispatch.
 
 Known parameters:
 
-- `problem_type` (enum-record, required): The following cleaned record is matched by its first four characters.
+- `problem_type` (enum-record, required) (allowed: `mechanical`, `thermal`, `contact`): The following cleaned record is matched by its first four characters.
 
 Remaining specification work:
 
@@ -447,7 +478,7 @@ Selects how declared solver IDs are assigned to nonlinear iterations for the cur
 
 Known parameters:
 
-- `schedule` (enum-record, required): Schedule 1 always uses solver 1; schedule 2 uses solver 1 at iteration 0 and solver 2 afterward.
+- `schedule` (enum-record, required) (allowed: `1`, `2`; default: `1`): Schedule 1 always uses solver 1; schedule 2 uses solver 1 at iteration 0 and solver 2 afterward.
 
 ### `*NAME`
 
@@ -477,7 +508,7 @@ Selects restart/new-run handling for the current boundary problem.
 
 Known parameters:
 
-- `status` (string-record, optional): The parser recognizes restart by first-four-character matching and treats no as a new run.
+- `status` (string-record, optional) (allowed: `restart`, `no restart`; default: `"restart"`): The parser recognizes restart by first-four-character matching and treats no as a new run.
 
 Remaining specification work:
 
@@ -507,7 +538,7 @@ Defines named boundary conditions as key/value pairs referencing cluster-qualifi
 
 Known parameters:
 
-- `type` (enum, required): Boundary-condition action matched by a short prefix.
+- `type` (enum, required) (allowed: `displacement`, `shift`, `stretch`, `force`, `off`, `temperature`): Boundary-condition action matched by a short prefix.
 - `component` (component, required): Degree-of-freedom/component converted by component2id.
 - `name` (string, required): Name of the boundary condition.
 - `value` (real, required): Boundary-condition magnitude.
@@ -530,11 +561,11 @@ Defines penalty, nodal, and surface-contact connections between cluster selectio
 
 Known parameters:
 
-- `type` (enum, required): Selects a penalty, nodal, or surface-contact connection.
+- `type` (enum, required) (allowed: `-2`, `-21`, `nodal`, `surface`): Selects a penalty, nodal, or surface-contact connection.
 - `name` (string, optional): Connection name; defaults to connection plus its one-based index.
-- `tolerance` (positive-real, optional): Penalty-connection search tolerance.
-- `search` (enum, optional): Penalty search implementation.
-- `component` (component, optional): Nodal-connection component selection.
+- `tolerance` (positive-real, optional) (default: `1e-05`): Penalty-connection search tolerance.
+- `search` (enum, optional) (allowed: `vtms`, `sheff`; default: `"vtms"`): Penalty search implementation.
+- `component` (component, optional) (default: `123`): Nodal-connection component selection.
 
 Remaining specification work:
 
@@ -575,7 +606,7 @@ Defines load-step histories, cyclic controls, and optional repeated fatigue bloc
 
 Known parameters:
 
-- `type` (enum, required): Selects the load history family by first-four-character matching.
+- `type` (enum, required) (allowed: `static`, `fatigue`, `2dfatigue`, `reduced_fatigue`): Selects the load history family by first-four-character matching.
 - `nstep` (positive-integer, required): Number of analysis steps; the parser rejects a load header without it.
 - `name` (string, optional): Name assigned to this load segment.
 - `incr` (real, optional): Load increment for static or fatigue segments.
@@ -611,19 +642,19 @@ Configures nonlinear convergence, time-step, iteration, and reattempt controls.
 
 Known parameters:
 
-- `relative` (positive-real, optional): Relative convergence tolerance; may share a row with absolute and divergence.
-- `absolute` (positive-real, optional): Absolute convergence tolerance.
-- `divergence` (positive-real, optional): Residual divergence multiplier parsed from a relative/absolute row.
-- `maxiterations` (positive-integer, optional): Maximum nonlinear iterations; recognized by the maxi prefix.
-- `mintime` (integer, optional): Minimum time control; recognized by the mint prefix.
-- `invert` (integer, optional): Full stiffness-inversion interval; recognized by the inve prefix.
-- `D_AA` (enum, optional): Anderson acceleration: 0 inactive, 1 prediction, 2 correction.
+- `relative` (positive-real, optional) (default: `0.001`): Relative convergence tolerance; may share a row with absolute and divergence.
+- `absolute` (positive-real, optional) (default: `100000000`): Absolute convergence tolerance.
+- `divergence` (positive-real, optional) (default: `1000000`): Residual divergence multiplier parsed from a relative/absolute row.
+- `maxiterations` (positive-integer, optional) (default: `20`): Maximum nonlinear iterations; recognized by the maxi prefix.
+- `mintime` (integer, optional) (default: `1`): Minimum time control; recognized by the mint prefix.
+- `invert` (integer, optional) (default: `-1`): Full stiffness-inversion interval; recognized by the inve prefix.
+- `D_AA` (enum, optional) (allowed: `0`, `1`, `2`; default: `0`): Anderson acceleration: 0 inactive, 1 prediction, 2 correction.
 - `d_in` (real, optional): Initial automatic time increment; full labels such as d_initial match this prefix.
-- `it_restart` (integer, optional): Iteration interval reset control recognized by it_r.
-- `d_reduction` (real, optional): Time-increment reduction ratio recognized by d_re; a negative default disables reset.
-- `d_min` (real, optional): Minimum time increment recognized by d_mi.
-- `it_opt` (integer, optional): Optimum-iteration adjustment control recognized by it_o.
-- `d_max` (real, optional): Maximum time increment recognized by d_ma.
+- `it_restart` (integer, optional) (default: `5000`): Iteration interval reset control recognized by it_r.
+- `d_reduction` (real, optional) (default: `-1`): Time-increment reduction ratio recognized by d_re; a negative default disables reset.
+- `d_min` (real, optional) (default: `0`): Minimum time increment recognized by d_mi.
+- `it_opt` (integer, optional) (default: `5000`): Optimum-iteration adjustment control recognized by it_o.
+- `d_max` (real, optional) (default: `1`): Maximum time increment recognized by d_ma.
 - `fatigue` (real, optional): 2D/3D fatigue convergence control recognized by fati.
 
 Remaining specification work:
@@ -659,8 +690,8 @@ Defines output types and their target, coordinate-system, and intermediate-outpu
 
 Known parameters:
 
-- `type` (enum, required): Selects the output family by its first three characters.
-- `c_system` (enum, optional): Selects the coordinate system; only the mate prefix changes the default.
+- `type` (enum, required) (allowed: `data_file`, `sum_force`, `volume_average`, `traction_average`, `cfv`): Selects the output family by its first three characters.
+- `c_system` (enum, optional) (allowed: `global`, `material`; default: `"global"`): Selects the coordinate system; only the mate prefix changes the default.
 - `intermediate` (integer, optional): Controls intermediate output frequency/selection.
 
 Remaining specification work:
@@ -760,6 +791,8 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 - `evidence.baseline-syntax-transition` — documentation: `docs/bsam/BASELINE_AUDIT_2026-08-31.md` — Records the verified transition to exact SOLVER, STATISTICAL, MATERIALS, and CLUSTERS generation tokens while retaining END APPROXIMATION only as compatibility input.
 <a id="evidencesolver-parser"></a>
 - `evidence.solver-parser` — source: `source/libbsam/solve_ini.f90:1-491` — Defines solver schedules and parses up to 50 current-format solver records and their options while retaining an old-format path.
+<a id="evidencesheff-solver-dispatch"></a>
+- `evidence.sheff-solver-dispatch` — source: `sheff_modules/first_party/bsam_sheff_interface@836d8037b5cbb1fa89126da3652bbafc75253ab9:source/Solvers.cpp` — Defines the case-insensitive SHEFF backend, solver, and preconditioner values accepted by the submodule revision pinned by the BSAM source commit.
 <a id="evidenceufunction-parser"></a>
 - `evidence.ufunction-parser` — source: `source/libbsam/ufunction_ini.f90:10-68` — Locates the optional UFUNCTIONS block and divides entries at *end records.
 <a id="evidencemoisture-parser"></a>
