@@ -18,9 +18,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(13, counts["blocks"])
         self.assertEqual(29, counts["commands"])
         self.assertEqual(12, counts["constructs"])
-        self.assertEqual(1, counts["transformations"])
+        self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(55, counts["evidence"])
+        self.assertEqual(56, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -230,8 +230,10 @@ class RegistryToolsTests(unittest.TestCase):
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
-        self.assertEqual(1, len(transformations))
-        transformation = transformations[0]
+        self.assertEqual(2, len(transformations))
+        transformation = next(
+            item for item in transformations if item["id"] == "transformation.notch-expand-plies"
+        )
         self.assertEqual("transformation.notch-expand-plies", transformation["id"])
         self.assertEqual("1.0.0", transformation["algorithm_version"])
         self.assertEqual("runtime-verified", transformation["coverage"])
@@ -241,6 +243,18 @@ class RegistryToolsTests(unittest.TestCase):
         decisions = {item["name"]: item for item in transformation["decisions"]}
         self.assertEqual(2.0, decisions["total_thickness"]["value"])
         self.assertEqual("user-approved", decisions["interface_constitutive"]["source"])
+
+    def test_solver_migration_rules_are_registered(self) -> None:
+        transformation = next(
+            item for item in self.registry["transformations"]
+            if item["id"] == "transformation.migrate-legacy-solver"
+        )
+        self.assertEqual("runtime-verified", transformation["coverage"])
+        self.assertEqual("preview_migrate_legacy_solver", transformation["tool"])
+        paths = {item["path"] for item in transformation["applicability"]}
+        self.assertIn("BASELINE.execution_mode", paths)
+        decisions = {item["name"]: item for item in transformation["decisions"]}
+        self.assertEqual("pardiso", decisions["target_solver"]["value"])
 
     def test_obsolete_tokens_have_current_replacements(self) -> None:
         obsolete = {item["token"]: item for item in self.registry["obsolete_tokens"]}

@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.13.0`
-- Registry SHA-256: `5F69F06AAD103EE9B43D411D674DCBFF439ED958F306AD56DC4562B4D540EE27`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
+- Registry version: `0.14.0`
+- Registry SHA-256: `50E78AEDBD7574F691826F193CCC90D73128355AC71BF686AE276C7480D00424`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
 
@@ -1018,6 +1018,32 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
   - The plan must be rebound to the exact source-set digest during review and apply.
   - The output must be written separately from the source with an immutable audit sidecar.
 
+### `transformation.migrate-legacy-solver@1.0.0`
+
+Migrates the established legacy numeric type-9 SOLVER body to explicit current PARDISO syntax for the pinned non-MPI baseline.
+
+- Coverage: runtime-verified
+- Tool/operation: `preview_migrate_legacy_solver` / `migrate-legacy-solver`
+- Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch), [evidence.runtime-notch-current-solver](#evidenceruntime-notch-current-solver)
+- Applicability:
+  - `SOLVER.count` equals `1`; otherwise: The source must contain exactly one terminated SOLVER block.
+  - `SOLVER.format` equals `"legacy-numeric"`; otherwise: The SOLVER body must use the supported legacy numeric record format.
+  - `SOLVER.type` equals `9`; otherwise: This transformation is restricted to legacy solver type 9.
+  - `SOLVER.records.valid` equals `true`; otherwise: The body must contain a positive thread count and at most one supported matrix marker.
+  - `BASELINE.execution_mode` equals `"serial"`; otherwise: Mapping legacy type 9 to PARDISO is established only for the pinned serial non-MPI baseline.
+- Approved/source-derived decisions:
+  - `target_solver` = `"pardiso"` (user-approved)
+  - `thread_policy` = `"preserve positive legacy thread count"` (source-derived)
+  - `matrix_policy` = `"preserve definite, indefinite, or unsymmetric classification"` (source-derived)
+- Impacts:
+  - Replace only the SOLVER body while retaining the surrounding SOLVER and END SOLVER records.
+  - Emit explicit *type, n_threads, optional matrix_type, and end solver records.
+  - Leave every non-SOLVER byte and all analysis semantics unchanged.
+- Dependencies:
+  - The plan must be rebound to the exact source-set digest during review and apply.
+  - The output must be written separately from the source with an immutable audit sidecar.
+  - The target executable must match the pinned serial baseline fingerprint.
+
 
 ## Obsolete and compatibility tokens
 
@@ -1145,6 +1171,8 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 - `evidence.current-vtms-deck-notch` — example: `projects/notch_v1/notch_v1.in` — Current multi-cluster project deck assembled from pre-existing mesh data that demonstrates repeated solid cluster records; VTMS may have assembled or visualized the mesh but did not generate it.
 <a id="evidenceruntime-notch-eight-ply"></a>
 - `evidence.runtime-notch-eight-ply` — runtime: `local-probe/2026-09-01/notch-v1-eight-ply-controlled-acceptance` — The transformed eight-ply notch deck completed input and connection setup, produced step and TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker.
+<a id="evidenceruntime-notch-current-solver"></a>
+- `evidence.runtime-notch-current-solver` — runtime: `local-probe/2026-09-02/notch-v1-eight-ply-current-solver` — The legacy type-9 SOLVER body was migrated to current PARDISO syntax with 14 threads and an indefinite matrix; the pinned serial executable reported PARDISO, advanced through seven loading steps, and stopped cleanly after a 120-second controlled probe with no fatal marker.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>

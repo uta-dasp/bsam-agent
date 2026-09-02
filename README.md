@@ -74,6 +74,8 @@ python -m bsam_agent plan-expand-notch-plies "..\projects\notch_v1\notch_v1.in" 
   --out "..\projects\notch_v1\notch_v1_8ply.plan.json"
 python -m bsam_agent apply-change "..\projects\notch_v1\notch_v1_8ply.plan.json" `
   --out "..\projects\notch_v1\notch_v1_8ply.in"
+python -m bsam_agent plan-migrate-legacy-solver "..\projects\notch_v1\notch_v1_8ply.in" `
+  --out "..\projects\notch_v1\notch_v1_8ply_solver.plan.json"
 python -m bsam_agent run notch_v1.changed.in `
   --output-dir runs\notch-v1-run --timeout 3600
 python -m bsam_agent serve --workspace-root ".." --port 8765

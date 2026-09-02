@@ -97,6 +97,16 @@ class LocalApiTests(unittest.TestCase):
                 "plan_path": "change.json",
             })
             self.assertTrue((root / "change.json").is_file())
+            solver_source = root / "legacy-solver.in"
+            solver_source.write_bytes(DECK.replace(
+                b"BOUNDARY\n",
+                b"SOLVER\n9\n2\n*indefinite\nEND SOLVER\nBOUNDARY\n",
+                1,
+            ))
+            solver_plan = api.dispatch("preview_migrate_legacy_solver", {
+                "source": "legacy-solver.in", "plan_path": "solver.json",
+            })
+            self.assertEqual("migrate-legacy-solver", solver_plan["operation"])
             self.assertEqual(plan["plan_id"], api.dispatch(
                 "review_change", {"plan_path": "change.json"}
             )["plan_id"])

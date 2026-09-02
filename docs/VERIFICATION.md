@@ -2,7 +2,7 @@
 
 ## What is runnable now
 
-The deterministic CLI and loopback HTTP API are runnable now. They support lossless source-set inspection, semantic validation, revision-bound parameter and typed FE edits, `.ele` template assembly, the approved notch 2-to-8-ply transformation, reviewed multi-patch plans, non-overwriting audit sidecars, isolated execution, concurrent run status, and controlled stopping. Complete syntax coverage, general structural transformations, included-file editing, Gmsh generation, and model adapters are not implemented yet.
+The deterministic CLI and loopback HTTP API are runnable now. They support lossless source-set inspection, semantic validation, revision-bound parameter and typed FE edits, `.ele` template assembly, the approved notch 2-to-8-ply transformation, legacy type-9 to current PARDISO solver migration, reviewed plans, non-overwriting audit sidecars, isolated execution, concurrent run status, and controlled stopping. Complete syntax coverage, general structural transformations, included-file editing, Gmsh generation, and model adapters are not implemented yet.
 
 ```powershell
 cd "D:\Partha\BSAM\bsam agent"
@@ -24,6 +24,8 @@ A second isolated smoke run on 2026-08-31 exercised concurrent external control 
 Run artifacts are local and ignored beneath `runs/`. A successful acceptance run still requires a reviewed test case allowed to finish and classification `succeeded`.
 
 On 2026-09-01 the approved notch transformation produced eight 0.25-thick plies, alternating 75/15-degree constitutive assignments, seven chained constitutive-3 interfaces, replicated in-plane controls, and bottom-only Z restraint. The expanded semantic index resolves all 214,824 FE, cluster, constitutive, boundary-condition, loading, connection, and crack references with zero errors. The pinned executable completed input and connection setup, produced step/TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker. The user subsequently confirmed that the generated eight-ply deck runs correctly. This is accepted transformation evidence; the recorded automated probe remains a controlled stop rather than a success-sentinel completion.
+
+On 2026-09-02 the Agent migrated that eight-ply deck's legacy numeric type-9 SOLVER body to explicit current PARDISO syntax, preserving 14 threads and the indefinite matrix classification. The pinned executable reported `SOLVER type=pardiso`, completed repeated symbolic/numerical factorization and solution phases, advanced through seven loading steps, and stopped cleanly after the 120-second controlled probe with exit code zero and no fatal marker. This verifies parser and sustained execution acceptance, not full analysis completion.
 
 ## Independently verify the pinned baseline
 

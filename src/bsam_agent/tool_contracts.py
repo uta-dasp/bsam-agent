@@ -80,6 +80,9 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
     "preview_expand_notch_plies": ToolContract({
         "source": S, "plan_path": S,
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_migrate_legacy_solver": ToolContract({
+        "source": S, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "preview_rename_boundary_condition": ToolContract({
         "source": S, "old_name": S, "new_name": S, "plan_path": S,
     }, ("plan_id", "plan_digest", "source_diff", "validation")),

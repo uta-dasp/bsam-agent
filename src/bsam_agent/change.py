@@ -981,6 +981,92 @@ def _notch_expansion_patches(source_set: SourceSet) -> list[dict[str, Any]]:
     ]
 
 
+def _legacy_solver_patch(source_set: SourceSet) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Translate the established serial type-9 SOLVER body to current syntax."""
+    document = source_set.documents[source_set.root]
+    blocks = [item for item in document.blocks() if item["name"] == "SOLVER"]
+    if len(blocks) != 1:
+        raise ChangeError("solver migration requires exactly one SOLVER block")
+    block = blocks[0]
+    if block["end_line"] is None:
+        raise ChangeError("solver migration requires a terminated SOLVER block")
+
+    body_lines = document.lines[block["start_line"]:block["end_line"] - 1]
+    records = [
+        line for line in body_lines
+        if line.stripped and not line.stripped.startswith("**")
+    ]
+    if records and records[0].first_field.casefold().startswith("*type"):
+        raise ChangeError("SOLVER block already uses current syntax")
+    if len(records) not in {2, 3}:
+        raise ChangeError("legacy solver migration requires two records and one optional matrix marker")
+    try:
+        solver_type = int(records[0].first_field)
+        threads = int(records[1].first_field)
+    except ValueError as exc:
+        raise ChangeError("SOLVER block is not the supported legacy numeric format") from exc
+    if solver_type != 9:
+        raise ChangeError("solver migration currently supports legacy type 9 only")
+    if threads <= 0:
+        raise ChangeError("legacy solver thread count must be positive")
+
+    matrix_type = "definite"
+    if len(records) == 3:
+        marker = records[2].first_field.casefold()
+        if marker.startswith("*in"):
+            matrix_type = "indefinite"
+        elif marker.startswith("*un"):
+            matrix_type = "unsymmetric"
+        else:
+            raise ChangeError("legacy solver matrix marker must be *indefinite or *unsymmetric")
+
+    newline = next((line.newline for line in body_lines if line.newline), b"\n")
+    rendered = ["*type=pardiso", f"n_threads={threads}"]
+    if matrix_type != "definite":
+        rendered.append(f"matrix_type={matrix_type}")
+    rendered.append("end solver")
+    new_body = newline.join(item.encode("latin-1") for item in rendered) + newline
+    start = document.lines[block["start_line"] - 1].end
+    end = document.lines[block["end_line"] - 1].start
+    patch = {
+        "start": start,
+        "end": end,
+        "line": block["start_line"] + 1,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": new_body.decode("latin-1"),
+    }
+    selector = {
+        "source_format": "legacy-numeric",
+        "source_type": solver_type,
+        "target_type": "pardiso",
+        "n_threads": threads,
+        "matrix_type": matrix_type,
+        "baseline": "BSAM 2.4 non-MPI",
+    }
+    return patch, selector
+
+
+def plan_migrate_legacy_solver(
+    source: Path, workspace_root: Path | None = None
+) -> dict[str, Any]:
+    """Plan type-9 legacy-to-current PARDISO syntax migration for the serial baseline."""
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch, selector = _legacy_solver_patch(source_set)
+    preview = (
+        "migrate legacy solver type 9 to current PARDISO syntax; preserve "
+        f"n_threads={selector['n_threads']} and matrix_type={selector['matrix_type']}"
+    )
+    return _typed_plan(
+        source_set,
+        patch,
+        "migrate-legacy-solver",
+        selector,
+        "SOLVER[1]",
+        preview,
+        "modify",
+    )
+
+
 def plan_expand_notch_plies(
     source: Path, workspace_root: Path | None = None
 ) -> dict[str, Any]:
@@ -1210,6 +1296,26 @@ def _validated_plan_proposal(
                 raise ChangeError(f"notch expansion plan {field} does not match its typed selector")
         patches = expected["patches"]
         updated = _patched_bytes_many(document, patches)
+        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+        return (
+            updated,
+            updated_document,
+            expected["changed_model_paths"],
+            expected["source_diff"],
+            expected["validation"],
+        )
+
+    if operation == "migrate-legacy-solver":
+        expected = plan_migrate_legacy_solver(source, source_set.workspace_root)
+        checked_fields = (
+            "selector", "patch", "changed_model_paths", "affected_files", "changes",
+            "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(f"solver migration plan {field} does not match its typed selector")
+        updated = _patched_bytes(document, expected["patch"])
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         return (
             updated,

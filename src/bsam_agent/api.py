@@ -19,6 +19,7 @@ from .change import (
     plan_delete_node,
     plan_expand_notch_plies,
     plan_import_mesh,
+    plan_migrate_legacy_solver,
     plan_parameter_change,
     plan_rename_boundary_condition,
     review_plan,
@@ -221,6 +222,13 @@ class LocalAgentApi:
         if tool == "preview_expand_notch_plies":
             args = self._args(arguments, {"source", "plan_path"})
             plan = plan_expand_notch_plies(
+                self._path(args["source"], "source"), self.workspace_root
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_migrate_legacy_solver":
+            args = self._args(arguments, {"source", "plan_path"})
+            plan = plan_migrate_legacy_solver(
                 self._path(args["source"], "source"), self.workspace_root
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))

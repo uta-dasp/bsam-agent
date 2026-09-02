@@ -19,6 +19,7 @@ from .change import (
     plan_create_set,
     plan_expand_notch_plies,
     plan_import_mesh,
+    plan_migrate_legacy_solver,
     plan_parameter_change,
     plan_rename_boundary_condition,
     review_plan,
@@ -163,6 +164,14 @@ def build_parser() -> argparse.ArgumentParser:
     notch_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
     notch_parser.add_argument("--out", required=True, help="new JSON plan path")
 
+    solver_parser = subparsers.add_parser(
+        "plan-migrate-legacy-solver",
+        help="plan legacy type-9 to current PARDISO solver syntax migration",
+    )
+    solver_parser.add_argument("deck")
+    solver_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    solver_parser.add_argument("--out", required=True, help="new JSON plan path")
+
     rename_bc_parser = subparsers.add_parser(
         "plan-rename-boundary-condition",
         help="plan a boundary-condition rename and dependent loading updates",
@@ -202,6 +211,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "plan-expand-notch-plies":
             plan = plan_expand_notch_plies(
+                Path(args.deck), Path(args.workspace_root) if args.workspace_root else None
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "plan-migrate-legacy-solver":
+            plan = plan_migrate_legacy_solver(
                 Path(args.deck), Path(args.workspace_root) if args.workspace_root else None
             )
             write_plan(plan, Path(args.out))

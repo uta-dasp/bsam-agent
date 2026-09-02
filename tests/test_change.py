@@ -21,6 +21,7 @@ from bsam_agent.change import (
     plan_create_set,
     plan_delete_node,
     plan_import_mesh,
+    plan_migrate_legacy_solver,
     plan_parameter_change,
     plan_rename_boundary_condition,
     review_plan,
@@ -40,6 +41,35 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_plan_and_apply_legacy_solver_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            plan_path = root / "solver.json"
+            output = root / "current.in"
+            source.write_bytes(DECK.replace(
+                b"BOUNDARY\r\n",
+                b"SOLVER\r\n9\r\n14        Processors #\r\n*indefinite\r\nEND SOLVER\r\n"
+                b"BOUNDARY\r\n",
+                1,
+            ))
+
+            plan = plan_migrate_legacy_solver(source)
+            self.assertEqual("migrate-legacy-solver", plan["operation"])
+            self.assertEqual("pardiso", plan["selector"]["target_type"])
+            write_plan(plan, plan_path)
+            review_plan(plan_path)
+            apply_plan(plan_path, output)
+
+            self.assertIn(
+                b"SOLVER\r\n*type=pardiso\r\nn_threads=14\r\n"
+                b"matrix_type=indefinite\r\nend solver\r\nEND SOLVER\r\n",
+                output.read_bytes(),
+            )
+            self.assertNotIn(b"Processors #", output.read_bytes())
+            with self.assertRaisesRegex(ChangeError, "already uses current syntax"):
+                plan_migrate_legacy_solver(output)
+
     def test_boundary_condition_rename_updates_loading_dependents(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

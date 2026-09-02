@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.13.0",
+  "registry_version": "0.14.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -405,6 +405,12 @@
       "kind": "runtime",
       "locator": "local-probe/2026-09-01/notch-v1-eight-ply-controlled-acceptance",
       "claim": "The transformed eight-ply notch deck completed input and connection setup, produced step and TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker."
+    },
+    {
+      "id": "evidence.runtime-notch-current-solver",
+      "kind": "runtime",
+      "locator": "local-probe/2026-09-02/notch-v1-eight-ply-current-solver",
+      "claim": "The legacy type-9 SOLVER body was migrated to current PARDISO syntax with 14 threads and an indefinite matrix; the pinned serial executable reported PARDISO, advanced through seven loading steps, and stopped cleanly after a 120-second controlled probe with no fatal marker."
     },
     {
       "id": "evidence.invocation-parser",
@@ -2570,6 +2576,42 @@
         "evidence.current-vtms-deck-notch",
         "evidence.boundary-connections",
         "evidence.runtime-notch-eight-ply"
+      ]
+    },
+    {
+      "id": "transformation.migrate-legacy-solver",
+      "algorithm_version": "1.0.0",
+      "summary": "Migrates the established legacy numeric type-9 SOLVER body to explicit current PARDISO syntax for the pinned non-MPI baseline.",
+      "coverage": "runtime-verified",
+      "tool": "preview_migrate_legacy_solver",
+      "operation": "migrate-legacy-solver",
+      "applicability": [
+        {"path": "SOLVER.count", "operator": "equals", "value": 1, "failure": "The source must contain exactly one terminated SOLVER block."},
+        {"path": "SOLVER.format", "operator": "equals", "value": "legacy-numeric", "failure": "The SOLVER body must use the supported legacy numeric record format."},
+        {"path": "SOLVER.type", "operator": "equals", "value": 9, "failure": "This transformation is restricted to legacy solver type 9."},
+        {"path": "SOLVER.records.valid", "operator": "equals", "value": true, "failure": "The body must contain a positive thread count and at most one supported matrix marker."},
+        {"path": "BASELINE.execution_mode", "operator": "equals", "value": "serial", "failure": "Mapping legacy type 9 to PARDISO is established only for the pinned serial non-MPI baseline."}
+      ],
+      "parameters": [],
+      "decisions": [
+        {"name": "target_solver", "value": "pardiso", "source": "user-approved"},
+        {"name": "thread_policy", "value": "preserve positive legacy thread count", "source": "source-derived"},
+        {"name": "matrix_policy", "value": "preserve definite, indefinite, or unsymmetric classification", "source": "source-derived"}
+      ],
+      "impacts": [
+        "Replace only the SOLVER body while retaining the surrounding SOLVER and END SOLVER records.",
+        "Emit explicit *type, n_threads, optional matrix_type, and end solver records.",
+        "Leave every non-SOLVER byte and all analysis semantics unchanged."
+      ],
+      "dependencies": [
+        "The plan must be rebound to the exact source-set digest during review and apply.",
+        "The output must be written separately from the source with an immutable audit sidecar.",
+        "The target executable must match the pinned serial baseline fingerprint."
+      ],
+      "evidence_ids": [
+        "evidence.solver-parser",
+        "evidence.current-vtms-deck-notch",
+        "evidence.runtime-notch-current-solver"
       ]
     }
   ],

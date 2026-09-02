@@ -34,7 +34,7 @@ Exit: documents agree on scope and no implementation decision depends on a missi
 
 ## G1 - Current BSAM input specification
 
-Status: in progress. Registry `0.13.0` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
+Status: in progress. Registry `0.14.0` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
 
 - [x] Inventory top-level blocks, FE cluster commands, core mesh/section records, and active BOUNDARY constructs.
 - [x] Record executable invocation and completion classification.
@@ -128,6 +128,7 @@ Exit: without an LLM, a client can safely inspect, modify, validate, render, and
 - [ ] Add complete typed entity creation, deletion, rename, list, table, and reference edits.
 - [ ] Support minimal patches in included files and multi-file reviewed changes.
 - [x] Implement and verify the supported notch two-ply-to-eight-ply transformation fixture, including a 120-second nonfatal controlled executable probe.
+- [x] Implement and runtime-verify revision-bound migration of the notch legacy type-9 solver body to current PARDISO syntax.
 - [ ] Add representative executable probes and regression cases.
 - [x] Expose the pinned versioned capability and tool-schema manifest through the API.
 - [ ] Ensure unsupported or ambiguous requests fail with actionable diagnostics.
