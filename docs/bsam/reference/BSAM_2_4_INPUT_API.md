@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.7.0`
-- Registry SHA-256: `4CFDABAAA72D2CFEDFF4FD7BAC391B9E5732FAFD7D0F9FE9000C70C889C876B2`
+- Registry version: `0.8.0`
+- Registry SHA-256: `09FDC4C9F4397B4DDB227F0A2C8D6008C5D3A0CA59A62BA53C0C2622779A833A`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -25,7 +25,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
 | `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | identified | Defines constitutive law records that reference material and failure definitions. |
-| `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | identified | Defines named lookup tables used by material data. |
+| `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | identified | Defines named statistical distributions that modify material data. |
 | `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
 | `FAILURE` | no | exact-case-sensitive | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
@@ -230,12 +230,34 @@ Defines named lookup tables used by material data.
 - Lookup token/matcher: `TABLES` / exact-case-sensitive
 - Required: no
 - Termination: `*end per table`, `END TABLES` (canonical)
-- Coverage: identified
-- Evidence: [evidence.table-parser](#evidencetable-parser)
+- Coverage: documented
+- Evidence: [evidence.table-parser](#evidencetable-parser), [evidence.table-initializer](#evidencetable-initializer), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
 
-Remaining specification work:
+Known parameters:
 
-- Document table headers, axes, dimensions, interpolation rules, and material references.
+- `name` (normalized-name, required): Names the table after the required table- prefix is removed and the entry is lowercased; generation uses a unique name without underscores for unambiguous table_<name> references.
+- `row_label` (axis-label, required) (allowed: `temp`, `moisture`, `time`, `fvf`): Labels the vertical axis. Registered labels select the corresponding material lookup coordinate; other labels retain the first positional coordinate.
+- `column_label` (axis-label, required) (allowed: `temp`, `moisture`, `time`, `fvf`): Labels the horizontal axis. Registered labels select the corresponding material lookup coordinate; other labels retain the second positional coordinate.
+- `horizontal_lookup` (strictly-increasing-real-list, required): Defines horizontal grid coordinates in consumer-defined units.
+- `vertical_lookup` (strictly-increasing-real, required): Begins each data row with its vertical grid coordinate in consumer-defined units.
+- `value` (real, required): Supplies one table value for each horizontal coordinate in the row.
+
+### `TABLES` body
+
+Termination: next-top-level-block. Dependencies: Structured bulk and interface material parameters may reference a table as table_<name>.; Statistical distributions may be combined with tables, and polynomial material parameters may reference multiple named tables.; Axis and value units are determined by the consuming material parameter and axis labels.
+
+- **rectangular-bilinear-table** (each entry starts with table-<name>):
+  - `table-name` [once]: `name`:table-<normalized-name>
+  - `axis-header` [once]: `labels`:<row_label>-<column_label>, `horizontal_lookup`:real-list
+  - `data-row` [repeated]: `vertical_lookup`:real, `value`:real-list(horizontal-count)
+  - `table-end` [once]: `*end`:exact-sentinel
+  - Constraint: At least one horizontal coordinate and one data row are required.
+  - Constraint: Safe generation emits an exactly rectangular numeric grid; the parser only warns on row-width mismatch and may otherwise retain undefined or stale values.
+  - Constraint: Both lookup axes must be strictly increasing for deterministic lookup; the initializer assumes this but does not validate it.
+  - Constraint: Values inside the grid use bilinear interpolation, reducing to linear or exact lookup on grid lines.
+  - Constraint: Out-of-range lookups warn and clamp to the nearest boundary coordinate.
+  - Constraint: Cleaning lowercases text, replaces commas with spaces, removes blank lines, and compacts whitespace.
+  - Constraint: Duplicate normalized names are unsafe because consumers select the first match.
 
 ### `STATISTICAL`
 
@@ -826,7 +848,7 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidenceufunction-material-reference"></a>
 - `evidence.ufunction-material-reference` — source: `source/libbsam/material.f90:417-500` — Resolves material parameter values of the form ufunc_<name> to the first matching normalized UFUNCTION name.
 <a id="evidenceufunction-interface-material-reference"></a>
-- `evidence.ufunction-interface-material-reference` — source: `source/libbsam/interface_material.f90:295-465` — Resolves interface-material parameter values of the form ufunc_<name> and binds them to UFUNCTION objects.
+- `evidence.ufunction-interface-material-reference` — source: `source/libbsam/interface_material.f90:295-465` — Resolves interface-material parameter values of the forms table_<name> and ufunc_<name> and binds them to the corresponding objects.
 <a id="evidencemoisture-parser"></a>
 - `evidence.moisture-parser` — source: `source/libbsam/moisture.f90:36-338` — Parses MOISTURE key/value labels, resolves and checks its external environment, disables coupling on missing prerequisites, and executes the converter/program workflow.
 <a id="evidencemoisture-step-dispatch"></a>
@@ -863,6 +885,10 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 - `evidence.constitutive-parser` — source: `source/libbsam/con_ini.f90:22-150` — Requires CONSTITUTIVE, dispatches constitutive type records, and reads the current *MIC value array.
 <a id="evidencetable-parser"></a>
 - `evidence.table-parser` — source: `source/libbsam/table_ini.f90:26-84` — Locates optional TABLES and divides table entries at *end records.
+<a id="evidencetable-initializer"></a>
+- `evidence.table-initializer` — source: `source/libbsam/table.f90:65-365` — Parses normalized rectangular table grids and performs label-directed bilinear interpolation with boundary clamping.
+<a id="evidencetable-material-reference"></a>
+- `evidence.table-material-reference` — source: `source/libbsam/material.f90:417-630` — Resolves table_<name>, statistical-table, and polynomial table references from structured material parameters.
 <a id="evidencestat-dist-parser"></a>
 - `evidence.stat-dist-parser` — source: `source/libbsam/stat_dist_ini.f90:27-80` — Locates the optional exact STATISTICAL start token and divides entries at *end records until END STATISTICAL DISTRIBUTIONS.
 <a id="evidencematerial-parser"></a>

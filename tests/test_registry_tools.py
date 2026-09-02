@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(41, counts["evidence"])
+        self.assertEqual(43, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -129,6 +129,21 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("blocked by default", contract)
         self.assertIn("mdsim.conf", contract)
         self.assertIn("disables moisture rather than stopping", contract)
+
+    def test_table_grid_and_interpolation_contract_is_registered(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "TABLES")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual(["temp", "moisture", "time", "fvf"], parameters["row_label"]["allowed_values"])
+        variant = block["body"]["variants"][0]
+        rows = {item["name"]: item for item in variant["rows"]}
+        self.assertEqual("real-list(horizontal-count)", rows["data-row"]["fields"][1]["value_type"])
+        contract = json.dumps(block).lower()
+        self.assertIn("strictly increasing", contract)
+        self.assertIn("bilinear interpolation", contract)
+        self.assertIn("table_<name>", contract)
+        self.assertIn("clamp", contract)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]

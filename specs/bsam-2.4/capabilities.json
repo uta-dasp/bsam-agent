@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.7.0",
+  "registry_version": "0.8.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -90,7 +90,7 @@
       "locator": "source/libbsam/interface_material.f90",
       "line_start": 295,
       "line_end": 465,
-      "claim": "Resolves interface-material parameter values of the form ufunc_<name> and binds them to UFUNCTION objects."
+      "claim": "Resolves interface-material parameter values of the forms table_<name> and ufunc_<name> and binds them to the corresponding objects."
     },
     {
       "id": "evidence.moisture-parser",
@@ -235,6 +235,22 @@
       "line_start": 26,
       "line_end": 84,
       "claim": "Locates optional TABLES and divides table entries at *end records."
+    },
+    {
+      "id": "evidence.table-initializer",
+      "kind": "source",
+      "locator": "source/libbsam/table.f90",
+      "line_start": 65,
+      "line_end": 365,
+      "claim": "Parses normalized rectangular table grids and performs label-directed bilinear interpolation with boundary clamping."
+    },
+    {
+      "id": "evidence.table-material-reference",
+      "kind": "source",
+      "locator": "source/libbsam/material.f90",
+      "line_start": 417,
+      "line_end": 630,
+      "claim": "Resolves table_<name>, statistical-table, and polynomial table references from structured material parameters."
     },
     {
       "id": "evidence.stat-dist-parser",
@@ -714,12 +730,67 @@
         "tokens": ["*end per table", "END TABLES"],
         "certainty": "canonical"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.table-parser"],
-      "remaining_work": [
-        "Document table headers, axes, dimensions, interpolation rules, and material references."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "name",
+          "value_type": "normalized-name",
+          "required": true,
+          "summary": "Names the table after the required table- prefix is removed and the entry is lowercased; generation uses a unique name without underscores for unambiguous table_<name> references."
+        },
+        {
+          "name": "row_label",
+          "value_type": "axis-label",
+          "required": true,
+          "allowed_values": ["temp", "moisture", "time", "fvf"],
+          "summary": "Labels the vertical axis. Registered labels select the corresponding material lookup coordinate; other labels retain the first positional coordinate."
+        },
+        {
+          "name": "column_label",
+          "value_type": "axis-label",
+          "required": true,
+          "allowed_values": ["temp", "moisture", "time", "fvf"],
+          "summary": "Labels the horizontal axis. Registered labels select the corresponding material lookup coordinate; other labels retain the second positional coordinate."
+        },
+        {
+          "name": "horizontal_lookup",
+          "value_type": "strictly-increasing-real-list",
+          "required": true,
+          "summary": "Defines horizontal grid coordinates in consumer-defined units."
+        },
+        {
+          "name": "vertical_lookup",
+          "value_type": "strictly-increasing-real",
+          "required": true,
+          "summary": "Begins each data row with its vertical grid coordinate in consumer-defined units."
+        },
+        {
+          "name": "value",
+          "value_type": "real",
+          "required": true,
+          "summary": "Supplies one table value for each horizontal coordinate in the row."
+        }
+      ],
+      "evidence_ids": ["evidence.table-parser", "evidence.table-initializer", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "next-top-level-block",
+        "variants": [
+          {
+            "name": "rectangular-bilinear-table",
+            "when": "each entry starts with table-<name>",
+            "rows": [
+              {"name": "table-name", "repetition": "once", "fields": [{"name": "name", "value_type": "table-<normalized-name>", "required": true, "summary": "Defines the table entity."}]},
+              {"name": "axis-header", "repetition": "once", "fields": [{"name": "labels", "value_type": "<row_label>-<column_label>", "required": true, "summary": "Defines vertical and horizontal axis labels; -, /, |, and _ are accepted separators."}, {"name": "horizontal_lookup", "value_type": "real-list", "required": true, "summary": "Defines one or more horizontal coordinates."}]},
+              {"name": "data-row", "repetition": "repeated", "fields": [{"name": "vertical_lookup", "value_type": "real", "required": true, "summary": "Defines this row coordinate."}, {"name": "value", "value_type": "real-list(horizontal-count)", "required": true, "summary": "Defines exactly one value per horizontal coordinate."}]},
+              {"name": "table-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-sentinel", "required": true, "summary": "Terminates the entry and must be lowercase for the outer block splitter."}]}
+            ],
+            "constraints": ["At least one horizontal coordinate and one data row are required.", "Safe generation emits an exactly rectangular numeric grid; the parser only warns on row-width mismatch and may otherwise retain undefined or stale values.", "Both lookup axes must be strictly increasing for deterministic lookup; the initializer assumes this but does not validate it.", "Values inside the grid use bilinear interpolation, reducing to linear or exact lookup on grid lines.", "Out-of-range lookups warn and clamp to the nearest boundary coordinate.", "Cleaning lowercases text, replaces commas with spaces, removes blank lines, and compacts whitespace.", "Duplicate normalized names are unsafe because consumers select the first match."]
+          }
+        ],
+        "dependencies": ["Structured bulk and interface material parameters may reference a table as table_<name>.", "Statistical distributions may be combined with tables, and polynomial material parameters may reference multiple named tables.", "Axis and value units are determined by the consuming material parameter and axis labels."]
+      }
     },
     {
       "id": "block.statistical-distributions",
