@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(50, counts["evidence"])
+        self.assertEqual(53, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -190,6 +190,24 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("*MODE_CRACKS", contract)
         self.assertIn("at most eight option slots", contract)
         self.assertIn("unreachable and blocked from generation", contract)
+
+    def test_constitutive_variants_and_blocked_wrappers_are_registered(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "CONSTITUTIVE")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual([1, 2, 3, 4, 5, 6, 7, 8, 10], parameters["type"]["allowed_values"])
+        variants = {item["name"]: item for item in block["body"]["variants"]}
+        self.assertIn("optional-common-modifiers", variants)
+        self.assertIn("blocked-time-step-wrapper-type-21", variants)
+        self.assertIn("blocked-indexed-interval-types-11-to-13", variants)
+        self.assertIn("blocked-coordinate-interval-types-110-120-130", variants)
+        modifiers = json.dumps(variants["optional-common-modifiers"])
+        self.assertIn("one-to-three-positive-constitutive-ids", modifiers)
+        self.assertIn("no active consumer", modifiers)
+        blocked = json.dumps([variant for name, variant in variants.items() if name.startswith("blocked-")]).lower()
+        self.assertIn("uninitialized local nx, ny, or nz", blocked)
+        self.assertIn("current active finite-element path does not call", blocked)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]

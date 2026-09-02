@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.11.0`
-- Registry SHA-256: `D983AF94DD944897BEAF3D8C06D6F14C31F3A88E7AA2DCCE7DBCA1626CEC7834`
+- Registry version: `0.12.0`
+- Registry SHA-256: `64B6E1BB751B78F53E26CF29BA0B71F9875A05838B870D5EB11560D91FA02E99`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -24,7 +24,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | documented | Configures optional coupling to the external moisture simulation workflow. |
 | `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
 | `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
-| `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | identified | Defines constitutive law records that reference material and failure definitions. |
+| `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | documented | Defines constitutive law records that reference material and failure definitions. |
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
 | `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
@@ -215,12 +215,73 @@ Defines constitutive law records that reference material and failure definitions
 - Lookup token/matcher: `CONSTITUTIVE` / exact-case-sensitive
 - Required: yes
 - Termination: `END CONSTITUTIVE` (accepted-current)
-- Coverage: identified
-- Evidence: [evidence.constitutive-parser](#evidenceconstitutive-parser), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Coverage: documented
+- Evidence: [evidence.constitutive-parser](#evidenceconstitutive-parser), [evidence.constitutive-storage](#evidenceconstitutive-storage), [evidence.constitutive-fe-consumer](#evidenceconstitutive-fe-consumer), [evidence.constitutive-wrapper-consumers](#evidenceconstitutive-wrapper-consumers), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
-Remaining specification work:
+Known parameters:
 
-- Enumerate all active constitutive type IDs, record layouts, defaults, and material/failure references.
+- `type` (enum, required) (allowed: `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `10`): Selects a direct safely generatable finite-element constitutive record; parsed wrapper types 11-13, 21, 110, 120, and 130 are explicitly blocked.
+- `material_id` (positive-material-id, required): References a MATERIALS declaration for direct types 1-8 and 10.
+- `failure_id` (positive-failure-id, required): References a FAILURE declaration for direct types 1-8 and 10.
+- `mic` (one-to-three-positive-constitutive-ids, optional): Defines optional MIC constitutive references; the full array is retained and the second nonzero entry is the legacy primary MIC ID.
+- `xyzload` (boolean-flag, optional) (default: `false`): Marks non-mechanical load vectors as global-coordinate data for material types 100 and 210.
+- `fatigue` (positive-failure-id, optional) (default: `0`): Stores a parsed fatigue criterion reference; Agent generation is blocked because no active consumer reads the stored field.
+
+### `CONSTITUTIVE` body
+
+Termination: END CONSTITUTIVE after a complete declaration. Dependencies: Constitutive IDs are one-based declaration order and are referenced by cluster assignments, sections, connections, and MIC definitions.; Every direct material_id and failure_id must resolve to existing MATERIALS and FAILURE declarations.; Types 3 and 4 require numeric USER function IDs; type 7 requires external element orientation data; type 8 is coupled to COMPRO material type 800.; *MIC entries reference constitutive IDs and may be forward references because all declarations are read before element processing.; At most 1,500 entries are stored; canonical generation reserves END CONSTITUTIVE by emitting fewer than 1,500 declarations.
+
+- **optional-common-modifiers** (after any type line and before its type-specific data):
+  - `xyz-load` [optional-once]: `*xyzload`:flag
+  - `mic` [optional-once]: `*MIC`:one-to-three-positive-constitutive-ids
+  - `fatigue` [optional-once]: `*fatigue`:positive-failure-id
+  - Constraint: The parser examines exactly three modifier slots; an unrecognized next record is backspaced but still consumes a slot.
+  - Constraint: Canonical generation places no more than three recognized modifier lines immediately after the type line.
+  - Constraint: *MIC matching is case-insensitive after the *mic= dispatch prefix; one value selects the first ID, while two or three values make the second ID the legacy primary and preserve the full array.
+  - Constraint: *fatigue is parsed but blocked from Agent generation until an active consumer and semantics are established.
+- **z-rotation-types-1-and-10** (type is 1 or 10):
+  - `type` [once]: `type`:enum(1,10)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id, `z_rotation_degrees`:real
+  - Constraint: Type 10 selects nonlinear orthotropic behavior but has the same input layout as type 1.
+- **three-axis-rotation-type-2** (type is 2):
+  - `type` [once]: `type`:const(2)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id, `z_rotation_degrees`:real, `y_rotation_degrees`:real, `x_rotation_degrees`:real
+  - Constraint: When no explicit element orientation is present, standardization composes X, Y, and Z rotation matrices from these values.
+- **tow-center-curve-type-3** (type is 3):
+  - `type` [once]: `type`:const(3)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id, `bias_option`:integer, `x_user_id`:positive-user-id, `y_user_id`:positive-user-id, `z_user_id`:positive-user-id, `twist_user_id`:positive-user-id, `bias_angle_degrees`:real
+  - Constraint: Every USER reference must resolve before the orientation is evaluated.
+- **two-curve-interpolation-type-4** (type is 4):
+  - `type` [once]: `type`:const(4)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id, `bias_option`:integer, `curve1_x_user_id`:positive-user-id, `curve1_y_user_id`:positive-user-id, `curve1_z_user_id`:positive-user-id, `curve2_x_user_id`:positive-user-id, `curve2_y_user_id`:positive-user-id, `curve2_z_user_id`:positive-user-id, `bias_angle_degrees`:real
+  - Constraint: All six USER references must resolve before interpolation.
+- **jacobian-rotation-type-5** (type is 5):
+  - `type` [once]: `type`:const(5)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id, `parametric_tow_direction`:integer
+  - Constraint: The mesh/geometry path must provide the Jacobian orientation context.
+- **macro-jacobian-rotation-type-6** (type is 6):
+  - `type` [once]: `type`:const(6)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id, `parametric_tow_direction`:integer, `macro_geometry_id`:positive-integer
+  - Constraint: The referenced macro geometry must exist in the model path that supplies Jacobian orientations.
+- **external-orientation-types-7-and-8** (type is 7 or 8):
+  - `type` [once]: `type`:enum(7,8)
+  - `constitutive-data` [once]: `material_id`:positive-material-id, `failure_id`:positive-failure-id
+  - Constraint: Type 7 requires external per-element orientation data; type 8 is intended for COMPRO material type 800.
+- **blocked-time-step-wrapper-type-21** (type is 21):
+  - `type` [once]: `type`:const(21)
+  - `count` [once]: `step_count`:positive-integer
+  - `mapping` [step_count-times]: `label`:integer, `constitutive_id`:positive-constitutive-id
+  - Constraint: Parsed but blocked from Agent generation because the current active finite-element path does not call the type-21 resolver; its observed callers are deprecated paths.
+- **blocked-indexed-interval-types-11-to-13** (type is 11, 12, or 13):
+  - `type` [once]: `type`:enum(11,12,13)
+  - `count` [once]: `interval_count`:positive-integer
+  - `mapping` [interval_count-times]: `label`:integer, `constitutive_id`:positive-constitutive-id
+  - Constraint: Parsed but blocked from Agent generation because current failure/statistical consumers select with uninitialized local NX, NY, or NZ indexes.
+- **blocked-coordinate-interval-types-110-120-130** (type is 110, 120, or 130):
+  - `type` [once]: `type`:enum(110,120,130)
+  - `header` [once]: `interval_count`:positive-integer, `property_subdivision_id`:positive-integer
+  - `mapping` [interval_count-times]: `label`:integer, `constitutive_id`:positive-constitutive-id
+  - Constraint: Parsed but blocked from Agent generation because the coordinate-selection consumer is commented out and current failure/statistical consumers stop on these types.
 
 ### `TABLES`
 
@@ -995,7 +1056,13 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidenceboundary-selectors"></a>
 - `evidence.boundary-selectors` — source: `source/libbsam/ibn_ini_tools.f90:447-905` — Defines all/list/qualified-name selection for clusters and cluster-qualified node or element sets.
 <a id="evidenceconstitutive-parser"></a>
-- `evidence.constitutive-parser` — source: `source/libbsam/con_ini.f90:22-150` — Requires CONSTITUTIVE, dispatches constitutive type records, and reads the current *MIC value array.
+- `evidence.constitutive-parser` — source: `source/libbsam/con_ini.f90:22-350` — Requires CONSTITUTIVE, parses the common modifier prefix, dispatches every accepted constitutive record layout, and terminates entries by declaration order.
+<a id="evidenceconstitutive-storage"></a>
+- `evidence.constitutive-storage` — source: `source/libbsam/module4.f90:9-77` — Defines constitutive record storage, the retained three-entry MIC array, and the 1,500-entry declaration-order limit.
+<a id="evidenceconstitutive-fe-consumer"></a>
+- `evidence.constitutive-fe-consumer` — source: `source/libbsam/con_elem.f90:50-260` — The active finite-element initialization path resolves direct material and failure references for constitutive types 1-8 and 10 and applies *xyzload only to legacy load-vector material types 100 and 210.
+<a id="evidenceconstitutive-wrapper-consumers"></a>
+- `evidence.constitutive-wrapper-consumers` — source: `source/libbsam/con_fai.f90:74-104` — Failure evaluation accepts direct types 1-8 and 10 plus interval types 11-13, while other parsed wrapper types stop; the interval selector locals are not initialized in this routine.
 <a id="evidencetable-parser"></a>
 - `evidence.table-parser` — source: `source/libbsam/table_ini.f90:26-84` — Locates optional TABLES and divides table entries at *end records.
 <a id="evidencetable-initializer"></a>

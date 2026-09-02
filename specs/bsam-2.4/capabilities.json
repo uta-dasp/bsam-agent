@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.11.0",
+  "registry_version": "0.12.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -225,8 +225,32 @@
       "kind": "source",
       "locator": "source/libbsam/con_ini.f90",
       "line_start": 22,
-      "line_end": 150,
-      "claim": "Requires CONSTITUTIVE, dispatches constitutive type records, and reads the current *MIC value array."
+      "line_end": 350,
+      "claim": "Requires CONSTITUTIVE, parses the common modifier prefix, dispatches every accepted constitutive record layout, and terminates entries by declaration order."
+    },
+    {
+      "id": "evidence.constitutive-storage",
+      "kind": "source",
+      "locator": "source/libbsam/module4.f90",
+      "line_start": 9,
+      "line_end": 77,
+      "claim": "Defines constitutive record storage, the retained three-entry MIC array, and the 1,500-entry declaration-order limit."
+    },
+    {
+      "id": "evidence.constitutive-fe-consumer",
+      "kind": "source",
+      "locator": "source/libbsam/con_elem.f90",
+      "line_start": 50,
+      "line_end": 260,
+      "claim": "The active finite-element initialization path resolves direct material and failure references for constitutive types 1-8 and 10 and applies *xyzload only to legacy load-vector material types 100 and 210."
+    },
+    {
+      "id": "evidence.constitutive-wrapper-consumers",
+      "kind": "source",
+      "locator": "source/libbsam/con_fai.f90",
+      "line_start": 74,
+      "line_end": 104,
+      "claim": "Failure evaluation accepts direct types 1-8 and 10 plus interval types 11-13, while other parsed wrapper types stop; the interval selector locals are not initialized in this routine."
     },
     {
       "id": "evidence.table-parser",
@@ -766,12 +790,166 @@
         "tokens": ["END CONSTITUTIVE"],
         "certainty": "accepted-current"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.constitutive-parser", "evidence.current-vtms-deck-tric"],
-      "remaining_work": [
-        "Enumerate all active constitutive type IDs, record layouts, defaults, and material/failure references."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "type",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": [1, 2, 3, 4, 5, 6, 7, 8, 10],
+          "summary": "Selects a direct safely generatable finite-element constitutive record; parsed wrapper types 11-13, 21, 110, 120, and 130 are explicitly blocked."
+        },
+        {
+          "name": "material_id",
+          "value_type": "positive-material-id",
+          "required": true,
+          "summary": "References a MATERIALS declaration for direct types 1-8 and 10."
+        },
+        {
+          "name": "failure_id",
+          "value_type": "positive-failure-id",
+          "required": true,
+          "summary": "References a FAILURE declaration for direct types 1-8 and 10."
+        },
+        {
+          "name": "mic",
+          "value_type": "one-to-three-positive-constitutive-ids",
+          "required": false,
+          "summary": "Defines optional MIC constitutive references; the full array is retained and the second nonzero entry is the legacy primary MIC ID."
+        },
+        {
+          "name": "xyzload",
+          "value_type": "boolean-flag",
+          "required": false,
+          "default": false,
+          "summary": "Marks non-mechanical load vectors as global-coordinate data for material types 100 and 210."
+        },
+        {
+          "name": "fatigue",
+          "value_type": "positive-failure-id",
+          "required": false,
+          "default": 0,
+          "summary": "Stores a parsed fatigue criterion reference; Agent generation is blocked because no active consumer reads the stored field."
+        }
+      ],
+      "evidence_ids": ["evidence.constitutive-parser", "evidence.constitutive-storage", "evidence.constitutive-fe-consumer", "evidence.constitutive-wrapper-consumers", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "END CONSTITUTIVE after a complete declaration",
+        "variants": [
+          {
+            "name": "optional-common-modifiers",
+            "when": "after any type line and before its type-specific data",
+            "rows": [
+              {"name": "xyz-load", "repetition": "optional-once", "fields": [{"name": "*xyzload", "value_type": "flag", "required": false, "summary": "Sets xyzload to one."}]},
+              {"name": "mic", "repetition": "optional-once", "fields": [{"name": "*MIC", "value_type": "one-to-three-positive-constitutive-ids", "required": false, "summary": "Retains up to three MIC constitutive references."}]},
+              {"name": "fatigue", "repetition": "optional-once", "fields": [{"name": "*fatigue", "value_type": "positive-failure-id", "required": false, "summary": "Stores a fatigue failure reference that currently has no active consumer."}]}
+            ],
+            "constraints": ["The parser examines exactly three modifier slots; an unrecognized next record is backspaced but still consumes a slot.", "Canonical generation places no more than three recognized modifier lines immediately after the type line.", "*MIC matching is case-insensitive after the *mic= dispatch prefix; one value selects the first ID, while two or three values make the second ID the legacy primary and preserve the full array.", "*fatigue is parsed but blocked from Agent generation until an active consumer and semantics are established."]
+          },
+          {
+            "name": "z-rotation-types-1-and-10",
+            "when": "type is 1 or 10",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(1,10)", "required": true, "summary": "Selects orthotropic or nonlinear orthotropic Z-only rotation."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}, {"name": "z_rotation_degrees", "value_type": "real", "required": true, "summary": "Fiber rotation about global Z in degrees."}]}
+            ],
+            "constraints": ["Type 10 selects nonlinear orthotropic behavior but has the same input layout as type 1."]
+          },
+          {
+            "name": "three-axis-rotation-type-2",
+            "when": "type is 2",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(2)", "required": true, "summary": "Selects explicit Z, Y, then X rotations."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}, {"name": "z_rotation_degrees", "value_type": "real", "required": true, "summary": "Z rotation."}, {"name": "y_rotation_degrees", "value_type": "real", "required": true, "summary": "Y rotation."}, {"name": "x_rotation_degrees", "value_type": "real", "required": true, "summary": "X rotation."}]}
+            ],
+            "constraints": ["When no explicit element orientation is present, standardization composes X, Y, and Z rotation matrices from these values."]
+          },
+          {
+            "name": "tow-center-curve-type-3",
+            "when": "type is 3",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(3)", "required": true, "summary": "Selects tow-center space-curve rotation."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}, {"name": "bias_option", "value_type": "integer", "required": true, "summary": "Selects the bias-angle policy."}, {"name": "x_user_id", "value_type": "positive-user-id", "required": true, "summary": "USER function for global X."}, {"name": "y_user_id", "value_type": "positive-user-id", "required": true, "summary": "USER function for global Y."}, {"name": "z_user_id", "value_type": "positive-user-id", "required": true, "summary": "USER function for global Z."}, {"name": "twist_user_id", "value_type": "positive-user-id", "required": true, "summary": "USER function for twist angle."}, {"name": "bias_angle_degrees", "value_type": "real", "required": true, "summary": "Bias angle."}]}
+            ],
+            "constraints": ["Every USER reference must resolve before the orientation is evaluated."]
+          },
+          {
+            "name": "two-curve-interpolation-type-4",
+            "when": "type is 4",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(4)", "required": true, "summary": "Selects interpolation between two space curves."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}, {"name": "bias_option", "value_type": "integer", "required": true, "summary": "Selects the bias-angle policy."}, {"name": "curve1_x_user_id", "value_type": "positive-user-id", "required": true, "summary": "First curve X function."}, {"name": "curve1_y_user_id", "value_type": "positive-user-id", "required": true, "summary": "First curve Y function."}, {"name": "curve1_z_user_id", "value_type": "positive-user-id", "required": true, "summary": "First curve Z function."}, {"name": "curve2_x_user_id", "value_type": "positive-user-id", "required": true, "summary": "Second curve X function."}, {"name": "curve2_y_user_id", "value_type": "positive-user-id", "required": true, "summary": "Second curve Y function."}, {"name": "curve2_z_user_id", "value_type": "positive-user-id", "required": true, "summary": "Second curve Z function."}, {"name": "bias_angle_degrees", "value_type": "real", "required": true, "summary": "Bias angle."}]}
+            ],
+            "constraints": ["All six USER references must resolve before interpolation."]
+          },
+          {
+            "name": "jacobian-rotation-type-5",
+            "when": "type is 5",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(5)", "required": true, "summary": "Selects Jacobian-based rotation angles."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}, {"name": "parametric_tow_direction", "value_type": "integer", "required": true, "summary": "Selects the tow direction in parameter space."}]}
+            ],
+            "constraints": ["The mesh/geometry path must provide the Jacobian orientation context."]
+          },
+          {
+            "name": "macro-jacobian-rotation-type-6",
+            "when": "type is 6",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(6)", "required": true, "summary": "Selects Jacobian rotations using macro geometry."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}, {"name": "parametric_tow_direction", "value_type": "integer", "required": true, "summary": "Selects the tow direction."}, {"name": "macro_geometry_id", "value_type": "positive-integer", "required": true, "summary": "References the required macro geometry."}]}
+            ],
+            "constraints": ["The referenced macro geometry must exist in the model path that supplies Jacobian orientations."]
+          },
+          {
+            "name": "external-orientation-types-7-and-8",
+            "when": "type is 7 or 8",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(7,8)", "required": true, "summary": "Selects external cosine-matrix orientation or COMPRO orientation."}]},
+              {"name": "constitutive-data", "repetition": "once", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Material reference."}, {"name": "failure_id", "value_type": "positive-failure-id", "required": true, "summary": "Failure reference."}]}
+            ],
+            "constraints": ["Type 7 requires external per-element orientation data; type 8 is intended for COMPRO material type 800."]
+          },
+          {
+            "name": "blocked-time-step-wrapper-type-21",
+            "when": "type is 21",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(21)", "required": true, "summary": "Selects a time-step-dependent constitutive wrapper."}]},
+              {"name": "count", "repetition": "once", "fields": [{"name": "step_count", "value_type": "positive-integer", "required": true, "summary": "Sets the number of referenced constitutive entries."}]},
+              {"name": "mapping", "repetition": "step_count-times", "fields": [{"name": "label", "value_type": "integer", "required": true, "summary": "Parsed but discarded row label; canonical form would equal the row index."}, {"name": "constitutive_id", "value_type": "positive-constitutive-id", "required": true, "summary": "Referenced direct constitutive entry."}]}
+            ],
+            "constraints": ["Parsed but blocked from Agent generation because the current active finite-element path does not call the type-21 resolver; its observed callers are deprecated paths."]
+          },
+          {
+            "name": "blocked-indexed-interval-types-11-to-13",
+            "when": "type is 11, 12, or 13",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(11,12,13)", "required": true, "summary": "Selects X-, Y-, or Z-indexed constitutive switching."}]},
+              {"name": "count", "repetition": "once", "fields": [{"name": "interval_count", "value_type": "positive-integer", "required": true, "summary": "Sets referenced constitutive count."}]},
+              {"name": "mapping", "repetition": "interval_count-times", "fields": [{"name": "label", "value_type": "integer", "required": true, "summary": "Parsed but discarded row label."}, {"name": "constitutive_id", "value_type": "positive-constitutive-id", "required": true, "summary": "Referenced direct constitutive entry."}]}
+            ],
+            "constraints": ["Parsed but blocked from Agent generation because current failure/statistical consumers select with uninitialized local NX, NY, or NZ indexes."]
+          },
+          {
+            "name": "blocked-coordinate-interval-types-110-120-130",
+            "when": "type is 110, 120, or 130",
+            "rows": [
+              {"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(110,120,130)", "required": true, "summary": "Selects X-, Y-, or Z-coordinate constitutive switching."}]},
+              {"name": "header", "repetition": "once", "fields": [{"name": "interval_count", "value_type": "positive-integer", "required": true, "summary": "Sets referenced constitutive count."}, {"name": "property_subdivision_id", "value_type": "positive-integer", "required": true, "summary": "Selects the property subdivision definition."}]},
+              {"name": "mapping", "repetition": "interval_count-times", "fields": [{"name": "label", "value_type": "integer", "required": true, "summary": "Parsed but discarded row label."}, {"name": "constitutive_id", "value_type": "positive-constitutive-id", "required": true, "summary": "Referenced direct constitutive entry."}]}
+            ],
+            "constraints": ["Parsed but blocked from Agent generation because the coordinate-selection consumer is commented out and current failure/statistical consumers stop on these types."]
+          }
+        ],
+        "dependencies": [
+          "Constitutive IDs are one-based declaration order and are referenced by cluster assignments, sections, connections, and MIC definitions.",
+          "Every direct material_id and failure_id must resolve to existing MATERIALS and FAILURE declarations.",
+          "Types 3 and 4 require numeric USER function IDs; type 7 requires external element orientation data; type 8 is coupled to COMPRO material type 800.",
+          "*MIC entries reference constitutive IDs and may be forward references because all declarations are read before element processing.",
+          "At most 1,500 entries are stored; canonical generation reserves END CONSTITUTIVE by emitting fewer than 1,500 declarations."
+        ]
+      }
     },
     {
       "id": "block.tables",
