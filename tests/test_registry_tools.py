@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(37, counts["evidence"])
+        self.assertEqual(40, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -105,6 +105,18 @@ class RegistryToolsTests(unittest.TestCase):
         legacy = json.dumps(variants["legacy-numeric"]).lower()
         self.assertIn("diagnostics only", legacy)
         self.assertIn("notch_v1", legacy)
+
+    def test_ufunction_spline_contract_is_registered(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "UFUNCTIONS")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        variant = block["body"]["variants"][0]
+        rows = {item["name"]: item for item in variant["rows"]}
+        self.assertEqual(["x", "y"], [item["name"] for item in rows["data-point"]["fields"]])
+        contract = json.dumps(block).lower()
+        self.assertIn("strictly increasing or strictly decreasing", contract)
+        self.assertIn("ufunc_<name>", contract)
+        self.assertIn("must be lowercase", contract)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]

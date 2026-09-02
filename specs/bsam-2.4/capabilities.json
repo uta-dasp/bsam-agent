@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.5.0",
+  "registry_version": "0.6.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -67,6 +67,30 @@
       "line_start": 10,
       "line_end": 68,
       "claim": "Locates the optional UFUNCTIONS block and divides entries at *end records."
+    },
+    {
+      "id": "evidence.ufunction-initializer",
+      "kind": "source",
+      "locator": "source/libbsam/ufunction.f90",
+      "line_start": 46,
+      "line_end": 240,
+      "claim": "Normalizes each UFUNCTION entry, extracts its name and two-column numeric data, builds natural-cubic-spline coefficients, and requires strictly monotonic x coordinates."
+    },
+    {
+      "id": "evidence.ufunction-material-reference",
+      "kind": "source",
+      "locator": "source/libbsam/material.f90",
+      "line_start": 417,
+      "line_end": 500,
+      "claim": "Resolves material parameter values of the form ufunc_<name> to the first matching normalized UFUNCTION name."
+    },
+    {
+      "id": "evidence.ufunction-interface-material-reference",
+      "kind": "source",
+      "locator": "source/libbsam/interface_material.f90",
+      "line_start": 295,
+      "line_end": 465,
+      "claim": "Resolves interface-material parameter values of the form ufunc_<name> and binds them to UFUNCTION objects."
     },
     {
       "id": "evidence.moisture-parser",
@@ -487,12 +511,46 @@
         "tokens": ["END UFUNCTIONS"],
         "certainty": "canonical"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.ufunction-parser"],
-      "remaining_work": [
-        "Trace the ufunction object initializer and document every entry key, type, and reference."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "name",
+          "value_type": "normalized-name",
+          "required": true,
+          "summary": "Names the function. Cleaning lowercases the header, and the semantic name is its last token after splitting on spaces, hyphens, and underscores; generation uses one unique token."
+        },
+        {
+          "name": "x",
+          "value_type": "real",
+          "required": true,
+          "summary": "Supplies the consumer-defined independent coordinate; all x values must be strictly monotonic in one direction."
+        },
+        {
+          "name": "y",
+          "value_type": "real",
+          "required": true,
+          "summary": "Supplies the consumer-defined function value paired with x."
+        }
+      ],
+      "evidence_ids": ["evidence.ufunction-parser", "evidence.ufunction-initializer", "evidence.ufunction-material-reference", "evidence.ufunction-interface-material-reference"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "next-top-level-block",
+        "variants": [
+          {
+            "name": "two-column-cubic-spline",
+            "when": "each entry starts with a function-name line",
+            "rows": [
+              {"name": "function-name", "repetition": "once", "fields": [{"name": "name", "value_type": "normalized-name", "required": true, "summary": "Defines the function name used by ufunc_<name> references."}]},
+              {"name": "data-point", "repetition": "repeated", "fields": [{"name": "x", "value_type": "real", "required": true, "summary": "Independent coordinate."}, {"name": "y", "value_type": "real", "required": true, "summary": "Function value."}]},
+              {"name": "function-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-sentinel", "required": true, "summary": "Terminates the entry and must be lowercase for the outer block splitter."}]}
+            ],
+            "constraints": ["At least two numeric data rows are required.", "Current safe generation emits exactly two columns; other column counts do not initialize the coefficients required by accessors.", "x values must be distinct and strictly increasing or strictly decreasing.", "Blank lines and commas are normalized before numeric conversion.", "Leading lines beginning with * are skipped by the initializer but have no implemented semantics and are not generated.", "Duplicate normalized names are unsafe because material lookup selects the first match."]
+          }
+        ],
+        "dependencies": ["Structured material parameters may reference a function as ufunc_<name>.", "Function coordinate/value units are defined by the consuming material parameter rather than by UFUNCTIONS."]
+      }
     },
     {
       "id": "block.moisture",

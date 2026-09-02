@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.5.0`
-- Registry SHA-256: `32EB69CDA1A21B845D61EF78862FA45B5AA59885D10C22FA071CC1782815F7C7`
+- Registry version: `0.6.0`
+- Registry SHA-256: `45D4C07ECEE9BD89CAD509244365A99842FDF8C3E3CC5C7125C88FA1F8BF229A`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -20,7 +20,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 |---|---:|---|---|---|---|
 | `INPUT` | yes | special-input-scan | `INP_INI` | documented | Selects the current non-sequential block input mode; the pinned executable requires type 3. |
 | `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
-| `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | identified | Defines named user functions parsed as *end-delimited entries. |
+| `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | documented | Defines named user functions parsed as *end-delimited entries. |
 | `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | partially-documented | Configures optional coupling to the external moisture simulation workflow. |
 | `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
 | `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
@@ -117,12 +117,29 @@ Defines named user functions parsed as *end-delimited entries.
 - Lookup token/matcher: `UFUNCTIONS` / exact-case-sensitive
 - Required: no
 - Termination: `END UFUNCTIONS` (canonical)
-- Coverage: identified
-- Evidence: [evidence.ufunction-parser](#evidenceufunction-parser)
+- Coverage: documented
+- Evidence: [evidence.ufunction-parser](#evidenceufunction-parser), [evidence.ufunction-initializer](#evidenceufunction-initializer), [evidence.ufunction-material-reference](#evidenceufunction-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
 
-Remaining specification work:
+Known parameters:
 
-- Trace the ufunction object initializer and document every entry key, type, and reference.
+- `name` (normalized-name, required): Names the function. Cleaning lowercases the header, and the semantic name is its last token after splitting on spaces, hyphens, and underscores; generation uses one unique token.
+- `x` (real, required): Supplies the consumer-defined independent coordinate; all x values must be strictly monotonic in one direction.
+- `y` (real, required): Supplies the consumer-defined function value paired with x.
+
+### `UFUNCTIONS` body
+
+Termination: next-top-level-block. Dependencies: Structured material parameters may reference a function as ufunc_<name>.; Function coordinate/value units are defined by the consuming material parameter rather than by UFUNCTIONS.
+
+- **two-column-cubic-spline** (each entry starts with a function-name line):
+  - `function-name` [once]: `name`:normalized-name
+  - `data-point` [repeated]: `x`:real, `y`:real
+  - `function-end` [once]: `*end`:exact-sentinel
+  - Constraint: At least two numeric data rows are required.
+  - Constraint: Current safe generation emits exactly two columns; other column counts do not initialize the coefficients required by accessors.
+  - Constraint: x values must be distinct and strictly increasing or strictly decreasing.
+  - Constraint: Blank lines and commas are normalized before numeric conversion.
+  - Constraint: Leading lines beginning with * are skipped by the initializer but have no implemented semantics and are not generated.
+  - Constraint: Duplicate normalized names are unsafe because material lookup selects the first match.
 
 ### `MOISTURE`
 
@@ -795,6 +812,12 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 - `evidence.sheff-solver-dispatch` — source: `sheff_modules/first_party/bsam_sheff_interface@836d8037b5cbb1fa89126da3652bbafc75253ab9:source/Solvers.cpp` — Defines the case-insensitive SHEFF backend, solver, and preconditioner values accepted by the submodule revision pinned by the BSAM source commit.
 <a id="evidenceufunction-parser"></a>
 - `evidence.ufunction-parser` — source: `source/libbsam/ufunction_ini.f90:10-68` — Locates the optional UFUNCTIONS block and divides entries at *end records.
+<a id="evidenceufunction-initializer"></a>
+- `evidence.ufunction-initializer` — source: `source/libbsam/ufunction.f90:46-240` — Normalizes each UFUNCTION entry, extracts its name and two-column numeric data, builds natural-cubic-spline coefficients, and requires strictly monotonic x coordinates.
+<a id="evidenceufunction-material-reference"></a>
+- `evidence.ufunction-material-reference` — source: `source/libbsam/material.f90:417-500` — Resolves material parameter values of the form ufunc_<name> to the first matching normalized UFUNCTION name.
+<a id="evidenceufunction-interface-material-reference"></a>
+- `evidence.ufunction-interface-material-reference` — source: `source/libbsam/interface_material.f90:295-465` — Resolves interface-material parameter values of the form ufunc_<name> and binds them to UFUNCTION objects.
 <a id="evidencemoisture-parser"></a>
 - `evidence.moisture-parser` — source: `source/libbsam/moisture.f90:36-173` — Locates the optional MOISTURE block and dispatches its current key/value labels.
 <a id="evidencecluster-parser"></a>
