@@ -13,6 +13,7 @@ These are the only operations an optional language model should be allowed to re
 | `preview_create_set`, `preview_add_set_members` | Plan bounded node/element-set changes | Writes plan only |
 | `preview_import_mesh` | Plan assembly of a validated `.ele` mesh into an empty template cluster | Writes plan only |
 | `preview_expand_notch_plies` | Plan the approved applicability-checked notch 2-to-8-ply transformation | Writes plan only |
+| `preview_rename_boundary_condition` | Plan a boundary-condition rename and retarget all loading-sequence changes | Writes plan only |
 | `review_change` | Re-derive and return an exact plan's semantic/source diff | No |
 | `apply_change` | Apply one exact reviewed plan to a new deck and audit sidecar | Yes, confirmation required |
 | `run_bsam` | Launch a validated rendered artifact | Yes |

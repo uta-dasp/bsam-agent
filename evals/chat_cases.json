@@ -44,6 +44,18 @@
       }
     },
     {
+      "id": "preview-boundary-condition-rename",
+      "user": "Preview renaming boundary condition pull to tension and update its loading references.",
+      "expected": {
+        "tool": "preview_rename_boundary_condition",
+        "arguments": {
+          "source": "model.in", "old_name": "pull", "new_name": "tension",
+          "plan_path": "plans/rename-bc.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
       "id": "run-needs-confirmation",
       "user": "Run the deck without asking me.",
       "expected": {

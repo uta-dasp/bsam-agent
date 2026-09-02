@@ -642,6 +642,118 @@ def _value_spans(line: SourceLine, parameter: str) -> list[tuple[int, int]]:
         cursor = found + 1
 
 
+def _boundary_condition_rename_patches(
+    source_set: SourceSet, old_name: str, new_name: str
+) -> list[dict[str, Any]]:
+    _validate_raw_value(old_name)
+    _validate_raw_value(new_name)
+    if any(character.isspace() for character in old_name + new_name):
+        raise ChangeError("boundary-condition names must not contain whitespace")
+    if old_name.casefold() == new_name.casefold():
+        raise ChangeError("new boundary-condition name must differ from the current name")
+    semantic = source_set.semantic_index()
+    old_key = _key_for_change("boundary-condition", old_name)
+    new_key = _key_for_change("boundary-condition", new_name)
+    definitions = [item for item in semantic.entities if item.key == old_key]
+    if len(definitions) != 1:
+        raise ChangeError(
+            f"boundary condition {old_name} must resolve to one exact root definition"
+        )
+    if any(item.key == new_key for item in semantic.entities):
+        raise ChangeError(f"boundary condition {new_name} already exists")
+    document = source_set.documents[source_set.root]
+    locations = [(definitions[0].location, "name")]
+    locations.extend(
+        (reference.location, "change")
+        for reference in semantic.references
+        if reference.target_key == old_key and reference.kind == "changes-boundary-condition"
+    )
+    patches: list[dict[str, Any]] = []
+    for location, parameter in locations:
+        if location.source != "<root>":
+            raise ChangeError("boundary-condition rename currently supports root-deck records only")
+        line = document.lines[location.line - 1]
+        spans = _value_spans(line, parameter)
+        if len(spans) != 1:
+            raise ChangeError(
+                f"{parameter} on line {line.number} no longer resolves to one exact value"
+            )
+        start, end = spans[0]
+        old = document.raw[start:end].decode("latin-1")
+        if old.casefold() != old_name.casefold():
+            raise ChangeError(
+                f"{parameter} on line {line.number} does not reference {old_name}"
+            )
+        patches.append({
+            "start": start,
+            "end": end,
+            "line": line.number,
+            "old": old,
+            "new": new_name,
+        })
+    return patches
+
+
+def _key_for_change(kind: str, name: str) -> str:
+    return f"{kind}:{name.casefold()}"
+
+
+def plan_rename_boundary_condition(
+    source: Path,
+    old_name: str,
+    new_name: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Plan one boundary-condition rename and all loading-sequence dependents."""
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    document = source_set.documents[source]
+    patches = _boundary_condition_rename_patches(source_set, old_name, new_name)
+    updated = _patched_bytes_many(document, patches)
+    updated_document = SourceDocument.from_bytes(updated, str(source))
+    validation = _validation_result(source_set, {source: updated})
+    if validation["summary"]["errors"]:
+        messages = "; ".join(
+            item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
+        )
+        raise ChangeError(f"planned boundary-condition rename failed validation: {messages}")
+    model_paths = [
+        f"BOUNDARY.boundary-conditions[{old_name}]",
+        f"BOUNDARY.loading-sequence.change[{old_name}]",
+    ]
+    dependent_count = len(patches) - 1
+    preview = (
+        f"rename boundary condition {old_name} -> {new_name} and update "
+        f"{dependent_count} loading-sequence reference(s)"
+    )
+    changes = [
+        {"operation": "rename", "target": model_paths[0], "summary": f"{old_name} -> {new_name}"},
+        {"operation": "retarget", "target": model_paths[1], "summary": f"updated {dependent_count} dependent reference(s)"},
+    ]
+    plan: dict[str, Any] = {
+        "schema_version": PLAN_SCHEMA_VERSION,
+        "source": str(source),
+        "workspace_root": str(source_set.workspace_root),
+        "base_sha256": document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "proposed_sha256": updated_document.sha256,
+        "proposed_source_set_sha256": source_set.digest_with({source: updated}),
+        "operation": "rename-boundary-condition",
+        "selector": {"old_name": old_name, "new_name": new_name},
+        "patches": patches,
+        "changed_model_paths": model_paths,
+        "affected_files": [str(source)],
+        "changes": changes,
+        "source_diff": _source_diff(source, document.raw, updated),
+        "validation": validation,
+        "preview": preview,
+    }
+    digest = _plan_digest(plan)
+    plan["plan_digest"] = digest
+    plan["plan_id"] = digest[:16]
+    return plan
+
+
 def _block_span(document: SourceDocument, name: str) -> tuple[int, int]:
     matches = [item for item in document.blocks() if item["name"] == name]
     if len(matches) != 1 or matches[0]["end_line"] is None:
@@ -1054,6 +1166,38 @@ def _validated_plan_proposal(
 ) -> tuple[bytes, SourceDocument, list[str], str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
     operation = plan.get("operation")
+    if operation == "rename-boundary-condition":
+        selector = plan.get("selector")
+        if not isinstance(selector, dict):
+            raise ChangeError("boundary-condition rename plan is missing its selector")
+        try:
+            old_name = str(selector["old_name"])
+            new_name = str(selector["new_name"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ChangeError("boundary-condition rename selector is malformed") from exc
+        expected = plan_rename_boundary_condition(
+            source, old_name, new_name, source_set.workspace_root
+        )
+        checked_fields = (
+            "selector", "patches", "changed_model_paths", "affected_files", "changes",
+            "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(
+                    f"boundary-condition rename plan {field} does not match its typed selector"
+                )
+        updated = _patched_bytes_many(document, expected["patches"])
+        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+        return (
+            updated,
+            updated_document,
+            expected["changed_model_paths"],
+            expected["source_diff"],
+            expected["validation"],
+        )
+
     if operation == "expand-notch-plies":
         expected = plan_expand_notch_plies(source, source_set.workspace_root)
         checked_fields = (

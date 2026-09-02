@@ -20,6 +20,7 @@ from .change import (
     plan_expand_notch_plies,
     plan_import_mesh,
     plan_parameter_change,
+    plan_rename_boundary_condition,
     review_plan,
     write_plan,
 )
@@ -221,6 +222,14 @@ class LocalAgentApi:
             args = self._args(arguments, {"source", "plan_path"})
             plan = plan_expand_notch_plies(
                 self._path(args["source"], "source"), self.workspace_root
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_rename_boundary_condition":
+            args = self._args(arguments, {"source", "old_name", "new_name", "plan_path"})
+            plan = plan_rename_boundary_condition(
+                self._path(args["source"], "source"), str(args["old_name"]),
+                str(args["new_name"]), self.workspace_root,
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))
             return plan

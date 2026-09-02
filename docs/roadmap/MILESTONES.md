@@ -83,6 +83,7 @@ Status: in progress.
 - [x] Add topology-constrained element creation with validated connectivity references.
 - [x] Add dependency-aware deletion for unreferenced nodes.
 - [x] Add typed node/element-set creation and validated member-list additions.
+- [x] Add dependency-aware boundary-condition rename with atomic loading-sequence reference updates.
 - [x] Bound G2 editing to the supported root-deck vertical slice; defer complete CRUD and included-file editing to G3 coverage.
 - [x] Guarantee byte-identical no-op output for the complete source set.
 

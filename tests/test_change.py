@@ -22,6 +22,7 @@ from bsam_agent.change import (
     plan_delete_node,
     plan_import_mesh,
     plan_parameter_change,
+    plan_rename_boundary_condition,
     review_plan,
     write_plan,
 )
@@ -39,6 +40,41 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_boundary_condition_rename_updates_loading_dependents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            plan_path = root / "rename.json"
+            output = root / "renamed.in"
+            fixture = (Path(__file__).parent / "fixtures" / "semantic_two_cluster.in").read_bytes()
+            source.write_bytes(fixture.replace(
+                b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
+                b"BOUNDARY\n*type\nmechanical\n"
+                b"*boundary condition\n"
+                b"type=disp, comp=x, name=pull, value=0, nset=lower_ply.all_nodes\n"
+                b"*loading sequence\n"
+                b"type=Static, nstep=1, incr=1\n"
+                b"change=pull, type=disp, value=1\n"
+                b"END BOUNDARY\n",
+            ))
+
+            plan = plan_rename_boundary_condition(source, "pull", "tension")
+            self.assertEqual("rename-boundary-condition", plan["operation"])
+            self.assertEqual(2, len(plan["patches"]))
+            self.assertEqual(0, plan["validation"]["summary"]["errors"])
+            write_plan(plan, plan_path)
+            review_plan(plan_path)
+            apply_plan(plan_path, output)
+
+            text = output.read_text(encoding="latin-1")
+            self.assertIn("name=tension", text)
+            self.assertIn("change=tension", text)
+            self.assertNotIn("name=pull", text)
+            self.assertEqual(0, SourceSet.read(output).inspection()["summary"]["errors"])
+
+            with self.assertRaisesRegex(ChangeError, "must resolve to one exact"):
+                plan_rename_boundary_condition(source, "missing", "replacement")
+
     def test_plan_and_apply_mesh_import_into_empty_template_cluster(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

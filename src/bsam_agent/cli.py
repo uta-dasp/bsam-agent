@@ -20,6 +20,7 @@ from .change import (
     plan_expand_notch_plies,
     plan_import_mesh,
     plan_parameter_change,
+    plan_rename_boundary_condition,
     review_plan,
     write_plan,
 )
@@ -161,6 +162,16 @@ def build_parser() -> argparse.ArgumentParser:
     notch_parser.add_argument("deck")
     notch_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
     notch_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    rename_bc_parser = subparsers.add_parser(
+        "plan-rename-boundary-condition",
+        help="plan a boundary-condition rename and dependent loading updates",
+    )
+    rename_bc_parser.add_argument("deck")
+    rename_bc_parser.add_argument("--old", required=True, dest="old_name")
+    rename_bc_parser.add_argument("--new", required=True, dest="new_name")
+    rename_bc_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    rename_bc_parser.add_argument("--out", required=True, help="new JSON plan path")
     return parser
 
 
@@ -192,6 +203,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "plan-expand-notch-plies":
             plan = plan_expand_notch_plies(
                 Path(args.deck), Path(args.workspace_root) if args.workspace_root else None
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "plan-rename-boundary-condition":
+            plan = plan_rename_boundary_condition(
+                Path(args.deck), args.old_name, args.new_name,
+                Path(args.workspace_root) if args.workspace_root else None,
             )
             write_plan(plan, Path(args.out))
             _print_json(plan)
