@@ -31,8 +31,8 @@ class NotchProjectIntegrationTests(unittest.TestCase):
             inspection["sha256"],
         )
         semantic = inspection["semantic_model"]["summary"]
-        self.assertEqual(15480, semantic["entities"])
-        self.assertEqual(53690, semantic["resolved_references"])
+        self.assertEqual(15501, semantic["entities"])
+        self.assertEqual(53706, semantic["resolved_references"])
         self.assertEqual(0, semantic["unresolved_references"])
 
         plan = plan_parameter_change(
@@ -51,7 +51,7 @@ class NotchProjectIntegrationTests(unittest.TestCase):
         self.assertEqual([75, 15] * 4, plan["selector"]["layup_degrees"])
         self.assertEqual(5, len(plan["patches"]))
         self.assertEqual(0, plan["validation"]["summary"]["errors"])
-        self.assertEqual(61920, plan["validation"]["semantic_summary"]["entities"])
+        self.assertEqual(61983, plan["validation"]["semantic_summary"]["entities"])
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -72,7 +72,7 @@ class NotchProjectIntegrationTests(unittest.TestCase):
             self.assertEqual(1, text.count("comp=z"))
             inspection = SourceSet.read(output).inspection()
             self.assertEqual(0, inspection["summary"]["errors"])
-            self.assertEqual(61920, inspection["semantic_model"]["summary"]["entities"])
+            self.assertEqual(61983, inspection["semantic_model"]["summary"]["entities"])
 
 
 if __name__ == "__main__":

@@ -70,6 +70,7 @@ Status: in progress.
 - [x] Expose the semantic records and summary through `inspect`.
 - [x] Add synthetic semantic-index unit tests.
 - [x] Add a non-sensitive representative two-cluster semantic regression fixture and test.
+- [x] Resolve documented cluster, constitutive assignment, boundary-condition, loading, connection, and crack dependencies used by the notch acceptance profile.
 
 ### G2.3 Validation and safe editing
 

@@ -1,4 +1,4 @@
-"""Conservative semantic records for the documented FE vertical slice."""
+"""Conservative semantic records for documented FE and control constructs."""
 
 from __future__ import annotations
 
@@ -84,8 +84,8 @@ class SemanticIndex:
         for entity in self.entities:
             counts[entity.kind] = counts.get(entity.kind, 0) + 1
         return {
-            "schema_version": "0.1.0",
-            "coverage": "documented-fe-explicit-records",
+            "schema_version": "0.2.0",
+            "coverage": "documented-fe-boundary-and-crack-records",
             "entities": [item.as_dict() for item in self.entities],
             "references": [item.as_dict() for item in self.references],
             "summary": {
@@ -105,7 +105,10 @@ class SemanticIndex:
             by_key.setdefault(entity.key, []).append(entity)
 
         for key, definitions in by_key.items():
-            if len(definitions) > 1 and definitions[0].kind in {"node", "element"}:
+            if len(definitions) > 1 and definitions[0].kind in {
+                "node", "element", "cluster", "constitutive", "boundary-condition",
+                "connection", "cluster-constitutive", "crack",
+            }:
                 for duplicate in definitions[1:]:
                     self.diagnostics.append(Diagnostic(
                         code="BSAM-E300",
@@ -167,6 +170,16 @@ def _options(line: SourceLine) -> dict[str, str | None]:
             result[name.strip().upper()] = setting.strip()
         else:
             result[value.upper()] = None
+    return result
+
+
+def _record_options(line: SourceLine) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for field in line.text[:500].split(","):
+        if "=" not in field:
+            continue
+        name, value = field.split("=", 1)
+        result[name.strip().casefold()] = value.strip()
     return result
 
 
@@ -235,7 +248,144 @@ def _command_spans(lines: Iterable[SourceLine]) -> list[tuple[SourceLine, list[S
     return result
 
 
-def build_semantic_index(sources: Iterable[tuple[Path, str, Iterable[SourceLine]]]) -> SemanticIndex:
+def _top_block_body(lines: tuple[SourceLine, ...], name: str) -> list[SourceLine]:
+    start = next((index for index, line in enumerate(lines) if line.stripped == name), None)
+    if start is None:
+        return []
+    terminators = {f"END {name}"}
+    if name == "STATISTICAL":
+        terminators = {"END STATISTICAL DISTRIBUTIONS"}
+    end = next(
+        (index for index in range(start + 1, len(lines)) if lines[index].stripped in terminators),
+        len(lines),
+    )
+    return list(lines[start + 1:end])
+
+
+def augment_root_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine]
+) -> None:
+    """Add documented root control entities and their FE/cluster references."""
+    all_lines = tuple(lines)
+
+    constitutive_body = _top_block_body(all_lines, "CONSTITUTIVE")
+    constitutive_ordinal = 0
+    for line in constitutive_body:
+        values = _fields(line.text)
+        if not values or not values[0].isdigit() or line.text[:1].isspace():
+            continue
+        constitutive_ordinal += 1
+        _entity(
+            index, "constitutive", str(constitutive_ordinal), source, line, None,
+            {"type": int(values[0])},
+        )
+
+    boundary_body = _top_block_body(all_lines, "BOUNDARY")
+    for command_line, body in _command_spans(boundary_body):
+        command = command_line.text.lstrip().split(",", 1)[0].casefold()
+        records = [line for line in body if line.stripped and not line.stripped.startswith("**")]
+        if command.startswith("*boundary condition"):
+            for line in records:
+                options = _record_options(line)
+                name = options.get("name")
+                if not name:
+                    continue
+                condition = _entity(
+                    index, "boundary-condition", name, source, line, None,
+                    {key: value for key, value in options.items() if key != "name"},
+                )
+                qualified = options.get("nset")
+                if qualified and "." in qualified:
+                    cluster, set_name = qualified.split(".", 1)
+                    _reference(
+                        index, condition, "targets-node-set",
+                        _key("node-set", set_name, cluster), source, line,
+                    )
+        elif command.startswith("*connections"):
+            connection: SemanticEntity | None = None
+            ordinal = 0
+            for line in records:
+                options = _record_options(line)
+                if "type" in options:
+                    ordinal += 1
+                    name = options.get("name", f"connection{ordinal}")
+                    connection = _entity(
+                        index, "connection", name, source, line, None,
+                        {"type": options["type"], "ordinal": ordinal},
+                    )
+                if connection is None:
+                    continue
+                for option in ("mset", "sset"):
+                    qualified = options.get(option)
+                    if qualified and "." in qualified:
+                        cluster, set_name = qualified.split(".", 1)
+                        _reference(
+                            index, connection, option,
+                            _key("node-set", set_name, cluster), source, line,
+                        )
+                constitutive = options.get("constitutive")
+                if constitutive and constitutive.isdigit():
+                    _reference(
+                        index, connection, "uses-constitutive",
+                        _key("constitutive", constitutive, None), source, line,
+                    )
+                if "last" in options:
+                    terminal_values = line.text.split("=", 1)[1].split(",")
+                    for terminal in (value.strip() for value in terminal_values):
+                        if terminal and terminal.casefold() != "none":
+                            _reference(
+                                index, connection, "terminal-cluster",
+                                _key("cluster", terminal, None), source, line,
+                            )
+        elif command.startswith("*loading sequence"):
+            for ordinal, line in enumerate(records, start=1):
+                options = _record_options(line)
+                changed = options.get("change")
+                if not changed:
+                    continue
+                change = _entity(
+                    index, "load-change", f"{changed}:{ordinal}", source, line, None,
+                    {key: value for key, value in options.items() if key != "change"},
+                )
+                _reference(
+                    index, change, "changes-boundary-condition",
+                    _key("boundary-condition", changed, None), source, line,
+                )
+
+    clusters = [item for item in index.entities if item.kind == "cluster"]
+    active_crack: SemanticEntity | None = None
+    crack_ordinal = 0
+    for line in _top_block_body(all_lines, "CRACK"):
+        values = _fields(line.text)
+        if values and values[0] in {"101", "201", "301"} and not line.text[:1].isspace():
+            crack_ordinal += 1
+            active_crack = _entity(
+                index, "crack", str(crack_ordinal), source, line, None,
+                {"type": int(values[0])},
+            )
+            continue
+        if active_crack is None or "-approximation" not in line.text.casefold():
+            continue
+        values = _fields(line.text)
+        if not values or not values[0].isdigit():
+            continue
+        approximation = int(values[0])
+        if 1 <= approximation <= len(clusters):
+            _reference(
+                index, active_crack, "targets-cluster", clusters[approximation - 1].key,
+                source, line, {"approximation": approximation},
+            )
+        else:
+            _reference(
+                index, active_crack, "targets-cluster",
+                _key("cluster", f"approximation-{approximation}", None), source, line,
+                {"approximation": approximation},
+            )
+
+
+def build_semantic_index(
+    sources: Iterable[tuple[Path, str, Iterable[SourceLine]]], *, resolve: bool = True
+) -> SemanticIndex:
     """Index only explicit FE records whose grammar is documented in the registry."""
     index = SemanticIndex()
     for _path, source, lines in sources:
@@ -247,6 +397,7 @@ def build_semantic_index(sources: Iterable[tuple[Path, str, Iterable[SourceLine]
 
             if command == "*NAME" and records:
                 cluster = records[0].stripped.casefold()
+                _entity(index, "cluster", cluster, source, records[0], None)
                 continue
 
             if command == "*NODE":
@@ -311,5 +462,17 @@ def build_semantic_index(sources: Iterable[tuple[Path, str, Iterable[SourceLine]
                         "layers": options.get("LAYERS"),
                     })
                     _reference(index, section, "assigns-to", _key("element-set", elset, cluster), source, command_line)
-    index.resolve()
+            elif command == "*CONS" and cluster and records:
+                value = _fields(records[0].text)
+                if value and value[0].isdigit():
+                    assignment = _entity(
+                        index, "cluster-constitutive", "assignment", source,
+                        command_line, cluster, {"constitutive": int(value[0])},
+                    )
+                    _reference(
+                        index, assignment, "uses-constitutive",
+                        _key("constitutive", value[0], None), source, records[0],
+                    )
+    if resolve:
+        index.resolve()
     return index

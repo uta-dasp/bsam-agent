@@ -23,7 +23,7 @@ A second isolated smoke run on 2026-08-31 exercised concurrent external control 
 
 Run artifacts are local and ignored beneath `runs/`. A successful acceptance run still requires a reviewed test case allowed to finish and classification `succeeded`.
 
-On 2026-09-01 the approved notch transformation produced eight 0.25-thick plies, alternating 75/15-degree constitutive assignments, seven chained constitutive-3 interfaces, replicated in-plane controls, and bottom-only Z restraint. Static validation resolved all 214,760 semantic references with zero errors. The pinned executable completed input and connection setup, produced step/TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker. This is sustained nonfatal transformation evidence, not a success-sentinel completion.
+On 2026-09-01 the approved notch transformation produced eight 0.25-thick plies, alternating 75/15-degree constitutive assignments, seven chained constitutive-3 interfaces, replicated in-plane controls, and bottom-only Z restraint. The expanded semantic index resolves all 214,824 FE, cluster, constitutive, boundary-condition, loading, connection, and crack references with zero errors. The pinned executable completed input and connection setup, produced step/TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker. The user subsequently confirmed that the generated eight-ply deck runs correctly. This is accepted transformation evidence; the recorded automated probe remains a controlled stop rather than a success-sentinel completion.
 
 ## Independently verify the pinned baseline
 

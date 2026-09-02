@@ -9,7 +9,7 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from .document import Diagnostic, SourceDocument, SourceLine
-from .semantic import SemanticIndex, build_semantic_index
+from .semantic import SemanticIndex, augment_root_semantics, build_semantic_index
 
 
 @dataclass(frozen=True)
@@ -261,7 +261,13 @@ class SourceSet:
                 path, self.input_directory
             ).replace("\\", "/")
             sources.append((path, relative, self._candidate_lines(path, document)))
-        return build_semantic_index(sources)
+        index = build_semantic_index(sources, resolve=False)
+        root_document = self.documents[self.root]
+        if self.root in replacements:
+            root_document = SourceDocument.from_bytes(replacements[self.root], str(self.root))
+        augment_root_semantics(index, "<root>", root_document.lines)
+        index.resolve()
+        return index
 
     def inspection(self) -> dict[str, Any]:
         root_inspection = self.documents[self.root].inspection()
