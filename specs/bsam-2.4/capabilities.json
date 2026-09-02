@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.10.0",
+  "registry_version": "0.11.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -328,9 +328,25 @@
       "id": "evidence.crack-parser",
       "kind": "source",
       "locator": "source/libbsam/crk_ini.f90",
-      "line_start": 1,
-      "line_end": 220,
-      "claim": "Locates optional CRACK and dispatches current FE crack types 101, 201, and 301."
+      "line_start": 11,
+      "line_end": 990,
+      "claim": "Locates optional CRACK, dispatches active FE crack types 101, 201, and 301, parses their shared counts, cluster, option, and predefined-crack records, and enforces count and mesh prerequisites."
+    },
+    {
+      "id": "evidence.crack-storage",
+      "kind": "source",
+      "locator": "source/libbsam/module3.f90",
+      "line_start": 777,
+      "line_end": 835,
+      "claim": "Defines storage for crack parameters, normals, two failure-mode thresholds, and the 250-entry CRACK array limit."
+    },
+    {
+      "id": "evidence.crack-active-consumer",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_module.f90",
+      "line_start": 3136,
+      "line_end": 3265,
+      "claim": "Accepts only crack types 101, 201, and 301 in the active finite-element crack-check path and binds a crack to its referenced cluster and constitutive/failure processing."
     },
     {
       "id": "evidence.current-vtms-deck-tric",
@@ -1109,12 +1125,165 @@
         "tokens": ["END CRACK"],
         "certainty": "accepted-current"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.crack-parser", "evidence.current-vtms-deck-tric"],
-      "remaining_work": [
-        "Document all common and type-specific crack records, tolerances, orientations, and cluster references."
-      ]
+      "coverage": "documented",
+      "parameters": [
+        {
+          "name": "type",
+          "value_type": "enum",
+          "required": true,
+          "allowed_values": [101, 201, 301],
+          "summary": "Selects standard FE cracking, reduced-spacing FE cracking, or crossing FE cracking."
+        },
+        {
+          "name": "predefined_count",
+          "value_type": "nonnegative-integer",
+          "required": true,
+          "summary": "Sets the number of explicit initial crack-location records that follow the options."
+        },
+        {
+          "name": "maximum_count",
+          "value_type": "nonnegative-integer",
+          "required": true,
+          "summary": "Caps cracks for each failure mode unless *MODE_CRACKS supplies separate mode limits."
+        },
+        {
+          "name": "n_gap",
+          "value_type": "integer",
+          "required": true,
+          "summary": "Sets element spacing between cracks; canonical values are at least 6 for type 101 and at least 2 for types 201 and 301."
+        },
+        {
+          "name": "cluster",
+          "value_type": "cluster-id-or-name",
+          "required": true,
+          "summary": "References the meshed CLUSTERS declaration in which cracks are inserted."
+        },
+        {
+          "name": "orientation",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["fiber", "normal", "full_field"],
+          "default": "fiber",
+          "summary": "Selects fiber-based, fixed-normal, or stress-field-based crack orientation."
+        },
+        {
+          "name": "minimum_length",
+          "value_type": "positive-real",
+          "required": false,
+          "default": 3,
+          "summary": "Sets the minimum crack length through *min."
+        },
+        {
+          "name": "maximum_length",
+          "value_type": "positive-real",
+          "required": false,
+          "default": 1000,
+          "summary": "Sets the maximum crack length through *max and initializes predefined-crack physical radii."
+        }
+      ],
+      "evidence_ids": ["evidence.crack-parser", "evidence.crack-storage", "evidence.crack-active-consumer", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": [],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "END CRACK after a complete crack entry",
+        "variants": [
+          {
+            "name": "active-fe-crack-types",
+            "when": "type is 101, 201, or 301",
+            "rows": [
+              {
+                "name": "type",
+                "repetition": "once",
+                "fields": [
+                  {"name": "type", "value_type": "enum(101,201,301)", "required": true, "summary": "Starts one declaration-order crack entity."}
+                ]
+              },
+              {
+                "name": "counts",
+                "repetition": "once",
+                "fields": [
+                  {"name": "predefined_count", "value_type": "nonnegative-integer", "required": true, "summary": "Sets explicit initial crack locations."},
+                  {"name": "maximum_count", "value_type": "nonnegative-integer", "required": true, "summary": "Sets the default maximum for both failure modes."}
+                ]
+              },
+              {
+                "name": "spacing",
+                "repetition": "once",
+                "fields": [
+                  {"name": "n_gap", "value_type": "bounded-integer", "required": true, "summary": "Sets minimum element spacing between cracks."}
+                ]
+              },
+              {
+                "name": "cluster-selector",
+                "repetition": "once",
+                "fields": [
+                  {"name": "cluster", "value_type": "cluster-id-or-name", "required": true, "summary": "Selects one existing meshed cluster."}
+                ]
+              },
+              {
+                "name": "mode-limits",
+                "repetition": "optional-once",
+                "fields": [
+                  {"name": "*MODE_CRACKS", "value_type": "two-nonnegative-integers", "required": false, "summary": "Overrides the maximum crack counts for failure modes one and two."}
+                ]
+              },
+              {
+                "name": "orientation-mode",
+                "repetition": "optional-once",
+                "fields": [
+                  {"name": "option", "value_type": "enum(*fiber,*normal,*full_field)", "required": false, "summary": "Selects fiber, fixed-normal, or stress-field orientation."},
+                  {"name": "normal", "value_type": "optional-three-reals", "required": false, "summary": "A nonzero vector on *normal is normalized; omitting it requests a stress-based normal."},
+                  {"name": "full_field", "value_type": "optional-two-reals", "required": false, "summary": "Overrides the two growth thresholds, default 0.9."},
+                  {"name": "crack_extension", "value_type": "optional-two-reals", "required": false, "summary": "Overrides the two extension thresholds, default 0.2."}
+                ]
+              },
+              {
+                "name": "inclination",
+                "repetition": "optional-once",
+                "fields": [
+                  {"name": "*angle", "value_type": "optional-real", "required": false, "summary": "Sets the default crack inclination angle; omission of the value selects zero."}
+                ]
+              },
+              {
+                "name": "length-limits",
+                "repetition": "optional",
+                "fields": [
+                  {"name": "*min", "value_type": "optional-positive-real", "required": false, "summary": "Overrides the default minimum length of 3."},
+                  {"name": "*max", "value_type": "optional-positive-real", "required": false, "summary": "Overrides the default maximum length of 1000."}
+                ]
+              },
+              {
+                "name": "predefined-crack",
+                "repetition": "predefined_count-times",
+                "fields": [
+                  {"name": "x", "value_type": "real", "required": true, "summary": "Initial crack point X coordinate."},
+                  {"name": "y", "value_type": "real", "required": true, "summary": "Initial crack point Y coordinate."},
+                  {"name": "z", "value_type": "real", "required": true, "summary": "Initial crack point Z coordinate."},
+                  {"name": "NORMAL", "value_type": "optional-three-reals", "required": false, "summary": "Overrides the normal for this initial crack and is normalized when nonzero."},
+                  {"name": "LENGTH", "value_type": "optional-positive-real", "required": false, "summary": "Overrides the physical crack radius for this initial crack."}
+                ]
+              }
+            ],
+            "constraints": [
+              "predefined_count must not exceed maximum_count; both counts must be nonnegative.",
+              "The parser silently raises n_gap values below 6 for type 101 and below 2 for types 201 and 301; Agent generation uses the effective minimum instead of relying on mutation.",
+              "The selected cluster must exist, contain finite-element nodes, and support the requested crack insertion path.",
+              "The parser examines at most eight option slots before predefined crack records; canonical generation emits no more than eight recognized option lines.",
+              "Canonical option spelling preserves the parser's mixed case-sensitive dispatch: *MODE_CRACKS is uppercase, while *fiber, *normal, *full_field, *angle, *min, and *max begin lowercase.",
+              "A fixed normal or predefined-crack NORMAL vector must have nonzero magnitude.",
+              "Types other than 101, 201, and 301 stop in the active dispatch; legacy case bodies remaining later in the routine are unreachable and blocked from generation.",
+              "At most 250 crack entities are stored; canonical generation reserves END CRACK by emitting fewer than 250 declarations."
+            ]
+          }
+        ],
+        "dependencies": [
+          "Crack IDs are one-based declaration order and cluster *CRACK records reference them.",
+          "cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.",
+          "Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.",
+          "Growth and extension threshold pairs are indexed by failure mode.",
+          "END CRACK is recognized after a complete entry by reading the next record's first three characters as END."
+        ]
+      }
     }
   ],
   "cluster_commands": [

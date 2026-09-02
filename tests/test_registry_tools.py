@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(48, counts["evidence"])
+        self.assertEqual(50, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -176,6 +176,20 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("blocked from agent generation", blocked_external)
         self.assertIn("blocked from generation", blocked_sparse)
         self.assertIn("uninitialized nparam/ncoeff", blocked_sparse)
+
+    def test_active_crack_grammar_is_bounded(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "CRACK")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual([101, 201, 301], parameters["type"]["allowed_values"])
+        self.assertEqual("fiber", parameters["orientation"]["default"])
+        rows = {item["name"]: item for item in block["body"]["variants"][0]["rows"]}
+        self.assertEqual("predefined_count-times", rows["predefined-crack"]["repetition"])
+        contract = json.dumps(block)
+        self.assertIn("*MODE_CRACKS", contract)
+        self.assertIn("at most eight option slots", contract)
+        self.assertIn("unreachable and blocked from generation", contract)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]

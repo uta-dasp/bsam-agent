@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.10.0`
-- Registry SHA-256: `FAAA8E128B4906C2A2E24D0103070BE29C6D0B24CD3F63E4806194DD65E74BBF`
+- Registry version: `0.11.0`
+- Registry SHA-256: `D983AF94DD944897BEAF3D8C06D6F14C31F3A88E7AA2DCCE7DBCA1626CEC7834`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -30,7 +30,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
 | `FAILURE` | no | exact-case-sensitive | `FAI_INI` | identified | Defines failure criterion records referenced by constitutive laws and damage behavior. |
 | `USER` | no | exact-case-sensitive | `USF_INI` | documented | Defines numeric user-function records, including polynomial and discrete forms. |
-| `CRACK` | no | exact-case-sensitive | `CRK_INI` | identified | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
+| `CRACK` | no | exact-case-sensitive | `CRK_INI` | documented | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
 
 ## Block details
 
@@ -412,12 +412,42 @@ Defines global finite-element crack insertion controls for crack types 101, 201,
 - Lookup token/matcher: `CRACK` / exact-case-sensitive
 - Required: no
 - Termination: `END CRACK` (accepted-current)
-- Coverage: identified
-- Evidence: [evidence.crack-parser](#evidencecrack-parser), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Coverage: documented
+- Evidence: [evidence.crack-parser](#evidencecrack-parser), [evidence.crack-storage](#evidencecrack-storage), [evidence.crack-active-consumer](#evidencecrack-active-consumer), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
-Remaining specification work:
+Known parameters:
 
-- Document all common and type-specific crack records, tolerances, orientations, and cluster references.
+- `type` (enum, required) (allowed: `101`, `201`, `301`): Selects standard FE cracking, reduced-spacing FE cracking, or crossing FE cracking.
+- `predefined_count` (nonnegative-integer, required): Sets the number of explicit initial crack-location records that follow the options.
+- `maximum_count` (nonnegative-integer, required): Caps cracks for each failure mode unless *MODE_CRACKS supplies separate mode limits.
+- `n_gap` (integer, required): Sets element spacing between cracks; canonical values are at least 6 for type 101 and at least 2 for types 201 and 301.
+- `cluster` (cluster-id-or-name, required): References the meshed CLUSTERS declaration in which cracks are inserted.
+- `orientation` (enum, optional) (allowed: `fiber`, `normal`, `full_field`; default: `"fiber"`): Selects fiber-based, fixed-normal, or stress-field-based crack orientation.
+- `minimum_length` (positive-real, optional) (default: `3`): Sets the minimum crack length through *min.
+- `maximum_length` (positive-real, optional) (default: `1000`): Sets the maximum crack length through *max and initializes predefined-crack physical radii.
+
+### `CRACK` body
+
+Termination: END CRACK after a complete crack entry. Dependencies: Crack IDs are one-based declaration order and cluster *CRACK records reference them.; cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.; Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.; Growth and extension threshold pairs are indexed by failure mode.; END CRACK is recognized after a complete entry by reading the next record's first three characters as END.
+
+- **active-fe-crack-types** (type is 101, 201, or 301):
+  - `type` [once]: `type`:enum(101,201,301)
+  - `counts` [once]: `predefined_count`:nonnegative-integer, `maximum_count`:nonnegative-integer
+  - `spacing` [once]: `n_gap`:bounded-integer
+  - `cluster-selector` [once]: `cluster`:cluster-id-or-name
+  - `mode-limits` [optional-once]: `*MODE_CRACKS`:two-nonnegative-integers
+  - `orientation-mode` [optional-once]: `option`:enum(*fiber,*normal,*full_field), `normal`:optional-three-reals, `full_field`:optional-two-reals, `crack_extension`:optional-two-reals
+  - `inclination` [optional-once]: `*angle`:optional-real
+  - `length-limits` [optional]: `*min`:optional-positive-real, `*max`:optional-positive-real
+  - `predefined-crack` [predefined_count-times]: `x`:real, `y`:real, `z`:real, `NORMAL`:optional-three-reals, `LENGTH`:optional-positive-real
+  - Constraint: predefined_count must not exceed maximum_count; both counts must be nonnegative.
+  - Constraint: The parser silently raises n_gap values below 6 for type 101 and below 2 for types 201 and 301; Agent generation uses the effective minimum instead of relying on mutation.
+  - Constraint: The selected cluster must exist, contain finite-element nodes, and support the requested crack insertion path.
+  - Constraint: The parser examines at most eight option slots before predefined crack records; canonical generation emits no more than eight recognized option lines.
+  - Constraint: Canonical option spelling preserves the parser's mixed case-sensitive dispatch: *MODE_CRACKS is uppercase, while *fiber, *normal, *full_field, *angle, *min, and *max begin lowercase.
+  - Constraint: A fixed normal or predefined-crack NORMAL vector must have nonzero magnitude.
+  - Constraint: Types other than 101, 201, and 301 stop in the active dispatch; legacy case bodies remaining later in the routine are unreachable and blocked from generation.
+  - Constraint: At most 250 crack entities are stored; canonical generation reserves END CRACK by emitting fewer than 250 declarations.
 
 ## Finite-element cluster commands
 
@@ -991,7 +1021,11 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidenceuser-active-consumer"></a>
 - `evidence.user-active-consumer` — source: `source/libbsam/mat_stiffness.f90:150-330` — Uses declaration-order USER function IDs from material selections to evaluate stiffness and related properties.
 <a id="evidencecrack-parser"></a>
-- `evidence.crack-parser` — source: `source/libbsam/crk_ini.f90:1-220` — Locates optional CRACK and dispatches current FE crack types 101, 201, and 301.
+- `evidence.crack-parser` — source: `source/libbsam/crk_ini.f90:11-990` — Locates optional CRACK, dispatches active FE crack types 101, 201, and 301, parses their shared counts, cluster, option, and predefined-crack records, and enforces count and mesh prerequisites.
+<a id="evidencecrack-storage"></a>
+- `evidence.crack-storage` — source: `source/libbsam/module3.f90:777-835` — Defines storage for crack parameters, normals, two failure-mode thresholds, and the 250-entry CRACK array limit.
+<a id="evidencecrack-active-consumer"></a>
+- `evidence.crack-active-consumer` — source: `source/libbsam/mod_fe_module.f90:3136-3265` — Accepts only crack types 101, 201, and 301 in the active finite-element crack-check path and binds a crack to its referenced cluster and constitutive/failure processing.
 <a id="evidencecurrent-vtms-deck-tric"></a>
 - `evidence.current-vtms-deck-tric` — example: `projects/TriC_v311/TriC_v311.in` — Current project deck assembled from pre-existing mesh data using INPUT type 3, MATERIALS, CLUSTERS, and current FE commands; VTMS may have assembled or visualized the mesh but did not generate it.
 <a id="evidencecurrent-vtms-deck-notch"></a>
