@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.6.0",
+  "registry_version": "0.7.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -97,8 +97,16 @@
       "kind": "source",
       "locator": "source/libbsam/moisture.f90",
       "line_start": 36,
-      "line_end": 173,
-      "claim": "Locates the optional MOISTURE block and dispatches its current key/value labels."
+      "line_end": 338,
+      "claim": "Parses MOISTURE key/value labels, resolves and checks its external environment, disables coupling on missing prerequisites, and executes the converter/program workflow."
+    },
+    {
+      "id": "evidence.moisture-step-dispatch",
+      "kind": "source",
+      "locator": "source/libbsam/out_datafile.f90",
+      "line_start": 120,
+      "line_end": 145,
+      "claim": "Runs enabled moisture coupling at completed block-loading steps and applies the optional positive step-index filter."
     },
     {
       "id": "evidence.cluster-parser",
@@ -565,44 +573,60 @@
         "tokens": ["END MOISTURE"],
         "certainty": "canonical"
       },
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "program",
           "value_type": "path-or-program-name",
           "required": false,
-          "summary": "Selects the moisture simulation program."
+          "default": "mdsim",
+          "summary": "Selects the lowercased moisture executable name, resolved first through the system command lookup and then as a platform executable in the moisture directory."
         },
         {
           "name": "converter",
-          "value_type": "path",
+          "value_type": "basename",
           "required": false,
-          "summary": "Selects the moisture output converter."
+          "default": "bsam2mdsim",
+          "summary": "Selects the lowercased converter basename; the parser appends .py and requires the file in the moisture directory."
         },
         {
           "name": "converter_utils",
-          "value_type": "path-list",
+          "value_type": "basename-list",
           "required": false,
-          "summary": "Lists supporting converter utilities."
+          "default": ["bsam2mdsim-dup", "bsam2mdsim-orient"],
+          "summary": "Lists lowercased utility basenames; the parser appends .py and requires every file in the moisture directory."
         },
         {
           "name": "directory",
-          "value_type": "path",
+          "value_type": "relative-directory",
           "required": false,
-          "summary": "Selects the directory containing moisture workflow files."
+          "default": "input directory",
+          "summary": "Selects the lowercased moisture workflow directory. Safe generation uses a relative child of the input or output directory because the full-path branch is prepended with the input directory."
         },
         {
           "name": "steps",
-          "value_type": "integer-list",
+          "value_type": "positive-integer-list",
           "required": false,
-          "summary": "Selects load steps at which the moisture program runs."
+          "summary": "Selects completed block-loading step numbers at which coupling runs; omission runs at every qualifying step."
         }
       ],
-      "evidence_ids": ["evidence.moisture-parser"],
-      "remaining_work": [
-        "Document path resolution, defaults, required file checks, and failure behavior.",
-        "Determine whether this external integration is suitable for initial executable tests."
-      ]
+      "evidence_ids": ["evidence.moisture-parser", "evidence.moisture-step-dispatch"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-top-level-block",
+        "variants": [
+          {
+            "name": "external-moisture-workflow",
+            "when": "the optional MOISTURE block is present",
+            "rows": [
+              {"name": "setting", "repetition": "repeated", "fields": [{"name": "key", "value_type": "enum(program,converter,converter_utils,directory,steps)", "required": true, "summary": "Selects a moisture setting."}, {"name": "value", "value_type": "key-specific-value", "required": true, "summary": "Sets the registered value using key = value syntax."}]}
+            ],
+            "constraints": ["Generation emits one key/value pair per line even though the parser can distribute multiple keys and values around one equals sign.", "Cleaning lowercases keys and values, replaces commas with spaces, removes blank lines, and compacts whitespace.", "steps values must be positive because they are used as one-based array indexes.", "Required environment files are <converter>.py, every <converter_utils>.py file, and mdsim.conf; the program must resolve from command lookup or the moisture directory.", "Any missing directory/file/program prerequisite prints errors and disables moisture rather than stopping BSAM.", "The workflow shells out to Python and the selected program, creates step directories, and moves/copies moisture outputs.", "Agent execution is blocked by default until a separately trusted external-integration profile authorizes the directory, executables, scripts, and shell side effects."]
+          }
+        ],
+        "dependencies": ["Coupling is invoked only for hygro-thermomechanical output at a completed block-loading step.", "A steps list filters those invocations; no list means every qualifying step.", "Execution requires the external MDSIM installation and support files and is not part of the initial notch acceptance profile."]
+      }
     },
     {
       "id": "block.clusters",

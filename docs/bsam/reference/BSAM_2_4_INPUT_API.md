@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.6.0`
-- Registry SHA-256: `45D4C07ECEE9BD89CAD509244365A99842FDF8C3E3CC5C7125C88FA1F8BF229A`
+- Registry version: `0.7.0`
+- Registry SHA-256: `4CFDABAAA72D2CFEDFF4FD7BAC391B9E5732FAFD7D0F9FE9000C70C889C876B2`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 1 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -21,7 +21,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `INPUT` | yes | special-input-scan | `INP_INI` | documented | Selects the current non-sequential block input mode; the pinned executable requires type 3. |
 | `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
 | `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | documented | Defines named user functions parsed as *end-delimited entries. |
-| `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | partially-documented | Configures optional coupling to the external moisture simulation workflow. |
+| `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | documented | Configures optional coupling to the external moisture simulation workflow. |
 | `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
 | `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | identified | Defines constitutive law records that reference material and failure definitions. |
@@ -149,21 +149,30 @@ Configures optional coupling to the external moisture simulation workflow.
 - Lookup token/matcher: `MOISTURE` / exact-case-sensitive
 - Required: no
 - Termination: `END MOISTURE` (canonical)
-- Coverage: partially-documented
-- Evidence: [evidence.moisture-parser](#evidencemoisture-parser)
+- Coverage: documented
+- Evidence: [evidence.moisture-parser](#evidencemoisture-parser), [evidence.moisture-step-dispatch](#evidencemoisture-step-dispatch)
 
 Known parameters:
 
-- `program` (path-or-program-name, optional): Selects the moisture simulation program.
-- `converter` (path, optional): Selects the moisture output converter.
-- `converter_utils` (path-list, optional): Lists supporting converter utilities.
-- `directory` (path, optional): Selects the directory containing moisture workflow files.
-- `steps` (integer-list, optional): Selects load steps at which the moisture program runs.
+- `program` (path-or-program-name, optional) (default: `"mdsim"`): Selects the lowercased moisture executable name, resolved first through the system command lookup and then as a platform executable in the moisture directory.
+- `converter` (basename, optional) (default: `"bsam2mdsim"`): Selects the lowercased converter basename; the parser appends .py and requires the file in the moisture directory.
+- `converter_utils` (basename-list, optional) (default: `["bsam2mdsim-dup", "bsam2mdsim-orient"]`): Lists lowercased utility basenames; the parser appends .py and requires every file in the moisture directory.
+- `directory` (relative-directory, optional) (default: `"input directory"`): Selects the lowercased moisture workflow directory. Safe generation uses a relative child of the input or output directory because the full-path branch is prepended with the input directory.
+- `steps` (positive-integer-list, optional): Selects completed block-loading step numbers at which coupling runs; omission runs at every qualifying step.
 
-Remaining specification work:
+### `MOISTURE` body
 
-- Document path resolution, defaults, required file checks, and failure behavior.
-- Determine whether this external integration is suitable for initial executable tests.
+Termination: next-top-level-block. Dependencies: Coupling is invoked only for hygro-thermomechanical output at a completed block-loading step.; A steps list filters those invocations; no list means every qualifying step.; Execution requires the external MDSIM installation and support files and is not part of the initial notch acceptance profile.
+
+- **external-moisture-workflow** (the optional MOISTURE block is present):
+  - `setting` [repeated]: `key`:enum(program,converter,converter_utils,directory,steps), `value`:key-specific-value
+  - Constraint: Generation emits one key/value pair per line even though the parser can distribute multiple keys and values around one equals sign.
+  - Constraint: Cleaning lowercases keys and values, replaces commas with spaces, removes blank lines, and compacts whitespace.
+  - Constraint: steps values must be positive because they are used as one-based array indexes.
+  - Constraint: Required environment files are <converter>.py, every <converter_utils>.py file, and mdsim.conf; the program must resolve from command lookup or the moisture directory.
+  - Constraint: Any missing directory/file/program prerequisite prints errors and disables moisture rather than stopping BSAM.
+  - Constraint: The workflow shells out to Python and the selected program, creates step directories, and moves/copies moisture outputs.
+  - Constraint: Agent execution is blocked by default until a separately trusted external-integration profile authorizes the directory, executables, scripts, and shell side effects.
 
 ### `CLUSTERS`
 
@@ -819,7 +828,9 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
 <a id="evidenceufunction-interface-material-reference"></a>
 - `evidence.ufunction-interface-material-reference` — source: `source/libbsam/interface_material.f90:295-465` — Resolves interface-material parameter values of the form ufunc_<name> and binds them to UFUNCTION objects.
 <a id="evidencemoisture-parser"></a>
-- `evidence.moisture-parser` — source: `source/libbsam/moisture.f90:36-173` — Locates the optional MOISTURE block and dispatches its current key/value labels.
+- `evidence.moisture-parser` — source: `source/libbsam/moisture.f90:36-338` — Parses MOISTURE key/value labels, resolves and checks its external environment, disables coupling on missing prerequisites, and executes the converter/program workflow.
+<a id="evidencemoisture-step-dispatch"></a>
+- `evidence.moisture-step-dispatch` — source: `source/libbsam/out_datafile.f90:120-145` — Runs enabled moisture coupling at completed block-loading steps and applies the optional positive step-index filter.
 <a id="evidencecluster-parser"></a>
 - `evidence.cluster-parser` — source: `source/libbsam/iap_ini.f90:119-295` — Requires CLUSTERS, accepts solid finite-element cluster type 100, and delegates each cluster to the FE reader.
 <a id="evidencefe-command-dispatch"></a>

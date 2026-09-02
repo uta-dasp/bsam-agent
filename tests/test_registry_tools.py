@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(40, counts["evidence"])
+        self.assertEqual(41, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -117,6 +117,18 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("strictly increasing or strictly decreasing", contract)
         self.assertIn("ufunc_<name>", contract)
         self.assertIn("must be lowercase", contract)
+
+    def test_moisture_external_integration_is_bounded(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "MOISTURE")
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        self.assertEqual("mdsim", parameters["program"]["default"])
+        self.assertEqual("positive-integer-list", parameters["steps"]["value_type"])
+        contract = json.dumps(block).lower()
+        self.assertIn("blocked by default", contract)
+        self.assertIn("mdsim.conf", contract)
+        self.assertIn("disables moisture rather than stopping", contract)
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
