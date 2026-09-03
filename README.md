@@ -2,7 +2,7 @@
 
 BSAM Agent will create, understand, modify, validate, and run current-syntax BSAM input files on Windows. This repository is intentionally separate from the BSAM source tree and will not modify BSAM itself.
 
-Status: the guarded G4 chat orchestrator and terminal client are runnable while G1 coverage and G3 deterministic capability expansion continue. The CPU-local candidate is Llama 4 Scout Q4_K_M: its raw routing benchmark remains below the autonomous-dispatch threshold, but the 512 GiB workstation can run its faster repacked mode and deterministic code owns schemas, confirmation, paths, validation, and execution. Llama 3.1 8B remains only a transport baseline.
+Status: the core vertical slice and guarded local chat are runnable. Current development is focused on completing the active BSAM 2.4 specification and replacing feature-specific behavior with a registry-driven deterministic engine. The notch model is one regression fixture, not the product scope.
 
 ## Version 1 target
 
@@ -20,6 +20,7 @@ Status: the guarded G4 chat orchestrator and terminal client are runnable while 
 
 ## Documentation map
 
+- [Documentation index](docs/README.md)
 - [Project charter](docs/PROJECT_CHARTER.md)
 - [Verification and trust model](docs/VERIFICATION.md)
 - [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)
@@ -35,7 +36,7 @@ Status: the guarded G4 chat orchestrator and terminal client are runnable while 
 - [Generated BSAM 2.4 input API reference](docs/bsam/reference/BSAM_2_4_INPUT_API.md)
 - [Machine-readable BSAM 2.4 registry](specs/bsam-2.4/capabilities.json)
 - [Specification extraction method](docs/bsam/SPECIFICATION_METHOD.md)
-- [Roadmap](docs/roadmap/MILESTONES.md)
+- [Authoritative development roadmap](docs/roadmap/MILESTONES.md)
 - [Local-data policy](docs/security/LOCAL_DATA_POLICY.md)
 - [Development environment](docs/DEVELOPMENT_ENVIRONMENT.md)
 - [Open inputs and assumptions](docs/OPEN_INPUTS.md)

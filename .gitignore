@@ -12,6 +12,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+*.egg-info/
 
 # Node / VS Code extension (later phase)
 node_modules/
@@ -40,6 +41,9 @@ artifacts/
 *_TP.dat
 *.D_Hs
 *.D_HsMIC
+/change.json
+/*.changed.in
+/*.changed.in.audit.json
 
 # Editor and OS noise
 .vscode/settings.json

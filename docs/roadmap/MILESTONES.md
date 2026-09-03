@@ -1,227 +1,154 @@
-# Milestones to a usable BSAM chat agent
+# BSAM Agent development roadmap
 
-This is the execution order. A checkbox means implemented and verified in this repository, not merely designed.
+This is the single authoritative implementation roadmap. A checked item is implemented and verified. BSAM-specific behavior must come from the pinned local BSAM source, controlled executable probes, or trusted local documentation.
 
-## Current product checkpoint
+## Product objective
 
-The project is currently expanding the deterministic BSAM engine underneath a runnable local terminal chat. It can inspect and validate a losslessly loaded source set, preview and apply bounded revision-bound edits, assemble a manually prepared Abaqus-style `.ele` mesh into an explicit template, perform the approved notch 2-to-8-ply transformation, expose those operations through the local API, show diffs and audits, and supervise isolated serial BSAM runs. The chat remains limited to registered deterministic operations and is undergoing live usability acceptance.
+Build a dependable, general BSAM 2.4 agent that can inspect, create, modify, validate, render, and run models across the active current-syntax capability set. The language model interprets intent and conducts clarification; deterministic code owns BSAM syntax, semantics, changes, validation, and execution.
 
-The language model will be an optional planner and conversational interface. It will never be the BSAM parser, validator, renderer, or process supervisor.
+The notch project is one laminate regression fixture. It does not define the architecture or limit supported capabilities.
 
-## When the Meta model is needed
+## Current checkpoint
 
-Do not download model weights during G0-G3. The first model file is acquired at **G4.3**, after all of these gates pass:
+The repository has a loss-preserving source-set loader, an initial semantic/reference model, bounded editing operations, `.ele` import, isolated serial execution, a loopback Agent API, and a guarded local chat client. These establish the infrastructure but do not constitute broad BSAM capability coverage.
 
-- the deterministic engine can inspect, modify, validate, render, and run the supported vertical slice;
-- the local Agent tool schemas and authorization rules are executable;
-- synthetic evaluation conversations and expected tool calls are checked in;
-- local-model storage, licensing, checksum, loopback-only networking, and resource limits are configured.
+Current focus: complete the BSAM specification and build registry-driven deterministic behavior. Chat-specific polishing is frozen except where required to expose or test generic capabilities.
 
-At G4.3, the user accepts Meta's applicable license and obtains an approved quantized model. Weights stay outside Git and outside project data directories. A local configuration records only the model path, model identifier, checksum, runtime endpoint, and limits. The first benchmark should use a small interactive model before spending time on a much larger model. Model selection is an evaluation result, not an architectural dependency.
-
-## G0 - Groundwork
+## M0 — Foundation and vertical slice
 
 Status: complete.
 
-- [x] Create the independent Git repository and repository boundary.
-- [x] Record product scope, deterministic-core architecture, and current-syntax policy.
-- [x] Draft the local API lifecycle and OpenAPI contract.
-- [x] Define the source-derived specification and coverage method.
-- [x] Record local-data and provider policy.
-- [x] Inventory the Windows development host and unresolved inputs.
+- [x] Establish the independent repository, scope, security boundary, and architecture.
+- [x] Pin the BSAM 2.4 source/executable baseline and evidence method.
+- [x] Implement lossless root/include loading and byte-identical no-op rendering.
+- [x] Implement initial semantic entities and reference diagnostics.
+- [x] Implement revision-bound plans, diffs, non-overwriting apply, and audit records.
+- [x] Implement selected node, element, set, boundary, parameter, and transformation edits.
+- [x] Import manually prepared Abaqus-style `.ele` mesh data into a neutral model.
+- [x] Implement isolated serial run, status, timeout, and controlled stop.
+- [x] Expose deterministic tools through a loopback-only API.
+- [x] Establish provider-neutral and CPU-local guarded chat infrastructure.
+- [x] Verify the notch two-to-eight-ply transformation as one regression scenario.
 
-Exit: documents agree on scope and no implementation decision depends on a missing manual.
+Exit: the full architecture works for a bounded vertical slice without trusting an LLM.
 
-## G1 - Current BSAM input specification
+## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.14.0` is pinned to source commit `9954027f1c325c63d58aeb836e8fec41a4b363af` and the locally probed 2026-08-27 executable.
+Status: in progress. Registry `0.14.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
-- [x] Inventory top-level blocks, FE cluster commands, core mesh/section records, and active BOUNDARY constructs.
-- [x] Record executable invocation and completion classification.
-- [x] Define lossless source-set and include-graph behavior.
-- [x] Generate and validate the human-readable API reference.
-- [ ] Account for every reachable active parser dispatch path.
-- [ ] Complete parameter grammars, units, defaults, ranges, and repeatability.
-- [ ] Record entity definitions and references for every supported construct.
-- [x] Register obsolete/compatibility tokens and generate current replacements used by diagnostics.
-- [x] Register the supported notch transformation's applicability, approved decisions, impacts, dependencies, tool binding, version, and runtime evidence.
-- [x] Regenerate and deterministically check the coverage ledger/reference after every registry increment.
+### M1.1 Reachable-dispatch audit
 
-Exit: every active parser dispatch path is supported or explicitly blocked with a reason.
+- [x] Enumerate every active top-level, BOUNDARY, and finite-element command dispatch.
+- [x] Link every primary dispatch to a pinned local source location and calling path.
+- [x] Classify active dispatches plus commented and deprecated initialization paths.
+- [x] Reconcile the primary audit with `capabilities.json` and produce a zero-omission report.
 
-## G2 - Deterministic core vertical slice
+### M1.2 Grammar completion
 
-Status: in progress.
+- [ ] Record exact command matching, record layouts, termination, and repetition.
+- [ ] Complete parameter types, defaults, allowed values, ranges, and units.
+- [ ] Record conditional variants and cross-parameter constraints.
+- [ ] Mark unsupported ambiguity explicitly; never infer grammar from examples alone.
 
-### G2.1 Lossless source foundation
+### M1.3 Entity and dependency specification
 
-- [x] Implement the Python package and CLI.
-- [x] Preserve original bytes and line endings.
-- [x] Load recursively reachable FE include files with cycle and workspace-boundary checks.
-- [x] Bind the complete source set to a stable digest.
-- [x] Index top-level blocks and registered cluster commands.
+- [ ] Define entities created by every active construct.
+- [ ] Define forward and reverse references across analysis controls, clusters, mesh, sets, sections, orientations, materials, constitutives, failures, cracks, boundary conditions, loads, connections, tables, statistics, moisture, and user functions.
+- [ ] Record rename, deletion, creation, and transformation impacts.
+- [ ] Identify decisions that require engineering clarification.
 
-### G2.2 Semantic model and reference graph - next
+### M1.4 Generated contracts
 
-- [x] Define stable semantic entity and reference records with source locations.
-- [x] Index explicit node, element, node-set, element-set, and section records across root and included files.
-- [x] Resolve references while retaining unresolved, ambiguous, and type-mismatched records.
-- [x] Emit deterministic duplicate, unresolved, ambiguous, and type-mismatch diagnostics.
-- [x] Expose the semantic records and summary through `inspect`.
-- [x] Add synthetic semantic-index unit tests.
-- [x] Add a non-sensitive representative two-cluster semantic regression fixture and test.
-- [x] Resolve documented cluster, constitutive assignment, boundary-condition, loading, connection, and crack dependencies used by the notch acceptance profile.
+- [ ] Generate the human BSAM input reference and coverage ledger from the registry.
+- [ ] Generate capability schemas consumed by the parser, editor, validator, and agent.
+- [ ] Fail repository checks when generated outputs or coverage counts drift.
 
-### G2.3 Validation and safe editing
+Exit: every reachable active input path is fully specified or explicitly blocked with evidence.
 
-- [x] Validate structural and include-graph errors.
-- [x] Plan, diff, and apply narrow registered nested key/value edits.
-- [x] Reject stale plans and prohibit in-place writes.
-- [x] Persist digest-bound, non-overwriting audit records.
-- [x] Validate complete source-set semantic dependencies during planning, review, and apply.
-- [x] Add typed node creation with revision-bound preview, validation, apply, and audit.
-- [x] Add topology-constrained element creation with validated connectivity references.
-- [x] Add dependency-aware deletion for unreferenced nodes.
-- [x] Add typed node/element-set creation and validated member-list additions.
-- [x] Add dependency-aware boundary-condition rename with atomic loading-sequence reference updates.
-- [x] Bound G2 editing to the supported root-deck vertical slice; defer complete CRUD and included-file editing to G3 coverage.
-- [x] Guarantee byte-identical no-op output for the complete source set.
+## M2 — Registry-driven deterministic engine
 
-### G2.4 Import, assembly, and rendering
+### M2.1 Generic parsing and semantic model
 
-- [x] Use a supplied `.ele` only to establish the generic interchange structure and check in an independent reduced synthetic fixture.
-- [x] Import `.ele` nodes, elements, node/element sets, generated ranges, surfaces, orientations, dimensions, and provenance into the canonical mesh model.
-- [x] Define the v1 assembly contract: the validated `.ele` supplies mesh data and an existing `.in` template supplies explicit analysis data through an empty named solid cluster.
-- [x] Assemble the imported canonical mesh into a revision-bound complete template source set without a language model.
-- [x] Render imported mesh data as deterministic current BSAM cluster syntax.
-- [x] Provide reviewed source diffs, semantic validation, mesh provenance, and stale-input protection.
-- [ ] Round-trip and executable-test the representative model.
+- [ ] Parse completed registry constructs into typed records while preserving concrete syntax.
+- [ ] Preserve unknown or not-yet-supported records losslessly.
+- [ ] Populate consistent entity identities and cross-file references.
+- [ ] Replace feature-specific semantic extraction where registry metadata is sufficient.
 
-### G2.5 Run supervision
+### M2.2 Generic parameter editing
 
-- [x] Fingerprint and preflight the executable and full source set.
-- [x] Run serial BSAM in an isolated artifact directory.
-- [x] Capture streams and atomically publish state.
-- [x] Classify sentinel, diagnostics, timeout, and stop outcomes.
-- [x] Provide concurrent `status` and idempotent controlled `stop`.
-- [x] Exercise a revision-bound modified notch deck through preflight, sustained isolated execution, artifacts, and a non-escalated controlled timeout with no fatal markers.
-- [x] Accept sustained nonfatal modified-notch execution with controlled stop as sufficient for the current stage; defer a full success-sentinel run per user direction.
-- [ ] Add imported-model executable acceptance after a relevant analysis template is supplied.
+- [ ] Select parameters by canonical capability identity rather than handwritten functions.
+- [ ] Support typed scalar, integer, Boolean, enum, string, optional, and repeated values.
+- [ ] Produce minimal source patches with deterministic defaults and validation.
+- [ ] Return actionable missing, unknown, ambiguous, and invalid-value diagnostics.
 
-### G2.6 Local Agent API
+### M2.3 Generic structural editing
 
-- [x] Implement the initial versioned loopback-only JSON tool API service.
-- [x] Expose capabilities, inspection, semantic validation, mesh import, supported change preview/review/apply, run, status, and stop tools.
-- [x] Enforce workspace-relative paths, source/plan digests, mutation/run confirmation, and run policy at the API boundary.
-- [x] Generate strict request schemas and required response invariants from one canonical tool-contract source.
-- [x] Add API schema, HTTP-envelope, workspace escape, confirmation, concurrency, and error-normalization tests.
-- [x] Launch runs asynchronously through the API and test accepted/running status plus early controlled cancellation delivery.
+- [ ] Create, delete, rename, reorder, and list supported entities and records.
+- [ ] Edit tables, repeated records, member lists, and referenced names.
+- [ ] Support minimal reviewed changes in include files and across multiple files.
+- [ ] Compute dependent updates and block destructive changes with unresolved dependents.
+- [ ] Keep specialized transformations only for genuine engineering operations, not ordinary syntax edits.
 
-Exit: without an LLM, a client can safely inspect, modify, validate, render, and run the supported model, and combine the accepted `.ele` fixture with explicit analysis data.
+### M2.4 Deterministic generation
 
-## G3 - Complete deterministic capability layer
+- [ ] Build new current-syntax decks from typed analysis and mesh intent.
+- [ ] Require all essential engineering choices rather than inventing them.
+- [ ] Render canonical current syntax with provenance and stable digests.
 
-- [ ] Implement typed support for every capability admitted by G1.
-- [ ] Close all unexplained current-syntax coverage gaps.
-- [ ] Add golden no-op and minimal-patch tests for each syntax family.
-- [ ] Complete dependency-aware rename/delete/transform behavior.
-- [ ] Add complete typed entity creation, deletion, rename, list, table, and reference edits.
-- [ ] Support minimal patches in included files and multi-file reviewed changes.
-- [x] Implement and verify the supported notch two-ply-to-eight-ply transformation fixture, including a 120-second nonfatal controlled executable probe.
-- [x] Implement and runtime-verify revision-bound migration of the notch legacy type-9 solver body to current PARDISO syntax.
-- [ ] Add representative executable probes and regression cases.
-- [x] Expose the pinned versioned capability and tool-schema manifest through the API.
-- [ ] Ensure unsupported or ambiguous requests fail with actionable diagnostics.
+Exit: ordinary supported BSAM operations are driven by registry metadata, not prompt-specific or fixture-specific code.
 
-Exit: supported edits cannot leave unresolved dependent references, and the API is sufficient authority for a model-assisted client.
+## M3 — Comprehensive validation and evidence
 
-## G4 - Local model and first chat agent
+- [ ] Validate structure, types, ranges, cardinality, and required records for every supported construct.
+- [ ] Validate references, dependency rules, mesh connectivity, sets, topology, and cross-feature constraints.
+- [ ] Add golden no-op and minimal-patch tests for every syntax family.
+- [ ] Add invalid, ambiguous, and dependency-breaking test cases.
+- [ ] Add small representative fixtures across capability families; keep notch as one regression fixture.
+- [ ] Add controlled executable probes where static source evidence is insufficient.
+- [ ] Round-trip and executable-test a representative imported `.ele` model after an appropriate analysis template is available.
 
-### G4.1 Provider-neutral boundary
+Exit: capability support is measurable, reproducible, and protected against regression.
 
-- [x] Implement provider-independent message, structured-output, tool-call, usage, and request-correlation types.
-- [x] Implement strict local configuration without embedding credentials or model weights, including loopback enforcement for CPU-local inference.
-- [x] Keep provider responses out of deterministic domain models and audit records by contract and module boundary.
-- [x] Add provider request cancellation and normalized transport errors with the first concrete adapter.
+## M4 — General agent workflow
 
-### G4.2 Evaluation and policy gate
+- [ ] Generate high-level inspect, query, create, modify, validate, and run intents from the capability registry.
+- [ ] Map varied language to capability identities without exposing low-level parser details.
+- [ ] Persist clarification state for missing engineering inputs.
+- [ ] Compose multiple deterministic operations into one reviewed plan.
+- [ ] Evaluate paraphrases, ambiguity, unsupported requests, prompt injection, confirmation, and stale state across capability families.
+- [ ] Re-benchmark the local model after the generic capability surface is stable.
+- [ ] Complete live acceptance on representative non-notch projects.
 
-- [x] Create the initial synthetic conversations for inspection, editing, validation, and run policy.
-- [x] Specify strict expected tools, arguments, confirmation refusals, and unsupported-capability behavior.
-- [x] Cover path escape, raw-deck generation, unsupported capability invention, and unauthorized apply/run in the initial policy cases.
-- [x] Add prompt-injection, stale-revision, render, status, stop, and final-answer evaluation cases.
-- [x] Define initial pass thresholds for schema validity, tool accuracy, refusal behavior, latency, and memory.
+Exit: adding a registered deterministic capability makes it available to chat without adding prompt-specific routing code.
 
-### G4.3 Acquire and benchmark the Meta model
+## M5 — Scoped embedded mesh generation
 
-- [x] Select a llama.cpp-compatible Windows CPU runtime and pin its version/checksum.
-- [x] Create an ignored external model directory and local configuration template.
-- [x] Have the user accept the Meta license and download the approved model weights.
-- [x] Record model identity, quantization, file checksum, context limit, and provenance outside the capability registry.
-- [x] Bind the runtime to loopback only and disable telemetry/network model fetching.
-- [x] Benchmark the small interactive candidate against the checked-in evaluation suite (failed the accuracy and refusal gates; larger-candidate decision required).
-- [x] Benchmark Llama 4 Scout after the small model missed the thresholds (Scout also failed accuracy; its memory-efficient mode also failed latency).
-- [x] Select Scout provisionally for hardware-aware guarded chat; it is not authorized for autonomous dispatch and remains subject to end-to-end acceptance.
+- [ ] Select initial geometry families, element mappings, physical-group conventions, ply/orientation rules, and quality tolerances.
+- [ ] Pin a local Gmsh runtime with no network dependency.
+- [ ] Implement typed geometry/meshing recipes and deterministic neutral-mesh conversion.
+- [ ] Validate quality and equivalence against trusted target meshes.
 
-### G4.4 Local adapter and orchestrator
+Input gate: user selection of the first geometry families and trusted acceptance meshes after M1 completes.
 
-- [x] Implement the loopback model adapter with bounded context and structured tool calls.
-- [x] Validate every model response and tool argument before dispatch.
-- [x] Implement the conversation state machine: understand, inspect, propose, confirm, execute, verify, explain.
-- [x] Require explicit confirmation for mutations and runs according to policy.
-- [x] Summarize tool results without treating model text as authoritative state.
-- [x] Persist privacy-safe conversation and tool audit metadata with opt-out controls.
+## M6 — Product clients and optional providers
 
-### G4.5 First usable chat client
+- [ ] Add hosted providers only behind explicit data policy and the same conformance suite.
+- [ ] Build a thin VS Code client over the stable local API.
+- [ ] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
 
-- [x] Add a local `bsam-agent chat` terminal client.
-- [x] Support new/resume conversation, model selection, project binding, and cancellation.
-- [x] Display proposed semantic/source diffs and confirmation prompts.
-- [x] Display deterministic validation/run summaries and artifact paths.
-- [x] Add end-to-end scripted conversation tests with a fake provider.
-- [x] Run local-model routing cases plus guarded inspect/preview/apply conversations on synthetic and approved project fixtures.
-- [x] Document installation, model placement, configuration, startup, limitations, and recovery.
+## Deferred
 
-Exit: a user can converse locally with BSAM Agent to inspect a project, request a supported change, review and confirm it, validate it, and run BSAM; all authoritative work is performed by deterministic tools.
+- MPI execution.
+- Automated results interpretation and report generation.
+- General-purpose arbitrary CAD repair and unrestricted meshing.
+- Modification of BSAM source code.
 
-### G4.6 Live-chat usability stabilization
+## Next execution sessions
 
-- [x] Expand deterministic inspection messages with per-cluster mesh counts, ply-like structure, sections, boundary targets, constitutive types, reference resolution, source-set status, and diagnostics.
-- [x] Resolve an explicitly named, uniquely registered parameter to its owning block and construct without model guessing.
-- [x] Present the model with a registry-generated high-level parameter catalog instead of requiring internal block, construct, and plan-path knowledge.
-- [x] Generate safe plan and non-overwriting output defaults for a natural registered-parameter request.
-- [x] Chain a successful preview to a separately confirmed apply when the user requests a new output file.
-- [x] Make every successful preview immediately confirmable with a displayed safe destination, including natural approval words.
-- [x] Retain the latest reviewed plan so conversational follow-ups such as `apply that change` resolve deterministically, including across resumed sessions.
-- [x] Return explicit clarification guidance for missing, unknown, or context-ambiguous parameters.
-- [x] Replace generic model refusals for edit requests with an actionable summary of currently supported operations.
-- [x] Add regression tests for the two requests used in the first real user conversation.
-- [ ] Repeat the improved inspect and parameter-change conversation with the live Scout runtime and obtain user acceptance.
+1. Finish M1.1 reachable-dispatch audit and coverage-gap report.
+2. Complete M1.2 grammar gaps by parser family.
+3. Complete M1.3 entity/dependency metadata.
+4. Generate and verify M1.4 contracts.
+5. Begin M2.1 with the first registry-driven parser family.
 
-Exit: the first real notch inspection and registered-parameter edit work from natural prompts, with useful engineering output and an explicit confirmation boundary.
-
-## G5 - Optional hosted providers
-
-- [ ] Add Gemini and OpenAI adapters behind the same contract.
-- [ ] Enforce payload classification and explicit provider enablement.
-- [ ] Use only synthetic/sanitized data until the configured data policy permits otherwise.
-- [ ] Run the same provider conformance and tool-policy suite.
-
-## G6 - Gmsh-backed embedded mesh generation
-
-- [ ] Pin a local Gmsh executable/library with no network dependency.
-- [ ] Add typed geometry and meshing recipes, deterministic import/conversion, physical-group mapping, and quality validation.
-- [ ] Generate current-syntax clusters with provenance and trusted equivalence tests.
-
-## G7 - VS Code client
-
-- [ ] Build a thin TypeScript client of the local API.
-- [ ] Add schema-aware diagnostics, model forms, chat, reviewed diffs, run controls, and status.
-- [ ] Package it with Windows setup documentation while retaining CLI parity.
-
-## Later
-
-- MPI supervision
-- result interpretation and reporting
-- broader mesh generation
-- controlled obsolete-input migration
+No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

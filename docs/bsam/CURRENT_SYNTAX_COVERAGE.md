@@ -19,6 +19,8 @@ Registry version `0.14.0` records 13 active top-level blocks, 29 finite-element 
 
 This is an active-dispatch inventory, not completed G1 coverage. Records marked `identified` or `partially-documented` still require exact body grammar, types, defaults, dependencies, edit impacts, and tests.
 
+The generated [primary dispatch audit](DISPATCH_AUDIT.md) independently reconciles the pinned source with the registry: all 13 active top-level initializers, 29 finite-element cluster-command prefixes, and 12 active BOUNDARY construct prefixes are accounted for with no registry/source omissions. It also records the internal `*G-C` option case and excludes commented or deprecated initialization paths. This closes primary command enumeration, not subordinate record/value grammars.
+
 ## Capability categories
 
 | Category | Primary local entry point | Inventory status | V1 requirement |
