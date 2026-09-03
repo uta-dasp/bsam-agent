@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
-from bsam_agent.orchestrator import ChatOrchestrator
+from bsam_agent.orchestrator import ChatOrchestrator, _summarize_result
 from bsam_agent.provider import ProviderConfig, ProviderRequest, ProviderResponse, Usage
 
 
@@ -111,7 +111,7 @@ class OrchestratorTests(unittest.TestCase):
             "dispatch", "inspect_model", {"source": "model.in"},
         ))
         agent = ChatOrchestrator(provider, config(), FakeApi())  # type: ignore[arg-type]
-        result = agent.turn("Inspect model.in")
+        result = agent.turn("Analyze model.in")
         self.assertEqual("explain", result.phase)
 
         provider = FakeProvider(decision(
@@ -145,7 +145,7 @@ class OrchestratorTests(unittest.TestCase):
         )
         api = FakeApi()
         agent = ChatOrchestrator(provider, config(), api)  # type: ignore[arg-type]
-        result = agent.turn("Inspect model.in")
+        result = agent.turn("Analyze model.in")
         self.assertEqual("explain", result.phase)
         self.assertEqual(2, len(provider.requests))
         self.assertLess(len(provider.requests[1].messages), 6)
@@ -156,7 +156,7 @@ class OrchestratorTests(unittest.TestCase):
             decision("dispatch", "inspect_model", {"source": "model.in"}),
         )
         agent = ChatOrchestrator(provider, config(), FakeApi())  # type: ignore[arg-type]
-        result = agent.turn("Inspect model.in")
+        result = agent.turn("Analyze model.in")
         self.assertEqual("explain", result.phase)
         self.assertEqual(2, len(provider.requests))
 
@@ -173,7 +173,7 @@ class OrchestratorTests(unittest.TestCase):
                 raise RuntimeError("local server unavailable")
 
         agent = ChatOrchestrator(FailedProvider(), config(), FakeApi())  # type: ignore[arg-type]
-        result = agent.turn("Inspect model.in")
+        result = agent.turn("Analyze model.in")
         self.assertEqual("provider_error", result.error_code)
         self.assertIn("unavailable", result.message)
 
@@ -225,6 +225,83 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(pending.requires_confirmation)
         self.assertEqual("verify", applied.phase)
         self.assertIn(b"absolute=2", output)
+
+    def test_natural_registered_parameter_request_uses_defaults_and_confirmation(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\nd_reduction=0.25\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        provider = FakeProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            preview = agent.turn(
+                "Change d_reduction in model.in to 0.5 and create a new file. "
+                "Do not overwrite the original."
+            )
+            applied = agent.turn("/confirm")
+            output = (root / "model.changed.in").read_bytes()
+        self.assertEqual([], provider.requests)
+        self.assertEqual("confirm", preview.phase)
+        self.assertTrue(preview.requires_confirmation)
+        self.assertIn("model.changed.in", preview.message)
+        self.assertEqual("verify", applied.phase)
+        self.assertIn(b"d_reduction=0.5", output)
+
+    def test_natural_inspection_does_not_depend_on_model_routing(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\nBOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        provider = FakeProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn(
+                "Inspect model.in and summarize its laminate, boundary conditions, "
+                "mesh references, errors, and warnings."
+            )
+        self.assertEqual([], provider.requests)
+        self.assertEqual("inspect_model", result.tool)
+        self.assertIn("Inspection completed", result.message)
+        self.assertIn("References:", result.message)
+
+    def test_inspection_summary_includes_engineering_structure(self) -> None:
+        result = {
+            "summary": {"errors": 0, "warnings": 1},
+            "semantic_model": {
+                "entities": [
+                    {"id": "c1", "kind": "cluster", "name": "ply1"},
+                    {"id": "n1", "kind": "node", "name": "1", "attributes": {"cluster": "ply1"}},
+                    {"id": "e1", "kind": "element", "name": "1", "attributes": {"cluster": "ply1"}},
+                    {"id": "s1", "kind": "section", "name": "all", "attributes": {"cluster": "ply1", "layers": "1"}},
+                    {"id": "bc1", "kind": "boundary-condition", "name": "fixed"},
+                    {"id": "m1", "kind": "constitutive", "name": "1", "attributes": {"type": 3}},
+                ],
+                "references": [{
+                    "source_entity_id": "bc1", "target_key": "cluster:ply1/node-set:xmin",
+                }],
+                "summary": {
+                    "entities_by_kind": {"cluster": 1, "node": 1, "element": 1},
+                    "references": 1, "resolved_references": 1,
+                    "unresolved_references": 0, "ambiguous_references": 0,
+                    "type_mismatches": 0,
+                },
+            },
+            "source_set": {"files": [{}]},
+            "diagnostics": [{"code": "BSAM-W1", "line": 4, "message": "example warning"}],
+        }
+        message = _summarize_result("inspect_model", result)
+        self.assertIn("Ply-like clusters: ply1 (1 nodes, 1 elements)", message)
+        self.assertIn("Boundary conditions: fixed -> ply1.xmin", message)
+        self.assertIn("Constitutive definitions: 1 (type 3)", message)
+        self.assertIn("References: 1/1 resolved", message)
+        self.assertIn("BSAM-W1 line 4", message)
 
 
 if __name__ == "__main__":

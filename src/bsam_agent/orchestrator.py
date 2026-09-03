@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from .api import ApiError, LocalAgentApi
 from .provider import Message, Provider, ProviderConfig, ProviderRequest, ProviderResponse
+from .registry import load_registry
 from .tool_contracts import TOOL_CONTRACTS, TOOL_DESCRIPTIONS, validate_arguments
 
 
@@ -258,11 +259,17 @@ class ChatOrchestrator:
         self.state.phase = "understand"
         self._audit("user_turn", correlation_id=correlation_id, user_digest=_digest(text))
         tool_names = relevant_tools(text)
-        try:
-            decision, response = self._route(text, tool_names, correlation_id)
-        except (OSError, RuntimeError) as exc:
-            self._audit("provider_failed", correlation_id=correlation_id, error_code=type(exc).__name__)
-            return self._result("explain", str(exc), error="provider_error")
+        decision = _deterministic_inspection_request(text)
+        if decision is None:
+            decision = _deterministic_parameter_request(text)
+        if decision is None:
+            try:
+                decision, response = self._route(text, tool_names, correlation_id)
+            except (OSError, RuntimeError) as exc:
+                self._audit("provider_failed", correlation_id=correlation_id, error_code=type(exc).__name__)
+                return self._result("explain", str(exc), error="provider_error")
+        else:
+            response = ProviderResponse(content=json.dumps(decision, separators=(",", ":")))
         if decision is None:
             return self._result(
                 "explain", "The local model could not produce a valid request after one repair.",
@@ -281,8 +288,9 @@ class ChatOrchestrator:
         )
 
         if decision["outcome"] == "refuse":
+            guidance = _unsupported_guidance(text)
             return self._result(
-                "explain", decision["response"] or "That request is not allowed.",
+                "explain", guidance or decision["response"] or "That request is not allowed.",
                 tool=decision["tool"], error=decision["error_code"] or "refused",
             )
         if decision["outcome"] == "answer":
@@ -295,6 +303,7 @@ class ChatOrchestrator:
                 error="invalid_model_response",
             )
         arguments = _normalize_arguments(tool, decision["arguments"], text)
+        arguments = _add_safe_defaults(tool, arguments)
         if tool in GUARDED_TOOLS:
             arguments["confirm"] = False
         try:
@@ -309,7 +318,7 @@ class ChatOrchestrator:
                 "confirm", f"Ready to {TOOL_DESCRIPTIONS[tool].rstrip('.')}. Type /confirm to proceed or /cancel.",
                 tool=tool, requires_confirmation=True, error="confirmation_required",
             )
-        return self._execute(tool, arguments)
+        return self._execute(tool, arguments, user_text=text)
 
     def _route(
         self, user_text: str, tool_names: tuple[str, ...], correlation_id: str,
@@ -330,6 +339,10 @@ class ChatOrchestrator:
                 last = self.provider.complete(request)
                 decision = self._parse_decision(last.content, tool_names)
                 if decision["tool"] is not None:
+                    decision = dict(decision)
+                    decision["arguments"] = _add_safe_defaults(
+                        decision["tool"], decision["arguments"],
+                    )
                     validate_arguments(decision["tool"], decision["arguments"])
                 return decision, last
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
@@ -397,7 +410,9 @@ class ChatOrchestrator:
         self._audit("confirmation_cancelled", tool=pending.tool)
         return self._result("understand", f"Cancelled {pending.tool}.", tool=pending.tool)
 
-    def _execute(self, tool: str, arguments: dict[str, Any]) -> ChatTurn:
+    def _execute(
+        self, tool: str, arguments: dict[str, Any], *, user_text: str = "",
+    ) -> ChatTurn:
         if tool in {"inspect_model", "validate_model", "import_mesh", "get_capabilities"}:
             self.state.phase = "inspect"
         elif tool in PREVIEW_TOOLS or tool == "review_change":
@@ -420,8 +435,20 @@ class ChatOrchestrator:
         else:
             phase = "verify"
         message = _summarize_result(tool, result)
+        pending = _preview_follow_up(tool, arguments, user_text)
+        if pending is not None:
+            self.state.pending_action = pending
+            phase = "confirm"
+            message += (
+                f" The reviewed output will be written to {pending.arguments['destination']}. "
+                "Type /confirm to create it or /cancel."
+            )
         self._audit("tool_completed", tool=tool, result_digest=_digest(result), phase=phase)
-        return self._result(phase, message, tool=tool, result=result)
+        return self._result(
+            phase, message, tool=tool, result=result,
+            requires_confirmation=pending is not None,
+            error="confirmation_required" if pending is not None else None,
+        )
 
     def _result(
         self,
@@ -480,6 +507,142 @@ def _normalize_arguments(
     return result
 
 
+def _source_path_from_text(text: str) -> str | None:
+    match = re.search(
+        r'(?:"([^"\r\n]+\.in)"|\'([^\'\r\n]+\.in)\'|'
+        r'((?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.in|[A-Za-z0-9_.-]+\.in))',
+        text, re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    return next(value for value in match.groups() if value is not None).replace("\\", "/")
+
+
+def _parameter_location(name: str) -> tuple[str, str, str] | None:
+    registry = load_registry()
+    blocks = {
+        item.get("id"): str(item.get("canonical", "")).lstrip("*")
+        for item in registry.get("top_level_blocks", [])
+        if isinstance(item, dict)
+    }
+    matches: list[tuple[str, str, str]] = []
+    for construct in registry.get("nested_constructs", []):
+        if not isinstance(construct, dict):
+            continue
+        for parameter in construct.get("parameters", []):
+            if not isinstance(parameter, dict):
+                continue
+            canonical = str(parameter.get("name", ""))
+            if canonical.casefold() == name.casefold():
+                block = blocks.get(construct.get("parent_block_id"), "")
+                nested = str(construct.get("canonical", "")).lstrip("*")
+                if block and nested:
+                    matches.append((block, nested, canonical))
+    return matches[0] if len(matches) == 1 else None
+
+
+def _default_plan_path(source: str, operation: str) -> str:
+    path = Path(source)
+    safe_operation = re.sub(r"[^A-Za-z0-9_.-]+", "-", operation).strip("-")
+    return str(path.with_name(f"{path.stem}.{safe_operation}.plan.json")).replace("\\", "/")
+
+
+def _default_destination(source: str) -> str:
+    path = Path(source)
+    return str(path.with_name(f"{path.stem}.changed{path.suffix}")).replace("\\", "/")
+
+
+def _deterministic_parameter_request(text: str) -> dict[str, Any] | None:
+    """Recognize the narrow, registry-backed parameter-edit form without model guessing."""
+    change = re.search(
+        r"\b(?:change|set|update)\s+(?:the\s+)?(?P<parameter>[A-Za-z][A-Za-z0-9_-]*)"
+        r"\b.*?\bto\s+(?P<value>[^\s,;]+)",
+        text, re.IGNORECASE,
+    )
+    source = _source_path_from_text(text)
+    if change is None or source is None:
+        return None
+    location = _parameter_location(change.group("parameter"))
+    if location is None:
+        return None
+    block, construct, parameter = location
+    value = change.group("value").rstrip(".!?")
+    arguments = {
+        "source": source,
+        "block": block,
+        "construct": construct,
+        "parameter": parameter,
+        "value": value,
+        "plan_path": _default_plan_path(source, parameter),
+    }
+    return {
+        "outcome": "dispatch", "tool": "preview_parameter_change",
+        "arguments": arguments, "error_code": None, "response": None,
+    }
+
+
+def _deterministic_inspection_request(text: str) -> dict[str, Any] | None:
+    """Route an explicit single-deck inspection without depending on model accuracy."""
+    source = _source_path_from_text(text)
+    if source is None or not re.search(r"\b(?:inspect|summari[sz]e)\b", text, re.IGNORECASE):
+        return None
+    if re.search(r"\b(?:change|edit|modify|create|write|run|delete|rename)\b", text, re.IGNORECASE):
+        return None
+    return {
+        "outcome": "dispatch", "tool": "inspect_model",
+        "arguments": {"source": source}, "error_code": None, "response": None,
+    }
+
+
+def _add_safe_defaults(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    result = dict(arguments)
+    if tool == "preview_parameter_change" and "parameter" in result:
+        location = _parameter_location(str(result["parameter"]))
+        if location is not None:
+            block, construct, canonical = location
+            result.setdefault("block", block)
+            result.setdefault("construct", construct)
+            result["parameter"] = canonical
+    if tool in PREVIEW_TOOLS and "plan_path" not in result:
+        source = result.get("source") or result.get("template")
+        if isinstance(source, str) and source:
+            result["plan_path"] = _default_plan_path(
+                source, tool.removeprefix("preview_"),
+            )
+    return result
+
+
+def _preview_follow_up(
+    tool: str, arguments: dict[str, Any], user_text: str,
+) -> PendingAction | None:
+    if tool not in PREVIEW_TOOLS or not re.search(
+        r"\b(?:create|write|save|produce)\b.*\b(?:new|output|file|deck)\b|"
+        r"\bdo\s+not\s+overwrite\b",
+        user_text, re.IGNORECASE,
+    ):
+        return None
+    source = arguments.get("source") or arguments.get("template")
+    plan_path = arguments.get("plan_path")
+    if not isinstance(source, str) or not isinstance(plan_path, str):
+        return None
+    return PendingAction("apply_change", {
+        "plan_path": plan_path,
+        "destination": _default_destination(source),
+        "confirm": False,
+    })
+
+
+def _unsupported_guidance(user_text: str) -> str | None:
+    if re.search(r"\b(?:change|edit|modify|create|rewrite)\b", user_text, re.IGNORECASE):
+        return (
+            "I could not map that request to one safe deterministic operation. "
+            "I can currently inspect or validate a deck, change one existing registered "
+            "parameter, expand the approved notch model from 2 to 8 plies, migrate its "
+            "legacy solver, or review/apply an existing plan."
+        )
+    return None
+
+
 def _summarize_result(tool: str, result: dict[str, Any]) -> str:
     if tool in PREVIEW_TOOLS or tool == "review_change":
         validation = result.get("validation", {})
@@ -496,11 +659,13 @@ def _summarize_result(tool: str, result: dict[str, Any]) -> str:
         semantic_summary = semantic.get("summary", {}) if isinstance(semantic, dict) else {}
         counts = semantic_summary.get("entities_by_kind", {})
         if tool == "inspect_model" and isinstance(counts, dict):
-            return (
+            message = (
                 f"Inspection completed: {counts.get('cluster', 0)} cluster(s), "
                 f"{counts.get('node', 0)} node(s), {counts.get('element', 0)} element(s); "
                 f"{errors} error(s), {warnings} warning(s)."
             )
+            details = _inspection_details(result)
+            return message if not details else message + "\n" + "\n".join(details)
         return f"{tool} completed: {errors} error(s), {warnings} warning(s)."
     validation = result.get("validation")
     if isinstance(validation, dict) and isinstance(validation.get("summary"), dict):
@@ -526,3 +691,116 @@ def _summarize_result(tool: str, result: dict[str, Any]) -> str:
     if tool == "get_capabilities":
         return f"Loaded {len(result.get('tools', []))} deterministic tool contracts."
     return f"{tool} completed successfully."
+
+
+def _inspection_details(result: dict[str, Any]) -> list[str]:
+    semantic = result.get("semantic_model", {})
+    if not isinstance(semantic, dict):
+        return []
+    entities = semantic.get("entities", [])
+    references = semantic.get("references", [])
+    summary = semantic.get("summary", {})
+    if not isinstance(entities, list) or not isinstance(references, list):
+        return []
+
+    by_kind: dict[str, list[dict[str, Any]]] = {}
+    for entity in entities:
+        if isinstance(entity, dict) and isinstance(entity.get("kind"), str):
+            by_kind.setdefault(entity["kind"], []).append(entity)
+
+    details: list[str] = []
+    clusters = by_kind.get("cluster", [])
+    if clusters:
+        cluster_parts = []
+        for cluster in clusters[:12]:
+            name = str(cluster.get("name", "?"))
+            nodes = sum(
+                item.get("attributes", {}).get("cluster") == name
+                for item in by_kind.get("node", [])
+            )
+            elements = sum(
+                item.get("attributes", {}).get("cluster") == name
+                for item in by_kind.get("element", [])
+            )
+            cluster_parts.append(f"{name} ({nodes} nodes, {elements} elements)")
+        label = "Ply-like clusters" if all(
+            str(item.get("name", "")).casefold().startswith("ply") for item in clusters
+        ) else "Clusters/mesh"
+        details.append(f"{label}: " + "; ".join(cluster_parts) + _more(len(clusters), 12))
+
+    sections = by_kind.get("section", [])
+    if sections:
+        parts = []
+        for item in sections[:12]:
+            attributes = item.get("attributes", {})
+            cluster = attributes.get("cluster") if isinstance(attributes, dict) else None
+            layers = attributes.get("layers") if isinstance(attributes, dict) else None
+            text = f"{cluster}.{item.get('name')}" if cluster else str(item.get("name", "?"))
+            if layers is not None:
+                text += f" (layers={layers})"
+            parts.append(text)
+        details.append("Sections: " + ", ".join(parts) + _more(len(sections), 12))
+
+    boundaries = by_kind.get("boundary-condition", [])
+    if boundaries:
+        parts = []
+        for item in boundaries[:16]:
+            targets = [
+                _short_target(str(reference.get("target_key", "")))
+                for reference in references
+                if isinstance(reference, dict)
+                and reference.get("source_entity_id") == item.get("id")
+            ]
+            text = str(item.get("name", "?"))
+            if targets:
+                text += " -> " + ", ".join(targets)
+            parts.append(text)
+        details.append("Boundary conditions: " + "; ".join(parts) + _more(len(boundaries), 16))
+
+    constitutives = by_kind.get("constitutive", [])
+    if constitutives:
+        parts = []
+        for item in constitutives[:12]:
+            attributes = item.get("attributes", {})
+            type_value = attributes.get("type") if isinstance(attributes, dict) else None
+            parts.append(
+                str(item.get("name", "?"))
+                + (f" (type {type_value})" if type_value is not None else "")
+            )
+        details.append("Constitutive definitions: " + ", ".join(parts) + _more(len(constitutives), 12))
+
+    if isinstance(summary, dict) and summary.get("references") is not None:
+        details.append(
+            f"References: {summary.get('resolved_references', 0)}/{summary.get('references', 0)} "
+            f"resolved; {summary.get('unresolved_references', 0)} unresolved, "
+            f"{summary.get('ambiguous_references', 0)} ambiguous, "
+            f"{summary.get('type_mismatches', 0)} type mismatch(es)."
+        )
+
+    source_set = result.get("source_set", {})
+    files = source_set.get("files", []) if isinstance(source_set, dict) else []
+    if "source_set" in result and isinstance(files, list):
+        details.append(f"Source set: {len(files)} file(s); byte-identical no-op round trip verified.")
+
+    diagnostics = result.get("diagnostics", [])
+    if isinstance(diagnostics, list) and diagnostics:
+        shown = []
+        for item in diagnostics[:8]:
+            if not isinstance(item, dict):
+                continue
+            location = f" line {item['line']}" if item.get("line") is not None else ""
+            shown.append(f"{item.get('code', 'diagnostic')}{location}: {item.get('message', '')}")
+        if shown:
+            details.append("Diagnostics: " + " | ".join(shown) + _more(len(diagnostics), 8))
+    return details
+
+
+def _short_target(key: str) -> str:
+    match = re.fullmatch(r"cluster:([^/]+)/[^:]+:(.+)", key)
+    if match:
+        return f"{match.group(1)}.{match.group(2)}"
+    return key.split(":", 1)[-1]
+
+
+def _more(total: int, shown: int) -> str:
+    return f"; plus {total - shown} more" if total > shown else ""

@@ -20,9 +20,44 @@ $model = "D:\Partha\BSAM\models\meta-llama-4-scout-17b-16e-instruct\Llama-4-Scou
 
 Keep that terminal open. The API key exists only in the current PowerShell process and is not written to the provider JSON.
 
+### Share the key with a second PowerShell
+
+Environment variables are process-local, so a separately opened chat terminal does not automatically receive the server terminal's key. Use the exact variable name `BSAM_LOCAL_API_KEY`; do not insert backslashes before underscores.
+
+If clipboard transfer preserves the complete value, run this in the server terminal:
+
+```powershell
+Set-Clipboard -Value $env:BSAM_LOCAL_API_KEY
+```
+
+Then run this in the chat terminal:
+
+```powershell
+$env:BSAM_LOCAL_API_KEY = Get-Clipboard
+$env:BSAM_LOCAL_API_KEY.Length
+```
+
+The generated key should have length `64`. Some older PowerShell/clipboard combinations can truncate it. In that case, transfer it through a temporary file. In the server terminal:
+
+```powershell
+$keyFile = Join-Path $env:TEMP "bsam-local-key.txt"
+[IO.File]::WriteAllText($keyFile, $env:BSAM_LOCAL_API_KEY)
+```
+
+In the chat terminal:
+
+```powershell
+$keyFile = Join-Path $env:TEMP "bsam-local-key.txt"
+$env:BSAM_LOCAL_API_KEY = [IO.File]::ReadAllText($keyFile).Trim()
+$env:BSAM_LOCAL_API_KEY.Length
+[IO.File]::Delete($keyFile)
+```
+
+Start the server only after its environment variable is set. Both terminals must report the same 64-character value. To clear the clipboard on PowerShell versions without `Clear-Clipboard`, use `Set-Clipboard -Value ""`.
+
 ## Verify and benchmark
 
-In a second PowerShell opened from the first one (so it inherits the session key), run:
+In the second PowerShell after sharing the session key, run:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:18080/health `

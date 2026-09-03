@@ -4,7 +4,7 @@ This is the execution order. A checkbox means implemented and verified in this r
 
 ## Current product checkpoint
 
-The project is currently expanding the deterministic BSAM engine underneath the chat experience. It can inspect and validate a losslessly loaded source set, preview and apply bounded revision-bound edits, assemble a manually prepared Abaqus-style `.ele` mesh into an explicit template, perform the approved notch 2-to-8-ply transformation, expose those operations through the local API, show diffs and audits, and supervise isolated serial BSAM runs. It does **not** yet cover every BSAM capability or run a chat loop.
+The project is currently expanding the deterministic BSAM engine underneath a runnable local terminal chat. It can inspect and validate a losslessly loaded source set, preview and apply bounded revision-bound edits, assemble a manually prepared Abaqus-style `.ele` mesh into an explicit template, perform the approved notch 2-to-8-ply transformation, expose those operations through the local API, show diffs and audits, and supervise isolated serial BSAM runs. The chat remains limited to registered deterministic operations and is undergoing live usability acceptance.
 
 The language model will be an optional planner and conversational interface. It will never be the BSAM parser, validator, renderer, or process supervisor.
 
@@ -183,6 +183,18 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 - [x] Document installation, model placement, configuration, startup, limitations, and recovery.
 
 Exit: a user can converse locally with BSAM Agent to inspect a project, request a supported change, review and confirm it, validate it, and run BSAM; all authoritative work is performed by deterministic tools.
+
+### G4.6 Live-chat usability stabilization
+
+- [x] Expand deterministic inspection messages with per-cluster mesh counts, ply-like structure, sections, boundary targets, constitutive types, reference resolution, source-set status, and diagnostics.
+- [x] Resolve an explicitly named, uniquely registered parameter to its owning block and construct without model guessing.
+- [x] Generate safe plan and non-overwriting output defaults for a natural registered-parameter request.
+- [x] Chain a successful preview to a separately confirmed apply when the user requests a new output file.
+- [x] Replace generic model refusals for edit requests with an actionable summary of currently supported operations.
+- [x] Add regression tests for the two requests used in the first real user conversation.
+- [ ] Repeat the improved inspect and parameter-change conversation with the live Scout runtime and obtain user acceptance.
+
+Exit: the first real notch inspection and registered-parameter edit work from natural prompts, with useful engineering output and an explicit confirmation boundary.
 
 ## G5 - Optional hosted providers
 

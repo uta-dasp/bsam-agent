@@ -17,9 +17,25 @@ python -m bsam_agent chat `
 
 `/confirm` executes exactly the pending guarded action, `/cancel` discards it, and `/quit` exits. A different provider configuration selects another model. The workspace root binds every tool path. The optional `--session` file saves raw local chat text and pending state so the conversation can resume; omit it for an ephemeral conversation. Digest-only audit metadata is enabled by default beneath `.bsam-agent/audit`; `--no-audit` disables it.
 
+Start with a deterministic inspection:
+
+```text
+Inspect projects/notch_v1/notch_v1.in and summarize its laminate, boundary conditions, mesh references, errors, and warnings.
+```
+
+A uniquely registered parameter can be changed with safe plan and output defaults:
+
+```text
+Change d_reduction in projects/notch_v1/notch_v1.in to 0.5 and create a new file. Do not overwrite the original.
+```
+
+The client previews the diff first. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file.
+
 Preview and review responses display the deterministic source diff. Validation, apply, run, status, and stop responses are summarized from tool results rather than model claims. Run artifact directories are shown in the response.
 
 ## Current limitations and recovery
+
+If the client reports `credential environment variable is not set: BSAM_LOCAL_API_KEY`, its PowerShell process did not receive the server's key. Follow the key-sharing procedure in [Local model runtime](LOCAL_MODEL_RUNTIME.md), and write `$env:BSAM_LOCAL_API_KEY` without backslashes.
 
 - Scout takes roughly 20–30 seconds for many routed requests on the CPU host.
 - Only registered deterministic tools are available; unsupported BSAM operations remain unavailable through chat.
