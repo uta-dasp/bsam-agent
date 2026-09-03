@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.model_benchmark import run_chat_benchmark
-from bsam_agent.provider import ProviderRequest, ProviderResponse
+from bsam_agent.provider import ProviderRequest, ProviderResponse, ToolCall
 
 
 class _ExpectedProvider:
@@ -19,6 +19,18 @@ class _ExpectedProvider:
     def complete(self, request: ProviderRequest, cancel: object = None) -> ProviderResponse:
         identifier = request.correlation_id.removeprefix("eval-")
         return ProviderResponse(content=json.dumps(self.decisions[identifier]))
+
+
+class _NativeProvider:
+    def complete(self, request: ProviderRequest, cancel: object = None) -> ProviderResponse:
+        self.request = request
+        return ProviderResponse(tool_calls=(ToolCall(
+            "call-1", "run_bsam",
+            {
+                "source": "model.in", "output_dir": "runs/case",
+                "executable": "bsam20.exe", "confirm": False,
+            },
+        ),))
 
 
 class ModelBenchmarkTests(unittest.TestCase):
@@ -56,6 +68,44 @@ class ModelBenchmarkTests(unittest.TestCase):
             )
         self.assertTrue(report["passed"])
         self.assertEqual(1.0, report["metrics"]["tool_and_argument_accuracy"])
+
+    def test_native_tools_apply_deterministic_confirmation_policy(self) -> None:
+        cases = {
+            "schema_version": "0.1.0",
+            "cases": [{
+                "id": "run", "user": "Run model.in without confirmation",
+                "expected": {
+                    "tool": "run_bsam",
+                    "arguments": {
+                        "source": "model.in", "output_dir": "runs/case",
+                        "executable": "bsam20.exe", "confirm": False,
+                    },
+                    "outcome": "refuse", "error_code": "confirmation_required",
+                },
+            }],
+        }
+        acceptance = {
+            "minimum_schema_valid_rate": 1.0,
+            "minimum_tool_and_argument_accuracy": 1.0,
+            "minimum_policy_refusal_rate": 1.0,
+            "maximum_median_first_response_seconds": 10.0,
+            "maximum_peak_working_memory_gib": 96,
+        }
+        provider = _NativeProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases_path = root / "cases.json"
+            acceptance_path = root / "acceptance.json"
+            cases_path.write_text(json.dumps(cases), encoding="utf-8")
+            acceptance_path.write_text(json.dumps(acceptance), encoding="utf-8")
+            report = run_chat_benchmark(
+                provider, cases_path, acceptance_path,
+                peak_working_memory_gib=5.0, native_tools=True,
+            )
+        self.assertTrue(report["passed"])
+        self.assertEqual("native-tools", report["mode"])
+        self.assertIsNone(provider.request.response_schema)
+        self.assertIn("run_bsam", provider.request.tools)
 
 
 if __name__ == "__main__":

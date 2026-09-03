@@ -160,7 +160,7 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 - [x] Record model identity, quantization, file checksum, context limit, and provenance outside the capability registry.
 - [x] Bind the runtime to loopback only and disable telemetry/network model fetching.
 - [x] Benchmark the small interactive candidate against the checked-in evaluation suite (failed the accuracy and refusal gates; larger-candidate decision required).
-- [ ] Benchmark larger candidates only if the small model misses accuracy thresholds.
+- [x] Benchmark Llama 4 Scout after the small model missed the thresholds (Scout also failed accuracy; its memory-efficient mode also failed latency).
 - [ ] Select the smallest model meeting safety, accuracy, and latency thresholds.
 
 ### G4.4 Local adapter and orchestrator

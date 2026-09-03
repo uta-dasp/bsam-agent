@@ -105,6 +105,30 @@ class LocalProviderTests(unittest.TestCase):
         self.assertEqual("request_too_large", raised.exception.code)
         mocked.assert_not_called()  # type: ignore[attr-defined]
 
+    @patch("bsam_agent.local_provider.urlopen")
+    def test_parses_llama4_native_tool_syntax_without_execution(self, mocked: object) -> None:
+        mocked.return_value = _Response({  # type: ignore[attr-defined]
+            "choices": [{
+                "message": {"content": '[validate_model(source="model.in")]'},
+                "finish_reason": "stop",
+            }],
+        })
+        response = LlamaCppProvider(config()).complete(request())
+        self.assertIsNone(response.content)
+        self.assertEqual("validate_model", response.tool_calls[0].name)
+        self.assertEqual({"source": "model.in"}, response.tool_calls[0].arguments)
+
+    @patch("bsam_agent.local_provider.urlopen")
+    def test_native_tool_parser_rejects_expressions(self, mocked: object) -> None:
+        mocked.return_value = _Response({  # type: ignore[attr-defined]
+            "choices": [{
+                "message": {"content": '[validate_model(source=danger())]'},
+            }],
+        })
+        with self.assertRaises(ProviderError) as raised:
+            LlamaCppProvider(config()).complete(request())
+        self.assertEqual("invalid_response", raised.exception.code)
+
 
 if __name__ == "__main__":
     unittest.main()

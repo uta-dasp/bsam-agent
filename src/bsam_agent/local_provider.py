@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import queue
@@ -14,7 +15,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .provider import ProviderConfig, ProviderRequest, ProviderResponse, ToolCall, Usage
-from .tool_contracts import validate_arguments
+from .tool_contracts import TOOL_DESCRIPTIONS, validate_arguments
 
 
 class ProviderError(RuntimeError):
@@ -130,7 +131,9 @@ class LlamaCppProvider:
                     "type": "function",
                     "function": {
                         "name": name,
-                        "description": f"BSAM Agent deterministic tool: {name}",
+                        "description": TOOL_DESCRIPTIONS.get(
+                            name, f"BSAM Agent deterministic tool: {name}"
+                        ),
                         "parameters": schema,
                     },
                 }
@@ -205,6 +208,9 @@ class LlamaCppProvider:
             arguments = json.loads(function["arguments"])
             validate_arguments(name, arguments)
             calls.append(ToolCall(str(item["id"]), name, arguments))
+        if not calls and content and re.match(r"^\s*\[[A-Za-z_][A-Za-z0-9_]*\s*\(", content):
+            calls.extend(self._parse_native_calls(content, provider_request))
+            content = None
         if content is None and not calls:
             raise ValueError("response contains neither content nor tool calls")
         usage_value = value.get("usage") or {}
@@ -218,6 +224,39 @@ class LlamaCppProvider:
             usage=usage,
             finish_reason=str(choice.get("finish_reason", "stop")),
         )
+
+    @staticmethod
+    def _parse_native_calls(
+        content: str,
+        provider_request: ProviderRequest,
+    ) -> tuple[ToolCall, ...]:
+        """Parse Llama 4's documented ``[function(key=value)]`` form without executing it."""
+        expression = ast.parse(content.strip(), mode="eval").body
+        if not isinstance(expression, ast.List) or not expression.elts:
+            raise ValueError("native tool response must be a non-empty list")
+        calls: list[ToolCall] = []
+        for index, node in enumerate(expression.elts):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                raise ValueError("native tool response contains a non-call value")
+            if node.args or any(item.arg is None for item in node.keywords):
+                raise ValueError("native tool calls require named arguments")
+            name = node.func.id
+            if name not in provider_request.tools:
+                raise ValueError(f"provider requested unknown tool: {name}")
+            arguments = {
+                item.arg: LlamaCppProvider._literal(item.value) for item in node.keywords
+            }
+            validate_arguments(name, arguments)
+            calls.append(ToolCall(
+                f"{provider_request.correlation_id}-{index + 1}", name, arguments
+            ))
+        return tuple(calls)
+
+    @staticmethod
+    def _literal(node: ast.AST) -> Any:
+        if isinstance(node, ast.Name) and node.id in {"true", "false", "null"}:
+            return {"true": True, "false": False, "null": None}[node.id]
+        return ast.literal_eval(node)
 
     @staticmethod
     def _error(

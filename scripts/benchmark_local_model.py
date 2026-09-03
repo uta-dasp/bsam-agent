@@ -21,6 +21,7 @@ def main() -> int:
     parser.add_argument("--cases", type=Path, default=ROOT / "evals" / "chat_cases.json")
     parser.add_argument("--acceptance", type=Path, default=ROOT / "evals" / "acceptance.json")
     parser.add_argument("--peak-working-memory-gib", type=float)
+    parser.add_argument("--native-tools", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = run_chat_benchmark(
@@ -28,6 +29,7 @@ def main() -> int:
         args.cases,
         args.acceptance,
         peak_working_memory_gib=args.peak_working_memory_gib,
+        native_tools=args.native_tools,
     )
     rendered = json.dumps(report, indent=2, sort_keys=True)
     if args.output:

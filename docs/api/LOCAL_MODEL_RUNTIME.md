@@ -1,6 +1,6 @@
 # Local model runtime
 
-The pinned initial runtime is llama.cpp b10621 (`v0.3.0`, commit `c1d0e7a0`) with Meta Llama 3.1 8B Instruct Q4_K_M. Exact provenance and checksums are in `config/model-profiles/meta-llama-3.1-8b-instruct-q4_k_m.json`. Model weights and the machine-local provider configuration remain outside Git.
+The pinned runtime is llama.cpp b10621 (`v0.3.0`, commit `c1d0e7a0`). Meta Llama 3.1 8B and Llama 4 Scout Q4_K_M are verified benchmark candidates, but neither passed chat acceptance. Exact provenance and checksums are in `config/model-profiles/`. Model weights and the machine-local provider configuration remain outside Git.
 
 ## Start the server
 
@@ -34,6 +34,8 @@ python scripts\benchmark_local_model.py `
 ```
 
 Replace the memory value with the measured peak working set of `llama-server`; it is an acceptance input, not a model claim. The result JSON is ignored because it can contain raw synthetic prompts and responses. Stop the server with Ctrl+C.
+
+For Scout on this CPU, `--no-repack` reduced observed peak working memory substantially but made generation too slow for the acceptance gate. `--skip-chat-parsing` exposes Scout's native function-call text for the adapter's strict literal parser; it is an evaluation workaround for llama.cpp's incompatible PEG parser, not a model acceptance result.
 
 ## Security boundary
 

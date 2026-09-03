@@ -1,0 +1,72 @@
+{
+  "schema_version": "0.1.0",
+  "model": {
+    "family": "Meta Llama 4",
+    "identifier": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "source_revision": "92f3b1597a195b523d8d9e5700e57e4fbb8f20d3",
+    "source_format": "Hugging Face safetensors",
+    "license_acceptance_and_download": "performed by project owner",
+    "source_shard_count": 50,
+    "source_shard_size_bytes": 217283738720,
+    "local_file": "../models/meta-llama-4-scout-17b-16e-instruct/Llama-4-Scout-17B-16E-Instruct-Q4_K_M.gguf",
+    "local_file_size_bytes": 65359899808,
+    "local_file_sha256": "A5C993CAA2329F5BF0F65EA444FF40E61FD7164E240A3F73A9DF36DD711D63BF",
+    "quantization": "Q4_K_M",
+    "declared_context_tokens": 10485760,
+    "benchmark_context_tokens": 4096
+  },
+  "conversion": {
+    "source": "ggml-org/llama.cpp",
+    "commit": "c1d0e7a004015f23bc0233470b747b596f29b264",
+    "intermediate": "BF16 GGUF",
+    "intermediate_deleted_after_verification": true,
+    "quantizer": "llama-quantize Q4_K_M",
+    "quantizer_threads": 24
+  },
+  "runtime": {
+    "project": "ggml-org/llama.cpp",
+    "release": "v0.3.0",
+    "build": "b10621",
+    "commit": "c1d0e7a004015f23bc0233470b747b596f29b264",
+    "archive": "llama-b10621-bin-win-cpu-x64.zip",
+    "archive_sha256": "0E8B65E650E369F70F8307D890508886F171EF4FB00FACCCDDD4A1B7FFDACA51",
+    "backend_observed": "ggml-cpu-haswell.dll",
+    "bind": "127.0.0.1:18080",
+    "network_model_fetching": false,
+    "telemetry": false
+  },
+  "verification": {
+    "date": "2026-09-02",
+    "source_payload_files_verified": 64,
+    "source_revision_mismatches": 0,
+    "comparable_remote_sha256_records": 52,
+    "source_sha256_mismatches": 0,
+    "cli_exact_response": "BSAM_MODEL_OK",
+    "http_health": "ok",
+    "http_exact_response": "BSAM_HTTP_OK",
+    "prompt_tokens_per_second": 7.1,
+    "generation_tokens_per_second": 4.8
+  },
+  "synthetic_benchmark": {
+    "date": "2026-09-02",
+    "cases": 16,
+    "structured_decision": {
+      "schema_valid_rate": 1.0,
+      "tool_and_argument_accuracy": 0.6875,
+      "policy_refusal_rate": 1.0,
+      "outcome_accuracy": 0.875,
+      "median_response_seconds": 10.896,
+      "observed_peak_working_memory_gib": 107.933
+    },
+    "native_tools": {
+      "schema_valid_rate": 0.8125,
+      "tool_and_argument_accuracy": 0.6875,
+      "policy_refusal_rate": 0.3333333333333333,
+      "outcome_accuracy": 0.5625,
+      "median_response_seconds": 32.35,
+      "observed_peak_working_memory_gib": 62.683
+    },
+    "accepted": false,
+    "decision": "Do not select as the first chat-agent model; benchmark the Llama 3.3 70B control candidate."
+  }
+}

@@ -100,6 +100,29 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
 }
 
 
+TOOL_DESCRIPTIONS: dict[str, str] = {
+    "get_capabilities": "List supported BSAM capabilities and tool contracts before handling an unknown feature.",
+    "inspect_model": "Inspect an existing BSAM deck and return its structure, semantic entities, diagnostics, and summary.",
+    "validate_model": "Validate an existing BSAM deck without changing or running it.",
+    "import_mesh": "Inspect and validate a manually prepared Abaqus-style .ele mesh without modifying a deck.",
+    "preview_parameter_change": "Create a review plan for one registered parameter in a named BSAM block and construct.",
+    "preview_add_node": "Create a review plan to add one finite-element node.",
+    "preview_add_element": "Create a review plan to add one finite element with existing node labels.",
+    "preview_delete_node": "Create a review plan to delete one unreferenced node.",
+    "preview_create_set": "Create a review plan for a new node or element set.",
+    "preview_add_set_members": "Create a review plan to add members to an existing node or element set.",
+    "preview_import_mesh": "Create a review plan to place a validated .ele mesh into an empty template cluster.",
+    "preview_expand_notch_plies": "Create the approved notch_v1 review plan that expands two plies to eight plies.",
+    "preview_migrate_legacy_solver": "Create a review plan that migrates a legacy type-9 solver body to current PARDISO syntax.",
+    "preview_rename_boundary_condition": "Create a review plan that renames a boundary condition and updates its loading references.",
+    "review_change": "Recheck an existing revision-bound change plan and return its exact source and semantic diff.",
+    "apply_change": "Apply one reviewed change plan to a new deck; confirm must be true or policy refuses execution.",
+    "run_bsam": "Run one validated deck in an isolated output directory; confirm must be true or policy refuses execution.",
+    "get_run_status": "Read the status of one existing isolated BSAM run.",
+    "stop_run": "Request a controlled stop for one existing run; confirm must be true or policy refuses execution.",
+}
+
+
 def contract_manifest() -> dict[str, Any]:
     return {
         name: {

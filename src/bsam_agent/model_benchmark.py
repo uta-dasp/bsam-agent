@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .evals import load_chat_cases
-from .provider import Message, Provider, ProviderRequest
+from .provider import Message, Provider, ProviderRequest, ProviderResponse
 from .tool_contracts import TOOL_CONTRACTS, validate_arguments
 
 
@@ -52,6 +52,107 @@ def evaluation_system_prompt() -> str:
     )
 
 
+def native_evaluation_system_prompt() -> str:
+    return (
+        "You route requests to the listed deterministic BSAM Agent functions. Call exactly one function "
+        "when a listed function matches. Never claim a function result before calling it. Copy paths, "
+        "names, capitalization, and values exactly. Omit optional arguments unless the user supplied "
+        "them. For a requested apply, run, or stop without confirmation, call the requested function "
+        "with confirm=false; local policy will refuse execution. For a requested read of an unsafe path, "
+        "call the requested read function with the exact path; local policy will refuse it. For an "
+        "unknown BSAM feature call get_capabilities. For an unrestricted raw rewrite, or rendering from "
+        "prose without a reviewed plan, do not call a function; respond only as JSON with outcome=refuse "
+        "and the appropriate error_code (unsupported_capability or reviewed_plan_required). If a tool "
+        "result is already stated and the user asks only for a summary without another tool, answer it. "
+        "Defaults used only when omitted: deck=model.in, plan=plans/change.json, changed deck=changed.in, "
+        "run directory=runs/case, executable=bsam20.exe."
+    )
+
+
+def candidate_tools(user: str) -> dict[str, dict[str, Any]]:
+    text = user.casefold()
+    if "without calling another tool" in text or "without another tool" in text:
+        names: tuple[str, ...] = ()
+    elif "status" in text:
+        names = ("get_run_status", "run_bsam", "stop_run")
+    elif "stop" in text:
+        names = ("stop_run", "get_run_status", "run_bsam")
+    elif "run" in text or "launch" in text:
+        names = ("run_bsam", "validate_model", "get_run_status", "stop_run")
+    elif "unknown" in text or "undocumented" in text or "sounds plausible" in text:
+        names = ("get_capabilities", "preview_parameter_change", "validate_model")
+    elif "rename" in text:
+        names = (
+            "preview_rename_boundary_condition", "preview_parameter_change", "review_change"
+        )
+    elif "two-to-eight" in text or "eight-ply" in text:
+        names = ("preview_expand_notch_plies", "preview_parameter_change", "review_change")
+    elif "apply" in text:
+        names = ("apply_change", "review_change", "validate_model")
+    elif "stale" in text or "recheck" in text:
+        names = ("review_change", "apply_change", "validate_model")
+    elif "rewrite" in text or "render" in text:
+        names = (
+            "get_capabilities", "preview_parameter_change", "review_change", "apply_change"
+        )
+    elif "preview" in text or "chang" in text:
+        names = ("preview_parameter_change", "review_change", "apply_change")
+    elif "inspect" in text:
+        names = ("inspect_model", "validate_model", "import_mesh", "get_capabilities")
+    elif "validate" in text:
+        names = ("validate_model", "inspect_model", "get_capabilities")
+    else:
+        names = tuple(TOOL_CONTRACTS)
+    return {name: TOOL_CONTRACTS[name].request_schema() for name in names}
+
+
+def _native_decision(response: ProviderResponse) -> dict[str, Any]:
+    if len(response.tool_calls) > 1:
+        raise ValueError("evaluation response requested multiple tools")
+    if response.tool_calls:
+        call = response.tool_calls[0]
+        error_code = _policy_error(call.name, call.arguments)
+        return {
+            "outcome": "refuse" if error_code else "dispatch",
+            "tool": call.name,
+            "arguments": call.arguments,
+            "error_code": error_code,
+            "response": None,
+        }
+    content = (response.content or "").strip()
+    try:
+        value = json.loads(content)
+    except json.JSONDecodeError:
+        return {
+            "outcome": "answer", "tool": None, "arguments": {},
+            "error_code": None, "response": content,
+        }
+    if not isinstance(value, dict) or value.get("outcome") != "refuse":
+        raise ValueError("non-tool JSON response is not a refusal")
+    error_code = value.get("error_code")
+    if not isinstance(error_code, str):
+        raise ValueError("refusal requires error_code")
+    return {
+        "outcome": "refuse", "tool": None, "arguments": {},
+        "error_code": error_code, "response": value.get("response"),
+    }
+
+
+def _policy_error(tool: str, arguments: dict[str, Any]) -> str | None:
+    for name in (
+        "source", "template", "mesh", "plan_path", "destination", "audit_path",
+        "output_dir", "executable",
+    ):
+        value = arguments.get(name)
+        if isinstance(value, str):
+            path = Path(value)
+            if path.is_absolute() or ".." in path.parts:
+                return "path_not_allowed"
+    if tool in {"apply_change", "run_bsam", "stop_run"} and arguments.get("confirm") is not True:
+        return "confirmation_required"
+    return None
+
+
 def _parse_decision(content: str | None) -> dict[str, Any]:
     if content is None:
         raise ValueError("model returned no decision content")
@@ -83,28 +184,36 @@ def run_chat_benchmark(
     acceptance_path: Path,
     *,
     peak_working_memory_gib: float | None = None,
+    native_tools: bool = False,
 ) -> dict[str, Any]:
     cases = load_chat_cases(cases_path)["cases"]
     acceptance = json.loads(acceptance_path.read_text(encoding="utf-8"))
-    system = evaluation_system_prompt()
+    system = native_evaluation_system_prompt() if native_tools else evaluation_system_prompt()
     results: list[dict[str, Any]] = []
     latencies: list[float] = []
     for case in cases:
         started = time.perf_counter()
-        response = provider.complete(ProviderRequest(
-            messages=(Message("system", system), Message("user", case["user"])),
-            tools={},
-            response_schema=decision_schema(),
-            max_output_tokens=512,
-            correlation_id=f"eval-{case['id']}",
-            data_policy="synthetic-only",
-        ))
+        provider_error: str | None = None
+        try:
+            response = provider.complete(ProviderRequest(
+                messages=(Message("system", system), Message("user", case["user"])),
+                tools=candidate_tools(case["user"]) if native_tools else {},
+                response_schema=None if native_tools else decision_schema(),
+                max_output_tokens=512,
+                correlation_id=f"eval-{case['id']}",
+                data_policy="synthetic-only",
+            ))
+        except Exception as exc:
+            provider_error = str(exc)
+            response = ProviderResponse()
         elapsed = time.perf_counter() - started
         latencies.append(elapsed)
         schema_valid = True
         error: str | None = None
         try:
-            decision = _parse_decision(response.content)
+            if provider_error:
+                raise ValueError(provider_error)
+            decision = _native_decision(response) if native_tools else _parse_decision(response.content)
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             schema_valid = False
             error = str(exc)
@@ -172,6 +281,7 @@ def run_chat_benchmark(
     }
     return {
         "schema_version": "0.1.0",
+        "mode": "native-tools" if native_tools else "structured-decision",
         "case_count": count,
         "metrics": metrics,
         "acceptance": acceptance,

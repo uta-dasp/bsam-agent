@@ -2,7 +2,7 @@
 
 BSAM Agent will create, understand, modify, validate, and run current-syntax BSAM input files on Windows. This repository is intentionally separate from the BSAM source tree and will not modify BSAM itself.
 
-Status: G4 local-model benchmarking is in progress while G1 coverage and G3 deterministic capability expansion continue. The runnable core includes lossless inspection, semantic validation, reviewed typed edits, mesh-template assembly, the approved notch 2-to-8-ply transformation, supervised BSAM execution, and a validated llama.cpp loopback adapter. The initial 8B model failed the chat accuracy gates, so it is not selected for the client.
+Status: G4 local-model benchmarking is in progress while G1 coverage and G3 deterministic capability expansion continue. The runnable core includes lossless inspection, semantic validation, reviewed typed edits, mesh-template assembly, the approved notch 2-to-8-ply transformation, supervised BSAM execution, and a validated llama.cpp loopback adapter. Llama 3.1 8B and Llama 4 Scout both failed the chat acceptance gates, so the planned Llama 3.3 70B control benchmark is the next model-selection decision.
 
 ## Version 1 target
 
