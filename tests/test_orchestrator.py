@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
-from bsam_agent.orchestrator import ChatOrchestrator, _summarize_result
+from bsam_agent.orchestrator import ChatOrchestrator, ConversationState, _summarize_result
 from bsam_agent.provider import ProviderConfig, ProviderRequest, ProviderResponse, Usage
 
 
@@ -194,6 +194,13 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(first.state.conversation_id, restored.state.conversation_id)
         self.assertEqual("apply_change", restored.state.pending_action.tool)  # type: ignore[union-attr]
 
+    def test_existing_session_schema_migrates_without_a_last_plan(self) -> None:
+        value = ConversationState().as_dict()
+        value["schema_version"] = "0.1.0"
+        value.pop("last_plan")
+        restored = ConversationState.from_dict(value)
+        self.assertIsNone(restored.last_plan)
+
     def test_end_to_end_preview_confirm_and_apply_with_fake_provider(self) -> None:
         deck = (
             b"INPUT\n3\nEND INPUT\n"
@@ -207,9 +214,6 @@ class OrchestratorTests(unittest.TestCase):
                 "parameter": "absolute", "value": "2", "plan_path": "plans/change.json",
                 "occurrence": 0,
             }),
-            decision("dispatch", "apply_change", {
-                "plan_path": "plans/change.json", "destination": "changed.in", "confirm": False,
-            }),
         )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -217,7 +221,7 @@ class OrchestratorTests(unittest.TestCase):
             (root / "plans").mkdir()
             agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
             preview = agent.turn("Preview changing absolute to 2 in model.in")
-            pending = agent.turn("Apply plans/change.json to changed.in")
+            pending = agent.turn("Apply that change to changed.in")
             applied = agent.turn("/confirm")
             output = (root / "changed.in").read_bytes()
         self.assertEqual("propose", preview.phase)
@@ -249,6 +253,59 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(preview.requires_confirmation)
         self.assertIn("model.changed.in", preview.message)
         self.assertEqual("verify", applied.phase)
+        self.assertIn(b"d_reduction=0.5", output)
+
+    def test_model_routes_high_level_parameter_intent_through_registry(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\nd_reduction=0.25\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        provider = FakeProvider(decision(
+            "dispatch", "preview_parameter_change",
+            {"source": "model.in", "parameter": "d_reduction", "value": "0.5"},
+        ))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Please make the time-increment reduction ratio 0.5 in model.in")
+        self.assertEqual("propose", result.phase)
+        called_contract = provider.requests[0].messages[0].content
+        self.assertIn("d_reduction", called_contract)
+        self.assertIn("BOUNDARY/CONVERGENCE", called_contract)
+        self.assertIn("d_reduction=0.5", result.tool_result["source_diff"])  # type: ignore[index]
+
+    def test_ambiguous_parameter_request_asks_for_context(self) -> None:
+        routed = decision(
+            "dispatch", "preview_parameter_change",
+            {"source": "model.in", "parameter": "type", "value": "static"},
+        )
+        provider = FakeProvider(routed, routed)
+        agent = ChatOrchestrator(provider, config(), FakeApi())  # type: ignore[arg-type]
+        result = agent.turn("Adjust the type to static in model.in")
+        self.assertEqual("invalid_arguments", result.error_code)
+        self.assertIn("ambiguous", result.message)
+        self.assertIn("specify one of these contexts", result.message)
+
+    def test_requested_output_path_is_preserved_for_follow_up(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\nd_reduction=0.25\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(FakeProvider(), config(), LocalAgentApi(root))
+            preview = agent.turn(
+                "Change d_reduction in model.in to 0.5 and create new-output.in."
+            )
+            agent.turn("/confirm")
+            output = (root / "new-output.in").read_bytes()
+        self.assertEqual("confirm", preview.phase)
         self.assertIn(b"d_reduction=0.5", output)
 
     def test_natural_inspection_does_not_depend_on_model_routing(self) -> None:

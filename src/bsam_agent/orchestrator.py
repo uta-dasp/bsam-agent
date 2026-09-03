@@ -34,6 +34,12 @@ class PendingAction:
     arguments: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class LastPlan:
+    plan_path: str
+    source: str
+
+
 @dataclass
 class ConversationState:
     conversation_id: str = field(default_factory=lambda: uuid4().hex)
@@ -41,11 +47,13 @@ class ConversationState:
     turn_number: int = 0
     history: list[Message] = field(default_factory=list)
     pending_action: PendingAction | None = None
+    last_plan: LastPlan | None = None
 
     def as_dict(self) -> dict[str, Any]:
         pending = self.pending_action
+        last_plan = self.last_plan
         return {
-            "schema_version": "0.1.0",
+            "schema_version": "0.2.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -53,16 +61,21 @@ class ConversationState:
             "pending_action": None if pending is None else {
                 "tool": pending.tool, "arguments": pending.arguments,
             },
+            "last_plan": None if last_plan is None else {
+                "plan_path": last_plan.plan_path, "source": last_plan.source,
+            },
         }
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") != "0.1.0":
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
             "pending_action",
         }
+        if value["schema_version"] == "0.2.0":
+            expected.add("last_plan")
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
         if not isinstance(value["conversation_id"], str) or not value["conversation_id"]:
@@ -97,8 +110,19 @@ class ConversationState:
             if arguments.get("confirm") is not False:
                 raise ValueError("pending action must remain unconfirmed")
             pending = PendingAction(tool, arguments)
+        last_plan = None
+        last_plan_value = value.get("last_plan")
+        if last_plan_value is not None:
+            if (
+                not isinstance(last_plan_value, dict)
+                or set(last_plan_value) != {"plan_path", "source"}
+                or not all(isinstance(item, str) and item for item in last_plan_value.values())
+            ):
+                raise ValueError("last plan is invalid")
+            last_plan = LastPlan(last_plan_value["plan_path"], last_plan_value["source"])
         return cls(
-            value["conversation_id"], value["phase"], value["turn_number"], history, pending
+            value["conversation_id"], value["phase"], value["turn_number"], history,
+            pending, last_plan,
         )
 
 
@@ -143,7 +167,7 @@ def relevant_tools(user_text: str) -> tuple[str, ...]:
         return ("preview_expand_notch_plies", "review_change")
     if "apply" in text:
         return ("apply_change", "review_change")
-    if "preview" in text or "chang" in text:
+    if re.search(r"\b(?:preview|change|changing|set|adjust|make|modify|update)\b", text):
         return ("preview_parameter_change", "review_change", "apply_change")
     if "stale" in text or "recheck" in text or "review" in text:
         return ("review_change", "apply_change", "validate_model")
@@ -189,7 +213,7 @@ def routing_prompt(tool_names: tuple[str, ...]) -> str:
     contracts = {
         name: {
             "description": TOOL_DESCRIPTIONS[name],
-            "arguments": TOOL_CONTRACTS[name].request_schema(),
+            "arguments": _routing_request_schema(name),
         }
         for name in tool_names
     }
@@ -199,10 +223,29 @@ def routing_prompt(tool_names: tuple[str, ...]) -> str:
         "Return exactly one JSON object matching the supplied schema. Use outcome=dispatch only "
         "for a listed tool and copy explicit user values exactly. For apply, run, or stop, always "
         "set confirm=false; the local application handles confirmation. Use outcome=refuse, "
-        "tool=null, and arguments={} for unsupported raw rewriting. Use outcome=answer only when "
+        "tool=null, and arguments={} for unsupported raw rewriting. Changing an existing "
+        "registered parameter is supported and must use preview_parameter_change, not refusal. "
+        "For that tool identify only source, parameter, and value; deterministic code resolves "
+        "the internal BSAM location and safe output paths. Use outcome=answer only when "
         "no tool is needed. Unknown BSAM features route to get_capabilities. Available tools: "
         + json.dumps(contracts, separators=(",", ":"), sort_keys=True)
     )
+
+
+def _routing_request_schema(tool: str) -> dict[str, Any]:
+    if tool != "preview_parameter_change":
+        return TOOL_CONTRACTS[tool].request_schema()
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["source", "parameter", "value"],
+        "properties": {
+            "source": {"type": "string"},
+            "parameter": {"type": "string"},
+            "value": {"type": "string"},
+        },
+        "registered_parameters": _parameter_catalog(),
+    }
 
 
 class ChatOrchestrator:
@@ -263,6 +306,8 @@ class ChatOrchestrator:
         if decision is None:
             decision = _deterministic_parameter_request(text)
         if decision is None:
+            decision = _deterministic_last_plan_request(text, self.state)
+        if decision is None:
             try:
                 decision, response = self._route(text, tool_names, correlation_id)
             except (OSError, RuntimeError) as exc:
@@ -304,12 +349,16 @@ class ChatOrchestrator:
             )
         arguments = _normalize_arguments(tool, decision["arguments"], text)
         arguments = _add_safe_defaults(tool, arguments)
+        arguments = _conversation_defaults(tool, arguments, text, self.state)
         if tool in GUARDED_TOOLS:
             arguments["confirm"] = False
         try:
             validate_arguments(tool, arguments)
         except (KeyError, TypeError, ValueError) as exc:
-            return self._result("explain", str(exc), tool=tool, error="invalid_arguments")
+            return self._result(
+                "explain", _invalid_argument_guidance(tool, arguments, exc),
+                tool=tool, error="invalid_arguments",
+            )
         if tool in GUARDED_TOOLS:
             self.state.pending_action = PendingAction(tool, arguments)
             self.state.phase = "confirm"
@@ -326,6 +375,7 @@ class ChatOrchestrator:
         system = routing_prompt(tool_names)
         messages = (Message("system", system), *self.state.history, Message("user", user_text))
         last = ProviderResponse()
+        last_decision: dict[str, Any] | None = None
         for attempt in range(self.repair_attempts + 1):
             request = ProviderRequest(
                 messages=messages,
@@ -338,6 +388,7 @@ class ChatOrchestrator:
             try:
                 last = self.provider.complete(request)
                 decision = self._parse_decision(last.content, tool_names)
+                last_decision = decision
                 if decision["tool"] is not None:
                     decision = dict(decision)
                     decision["arguments"] = _add_safe_defaults(
@@ -348,7 +399,7 @@ class ChatOrchestrator:
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 if attempt >= self.repair_attempts:
                     self._audit("model_response_invalid", error_code=type(exc).__name__)
-                    return None, last
+                    return last_decision, last
                 messages = (
                     Message("system", system), Message("user", user_text),
                     Message("assistant", last.content or ""),
@@ -435,6 +486,12 @@ class ChatOrchestrator:
         else:
             phase = "verify"
         message = _summarize_result(tool, result)
+        if tool in PREVIEW_TOOLS:
+            source = arguments.get("source") or arguments.get("template")
+            plan_path = arguments.get("plan_path")
+            if isinstance(source, str) and isinstance(plan_path, str):
+                self.state.last_plan = LastPlan(plan_path, source)
+                message += f" Plan: {plan_path}."
         pending = _preview_follow_up(tool, arguments, user_text)
         if pending is not None:
             self.state.pending_action = pending
@@ -507,25 +564,36 @@ def _normalize_arguments(
     return result
 
 
-def _source_path_from_text(text: str) -> str | None:
-    match = re.search(
+def _input_paths_from_text(text: str) -> list[str]:
+    matches = re.finditer(
         r'(?:"([^"\r\n]+\.in)"|\'([^\'\r\n]+\.in)\'|'
         r'((?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.in|[A-Za-z0-9_.-]+\.in))',
         text, re.IGNORECASE,
     )
-    if match is None:
-        return None
-    return next(value for value in match.groups() if value is not None).replace("\\", "/")
+    return [
+        next(value for value in match.groups() if value is not None).replace("\\", "/")
+        for match in matches
+    ]
+
+
+def _source_path_from_text(text: str) -> str | None:
+    paths = _input_paths_from_text(text)
+    return paths[0] if paths else None
 
 
 def _parameter_location(name: str) -> tuple[str, str, str] | None:
+    matches = _parameter_candidates(name)
+    return matches[0][:3] if len(matches) == 1 else None
+
+
+def _parameter_candidates(name: str) -> list[tuple[str, str, str, str]]:
     registry = load_registry()
     blocks = {
         item.get("id"): str(item.get("canonical", "")).lstrip("*")
         for item in registry.get("top_level_blocks", [])
         if isinstance(item, dict)
     }
-    matches: list[tuple[str, str, str]] = []
+    matches: list[tuple[str, str, str, str]] = []
     for construct in registry.get("nested_constructs", []):
         if not isinstance(construct, dict):
             continue
@@ -537,8 +605,30 @@ def _parameter_location(name: str) -> tuple[str, str, str] | None:
                 block = blocks.get(construct.get("parent_block_id"), "")
                 nested = str(construct.get("canonical", "")).lstrip("*")
                 if block and nested:
-                    matches.append((block, nested, canonical))
-    return matches[0] if len(matches) == 1 else None
+                    matches.append((
+                        block, nested, canonical, str(parameter.get("summary", "")),
+                    ))
+    return matches
+
+
+def _parameter_catalog() -> list[dict[str, Any]]:
+    registry = load_registry()
+    names = sorted({
+        str(parameter.get("name", ""))
+        for construct in registry.get("nested_constructs", [])
+        if isinstance(construct, dict)
+        for parameter in construct.get("parameters", [])
+        if isinstance(parameter, dict) and parameter.get("name")
+    }, key=str.casefold)
+    result = []
+    for name in names:
+        candidates = _parameter_candidates(name)
+        result.append({
+            "name": name,
+            "meaning": candidates[0][3] if len(candidates) == 1 else "context-dependent",
+            "locations": [f"{item[0]}/{item[1]}" for item in candidates],
+        })
+    return result
 
 
 def _default_plan_path(source: str, operation: str) -> str:
@@ -554,6 +644,12 @@ def _default_destination(source: str) -> str:
 
 def _deterministic_parameter_request(text: str) -> dict[str, Any] | None:
     """Recognize the narrow, registry-backed parameter-edit form without model guessing."""
+    if not re.search(
+        r"\b(?:create|write|save|produce)\b.*\b(?:new|output|file|deck)\b|"
+        r"\bdo\s+not\s+overwrite\b",
+        text, re.IGNORECASE,
+    ):
+        return None
     change = re.search(
         r"\b(?:change|set|update)\s+(?:the\s+)?(?P<parameter>[A-Za-z][A-Za-z0-9_-]*)"
         r"\b.*?\bto\s+(?P<value>[^\s,;]+)",
@@ -594,6 +690,27 @@ def _deterministic_inspection_request(text: str) -> dict[str, Any] | None:
     }
 
 
+def _deterministic_last_plan_request(
+    text: str, state: ConversationState,
+) -> dict[str, Any] | None:
+    last_plan = state.last_plan
+    if last_plan is None or not re.search(r"\b(?:apply|write|save)\b", text, re.IGNORECASE):
+        return None
+    if not re.search(r"\b(?:that|it|change|plan|preview|reviewed)\b", text, re.IGNORECASE):
+        return None
+    paths = _input_paths_from_text(text)
+    destination = paths[-1] if paths else _default_destination(last_plan.source)
+    return {
+        "outcome": "dispatch", "tool": "apply_change",
+        "arguments": {
+            "plan_path": last_plan.plan_path,
+            "destination": destination,
+            "confirm": False,
+        },
+        "error_code": None, "response": None,
+    }
+
+
 def _add_safe_defaults(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
     result = dict(arguments)
     if tool == "preview_parameter_change" and "parameter" in result:
@@ -612,6 +729,19 @@ def _add_safe_defaults(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _conversation_defaults(
+    tool: str, arguments: dict[str, Any], user_text: str, state: ConversationState,
+) -> dict[str, Any]:
+    result = dict(arguments)
+    if tool in PREVIEW_TOOLS and not re.search(r"\b[^\s\"']+\.json\b", user_text, re.IGNORECASE):
+        source = result.get("source") or result.get("template")
+        if isinstance(source, str) and source:
+            operation = str(result.get("parameter") or tool.removeprefix("preview_"))
+            token = f"{operation}-{state.conversation_id[:8]}-{state.turn_number}"
+            result["plan_path"] = _default_plan_path(source, token)
+    return result
+
+
 def _preview_follow_up(
     tool: str, arguments: dict[str, Any], user_text: str,
 ) -> PendingAction | None:
@@ -625,9 +755,11 @@ def _preview_follow_up(
     plan_path = arguments.get("plan_path")
     if not isinstance(source, str) or not isinstance(plan_path, str):
         return None
+    paths = _input_paths_from_text(user_text)
+    destination = paths[1] if len(paths) > 1 else _default_destination(source)
     return PendingAction("apply_change", {
         "plan_path": plan_path,
-        "destination": _default_destination(source),
+        "destination": destination,
         "confirm": False,
     })
 
@@ -641,6 +773,37 @@ def _unsupported_guidance(user_text: str) -> str | None:
             "legacy solver, or review/apply an existing plan."
         )
     return None
+
+
+def _invalid_argument_guidance(
+    tool: str, arguments: dict[str, Any], error: Exception,
+) -> str:
+    if tool != "preview_parameter_change":
+        return str(error)
+    missing = [
+        label for key, label in (
+            ("source", "the relative `.in` source path"),
+            ("parameter", "the parameter name"),
+            ("value", "the new value"),
+        )
+        if not arguments.get(key)
+    ]
+    if missing:
+        return "Please specify " + ", ".join(missing) + ". No change was made."
+    parameter = str(arguments["parameter"])
+    candidates = _parameter_candidates(parameter)
+    if not candidates:
+        return (
+            f"`{parameter}` is not a registered editable parameter. "
+            "Ask for capabilities or use the canonical parameter name. No change was made."
+        )
+    if len(candidates) > 1 and (not arguments.get("block") or not arguments.get("construct")):
+        locations = ", ".join(f"{item[0]}/{item[1]}" for item in candidates)
+        return (
+            f"`{parameter}` is ambiguous; specify one of these contexts: {locations}. "
+            "No change was made."
+        )
+    return f"The parameter request is incomplete or invalid: {error}. No change was made."
 
 
 def _summarize_result(tool: str, result: dict[str, Any]) -> str:

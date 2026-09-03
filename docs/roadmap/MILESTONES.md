@@ -188,8 +188,11 @@ Exit: a user can converse locally with BSAM Agent to inspect a project, request 
 
 - [x] Expand deterministic inspection messages with per-cluster mesh counts, ply-like structure, sections, boundary targets, constitutive types, reference resolution, source-set status, and diagnostics.
 - [x] Resolve an explicitly named, uniquely registered parameter to its owning block and construct without model guessing.
+- [x] Present the model with a registry-generated high-level parameter catalog instead of requiring internal block, construct, and plan-path knowledge.
 - [x] Generate safe plan and non-overwriting output defaults for a natural registered-parameter request.
 - [x] Chain a successful preview to a separately confirmed apply when the user requests a new output file.
+- [x] Retain the latest reviewed plan so conversational follow-ups such as `apply that change` resolve deterministically, including across resumed sessions.
+- [x] Return explicit clarification guidance for missing, unknown, or context-ambiguous parameters.
 - [x] Replace generic model refusals for edit requests with an actionable summary of currently supported operations.
 - [x] Add regression tests for the two requests used in the first real user conversation.
 - [ ] Repeat the improved inspect and parameter-change conversation with the live Scout runtime and obtain user acceptance.

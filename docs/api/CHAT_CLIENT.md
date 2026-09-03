@@ -31,6 +31,8 @@ Change d_reduction in projects/notch_v1/notch_v1.in to 0.5 and create a new file
 
 The client previews the diff first. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file.
 
+For a preview-only request, the conversation remembers the reviewed plan. A later `apply that change to output.in` selects that exact plan and still requires `/confirm`. Parameter names and their BSAM locations come from the capability registry; the model is not required to invent internal block or construct names. Missing or ambiguous parameter context produces a clarification instead of a guessed edit.
+
 Preview and review responses display the deterministic source diff. Validation, apply, run, status, and stop responses are summarized from tool results rather than model claims. Run artifact directories are shown in the response.
 
 ## Current limitations and recovery
