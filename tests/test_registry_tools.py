@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(56, counts["evidence"])
+        self.assertEqual(58, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -160,6 +160,26 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("exactly three positive", contract)
         self.assertIn("stat_<name>_<initial-value>", contract)
         self.assertIn("generation=0", contract)
+
+    def test_material_types_and_structured_grammars_are_registered(self) -> None:
+        block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "MATERIALS")
+        self.assertEqual("partially-documented", block["coverage"])
+        parameters = {item["name"]: item for item in block["parameters"]}
+        numeric_types = [value for value in parameters["type"]["allowed_values"] if isinstance(value, int)]
+        self.assertEqual(28, len(numeric_types))
+        self.assertIn("mises", parameters["type"]["allowed_values"])
+        self.assertIn("hkin", parameters["structured_bulk_key"]["allowed_values"])
+        self.assertIn("penalty_stiffness", parameters["structured_interface_key"]["allowed_values"])
+        variants = {item["name"]: item for item in block["body"]["variants"]}
+        self.assertEqual(
+            {"structured-bulk-type-999", "structured-interface-type-998", "structured-j2-type-50", "legacy-numeric-types"},
+            set(variants),
+        )
+        contract = json.dumps(block).lower()
+        self.assertIn("load_vector keyword has no dispatch case", contract)
+        self.assertIn("canonical generation uses initval", contract)
+        self.assertIn("table_<name>", contract)
+        self.assertIn("replace the entire type-specific body atomically", contract)
 
     def test_numeric_user_function_variants_are_bounded(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "USER")

@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.14.0`
-- Registry SHA-256: `50E78AEDBD7574F691826F193CCC90D73128355AC71BF686AE276C7480D00424`
+- Registry version: `0.15.0`
+- Registry SHA-256: `A1BDCFABF5A44F2BDBEA3C78D8890C20E4A923137A3B8AF7DA3ECFD43B8C72DF`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -27,7 +27,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | documented | Defines constitutive law records that reference material and failure definitions. |
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
-| `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | identified | Defines bulk and interface material records, including current structured material forms. |
+| `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | partially-documented | Defines bulk and interface material records, including current structured material forms. |
 | `FAILURE` | no | exact-case-sensitive | `FAI_INI` | documented | Defines failure criterion records referenced by constitutive laws and damage behavior. |
 | `USER` | no | exact-case-sensitive | `USF_INI` | documented | Defines numeric user-function records, including polynomial and discrete forms. |
 | `CRACK` | no | exact-case-sensitive | `CRK_INI` | documented | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
@@ -373,14 +373,50 @@ Defines bulk and interface material records, including current structured materi
 - Lookup token/matcher: `MATERIALS` / exact-case-sensitive
 - Required: yes
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
-- Coverage: identified
-- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Coverage: partially-documented
+- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+
+Known parameters:
+
+- `type` (integer-or-named-header, required) (allowed: `1`, `2`, `3`, `4`, `5`, `6`, `7`, `10`, `11`, `12`, `15`, `40`, `41`, `50`, `100`, `101`, `102`, `103`, `104`, `105`, `106`, `200`, `210`, `300`, `500`, `800`, `998`, `999`, `mises`): Selects one of the 28 active numeric material implementations; type=mises is the named spelling of type 50.
+- `name` (string, optional): Optional note accepted only on a key/value header such as type=mises name=steel.
+- `structured_bulk_key` (enum, optional) (allowed: `e11`, `e22`, `e33`, `g13`, `g23`, `g12`, `nu13`, `nu23`, `nu12`, `xt`, `xc`, `yt`, `yc`, `s`, `s13`, `s12`, `s23`, `fxt`, `fxc`, `fgt`, `fgc`, `gxt`, `gxc`, `rho`, `density`, `a11`, `a22`, `a33`, `b11`, `b22`, `b33`, `lv1`, `lv2`, `lv3`, `lv4`, `lv5`, `lv6`, `s1`, `s2`, `eta1`, `*fiber`, `*max_crack_angle`, `cure_temp`, `tcure`, `amp`, `test_temp`, `*cdm`, `e`, `nu`, `y0`, `yinf`, `pbeta`, `hiso`, `hkin`): Implemented lowercase keys for structured bulk type 999 and the shared type-50 initializer; density and tcure are aliases.
+- `structured_interface_key` (enum, optional) (allowed: `k`, `penalty`, `penalty_stiffness`, `tol`, `tolerance`, `fric`, `friction`, `initval`, `yt`, `yc`, `s`, `gic`, `g1c`, `giic`, `g11c`, `giiic`, `g111c`, `s1`, `s2`, `eta1`, `m1`, `m2`, `c1`, `c2`, `eta2`, `cure_temp`, `tcure`, `amp`, `test_temp`, `davila`, `tangent`, `rel_t`): Implemented canonical keys and aliases for structured interface type 998.
+- `structured_parameter_value` (real-or-reference-expression, optional): Material-parameter values may be constants or table_<name>, stat_<name>_<initial>, ufunc_<name>, a combined table/stat expression, and for bulk material parameters poly_<table-name>... .
 
 Remaining specification work:
 
-- Enumerate every active material type and exact parameter schema.
-- Document structured bulk type 999 and interface type 998 from their class initializers.
-- Map table/statistical-distribution references and edit impacts.
+- Document the exact record grammar and numerical constraints for the 25 legacy numeric types.
+- Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.
+- Map material-type compatibility to each constitutive and element family.
+
+### `MATERIALS` body
+
+Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.
+
+- **structured-bulk-type-999** (the entry header is numeric type 999):
+  - `parameter` [repeated]: `key=value`:one-or-more-structured-bulk-keys paired with one-or-more values
+  - `material-end` [once]: `*end`:exact-lowercase-sentinel
+  - Constraint: The initializer lowercases and normalizes commas and whitespace before parsing.
+  - Constraint: Every assignment line must contain exactly one equals sign.
+  - Constraint: Unknown keys warn and then stop in the active dispatch; canonical generation uses only registered keys.
+  - Constraint: The advertised load_vector keyword has no dispatch case and is blocked from generation.
+- **structured-interface-type-998** (the entry header is numeric type 998):
+  - `parameter` [repeated]: `key=value`:one-or-more-structured-interface-keys paired with one-or-more values
+  - `material-end` [once]: `*end`:exact-lowercase-sentinel
+  - Constraint: The initializer lowercases and normalizes commas and whitespace before parsing.
+  - Constraint: Every assignment line must contain exactly one equals sign.
+  - Constraint: The init alias is dispatched but omitted from the initializer's accepted-key check and therefore warns; canonical generation uses initval.
+  - Constraint: Unknown keys warn and then stop in the active dispatch.
+- **structured-j2-type-50** (the entry header is numeric type 50 or type=mises):
+  - `plasticity-parameter` [repeated]: `key=value`:enum(e,nu,y0,yinf,pbeta,hiso,hkin)=real-or-reference-expression
+  - `material-end` [once]: `*end`:exact-lowercase-sentinel
+  - Constraint: The named header parser recognizes only type=mises or type=50 and an optional name pair.
+  - Constraint: Canonical generation restricts type 50 to the seven J2 keys even though the shared class dispatcher exposes other bulk keys.
+- **legacy-numeric-types** (the numeric type is any active type other than 50, 998, or 999):
+  - `type-specific-body` [once]: `records`:legacy-type-specific-record-sequence
+  - Constraint: These 25 types are recognized and preservable, but Agent generation and field edits remain blocked until each exact record schema is documented.
+  - Constraint: Type 800 additionally reads a referenced COMPRO output file from disk.
 
 ### `FAILURE`
 
@@ -1142,7 +1178,11 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 <a id="evidencestat-dist-initializer"></a>
 - `evidence.stat-dist-initializer` — source: `source/libbsam/statistical_dist.f90:80-565` — Parses statistical distribution attributes and implements active type-3 Weibull scaling for coordinate- or fiber-aligned three-dimensional seeding.
 <a id="evidencematerial-parser"></a>
-- `evidence.material-parser` — source: `source/libbsam/mat_ini.f90:62-230` — Requires MATERIALS and dispatches legacy numeric and newer representations, including numeric or named Mises material type 50.
+- `evidence.material-parser` — source: `source/libbsam/mat_ini.f90:62-1958` — Requires MATERIALS, enumerates 28 active numeric types, parses their legacy or structured bodies, and initializes the bulk, interface, and J2 structured-material arrays.
+<a id="evidencematerial-structured-bulk"></a>
+- `evidence.material-structured-bulk` — source: `source/libbsam/material.f90:162-632` — Parses structured bulk-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, polynomial-table, and user-function parameter forms.
+<a id="evidencematerial-structured-interface"></a>
+- `evidence.material-structured-interface` — source: `source/libbsam/interface_material.f90:123-464` — Parses structured interface-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, and user-function parameter forms.
 <a id="evidencefailure-parser"></a>
 - `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-339` — Locates optional FAILURE and parses every accepted no-data, degradation-table, wrapper, CFV, and LARC04 criterion record, including interface types 34, 35, and 36.
 <a id="evidencefailure-storage"></a>

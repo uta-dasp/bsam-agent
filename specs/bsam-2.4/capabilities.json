@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.14.0",
+  "registry_version": "0.15.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -297,8 +297,24 @@
       "kind": "source",
       "locator": "source/libbsam/mat_ini.f90",
       "line_start": 62,
-      "line_end": 230,
-      "claim": "Requires MATERIALS and dispatches legacy numeric and newer representations, including numeric or named Mises material type 50."
+      "line_end": 1958,
+      "claim": "Requires MATERIALS, enumerates 28 active numeric types, parses their legacy or structured bodies, and initializes the bulk, interface, and J2 structured-material arrays."
+    },
+    {
+      "id": "evidence.material-structured-bulk",
+      "kind": "source",
+      "locator": "source/libbsam/material.f90",
+      "line_start": 162,
+      "line_end": 632,
+      "claim": "Parses structured bulk-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, polynomial-table, and user-function parameter forms."
+    },
+    {
+      "id": "evidence.material-structured-interface",
+      "kind": "source",
+      "locator": "source/libbsam/interface_material.f90",
+      "line_start": 123,
+      "line_end": 464,
+      "claim": "Parses structured interface-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, and user-function parameter forms."
     },
     {
       "id": "evidence.failure-parser",
@@ -1159,13 +1175,89 @@
         "tokens": ["*end for structured material entries", "END MATERIALS"],
         "certainty": "accepted-current"
       },
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.material-parser", "evidence.current-vtms-deck-tric"],
+      "coverage": "partially-documented",
+      "parameters": [
+        {
+          "name": "type",
+          "value_type": "integer-or-named-header",
+          "required": true,
+          "allowed_values": [1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 15, 40, 41, 50, 100, 101, 102, 103, 104, 105, 106, 200, 210, 300, 500, 800, 998, 999, "mises"],
+          "summary": "Selects one of the 28 active numeric material implementations; type=mises is the named spelling of type 50."
+        },
+        {
+          "name": "name",
+          "value_type": "string",
+          "required": false,
+          "summary": "Optional note accepted only on a key/value header such as type=mises name=steel."
+        },
+        {
+          "name": "structured_bulk_key",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["e11", "e22", "e33", "g13", "g23", "g12", "nu13", "nu23", "nu12", "xt", "xc", "yt", "yc", "s", "s13", "s12", "s23", "fxt", "fxc", "fgt", "fgc", "gxt", "gxc", "rho", "density", "a11", "a22", "a33", "b11", "b22", "b33", "lv1", "lv2", "lv3", "lv4", "lv5", "lv6", "s1", "s2", "eta1", "*fiber", "*max_crack_angle", "cure_temp", "tcure", "amp", "test_temp", "*cdm", "e", "nu", "y0", "yinf", "pbeta", "hiso", "hkin"],
+          "summary": "Implemented lowercase keys for structured bulk type 999 and the shared type-50 initializer; density and tcure are aliases."
+        },
+        {
+          "name": "structured_interface_key",
+          "value_type": "enum",
+          "required": false,
+          "allowed_values": ["k", "penalty", "penalty_stiffness", "tol", "tolerance", "fric", "friction", "initval", "yt", "yc", "s", "gic", "g1c", "giic", "g11c", "giiic", "g111c", "s1", "s2", "eta1", "m1", "m2", "c1", "c2", "eta2", "cure_temp", "tcure", "amp", "test_temp", "davila", "tangent", "rel_t"],
+          "summary": "Implemented canonical keys and aliases for structured interface type 998."
+        },
+        {
+          "name": "structured_parameter_value",
+          "value_type": "real-or-reference-expression",
+          "required": false,
+          "summary": "Material-parameter values may be constants or table_<name>, stat_<name>_<initial>, ufunc_<name>, a combined table/stat expression, and for bulk material parameters poly_<table-name>... ."
+        }
+      ],
+      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.current-vtms-deck-tric"],
+      "body": {
+        "style": "repeated-record-groups",
+        "termination": "next-top-level-block",
+        "variants": [
+          {
+            "name": "structured-bulk-type-999",
+            "when": "the entry header is numeric type 999",
+            "rows": [
+              {"name": "parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "one-or-more-structured-bulk-keys paired with one-or-more values", "required": false, "summary": "Assigns bulk properties; canonical generation emits one key/value assignment per line."}]},
+              {"name": "material-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-lowercase-sentinel", "required": true, "summary": "Terminates this structured material entry."}]}
+            ],
+            "constraints": ["The initializer lowercases and normalizes commas and whitespace before parsing.", "Every assignment line must contain exactly one equals sign.", "Unknown keys warn and then stop in the active dispatch; canonical generation uses only registered keys.", "The advertised load_vector keyword has no dispatch case and is blocked from generation."]
+          },
+          {
+            "name": "structured-interface-type-998",
+            "when": "the entry header is numeric type 998",
+            "rows": [
+              {"name": "parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "one-or-more-structured-interface-keys paired with one-or-more values", "required": false, "summary": "Assigns interface properties; canonical generation emits one key/value assignment per line."}]},
+              {"name": "material-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-lowercase-sentinel", "required": true, "summary": "Terminates this structured interface entry."}]}
+            ],
+            "constraints": ["The initializer lowercases and normalizes commas and whitespace before parsing.", "Every assignment line must contain exactly one equals sign.", "The init alias is dispatched but omitted from the initializer's accepted-key check and therefore warns; canonical generation uses initval.", "Unknown keys warn and then stop in the active dispatch."]
+          },
+          {
+            "name": "structured-j2-type-50",
+            "when": "the entry header is numeric type 50 or type=mises",
+            "rows": [
+              {"name": "plasticity-parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "enum(e,nu,y0,yinf,pbeta,hiso,hkin)=real-or-reference-expression", "required": false, "summary": "Assigns isotropic elasticity and J2 hardening properties through the bulk structured-material initializer."}]},
+              {"name": "material-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-lowercase-sentinel", "required": true, "summary": "Terminates this J2 material entry."}]}
+            ],
+            "constraints": ["The named header parser recognizes only type=mises or type=50 and an optional name pair.", "Canonical generation restricts type 50 to the seven J2 keys even though the shared class dispatcher exposes other bulk keys."]
+          },
+          {
+            "name": "legacy-numeric-types",
+            "when": "the numeric type is any active type other than 50, 998, or 999",
+            "rows": [
+              {"name": "type-specific-body", "repetition": "once", "fields": [{"name": "records", "value_type": "legacy-type-specific-record-sequence", "required": true, "summary": "Fixed or counted records consumed by the selected legacy implementation."}]}
+            ],
+            "constraints": ["These 25 types are recognized and preservable, but Agent generation and field edits remain blocked until each exact record schema is documented.", "Type 800 additionally reads a referenced COMPRO output file from disk."]
+          }
+        ],
+        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically."]
+      },
       "remaining_work": [
-        "Enumerate every active material type and exact parameter schema.",
-        "Document structured bulk type 999 and interface type 998 from their class initializers.",
-        "Map table/statistical-distribution references and edit impacts."
+        "Document the exact record grammar and numerical constraints for the 25 legacy numeric types.",
+        "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.",
+        "Map material-type compatibility to each constitutive and element family."
       ]
     },
     {
