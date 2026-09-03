@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(70, counts["evidence"])
+        self.assertEqual(74, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -132,9 +132,26 @@ class RegistryToolsTests(unittest.TestCase):
         tokens = {item["canonical"] for item in self.registry["nested_constructs"]}
         self.assertTrue({"*TYPE", "*BOUNDARY CONDITION", "*LOADING SEQUENCE", "*CONVERGENCE", "*OUTPUT"} <= tokens)
 
+    def test_boundary_problem_control_and_condition_grammars_are_registered(self) -> None:
+        constructs = {item["canonical"]: item for item in self.registry["nested_constructs"]}
+        for token in ("*TYPE", "*G-CONTROL", "*NAME", "*STATUS", "*CLUSTERS", "*BOUNDARY CONDITION"):
+            self.assertEqual("documented", constructs[token]["coverage"], token)
+            self.assertIn("body", constructs[token], token)
+        type_variants = {item["name"] for item in constructs["*TYPE"]["body"]["variants"]}
+        self.assertEqual({"mechanical", "thermal", "blocked-contact"}, type_variants)
+        g_params = {item["name"]: item for item in constructs["*G-CONTROL"]["parameters"]}
+        self.assertEqual(1000, g_params["G_ITER"]["default"])
+        self.assertEqual("restart", constructs["*STATUS"]["parameters"][0]["default"])
+        condition_text = json.dumps(constructs["*BOUNDARY CONDITION"]).lower()
+        self.assertIn("global-local-file", condition_text)
+        self.assertIn("surface-stress", condition_text)
+        self.assertIn("multi-file plan", condition_text)
+
     def test_major_boundary_record_groups_have_structured_bodies(self) -> None:
         constructs = {item["canonical"]: item for item in self.registry["nested_constructs"]}
         for token in ("*CONNECTIONS", "*LOADING SEQUENCE", "*CONVERGENCE", "*OUTPUT"):
+            self.assertEqual("documented", constructs[token]["coverage"], token)
+            self.assertEqual([], constructs[token]["remaining_work"], token)
             self.assertIn("body", constructs[token], token)
             self.assertTrue(constructs[token]["body"]["dependencies"], token)
         convergence_text = json.dumps(constructs["*CONVERGENCE"]).lower()
@@ -145,6 +162,22 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("twelve convergence records", convergence_text)
         connection_text = json.dumps(constructs["*CONNECTIONS"]).lower()
         self.assertIn("surface-contact", connection_text)
+        self.assertIn("no -21 execution case", connection_text)
+        loading_text = json.dumps(constructs["*LOADING SEQUENCE"]).lower()
+        self.assertIn("allocated fatigue fields have no source defaults", loading_text)
+        self.assertIn("omit internal types 21, 22, and 31", loading_text)
+        output_text = json.dumps(constructs["*OUTPUT"]).lower()
+        self.assertIn("enum-prefix(tecplot,vtk,para)", output_text)
+        self.assertIn("do not consume it", output_text)
+
+    def test_every_boundary_construct_has_a_documented_grammar(self) -> None:
+        self.assertEqual(
+            [],
+            [item["canonical"] for item in self.registry["nested_constructs"] if item["coverage"] != "documented"],
+        )
+        boundary = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "BOUNDARY")
+        self.assertEqual("documented", boundary["coverage"])
+        self.assertEqual([], boundary["remaining_work"])
 
     def test_boundary_solver_schedule_is_registered(self) -> None:
         constructs = {item["canonical"]: item for item in self.registry["nested_constructs"]}

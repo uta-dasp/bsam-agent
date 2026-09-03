@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.18.0",
+  "registry_version": "0.20.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -285,6 +285,14 @@
       "claim": "Defines penalty types -2/-21, nodal, and surface connection headers, subordinate set rows, defaults, sentinels, and cross-reference checks."
     },
     {
+      "id": "evidence.boundary-connection-execution",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_connections.f90",
+      "line_start": 25,
+      "line_end": 80,
+      "claim": "Dispatches active penalty type -2 to VTMS or SHEFF, surface-contact type -3 to SHEFF, and nodal type 888; parsed penalty type -21 has no execution branch."
+    },
+    {
       "id": "evidence.boundary-loading",
       "kind": "source",
       "locator": "source/libbsam/ibn_ini.f90",
@@ -309,12 +317,36 @@
       "claim": "Defines data-file, sum-force, volume-average, traction-average, and CFV output records and selectors."
     },
     {
+      "id": "evidence.boundary-output-execution",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_outputs.f90",
+      "line_start": 55,
+      "line_end": 310,
+      "claim": "Executes data-file and aggregate output families and defines intermediate-output scheduling behavior."
+    },
+    {
+      "id": "evidence.boundary-data-formats",
+      "kind": "source",
+      "locator": "source/libbsam/out_datafile.f90",
+      "line_start": 88,
+      "line_end": 490,
+      "claim": "Implements tec, vtk, and optional ParaView/SHEFF data-file output paths selected from the stored format and global ParaView flag."
+    },
+    {
       "id": "evidence.boundary-selectors",
       "kind": "source",
       "locator": "source/libbsam/ibn_ini_tools.f90",
       "line_start": 447,
       "line_end": 905,
       "claim": "Defines all/list/qualified-name selection for clusters and cluster-qualified node or element sets."
+    },
+    {
+      "id": "evidence.boundary-components",
+      "kind": "source",
+      "locator": "source/libbsam/ibn_ini_tools.f90",
+      "line_start": 754,
+      "line_end": 808,
+      "claim": "Maps every accepted one-, two-, and three-axis component spelling to its stored component ID and canonical reverse spelling."
     },
     {
       "id": "evidence.constitutive-parser",
@@ -896,7 +928,7 @@
         "tokens": ["END BOUNDARY"],
         "certainty": "accepted-current"
       },
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [],
       "evidence_ids": [
         "evidence.boundary-parser",
@@ -904,10 +936,7 @@
         "evidence.current-vtms-deck-tric",
         "evidence.current-vtms-deck-notch"
       ],
-      "remaining_work": [
-        "Document every record-pair schema, allowed value, default, and dependency beneath each active nested construct.",
-        "Trace the separate contact-problem branch selected by TYPE contact."
-      ]
+      "remaining_work": []
     },
     {
       "id": "block.constitutive",
@@ -2585,10 +2614,20 @@
       "match_prefix": "*type",
       "kind": "problem-start",
       "summary": "Starts a boundary problem and selects mechanical, thermal, or contact dispatch.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [{"name": "problem_type", "value_type": "enum-record", "required": true, "allowed_values": ["mechanical", "thermal", "contact"], "summary": "The following cleaned record is matched by its first four characters."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Document the contact branch and the thermal temperature record in full."]
+      "remaining_work": [],
+      "body": {
+        "style": "nested-records",
+        "termination": "fixed-count",
+        "variants": [
+          {"name": "mechanical", "when": "problem_type begins mech", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(mech)", "required": true, "summary": "Selects mechanical analysis."}]}, {"name": "kinematic-options", "repetition": "optional-once", "fields": [{"name": "flags", "value_type": "subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)", "required": false, "summary": "Optional single record enabling kinematic update flags."}]}], "constraints": ["Canonical generation emits *TYPE before the problem-type record even though the parser can consume the type record directly."]},
+          {"name": "thermal", "when": "problem_type begins ther, including thermo-mechanical", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(ther)", "required": true, "summary": "Selects the mechanical plus thermal path."}]}, {"name": "initial-temperature-change", "repetition": "once", "fields": [{"name": "temperature", "value_type": "real", "required": true, "summary": "Initial uniform temperature change assigned to all selected-cluster nodes."}]}, {"name": "kinematic-options", "repetition": "optional-once", "fields": [{"name": "flags", "value_type": "subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)", "required": false, "summary": "Optional single record enabling kinematic update flags."}]}], "constraints": ["Temperature units follow the model's consistent unit system."]},
+          {"name": "blocked-contact", "when": "problem_type begins cont", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(cont)", "required": true, "summary": "Recognized as type 3 but rejected by the active outer type dispatch."}]}], "constraints": ["Contact problems are blocked from Agent generation because the only active body dispatch handles types 1 and 2 and the default branch stops."]}
+        ],
+        "dependencies": ["A new problem begins at each *TYPE and the preceding problem terminates when the dispatcher encounters it.", "Only mechanical and thermal problems may contain the registered nested BOUNDARY constructs."]
+      }
     },
     {
       "id": "construct.boundary-g-control",
@@ -2597,10 +2636,16 @@
       "match_prefix": "*g-co",
       "kind": "keyword",
       "summary": "Configures damage-increment control, update, damping, iteration, and exit thresholds.",
-      "coverage": "partially-documented",
-      "parameters": [],
+      "coverage": "documented",
+      "parameters": [{"name": "UPDATE", "value_type": "flag", "required": false, "default": false, "summary": "Enables damage update control."}, {"name": "DAMP", "value_type": "flag", "required": false, "default": false, "summary": "Enables damage damping."}, {"name": "G_ITER", "value_type": "positive-integer", "required": false, "default": 1000, "summary": "Sets the damage-control iteration limit."}, {"name": "GMIN", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Minimum damage increment for exit; G_TH is an accepted alias."}, {"name": "GMAX", "value_type": "nonnegative-real", "required": false, "default": 1000000000, "summary": "Maximum damage increment for exit."}, {"name": "GTHR", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Active-control damage increment threshold."}, {"name": "NO_DAMAGE_LOCK", "value_type": "flag", "required": false, "default": false, "summary": "NO_D disables the default damage lock."}],
       "evidence_ids": ["evidence.boundary-active-dispatch"],
-      "remaining_work": ["Record each option spelling, type, default, mutual dependency, and safe range."]
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "command-line-options", "when": "always", "rows": [{"name": "control", "repetition": "once", "fields": [{"name": "options", "value_type": "comma-or-space-delimited-key/value-options-on-command-line", "required": false, "summary": "Configures G-control without consuming a following data row."}]}], "constraints": ["Keys are uppercased and matched as UPDA, DAMP, G_IT, G_TH or GMIN, GMAX, GTHR, and NO_D.", "UPDATE requires GTHR greater than zero for safe generation; the source only warns when the threshold remains zero.", "Agent generation requires GMIN <= GMAX and nonnegative thresholds."]}],
+        "dependencies": ["The command enables G-control for the current mechanical or thermal boundary problem."]
+      }
     },
     {
       "id": "construct.boundary-geometric-nonlinearity",
@@ -2634,9 +2679,15 @@
       "kind": "keyword",
       "summary": "Sets the current boundary-problem name from the following record.",
       "coverage": "documented",
-      "parameters": [{"name": "name", "value_type": "string-record", "required": true, "summary": "Boundary problem name; defaults to boundname plus the problem index when absent."}],
+      "parameters": [{"name": "name", "value_type": "string-record", "required": false, "summary": "Boundary problem name; defaults to boundname plus the problem index when absent."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Confirm length, character, and uniqueness constraints."]
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "optional-name-record", "when": "always", "rows": [{"name": "name", "repetition": "optional-once", "fields": [{"name": "name", "value_type": "one-list-directed-token-up-to-80-characters", "required": false, "summary": "Overrides boundname<problem-index>; a next command is backspaced and leaves the default."}]}], "constraints": ["The name may not equal a registered top-level block token.", "Agent generation requires boundary-problem names to be unique even though this parser does not enforce uniqueness."]}],
+        "dependencies": ["Names identify boundary problems in diagnostics, run artifacts, and future query/edit selection."]
+      }
     },
     {
       "id": "construct.boundary-status",
@@ -2645,10 +2696,16 @@
       "match_prefix": "*stat",
       "kind": "keyword",
       "summary": "Selects restart/new-run handling for the current boundary problem.",
-      "coverage": "partially-documented",
-      "parameters": [{"name": "status", "value_type": "string-record", "required": false, "allowed_values": ["restart", "no restart"], "default": "restart", "summary": "The parser recognizes restart by first-four-character matching and treats no as a new run."}],
+      "coverage": "documented",
+      "parameters": [{"name": "status", "value_type": "string-record", "required": false, "allowed_values": ["restart", "no restart", "new"], "default": "restart", "summary": "restart maps to run option 1, no restart maps to -1, and new maps to the generic new-run option 0."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Resolve all accepted status strings and the default branch behavior."]
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "optional-status-record", "when": "always", "rows": [{"name": "status", "repetition": "optional-once", "fields": [{"name": "status", "value_type": "prefix(restart|no)-or-new", "required": false, "summary": "Selects restart persistence behavior; a next command leaves the default."}]}], "constraints": ["Any value other than rest* or no* maps to generic new-run option 0, but canonical generation uses new for that branch.", "no restart suppresses both restart input and restart/damage output, while new selects the ordinary new-run branch."]}],
+        "dependencies": ["The first boundary problem's run option is also passed to CRACK initialization."]
+      }
     },
     {
       "id": "construct.boundary-clusters",
@@ -2657,10 +2714,16 @@
       "match_prefix": "*clus",
       "kind": "record-group",
       "summary": "Restricts the boundary problem to a list of existing cluster names.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [],
-      "evidence_ids": ["evidence.boundary-active-dispatch"],
-      "remaining_work": ["Document list matching, wildcard behavior, defaults, and duplicate selection."]
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.boundary-selectors"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command",
+        "variants": [{"name": "cluster-list", "when": "always", "rows": [{"name": "clusters", "repetition": "repeated", "fields": [{"name": "names", "value_type": "one-to-ten-cluster-names-or-sole-all", "required": false, "summary": "Restricts the problem to the listed existing cluster names; a sole all selects every cluster."}]}], "constraints": ["Omitting *CLUSTERS leaves the initial all-clusters selection.", "Names are matched exactly against normalized cluster names.", "all is recognized only when it is the sole nonblank list item.", "The source preserves duplicate names; Agent generation rejects duplicates."]}],
+        "dependencies": ["Every later boundary condition, connection, crack, and output selector is restricted to this selected cluster list."]
+      }
     },
     {
       "id": "construct.boundary-conditions",
@@ -2669,17 +2732,28 @@
       "match_prefix": "*boun",
       "kind": "record-group",
       "summary": "Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["displacement", "shift", "stretch", "force", "off", "temperature"], "summary": "Boundary-condition action matched by a short prefix."},
-        {"name": "component", "value_type": "component", "required": true, "summary": "Degree-of-freedom/component converted by component2id."},
+        {"name": "component", "value_type": "enum", "required": false, "allowed_values": ["x", "y", "z", "xy", "yx", "xz", "zx", "yz", "zy", "xyz", "yzx", "zxy", "xzy", "yxz", "zyx"], "summary": "Required for displacement, shift, stretch, and force; order aliases map to component IDs 1, 2, 3, 12, 13, 23, or 123."},
         {"name": "name", "value_type": "string", "required": true, "summary": "Name of the boundary condition."},
         {"name": "value", "value_type": "real", "required": true, "summary": "Boundary-condition magnitude."},
         {"name": "nset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Existing node set qualified by its cluster name."},
         {"name": "global", "value_type": "input-relative-path", "required": false, "summary": "Loads global/local nodal coordinates, displacements, and forces from a local auxiliary file."}
       ],
-      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Document component values and exact per-type required-field rules.", "Add safe auxiliary-file path validation before implementing global-file edits."]
+      "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.boundary-components", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command",
+        "variants": [
+          {"name": "nodal-or-surface-action", "when": "type is displacement, shift, stretch, or force", "rows": [{"name": "condition", "repetition": "repeated", "fields": [{"name": "type", "value_type": "enum-prefix(disp,shif,stre,forc)", "required": true, "summary": "Maps to prescribed displacement, shifted displacement, surface stress, or nodal force."}, {"name": "component", "value_type": "registered-component", "required": true, "summary": "Selects one or more translational axes."}, {"name": "name", "value_type": "unique-string-up-to-80-characters", "required": true, "summary": "Defines the boundary-condition identity used by loading changes."}, {"name": "value", "value_type": "real", "required": true, "summary": "Base magnitude multiplied by the loading-sequence increment."}, {"name": "target", "value_type": "exactly-one-of(nset,global)", "required": true, "summary": "Selects a cluster-qualified node set or a global/local auxiliary file."}]}], "constraints": ["Each record contains at most five key/value pairs and keys are matched by their first four lowercase characters.", "nset must contain exactly one period separating an existing selected cluster name and node-set name.", "stretch maps to the surface-stress implementation and requires compatible surface/crack integration state.", "Boundary-condition names must be unique within the problem."]},
+          {"name": "off", "when": "type is off", "rows": [{"name": "condition", "repetition": "repeated", "fields": [{"name": "type", "value_type": "prefix(off)", "required": true, "summary": "Defines an inactive boundary condition."}, {"name": "name", "value_type": "unique-string-up-to-80-characters", "required": true, "summary": "Provides an identity that loading changes may later activate or modify."}]}], "constraints": ["Canonical generation omits unused component, value, and target keys."]},
+          {"name": "temperature", "when": "type is temperature", "rows": [{"name": "condition", "repetition": "repeated", "fields": [{"name": "type", "value_type": "prefix(temp)", "required": true, "summary": "Defines a uniform temperature increment."}, {"name": "name", "value_type": "unique-string-up-to-80-characters", "required": true, "summary": "Defines the loading-change identity."}, {"name": "value", "value_type": "real", "required": true, "summary": "Uniform temperature increment applied to every node in the problem's selected clusters."}]}], "constraints": ["component and nset are not consumed by the temperature increment implementation."]},
+          {"name": "global-local-file", "when": "global is used by a nodal-or-surface action", "rows": [{"name": "external-file", "repetition": "once", "fields": [{"name": "count", "value_type": "positive-integer", "required": true, "summary": "First auxiliary-file record."}, {"name": "entries", "value_type": "count rows of cluster-id,nset-id,node-id,x,y,z,u,v,w,fx,fy,fz", "required": true, "summary": "Explicit global/local mapping rows."}]}], "constraints": ["Agent paths must be relative to the root input directory, remain inside the workspace, and resolve to a regular file.", "Every cluster, set, and node ID must resolve and coordinates must agree with the referenced mesh within registered tolerance.", "Global/local generation remains blocked until the auxiliary file can be included atomically in a reviewed multi-file plan."]}
+        ],
+        "dependencies": ["Loading-sequence change records reference name and may replace type or value.", "nset targets must belong to clusters selected by *CLUSTERS.", "Deleting or renaming a cluster, node set, or boundary condition must update all reverse references atomically."]
+      }
     },
     {
       "id": "construct.boundary-connections",
@@ -2688,16 +2762,16 @@
       "match_prefix": "*conn",
       "kind": "record-group",
       "summary": "Defines penalty, nodal, and surface-contact connections between cluster selections.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
-        {"name": "type", "value_type": "enum", "required": true, "allowed_values": [-2, -21, "nodal", "surface"], "summary": "Selects a penalty, nodal, or surface-contact connection."},
+        {"name": "type", "value_type": "enum", "required": true, "allowed_values": [-2, -21, "nodal", "surface"], "summary": "Selects a penalty, nodal, or surface-contact connection; -21 is preservation-only because execution has no matching dispatch."},
         {"name": "name", "value_type": "string", "required": false, "summary": "Connection name; defaults to connection plus its one-based index."},
         {"name": "tolerance", "value_type": "positive-real", "required": false, "default": 0.00001, "summary": "Penalty-connection search tolerance."},
         {"name": "search", "value_type": "enum", "required": false, "allowed_values": ["vtms", "sheff"], "default": "vtms", "summary": "Penalty search implementation."},
         {"name": "component", "value_type": "component", "required": false, "default": 123, "summary": "Nodal-connection component selection."}
       ],
-      "evidence_ids": ["evidence.boundary-connections", "evidence.boundary-selectors", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Establish the engineering distinction between penalty types -2 and -21 and verify SHEFF search behavior."],
+      "evidence_ids": ["evidence.boundary-connections", "evidence.boundary-connection-execution", "evidence.boundary-selectors", "evidence.current-vtms-deck-notch"],
+      "remaining_work": [],
       "body": {
         "style": "nested-records",
         "termination": "next-command",
@@ -2710,7 +2784,7 @@
               {"name": "set-assignment", "repetition": "repeated", "fields": [{"name": "mset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Master node set for this row."}, {"name": "sset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Slave node set for this row."}, {"name": "material", "value_type": "material-id", "required": false, "summary": "Material associated with this row."}, {"name": "constitutive", "value_type": "constitutive-id", "required": false, "summary": "Constitutive law associated with this row."}, {"name": "failure", "value_type": "failure-id", "required": false, "summary": "Failure definition associated with this row."}]},
               {"name": "last", "repetition": "once", "fields": [{"name": "last", "value_type": "none-or-cluster-name-list", "required": true, "summary": "Ends the penalty connection and optionally lists terminal slave clusters."}]}
             ],
-            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing cluster name.", "The last record is the structural sentinel for a penalty connection.", "A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup."]
+            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing cluster name.", "The last record is the structural sentinel for a penalty connection.", "A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup.", "Type -2 is the active penalty form and dispatches search=vtms or search=sheff to distinct implementations.", "Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but blocks their creation and conversion to them."]
           },
           {
             "name": "nodal",
@@ -2742,16 +2816,16 @@
       "match_prefix": "*load",
       "kind": "record-group",
       "summary": "Defines load-step histories, cyclic controls, and optional repeated fatigue blocks.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["static", "fatigue", "2dfatigue", "reduced_fatigue"], "summary": "Selects the load history family by first-four-character matching."},
         {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of analysis steps; the parser rejects a load header without it."},
-        {"name": "name", "value_type": "string", "required": false, "summary": "Name assigned to this load segment."},
-        {"name": "incr", "value_type": "real", "required": false, "summary": "Load increment for static or fatigue segments."},
+        {"name": "name", "value_type": "string", "required": true, "summary": "Name assigned to this load segment; required by canonical Agent generation even though the parser does not reject omission."},
+        {"name": "incr", "value_type": "real", "required": true, "summary": "Load increment for static or fatigue segments; omission leaves active storage without a source-defined value."},
         {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Marks the start/end of a repeated load block and its repetition count."}
       ],
       "evidence_ids": ["evidence.boundary-loading", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Runtime-verify fatigue, 2D-fatigue, reduced-fatigue, and repeated-block examples and establish defaults/ranges for cyclic values."],
+      "remaining_work": [],
       "body": {
         "style": "nested-records",
         "termination": "next-command",
@@ -2760,19 +2834,19 @@
             "name": "static-segment",
             "when": "type begins stat",
             "rows": [
-              {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(static)", "required": true, "summary": "Static load segment."}, {"name": "name", "value_type": "string", "required": false, "summary": "Segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "incr", "value_type": "real", "required": false, "summary": "Load increment."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
+              {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(static)", "required": true, "summary": "Static load segment."}, {"name": "name", "value_type": "string", "required": true, "summary": "Canonical segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "incr", "value_type": "real", "required": true, "summary": "Load increment; required because the parser's temporary value has no per-segment default."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
               {"name": "change", "repetition": "repeated", "fields": [{"name": "change", "value_type": "boundary-condition-name", "required": true, "summary": "Existing boundary condition to change."}, {"name": "type", "value_type": "enum(displacement,stretch,force,off)", "required": false, "summary": "Replacement action; inherited when absent."}, {"name": "value", "value_type": "real", "required": false, "summary": "Replacement value; inherited when absent."}]}
             ],
-            "constraints": ["Change records continue until the next row containing nstep or the next command.", "Every change target must name an existing boundary condition."]
+            "constraints": ["Change records continue until the next row containing nstep or the next command.", "Every change target must name an existing boundary condition.", "The parser does not enforce positive nstep or initialize a missing incr; the Agent requires nstep greater than zero and an explicit finite incr."]
           },
           {
             "name": "fatigue-segment",
             "when": "type begins fati, 2dfa, or redu",
             "rows": [
-              {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(fatigue,2dfatigue,reduced_fatigue)", "required": true, "summary": "Cyclic load family."}, {"name": "name", "value_type": "string", "required": false, "summary": "Segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "maxcycle", "value_type": "integer", "required": false, "summary": "Maximum cycle control."}, {"name": "mincycle", "value_type": "integer", "required": false, "summary": "Minimum cycle control."}, {"name": "R", "value_type": "real", "required": false, "summary": "Cyclic load ratio."}, {"name": "incr", "value_type": "real", "required": false, "summary": "Load increment."}, {"name": "inicycle", "value_type": "integer", "required": false, "summary": "Initial cycle."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
+              {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(fatigue,2dfatigue,reduced_fatigue)", "required": true, "summary": "Cyclic load family."}, {"name": "name", "value_type": "string", "required": true, "summary": "Canonical segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "maxcycle", "value_type": "integer", "required": true, "summary": "Maximum cycle control; explicit generation is required because allocated storage has no source default."}, {"name": "mincycle", "value_type": "real", "required": true, "summary": "Minimum cycle control; explicit generation is required because allocated storage has no source default."}, {"name": "R", "value_type": "real", "required": true, "summary": "Cyclic load ratio; explicit generation is required because allocated storage has no source default."}, {"name": "incr", "value_type": "real", "required": true, "summary": "Load increment; explicit generation is required because allocated storage has no source default."}, {"name": "inicycle", "value_type": "real", "required": true, "summary": "Initial cycle; explicit generation is required because allocated storage has no source default."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
               {"name": "change", "repetition": "repeated", "fields": [{"name": "change", "value_type": "boundary-condition-name", "required": true, "summary": "Existing boundary condition to change."}, {"name": "type", "value_type": "enum(displacement,stretch,force,off)", "required": false, "summary": "Replacement action; inherited when absent."}, {"name": "value", "value_type": "real", "required": false, "summary": "Replacement value; inherited when absent."}, {"name": "maxcycle", "value_type": "integer", "required": false, "summary": "Change-specific maximum cycle; its sign selects an internal cycle-change type."}, {"name": "mincycle", "value_type": "integer", "required": false, "summary": "Change-specific minimum cycle."}, {"name": "R", "value_type": "real", "required": false, "summary": "Change-specific cyclic ratio."}]}
             ],
-            "constraints": ["A load header supports at most nine key/value pairs.", "Repeated blocks duplicate the enclosed segment sequence and derive suffixed names."]
+            "constraints": ["A load header supports at most nine key/value pairs.", "Allocated fatigue fields have no source defaults, so canonical generation requires finite explicit maxcycle, mincycle, R, incr, and inicycle values and positive nstep.", "Repeated blocks duplicate the enclosed segment sequence and derive suffixed names; every block count must be positive and a closing block marker should be explicit.", "The parser's change allocation and repeated-block copy branches omit internal types 21, 22, and 31; the Agent preserves existing 2dfatigue/reduced_fatigue content but blocks change rows and block repetition for those families.", "Fatigue-family creation remains source-documented but requires a separately runtime-verified profile before model-generated engineering values may be proposed."]
           }
         ],
         "dependencies": ["Change records reference names created in BOUNDARY CONDITION.", "Step ranges are accumulated in declaration order.", "Boundary-condition deletion or renaming must update every load change reference."]
@@ -2785,7 +2859,7 @@
       "match_prefix": "*conv",
       "kind": "record-group",
       "summary": "Configures nonlinear convergence, time-step, iteration, and reattempt controls.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {"name": "relative", "value_type": "positive-real", "required": false, "default": 0.001, "summary": "Relative convergence tolerance; may share a row with absolute and divergence."},
         {"name": "absolute", "value_type": "positive-real", "required": false, "default": 100000000, "summary": "Absolute convergence tolerance."},
@@ -2803,14 +2877,14 @@
         ,{"name": "fatigue", "value_type": "real", "required": false, "summary": "2D/3D fatigue convergence control recognized by fati."}
       ],
       "evidence_ids": ["evidence.boundary-convergence", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Resolve safe ranges and runtime behavior for automatic increment and fatigue controls; ini_dtime and fatigue2D3DD do not receive visible defaults in this parser routine.", "Runtime-probe D_AA modes and automatic time-step interactions before enabling unconstrained model-generated changes."],
+      "remaining_work": [],
       "body": {
         "style": "records",
         "termination": "next-command",
         "variants": [
           {"name": "tolerances", "when": "row begins rela or abso", "rows": [{"name": "tolerance-row", "repetition": "repeated", "fields": [{"name": "relative", "value_type": "positive-real", "required": false, "summary": "Relative convergence tolerance."}, {"name": "absolute", "value_type": "positive-real", "required": false, "summary": "Absolute convergence tolerance."}, {"name": "divergence", "value_type": "positive-real", "required": false, "summary": "Divergence multiplier."}]}], "constraints": ["At least relative or absolute must be present on a tolerance row.", "When only absolute is present, the internal relative tolerance is set to 10."]},
-          {"name": "anderson-acceleration", "when": "row contains D_AA", "rows": [{"name": "D_AA", "repetition": "repeated", "fields": [{"name": "D_AA", "value_type": "enum(0,1,2)", "required": true, "summary": "Sets the Anderson acceleration mode."}]}], "constraints": ["D_AA is found by key search before the four-character dispatch."]},
-          {"name": "scalar-control", "when": "row begins a recognized four-character label", "rows": [{"name": "control", "repetition": "repeated", "fields": [{"name": "label", "value_type": "enum-prefix(mint,d_in,it_r,d_re,d_mi,it_o,d_ma,fati,maxi,inve)", "required": true, "summary": "Active four-character dispatch label."}, {"name": "value", "value_type": "real-or-integer-by-label", "required": true, "summary": "Control value parsed from the second delimited token."}]}], "constraints": ["The parser scans at most twelve convergence records.", "Long VTMS labels are accepted when their first four characters match, including d_reduction, d_min, d_max, it_opt, and it_restart.", "An unrecognized record is backspaced for the enclosing BOUNDARY dispatcher rather than accepted as a convergence option."]}
+          {"name": "anderson-acceleration", "when": "row contains D_AA", "rows": [{"name": "D_AA", "repetition": "repeated", "fields": [{"name": "D_AA", "value_type": "enum(0,1,2)", "required": true, "summary": "Sets the Anderson acceleration mode."}]}], "constraints": ["D_AA is found by key search before the four-character dispatch.", "Modes 1 and 2 are source-recognized but require a runtime-verified profile before model-generated activation."]},
+          {"name": "scalar-control", "when": "row begins a recognized four-character label", "rows": [{"name": "control", "repetition": "repeated", "fields": [{"name": "label", "value_type": "enum-prefix(mint,d_in,it_r,d_re,d_mi,it_o,d_ma,fati,maxi,inve)", "required": true, "summary": "Active four-character dispatch label."}, {"name": "value", "value_type": "real-or-integer-by-label", "required": true, "summary": "Control value parsed from the second delimited token."}]}], "constraints": ["The parser scans at most twelve convergence records.", "Long VTMS labels are accepted when their first four characters match, including d_reduction, d_min, d_max, it_opt, and it_restart.", "An unrecognized record is backspaced for the enclosing BOUNDARY dispatcher rather than accepted as a convergence option.", "d_in and fatigue have no visible initialization in IBN_INI; omission is safe only when their associated features are unused, and the Agent requires explicit finite values whenever it enables them.", "Automatic-increment generation requires d_in greater than zero, d_min greater than zero, d_max at least d_min, d_reduction greater than zero and less than one, and positive it_restart and it_opt.", "fatigue and automatic-increment changes remain source-documented but require a runtime-verified profile before model-generated activation."]}
         ],
         "dependencies": ["Convergence controls apply to the current boundary problem and its ordered loading sequence.", "Automatic increment controls must be validated as a coherent group before rendering changes."]
       }
@@ -2822,14 +2896,14 @@
       "match_prefix": "*outp",
       "kind": "record-group",
       "summary": "Defines output types and their target, coordinate-system, and intermediate-output options.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {"name": "type", "value_type": "enum", "required": true, "allowed_values": ["data_file", "sum_force", "volume_average", "traction_average", "cfv"], "summary": "Selects the output family by its first three characters."},
         {"name": "c_system", "value_type": "enum", "required": false, "allowed_values": ["global", "material"], "default": "global", "summary": "Selects the coordinate system; only the mate prefix changes the default."},
         {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Controls intermediate output frequency/selection."}
       ],
-      "evidence_ids": ["evidence.boundary-output", "evidence.boundary-selectors", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Enumerate accepted data-file formats and runtime-verify each output family, coordinate system, and intermediate control."],
+      "evidence_ids": ["evidence.boundary-output", "evidence.boundary-output-execution", "evidence.boundary-data-formats", "evidence.boundary-selectors", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "remaining_work": [],
       "body": {
         "style": "nested-records",
         "termination": "next-command",
@@ -2838,10 +2912,10 @@
             "name": "data-file",
             "when": "type begins dat",
             "rows": [
-              {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(data_file)", "required": true, "summary": "Data-file output."}, {"name": "clusters", "value_type": "selector(all|list|cluster-name)", "required": true, "summary": "Target clusters."}, {"name": "format", "value_type": "string", "required": false, "summary": "Output format; defaults to tecplot."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate control; defaults to 10."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
+              {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(data_file)", "required": true, "summary": "Data-file output."}, {"name": "clusters", "value_type": "selector(all|list|cluster-name)", "required": true, "summary": "Target clusters."}, {"name": "format", "value_type": "enum-prefix(tecplot,vtk,para)", "required": false, "summary": "tec selects Tecplot text, vtk selects legacy VTK, and exact para enables the ParaView/SHEFF path; defaults to tecplot."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate iteration interval; defaults to 10."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
               {"name": "cluster-list", "repetition": "repeated", "fields": [{"name": "cluster_names", "value_type": "cluster-name-list", "required": true, "summary": "Continuation values when clusters=list."}]}
             ],
-            "constraints": ["Exactly one type key may appear in a header row.", "A header accepts at most five key/value pairs."]
+            "constraints": ["Exactly one type key may appear in a header row.", "A header accepts at most five key/value pairs.", "The parser stores arbitrary format text, but the writer dispatches only lower-case prefixes tec and vtk; exact para sets a process-global SHEFF/ParaView flag. The Agent emits only tecplot or a separately runtime-verified vtk/para profile.", "intermediate=0 disables iteration output, a positive value requests every nth iteration, and a negative value only participates in converged-step cleanup/output behavior.", "Every selected cluster must be an active finite-element cluster in the current boundary problem."]
           },
           {
             "name": "node-set-aggregate",
@@ -2850,7 +2924,7 @@
               {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(sum_force,traction_average)", "required": true, "summary": "Sum-force or average-traction output."}, {"name": "nset", "value_type": "selector(all|list)", "required": true, "summary": "Target node sets."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate control; defaults to 0."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
               {"name": "node-set-list", "repetition": "repeated", "fields": [{"name": "node_sets", "value_type": "cluster-name.node-set-name-list", "required": true, "summary": "Continuation values when nset=list."}]}
             ],
-            "constraints": ["The selector must resolve at least one existing node set."]
+            "constraints": ["The selector must resolve at least one existing node set.", "intermediate defaults to zero, which disables iteration output while converged-step output remains active."]
           },
           {
             "name": "element-set-aggregate",
@@ -2859,7 +2933,7 @@
               {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(volume_average,cfv)", "required": true, "summary": "Volume-average or CFV output."}, {"name": "elset", "value_type": "selector(all|list)", "required": true, "summary": "Target element sets."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate control; defaults to 0."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
               {"name": "element-set-list", "repetition": "repeated", "fields": [{"name": "element_sets", "value_type": "cluster-name.element-set-name-list", "required": true, "summary": "Continuation values when elset=list."}]}
             ],
-            "constraints": ["The selector must resolve at least one existing element set.", "The active implementation reduces multiple selected sets to one entry per distinct cluster."]
+            "constraints": ["The selector must resolve at least one existing element set.", "The active implementation reduces multiple selected sets to one entry per distinct cluster, so selecting two sets from the same cluster does not preserve both set identities.", "The execution path stores c_system but volume-average and CFV calculations do not consume it; the Agent preserves material-coordinate requests but blocks generating them as an effective transformation claim.", "CFV requires every retained cluster to use compatible constitutive/failure data and the same mode/level dimensions."]
           }
         ],
         "dependencies": ["All selected clusters and sets must belong to the current boundary problem.", "Mesh, set, or cluster edits must revalidate every output selector."]

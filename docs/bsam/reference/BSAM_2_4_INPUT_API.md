@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.18.0`
-- Registry SHA-256: `7E1E94659DE8F0AE37B0DA1DC1450294C82AC0B21F27297794674A5883D552B5`
+- Registry version: `0.20.0`
+- Registry SHA-256: `8D7C7E5FC57150424AAE7717E37771DC9BC2C5B82759EF768F78D721B9CD94AB`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -23,7 +23,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | documented | Defines named user functions parsed as *end-delimited entries. |
 | `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | documented | Configures optional coupling to the external moisture simulation workflow. |
 | `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
-| `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
+| `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | documented | Defines constitutive law records that reference material and failure definitions. |
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
@@ -197,13 +197,8 @@ Defines boundary problems, loads, connections, convergence, stepping, and output
 - Lookup token/matcher: `BOUNDARY` / exact-case-sensitive
 - Required: yes
 - Termination: `END BOUNDARY` (accepted-current)
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.boundary-parser](#evidenceboundary-parser), [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-
-Remaining specification work:
-
-- Document every record-pair schema, allowed value, default, and dependency beneath each active nested construct.
-- Trace the separate contact-problem branch selected by TYPE contact.
 
 ### `CONSTITUTIVE`
 
@@ -955,18 +950,18 @@ Termination: fixed-count. Dependencies: Elements must already be built with vali
 
 | Parent | Construct | Match prefix | Kind | Coverage | Purpose |
 |---|---|---|---|---|---|
-| `block.boundary` | `*TYPE` | `*type` | problem-start | partially-documented | Starts a boundary problem and selects mechanical, thermal, or contact dispatch. |
-| `block.boundary` | `*G-CONTROL` | `*g-co` | keyword | partially-documented | Configures damage-increment control, update, damping, iteration, and exit thresholds. |
+| `block.boundary` | `*TYPE` | `*type` | problem-start | documented | Starts a boundary problem and selects mechanical, thermal, or contact dispatch. |
+| `block.boundary` | `*G-CONTROL` | `*g-co` | keyword | documented | Configures damage-increment control, update, damping, iteration, and exit thresholds. |
 | `block.boundary` | `*GEO_NL` | `*geo_` | keyword | documented | Enables geometric nonlinearity for the current mechanical or thermal problem. |
 | `block.boundary` | `*SOLVER` | `*solv` | keyword | documented | Selects how declared solver IDs are assigned to nonlinear iterations for the current boundary problem. |
 | `block.boundary` | `*NAME` | `*name` | keyword | documented | Sets the current boundary-problem name from the following record. |
-| `block.boundary` | `*STATUS` | `*stat` | keyword | partially-documented | Selects restart/new-run handling for the current boundary problem. |
-| `block.boundary` | `*CLUSTERS` | `*clus` | record-group | partially-documented | Restricts the boundary problem to a list of existing cluster names. |
-| `block.boundary` | `*BOUNDARY CONDITION` | `*boun` | record-group | partially-documented | Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets. |
-| `block.boundary` | `*CONNECTIONS` | `*conn` | record-group | partially-documented | Defines penalty, nodal, and surface-contact connections between cluster selections. |
-| `block.boundary` | `*LOADING SEQUENCE` | `*load` | record-group | partially-documented | Defines load-step histories, cyclic controls, and optional repeated fatigue blocks. |
-| `block.boundary` | `*CONVERGENCE` | `*conv` | record-group | partially-documented | Configures nonlinear convergence, time-step, iteration, and reattempt controls. |
-| `block.boundary` | `*OUTPUT` | `*outp` | record-group | partially-documented | Defines output types and their target, coordinate-system, and intermediate-output options. |
+| `block.boundary` | `*STATUS` | `*stat` | keyword | documented | Selects restart/new-run handling for the current boundary problem. |
+| `block.boundary` | `*CLUSTERS` | `*clus` | record-group | documented | Restricts the boundary problem to a list of existing cluster names. |
+| `block.boundary` | `*BOUNDARY CONDITION` | `*boun` | record-group | documented | Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets. |
+| `block.boundary` | `*CONNECTIONS` | `*conn` | record-group | documented | Defines penalty, nodal, and surface-contact connections between cluster selections. |
+| `block.boundary` | `*LOADING SEQUENCE` | `*load` | record-group | documented | Defines load-step histories, cyclic controls, and optional repeated fatigue blocks. |
+| `block.boundary` | `*CONVERGENCE` | `*conv` | record-group | documented | Configures nonlinear convergence, time-step, iteration, and reattempt controls. |
+| `block.boundary` | `*OUTPUT` | `*outp` | record-group | documented | Defines output types and their target, coordinate-system, and intermediate-output options. |
 
 ## Nested construct details
 
@@ -976,16 +971,29 @@ Starts a boundary problem and selects mechanical, thermal, or contact dispatch.
 
 - Registry ID: `construct.boundary-type`
 - Match prefix: `*type`
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
 - `problem_type` (enum-record, required) (allowed: `mechanical`, `thermal`, `contact`): The following cleaned record is matched by its first four characters.
 
-Remaining specification work:
+### `*TYPE` body
 
-- Document the contact branch and the thermal temperature record in full.
+Termination: fixed-count. Dependencies: A new problem begins at each *TYPE and the preceding problem terminates when the dispatcher encounters it.; Only mechanical and thermal problems may contain the registered nested BOUNDARY constructs.
+
+- **mechanical** (problem_type begins mech):
+  - `problem-type` [once]: `problem_type`:case-normalized-prefix(mech)
+  - `kinematic-options` [optional-once]: `flags`:subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)
+  - Constraint: Canonical generation emits *TYPE before the problem-type record even though the parser can consume the type record directly.
+- **thermal** (problem_type begins ther, including thermo-mechanical):
+  - `problem-type` [once]: `problem_type`:case-normalized-prefix(ther)
+  - `initial-temperature-change` [once]: `temperature`:real
+  - `kinematic-options` [optional-once]: `flags`:subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)
+  - Constraint: Temperature units follow the model's consistent unit system.
+- **blocked-contact** (problem_type begins cont):
+  - `problem-type` [once]: `problem_type`:case-normalized-prefix(cont)
+  - Constraint: Contact problems are blocked from Agent generation because the only active body dispatch handles types 1 and 2 and the default branch stops.
 
 ### `*G-CONTROL`
 
@@ -993,12 +1001,28 @@ Configures damage-increment control, update, damping, iteration, and exit thresh
 
 - Registry ID: `construct.boundary-g-control`
 - Match prefix: `*g-co`
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
 
-Remaining specification work:
+Known parameters:
 
-- Record each option spelling, type, default, mutual dependency, and safe range.
+- `UPDATE` (flag, optional) (default: `false`): Enables damage update control.
+- `DAMP` (flag, optional) (default: `false`): Enables damage damping.
+- `G_ITER` (positive-integer, optional) (default: `1000`): Sets the damage-control iteration limit.
+- `GMIN` (nonnegative-real, optional) (default: `0`): Minimum damage increment for exit; G_TH is an accepted alias.
+- `GMAX` (nonnegative-real, optional) (default: `1000000000`): Maximum damage increment for exit.
+- `GTHR` (nonnegative-real, optional) (default: `0`): Active-control damage increment threshold.
+- `NO_DAMAGE_LOCK` (flag, optional) (default: `false`): NO_D disables the default damage lock.
+
+### `*G-CONTROL` body
+
+Termination: fixed-count. Dependencies: The command enables G-control for the current mechanical or thermal boundary problem.
+
+- **command-line-options** (always):
+  - `control` [once]: `options`:comma-or-space-delimited-key/value-options-on-command-line
+  - Constraint: Keys are uppercased and matched as UPDA, DAMP, G_IT, G_TH or GMIN, GMAX, GTHR, and NO_D.
+  - Constraint: UPDATE requires GTHR greater than zero for safe generation; the source only warns when the threshold remains zero.
+  - Constraint: Agent generation requires GMIN <= GMAX and nonnegative thresholds.
 
 ### `*GEO_NL`
 
@@ -1033,11 +1057,16 @@ Sets the current boundary-problem name from the following record.
 
 Known parameters:
 
-- `name` (string-record, required): Boundary problem name; defaults to boundname plus the problem index when absent.
+- `name` (string-record, optional): Boundary problem name; defaults to boundname plus the problem index when absent.
 
-Remaining specification work:
+### `*NAME` body
 
-- Confirm length, character, and uniqueness constraints.
+Termination: fixed-count. Dependencies: Names identify boundary problems in diagnostics, run artifacts, and future query/edit selection.
+
+- **optional-name-record** (always):
+  - `name` [optional-once]: `name`:one-list-directed-token-up-to-80-characters
+  - Constraint: The name may not equal a registered top-level block token.
+  - Constraint: Agent generation requires boundary-problem names to be unique even though this parser does not enforce uniqueness.
 
 ### `*STATUS`
 
@@ -1045,16 +1074,21 @@ Selects restart/new-run handling for the current boundary problem.
 
 - Registry ID: `construct.boundary-status`
 - Match prefix: `*stat`
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
-- `status` (string-record, optional) (allowed: `restart`, `no restart`; default: `"restart"`): The parser recognizes restart by first-four-character matching and treats no as a new run.
+- `status` (string-record, optional) (allowed: `restart`, `no restart`, `new`; default: `"restart"`): restart maps to run option 1, no restart maps to -1, and new maps to the generic new-run option 0.
 
-Remaining specification work:
+### `*STATUS` body
 
-- Resolve all accepted status strings and the default branch behavior.
+Termination: fixed-count. Dependencies: The first boundary problem's run option is also passed to CRACK initialization.
+
+- **optional-status-record** (always):
+  - `status` [optional-once]: `status`:prefix(restart|no)-or-new
+  - Constraint: Any value other than rest* or no* maps to generic new-run option 0, but canonical generation uses new for that branch.
+  - Constraint: no restart suppresses both restart input and restart/damage output, while new selects the ordinary new-run branch.
 
 ### `*CLUSTERS`
 
@@ -1062,12 +1096,19 @@ Restricts the boundary problem to a list of existing cluster names.
 
 - Registry ID: `construct.boundary-clusters`
 - Match prefix: `*clus`
-- Coverage: partially-documented
-- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
+- Coverage: documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.boundary-selectors](#evidenceboundary-selectors)
 
-Remaining specification work:
+### `*CLUSTERS` body
 
-- Document list matching, wildcard behavior, defaults, and duplicate selection.
+Termination: next-command. Dependencies: Every later boundary condition, connection, crack, and output selector is restricted to this selected cluster list.
+
+- **cluster-list** (always):
+  - `clusters` [repeated]: `names`:one-to-ten-cluster-names-or-sole-all
+  - Constraint: Omitting *CLUSTERS leaves the initial all-clusters selection.
+  - Constraint: Names are matched exactly against normalized cluster names.
+  - Constraint: all is recognized only when it is the sole nonblank list item.
+  - Constraint: The source preserves duplicate names; Agent generation rejects duplicates.
 
 ### `*BOUNDARY CONDITION`
 
@@ -1075,22 +1116,39 @@ Defines named boundary conditions as key/value pairs referencing cluster-qualifi
 
 - Registry ID: `construct.boundary-conditions`
 - Match prefix: `*boun`
-- Coverage: partially-documented
-- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Coverage: documented
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.boundary-components](#evidenceboundary-components), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
 - `type` (enum, required) (allowed: `displacement`, `shift`, `stretch`, `force`, `off`, `temperature`): Boundary-condition action matched by a short prefix.
-- `component` (component, required): Degree-of-freedom/component converted by component2id.
+- `component` (enum, optional) (allowed: `x`, `y`, `z`, `xy`, `yx`, `xz`, `zx`, `yz`, `zy`, `xyz`, `yzx`, `zxy`, `xzy`, `yxz`, `zyx`): Required for displacement, shift, stretch, and force; order aliases map to component IDs 1, 2, 3, 12, 13, 23, or 123.
 - `name` (string, required): Name of the boundary condition.
 - `value` (real, required): Boundary-condition magnitude.
 - `nset` (cluster-name.node-set-name, optional): Existing node set qualified by its cluster name.
 - `global` (input-relative-path, optional): Loads global/local nodal coordinates, displacements, and forces from a local auxiliary file.
 
-Remaining specification work:
+### `*BOUNDARY CONDITION` body
 
-- Document component values and exact per-type required-field rules.
-- Add safe auxiliary-file path validation before implementing global-file edits.
+Termination: next-command. Dependencies: Loading-sequence change records reference name and may replace type or value.; nset targets must belong to clusters selected by *CLUSTERS.; Deleting or renaming a cluster, node set, or boundary condition must update all reverse references atomically.
+
+- **nodal-or-surface-action** (type is displacement, shift, stretch, or force):
+  - `condition` [repeated]: `type`:enum-prefix(disp,shif,stre,forc), `component`:registered-component, `name`:unique-string-up-to-80-characters, `value`:real, `target`:exactly-one-of(nset,global)
+  - Constraint: Each record contains at most five key/value pairs and keys are matched by their first four lowercase characters.
+  - Constraint: nset must contain exactly one period separating an existing selected cluster name and node-set name.
+  - Constraint: stretch maps to the surface-stress implementation and requires compatible surface/crack integration state.
+  - Constraint: Boundary-condition names must be unique within the problem.
+- **off** (type is off):
+  - `condition` [repeated]: `type`:prefix(off), `name`:unique-string-up-to-80-characters
+  - Constraint: Canonical generation omits unused component, value, and target keys.
+- **temperature** (type is temperature):
+  - `condition` [repeated]: `type`:prefix(temp), `name`:unique-string-up-to-80-characters, `value`:real
+  - Constraint: component and nset are not consumed by the temperature increment implementation.
+- **global-local-file** (global is used by a nodal-or-surface action):
+  - `external-file` [once]: `count`:positive-integer, `entries`:count rows of cluster-id,nset-id,node-id,x,y,z,u,v,w,fx,fy,fz
+  - Constraint: Agent paths must be relative to the root input directory, remain inside the workspace, and resolve to a regular file.
+  - Constraint: Every cluster, set, and node ID must resolve and coordinates must agree with the referenced mesh within registered tolerance.
+  - Constraint: Global/local generation remains blocked until the auxiliary file can be included atomically in a reviewed multi-file plan.
 
 ### `*CONNECTIONS`
 
@@ -1098,20 +1156,16 @@ Defines penalty, nodal, and surface-contact connections between cluster selectio
 
 - Registry ID: `construct.boundary-connections`
 - Match prefix: `*conn`
-- Coverage: partially-documented
-- Evidence: [evidence.boundary-connections](#evidenceboundary-connections), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Coverage: documented
+- Evidence: [evidence.boundary-connections](#evidenceboundary-connections), [evidence.boundary-connection-execution](#evidenceboundary-connection-execution), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
-- `type` (enum, required) (allowed: `-2`, `-21`, `nodal`, `surface`): Selects a penalty, nodal, or surface-contact connection.
+- `type` (enum, required) (allowed: `-2`, `-21`, `nodal`, `surface`): Selects a penalty, nodal, or surface-contact connection; -21 is preservation-only because execution has no matching dispatch.
 - `name` (string, optional): Connection name; defaults to connection plus its one-based index.
 - `tolerance` (positive-real, optional) (default: `1e-05`): Penalty-connection search tolerance.
 - `search` (enum, optional) (allowed: `vtms`, `sheff`; default: `"vtms"`): Penalty search implementation.
 - `component` (component, optional) (default: `123`): Nodal-connection component selection.
-
-Remaining specification work:
-
-- Establish the engineering distinction between penalty types -2 and -21 and verify SHEFF search behavior.
 
 ### `*CONNECTIONS` body
 
@@ -1125,6 +1179,8 @@ Termination: next-command. Dependencies: Referenced clusters must be selected by
   - Constraint: Each referenced set must be qualified by an existing cluster name.
   - Constraint: The last record is the structural sentinel for a penalty connection.
   - Constraint: A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup.
+  - Constraint: Type -2 is the active penalty form and dispatches search=vtms or search=sheff to distinct implementations.
+  - Constraint: Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but blocks their creation and conversion to them.
 - **nodal** (type is nodal):
   - `header` [once]: `type`:const(nodal), `name`:string, `component`:component
   - `master-sets` [once]: `mset`:selector(all|list)
@@ -1143,20 +1199,16 @@ Defines load-step histories, cyclic controls, and optional repeated fatigue bloc
 
 - Registry ID: `construct.boundary-loading-sequence`
 - Match prefix: `*load`
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.boundary-loading](#evidenceboundary-loading), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
 - `type` (enum, required) (allowed: `static`, `fatigue`, `2dfatigue`, `reduced_fatigue`): Selects the load history family by first-four-character matching.
 - `nstep` (positive-integer, required): Number of analysis steps; the parser rejects a load header without it.
-- `name` (string, optional): Name assigned to this load segment.
-- `incr` (real, optional): Load increment for static or fatigue segments.
+- `name` (string, required): Name assigned to this load segment; required by canonical Agent generation even though the parser does not reject omission.
+- `incr` (real, required): Load increment for static or fatigue segments; omission leaves active storage without a source-defined value.
 - `block` (positive-integer, optional): Marks the start/end of a repeated load block and its repetition count.
-
-Remaining specification work:
-
-- Runtime-verify fatigue, 2D-fatigue, reduced-fatigue, and repeated-block examples and establish defaults/ranges for cyclic values.
 
 ### `*LOADING SEQUENCE` body
 
@@ -1167,11 +1219,15 @@ Termination: next-command. Dependencies: Change records reference names created 
   - `change` [repeated]: `change`:boundary-condition-name, `type`:enum(displacement,stretch,force,off), `value`:real
   - Constraint: Change records continue until the next row containing nstep or the next command.
   - Constraint: Every change target must name an existing boundary condition.
+  - Constraint: The parser does not enforce positive nstep or initialize a missing incr; the Agent requires nstep greater than zero and an explicit finite incr.
 - **fatigue-segment** (type begins fati, 2dfa, or redu):
-  - `load-header` [once]: `type`:enum(fatigue,2dfatigue,reduced_fatigue), `name`:string, `nstep`:positive-integer, `maxcycle`:integer, `mincycle`:integer, `R`:real, `incr`:real, `inicycle`:integer, `block`:positive-integer
+  - `load-header` [once]: `type`:enum(fatigue,2dfatigue,reduced_fatigue), `name`:string, `nstep`:positive-integer, `maxcycle`:integer, `mincycle`:real, `R`:real, `incr`:real, `inicycle`:real, `block`:positive-integer
   - `change` [repeated]: `change`:boundary-condition-name, `type`:enum(displacement,stretch,force,off), `value`:real, `maxcycle`:integer, `mincycle`:integer, `R`:real
   - Constraint: A load header supports at most nine key/value pairs.
-  - Constraint: Repeated blocks duplicate the enclosed segment sequence and derive suffixed names.
+  - Constraint: Allocated fatigue fields have no source defaults, so canonical generation requires finite explicit maxcycle, mincycle, R, incr, and inicycle values and positive nstep.
+  - Constraint: Repeated blocks duplicate the enclosed segment sequence and derive suffixed names; every block count must be positive and a closing block marker should be explicit.
+  - Constraint: The parser's change allocation and repeated-block copy branches omit internal types 21, 22, and 31; the Agent preserves existing 2dfatigue/reduced_fatigue content but blocks change rows and block repetition for those families.
+  - Constraint: Fatigue-family creation remains source-documented but requires a separately runtime-verified profile before model-generated engineering values may be proposed.
 
 ### `*CONVERGENCE`
 
@@ -1179,7 +1235,7 @@ Configures nonlinear convergence, time-step, iteration, and reattempt controls.
 
 - Registry ID: `construct.boundary-convergence`
 - Match prefix: `*conv`
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.boundary-convergence](#evidenceboundary-convergence), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
@@ -1199,11 +1255,6 @@ Known parameters:
 - `d_max` (real, optional) (default: `1`): Maximum time increment recognized by d_ma.
 - `fatigue` (real, optional): 2D/3D fatigue convergence control recognized by fati.
 
-Remaining specification work:
-
-- Resolve safe ranges and runtime behavior for automatic increment and fatigue controls; ini_dtime and fatigue2D3DD do not receive visible defaults in this parser routine.
-- Runtime-probe D_AA modes and automatic time-step interactions before enabling unconstrained model-generated changes.
-
 ### `*CONVERGENCE` body
 
 Termination: next-command. Dependencies: Convergence controls apply to the current boundary problem and its ordered loading sequence.; Automatic increment controls must be validated as a coherent group before rendering changes.
@@ -1215,11 +1266,15 @@ Termination: next-command. Dependencies: Convergence controls apply to the curre
 - **anderson-acceleration** (row contains D_AA):
   - `D_AA` [repeated]: `D_AA`:enum(0,1,2)
   - Constraint: D_AA is found by key search before the four-character dispatch.
+  - Constraint: Modes 1 and 2 are source-recognized but require a runtime-verified profile before model-generated activation.
 - **scalar-control** (row begins a recognized four-character label):
   - `control` [repeated]: `label`:enum-prefix(mint,d_in,it_r,d_re,d_mi,it_o,d_ma,fati,maxi,inve), `value`:real-or-integer-by-label
   - Constraint: The parser scans at most twelve convergence records.
   - Constraint: Long VTMS labels are accepted when their first four characters match, including d_reduction, d_min, d_max, it_opt, and it_restart.
   - Constraint: An unrecognized record is backspaced for the enclosing BOUNDARY dispatcher rather than accepted as a convergence option.
+  - Constraint: d_in and fatigue have no visible initialization in IBN_INI; omission is safe only when their associated features are unused, and the Agent requires explicit finite values whenever it enables them.
+  - Constraint: Automatic-increment generation requires d_in greater than zero, d_min greater than zero, d_max at least d_min, d_reduction greater than zero and less than one, and positive it_restart and it_opt.
+  - Constraint: fatigue and automatic-increment changes remain source-documented but require a runtime-verified profile before model-generated activation.
 
 ### `*OUTPUT`
 
@@ -1227,8 +1282,8 @@ Defines output types and their target, coordinate-system, and intermediate-outpu
 
 - Registry ID: `construct.boundary-output`
 - Match prefix: `*outp`
-- Coverage: partially-documented
-- Evidence: [evidence.boundary-output](#evidenceboundary-output), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Coverage: documented
+- Evidence: [evidence.boundary-output](#evidenceboundary-output), [evidence.boundary-output-execution](#evidenceboundary-output-execution), [evidence.boundary-data-formats](#evidenceboundary-data-formats), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Known parameters:
 
@@ -1236,28 +1291,30 @@ Known parameters:
 - `c_system` (enum, optional) (allowed: `global`, `material`; default: `"global"`): Selects the coordinate system; only the mate prefix changes the default.
 - `intermediate` (integer, optional): Controls intermediate output frequency/selection.
 
-Remaining specification work:
-
-- Enumerate accepted data-file formats and runtime-verify each output family, coordinate system, and intermediate control.
-
 ### `*OUTPUT` body
 
 Termination: next-command. Dependencies: All selected clusters and sets must belong to the current boundary problem.; Mesh, set, or cluster edits must revalidate every output selector.
 
 - **data-file** (type begins dat):
-  - `output-header` [once]: `type`:const(data_file), `clusters`:selector(all|list|cluster-name), `format`:string, `intermediate`:integer, `c_system`:enum(global,material)
+  - `output-header` [once]: `type`:const(data_file), `clusters`:selector(all|list|cluster-name), `format`:enum-prefix(tecplot,vtk,para), `intermediate`:integer, `c_system`:enum(global,material)
   - `cluster-list` [repeated]: `cluster_names`:cluster-name-list
   - Constraint: Exactly one type key may appear in a header row.
   - Constraint: A header accepts at most five key/value pairs.
+  - Constraint: The parser stores arbitrary format text, but the writer dispatches only lower-case prefixes tec and vtk; exact para sets a process-global SHEFF/ParaView flag. The Agent emits only tecplot or a separately runtime-verified vtk/para profile.
+  - Constraint: intermediate=0 disables iteration output, a positive value requests every nth iteration, and a negative value only participates in converged-step cleanup/output behavior.
+  - Constraint: Every selected cluster must be an active finite-element cluster in the current boundary problem.
 - **node-set-aggregate** (type begins sum or tra):
   - `output-header` [once]: `type`:enum(sum_force,traction_average), `nset`:selector(all|list), `intermediate`:integer, `c_system`:enum(global,material)
   - `node-set-list` [repeated]: `node_sets`:cluster-name.node-set-name-list
   - Constraint: The selector must resolve at least one existing node set.
+  - Constraint: intermediate defaults to zero, which disables iteration output while converged-step output remains active.
 - **element-set-aggregate** (type begins vol or cfv):
   - `output-header` [once]: `type`:enum(volume_average,cfv), `elset`:selector(all|list), `intermediate`:integer, `c_system`:enum(global,material)
   - `element-set-list` [repeated]: `element_sets`:cluster-name.element-set-name-list
   - Constraint: The selector must resolve at least one existing element set.
-  - Constraint: The active implementation reduces multiple selected sets to one entry per distinct cluster.
+  - Constraint: The active implementation reduces multiple selected sets to one entry per distinct cluster, so selecting two sets from the same cluster does not preserve both set identities.
+  - Constraint: The execution path stores c_system but volume-average and CFV calculations do not consume it; the Agent preserves material-coordinate requests but blocks generating them as an effective transformation claim.
+  - Constraint: CFV requires every retained cluster to use compatible constitutive/failure data and the same mode/level dimensions.
 
 
 ## Registered transformations
@@ -1417,14 +1474,22 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.boundary-active-dispatch` — source: `source/libbsam/ibn_ini.f90:123-2048` — Defines mechanical/thermal problem starts and the active nested BOUNDARY command dispatch through convergence and output controls.
 <a id="evidenceboundary-connections"></a>
 - `evidence.boundary-connections` — source: `source/libbsam/ibn_ini.f90:536-941` — Defines penalty types -2/-21, nodal, and surface connection headers, subordinate set rows, defaults, sentinels, and cross-reference checks.
+<a id="evidenceboundary-connection-execution"></a>
+- `evidence.boundary-connection-execution` — source: `source/libbsam/ibn_connections.f90:25-80` — Dispatches active penalty type -2 to VTMS or SHEFF, surface-contact type -3 to SHEFF, and nodal type 888; parsed penalty type -21 has no execution branch.
 <a id="evidenceboundary-loading"></a>
 - `evidence.boundary-loading` — source: `source/libbsam/ibn_ini.f90:943-1385` — Defines static, fatigue, 2D-fatigue, reduced-fatigue, block repetition, and boundary-condition change records.
 <a id="evidenceboundary-convergence"></a>
 - `evidence.boundary-convergence` — source: `source/libbsam/ibn_ini.f90:1386-1632` — Defines D_AA, active four-character convergence labels, values, defaults, and the twelve-record scan limit.
 <a id="evidenceboundary-output"></a>
 - `evidence.boundary-output` — source: `source/libbsam/ibn_ini.f90:1634-2014` — Defines data-file, sum-force, volume-average, traction-average, and CFV output records and selectors.
+<a id="evidenceboundary-output-execution"></a>
+- `evidence.boundary-output-execution` — source: `source/libbsam/ibn_outputs.f90:55-310` — Executes data-file and aggregate output families and defines intermediate-output scheduling behavior.
+<a id="evidenceboundary-data-formats"></a>
+- `evidence.boundary-data-formats` — source: `source/libbsam/out_datafile.f90:88-490` — Implements tec, vtk, and optional ParaView/SHEFF data-file output paths selected from the stored format and global ParaView flag.
 <a id="evidenceboundary-selectors"></a>
 - `evidence.boundary-selectors` — source: `source/libbsam/ibn_ini_tools.f90:447-905` — Defines all/list/qualified-name selection for clusters and cluster-qualified node or element sets.
+<a id="evidenceboundary-components"></a>
+- `evidence.boundary-components` — source: `source/libbsam/ibn_ini_tools.f90:754-808` — Maps every accepted one-, two-, and three-axis component spelling to its stored component ID and canonical reverse spelling.
 <a id="evidenceconstitutive-parser"></a>
 - `evidence.constitutive-parser` — source: `source/libbsam/con_ini.f90:22-350` — Requires CONSTITUTIVE, parses the common modifier prefix, dispatches every accepted constitutive record layout, and terminates entries by declaration order.
 <a id="evidenceconstitutive-storage"></a>
