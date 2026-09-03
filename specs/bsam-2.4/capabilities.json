@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.15.0",
+  "registry_version": "0.18.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -147,6 +147,102 @@
       "line_start": 1556,
       "line_end": 2651,
       "claim": "Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination."
+    },
+    {
+      "id": "evidence.fe-cluster-controls",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 1588,
+      "line_end": 1692,
+      "claim": "Defines the fixed one-record NAME, TYPE, and CONSTITUTIVE readers, including the reserved top-level token check for cluster names."
+    },
+    {
+      "id": "evidence.fe-load-records",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 2889,
+      "line_end": 2975,
+      "claim": "Defines repeated target, degree-of-freedom, and value rows for cluster-local nodal loads and resolves each target as a node set before a node label."
+    },
+    {
+      "id": "evidence.fe-build-spacing",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 4111,
+      "line_end": 4999,
+      "claim": "Defines the no-body BUILD action and the strict, positive-value, and relaxed crack-spacing command-line options."
+    },
+    {
+      "id": "evidence.fe-field-selection",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 2983,
+      "line_end": 3341,
+      "claim": "Defines repeated field-value rows and indexed node/element selection rows, including target resolution and selection limits."
+    },
+    {
+      "id": "evidence.fe-coordinate-operations",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 3350,
+      "line_end": 3695,
+      "claim": "Defines the single-vector SHIFT, TOLERANCE, and SCALE bodies and all six command-line FLIP coordinate mappings."
+    },
+    {
+      "id": "evidence.fe-exclusion-records",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 1328,
+      "line_end": 1522,
+      "claim": "Defines BOX, PLANE, and PREVIOUS exclusion data and their element-exclusion or crack-diameter effects."
+    },
+    {
+      "id": "evidence.fe-node-generation",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 1807,
+      "line_end": 2255,
+      "claim": "Defines straight, paired-set, and arc NGEN record variants plus translated node-set NCOPY records."
+    },
+    {
+      "id": "evidence.fe-element-generation",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 2263,
+      "line_end": 2472,
+      "claim": "Defines explicit element connectivity and structured grid-offset ELGEN records."
+    },
+    {
+      "id": "evidence.fe-element-types",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_element_library.f90",
+      "line_start": 30,
+      "line_end": 117,
+      "claim": "Enumerates the six allocatable element types and dispatches their topology sizes."
+    },
+    {
+      "id": "evidence.fe-boundary-records",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 2661,
+      "line_end": 2879,
+      "claim": "Defines ABAQUS, LIST, and POLYNOMIAL cluster-local boundary rows, target resolution, and polynomial-order handling."
+    },
+    {
+      "id": "evidence.fe-crack-controls",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 3100,
+      "line_end": 5229,
+      "claim": "Defines cluster crack definitions and the REGION, SPACING, INITIATION, and FUNCTION command-line state mutations and geometry records."
+    },
+    {
+      "id": "evidence.fe-inertial-transform",
+      "kind": "source",
+      "locator": "source/libbsam/mod_fe_input.f90",
+      "line_start": 4148,
+      "line_end": 4365,
+      "claim": "Centers a built cluster at its volume centroid, computes its principal inertial frame, rotates existing nodes and full boundary vectors, and leaves partial boundary vectors unchanged only by stopping."
     },
     {
       "id": "evidence.fe-integration-orientation",
@@ -775,7 +871,7 @@
         "tokens": ["*STOP per cluster", "END CLUSTERS"],
         "certainty": "canonical"
       },
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [],
       "evidence_ids": [
         "evidence.cluster-parser",
@@ -784,9 +880,7 @@
         "evidence.current-vtms-deck-notch"
       ],
       "remaining_work": [
-        "Document all command data-body grammars and element-type constraints.",
-        "Build the node/element/set/orientation dependency model required for safe ply transformations.",
-        "Classify END APPROXIMATION, which remains accepted in VTMS project exports, as a compatibility diagnostic."
+        "Complete the node/element/set/orientation reverse-dependency model required for general structural edits."
       ]
     },
     {
@@ -1686,10 +1780,16 @@
       "canonical": "*TYPE",
       "dispatch_prefix": "*TYPE",
       "summary": "Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters.",
-      "coverage": "partially-documented",
-      "parameters": [],
-      "evidence_ids": ["evidence.cluster-parser", "evidence.fe-command-dispatch"],
-      "remaining_work": ["Document the complete accepted data-line spelling and case behavior for solid."]
+      "coverage": "documented",
+      "parameters": [{"name": "representation", "value_type": "enum-prefix", "required": true, "allowed_values": ["solid"], "summary": "The following data record is lowercased and accepted when its first four characters are soli."}],
+      "evidence_ids": ["evidence.cluster-parser", "evidence.fe-command-dispatch", "evidence.fe-cluster-controls"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "solid-fe", "when": "always", "rows": [{"name": "representation", "repetition": "once", "fields": [{"name": "representation", "value_type": "case-insensitive-prefix(soli)", "required": true, "summary": "Selects the only active finite-element cluster representation; canonical generation emits solid."}]}], "constraints": ["*TYPE must be the first non-comment record for each cluster.", "A second *TYPE encountered by the FE command reader stops the program."]}],
+        "dependencies": ["The accepted representation maps to internal cluster type 100."]
+      }
     },
     {
       "id": "command.dimensions",
@@ -1728,15 +1828,15 @@
       "canonical": "*NAME",
       "dispatch_prefix": "*NAME",
       "summary": "Assigns a name to the current cluster.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [{"name": "name", "value_type": "string-record", "required": true, "summary": "Cluster name; it is normalized to lowercase by the enclosing cluster parser."}],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.cluster-parser"],
-      "remaining_work": ["Document length and uniqueness behavior across multiple clusters."],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.cluster-parser", "evidence.fe-cluster-controls"],
+      "remaining_work": [],
       "body": {
-        "style": "records",
-        "termination": "next-command",
-        "variants": [{"name": "cluster-name", "when": "*NAME is dispatched", "rows": [{"name": "name", "repetition": "once", "fields": [{"name": "name", "value_type": "string", "required": true, "summary": "Name assigned to the current cluster."}]}], "constraints": ["The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization."]}],
-        "dependencies": ["Every cluster-qualified set reference uses the normalized lowercase cluster name."]
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "cluster-name", "when": "*NAME is dispatched", "rows": [{"name": "name", "repetition": "once", "fields": [{"name": "name", "value_type": "one-list-directed-token-up-to-80-characters", "required": true, "summary": "Name assigned to the current cluster and later normalized to lowercase."}]}], "constraints": ["The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.", "The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness because name-based consumers otherwise select or compare ambiguously."]}],
+        "dependencies": ["Every cluster-qualified set reference uses the normalized lowercase cluster name.", "If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name.", "Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference."]
       }
     },
     {
@@ -1745,10 +1845,16 @@
       "canonical": "*CONSTITUTIVE",
       "dispatch_prefix": "*CONS",
       "summary": "Assigns the constitutive record used by the current cluster.",
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document the ID grammar and cross-reference validation rules."]
+      "coverage": "documented",
+      "parameters": [{"name": "constitutive_id", "value_type": "positive-constitutive-id-record", "required": true, "summary": "The following data record selects one declaration-order CONSTITUTIVE definition."}],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-cluster-controls"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "constitutive-reference", "when": "always", "rows": [{"name": "constitutive", "repetition": "once", "fields": [{"name": "constitutive_id", "value_type": "positive-integer", "required": true, "summary": "References one existing CONSTITUTIVE entity by declaration order."}]}], "constraints": ["The BSAM reader stores the integer without bounds checking; the Agent must reject zero, negative, and unresolved IDs."]}],
+        "dependencies": ["The ID must resolve to an existing CONSTITUTIVE declaration.", "Deleting or reordering CONSTITUTIVE entries must update this reference atomically."]
+      }
     },
     {
       "id": "command.node",
@@ -1790,7 +1896,7 @@
       "canonical": "*NGEN",
       "dispatch_prefix": "*NGEN",
       "summary": "Generates nodes from compact generation records.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "NSET",
@@ -1800,7 +1906,7 @@
         },
         {
           "name": "BIAS",
-          "value_type": "real",
+          "value_type": "positive-real",
           "required": false,
           "default": 1,
           "summary": "Controls generation spacing bias."
@@ -1812,8 +1918,18 @@
           "summary": "Selects arc generation mode."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document generation row grammar and numerical constraints."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-node-generation"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "straight-between-nodes", "when": "ARC is absent and the first endpoint token is not a node-set name", "rows": [{"name": "generation", "repetition": "repeated", "fields": [{"name": "start_node", "value_type": "existing-node-label", "required": true, "summary": "First endpoint and label-range origin."}, {"name": "end_node", "value_type": "existing-node-label", "required": true, "summary": "Second endpoint and inclusive label-range end."}, {"name": "label_increment", "value_type": "nonzero-integer", "required": true, "summary": "Generates intermediate labels start+increment through end-increment."}]}], "constraints": ["Increment sign must progress from start_node toward end_node and divide the label interval without colliding with existing labels.", "Coordinates use s=((label-start)/(end-start))^BIAS along the endpoint segment."]},
+          {"name": "straight-between-paired-node-sets", "when": "ARC is absent and the first endpoint token resolves to a node set", "rows": [{"name": "generation", "repetition": "repeated", "fields": [{"name": "start_set", "value_type": "existing-node-set-name", "required": true, "summary": "Ordered start endpoints."}, {"name": "end_set", "value_type": "existing-node-set-name", "required": true, "summary": "Ordered end endpoints with equal membership count."}, {"name": "label_increment", "value_type": "nonzero-integer", "required": true, "summary": "Generates intermediate labels for every paired endpoint."}]}], "constraints": ["Both sets must exist and contain the same number of nodes in corresponding order.", "Every endpoint-label interval must be compatible with the common increment and produce globally unique labels."]},
+          {"name": "circular-arc", "when": "ARC is present", "rows": [{"name": "center", "repetition": "once", "fields": [{"name": "cx", "value_type": "real", "required": true, "summary": "Arc-center X."}, {"name": "cy", "value_type": "real", "required": true, "summary": "Arc-center Y."}, {"name": "cz", "value_type": "real", "required": true, "summary": "Arc-center Z."}]}, {"name": "generation", "repetition": "repeated", "fields": [{"name": "start_node", "value_type": "existing-node-label", "required": true, "summary": "First radial endpoint."}, {"name": "end_node", "value_type": "existing-node-label", "required": true, "summary": "Second radial endpoint."}, {"name": "label_increment", "value_type": "nonzero-integer", "required": true, "summary": "Generates intermediate arc labels."}]}], "constraints": ["Endpoint radii must be nonzero and their radial vectors must not be collinear because the local arc frame normalizes their cross product.", "The implementation uses the start radius for all generated nodes and advances the end angle counterclockwise by at most one revolution."]}
+        ],
+        "dependencies": ["All endpoint nodes and sets must be defined before NGEN.", "DIMENSIONS node_capacity and the node-label lookup allocation must cover all generated nodes and labels.", "NSET creates or appends both endpoints and generated nodes when supplied.", "BIAS must be positive to keep the interpolation finite and monotone."]
+      }
     },
     {
       "id": "command.ncopy",
@@ -1821,7 +1937,7 @@
       "canonical": "*NCOPY",
       "dispatch_prefix": "*NCOP",
       "summary": "Copies nodes using compact copy records.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "NSET",
@@ -1830,8 +1946,14 @@
           "summary": "Adds copied nodes to a named node set."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document copy row grammar, label allocation, and coordinate transformation behavior."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-node-generation"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{"name": "translated-node-set-copies", "when": "always", "rows": [{"name": "copy", "repetition": "repeated", "fields": [{"name": "source_set", "value_type": "existing-node-set-name", "required": true, "summary": "Ordered nodes copied by the row."}, {"name": "copy_count", "value_type": "positive-integer", "required": true, "summary": "Number of translated copies of every source node."}, {"name": "label_offset", "value_type": "nonzero-integer", "required": true, "summary": "Added once per copy index to each source label."}, {"name": "dx", "value_type": "real", "required": true, "summary": "Translation per copy index in X."}, {"name": "dy", "value_type": "real", "required": true, "summary": "Translation per copy index in Y."}, {"name": "dz", "value_type": "real", "required": true, "summary": "Translation per copy index in Z."}]}], "constraints": ["Generated copy j has label source_label+j*label_offset and coordinates source_coordinates+j*(dx,dy,dz).", "All generated labels must be positive and globally unique."]}],
+        "dependencies": ["source_set must already exist and contain at least one node.", "DIMENSIONS node_capacity and the node-label lookup allocation must cover every copy.", "NSET creates or appends generated copies when supplied; source nodes are not added."]
+      }
     },
     {
       "id": "command.element",
@@ -1843,8 +1965,9 @@
       "parameters": [
         {
           "name": "TYPE",
-          "value_type": "element-type",
+          "value_type": "enum",
           "required": true,
+          "allowed_values": ["C3D8", "Y3D8", "X3D8", "LC3D8", "C3D4", "C3D10", "B3D10"],
           "summary": "Selects the element topology; B3D10 is internally mapped to C3D10 with a Bernstein flag."
         },
         {
@@ -1854,8 +1977,8 @@
           "summary": "Creates or appends elements to the named element set."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
-      "remaining_work": ["Enumerate every supported element type and its connectivity width; confirm duplicate-label diagnostics."],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records", "evidence.fe-element-generation", "evidence.fe-element-types"],
+      "remaining_work": ["Confirm duplicate-label and capacity-overrun diagnostics."],
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -1866,7 +1989,7 @@
             {"name": "element_label", "value_type": "positive-integer", "required": true, "summary": "External element label."},
             {"name": "node_labels", "value_type": "integer-list(element-type-width)", "required": true, "summary": "Connectivity labels; count is selected by TYPE."}
           ]}],
-          "constraints": ["Every connectivity node label must resolve to a node; row width depends on TYPE."]
+          "constraints": ["C3D8, Y3D8, X3D8, and LC3D8 require 8 connectivity labels; C3D4 requires 4; C3D10 and B3D10 require 10.", "Every connectivity node label must resolve to a node before BUILD or STOP.", "Element labels must be positive and unique; Agent validation rejects duplicates before the source lookup is overwritten."]
         }],
         "dependencies": ["TYPE is required.", "Referenced nodes must already exist.", "DIMENSIONS element_capacity must be large enough."]
       }
@@ -1877,17 +2000,24 @@
       "canonical": "*ELGEN",
       "dispatch_prefix": "*ELGE",
       "summary": "Generates elements from compact connectivity-generation records.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "TYPE",
-          "value_type": "element-type",
+          "value_type": "enum",
           "required": true,
+          "allowed_values": ["C3D8", "Y3D8", "X3D8", "LC3D8", "C3D4", "C3D10"],
           "summary": "Selects the generated element topology."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document generation records, supported types, and resulting set membership."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-element-generation", "evidence.fe-element-types"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{"name": "structured-label-offset-grid", "when": "always", "rows": [{"name": "generation", "repetition": "repeated", "fields": [{"name": "seed_element", "value_type": "existing-element-label", "required": true, "summary": "Supplies the seed connectivity and first generated-label predecessor."}, {"name": "row_count", "value_type": "positive-integer", "required": true, "summary": "Number of row positions including the seed."}, {"name": "column_count", "value_type": "positive-integer", "required": true, "summary": "Number of column positions including the seed."}, {"name": "layer_count", "value_type": "positive-integer", "required": true, "summary": "Number of layer positions including the seed."}, {"name": "row_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per row position."}, {"name": "column_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per column position."}, {"name": "layer_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per layer position."}]}], "constraints": ["The seed occupies position 1,1,1; every other position creates one element whose label increments sequentially from seed_element.", "TYPE must match the seed topology and determines whether 4, 8, or 10 connectivity labels are shifted.", "Every shifted node label must already exist and every generated element label must be unique.", "ELGEN has no ELSET option and does not add generated elements to a set."]}],
+        "dependencies": ["The seed element and every referenced/generated connectivity node must already exist.", "DIMENSIONS element_capacity must cover row_count*column_count*layer_count minus the seed position."]
+      }
     },
     {
       "id": "command.nset",
@@ -1968,7 +2098,7 @@
       "canonical": "*BOUNDARY",
       "dispatch_prefix": "*BOUN",
       "summary": "Applies cluster-local boundary data using supported row formats.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "FORMAT",
@@ -1979,8 +2109,18 @@
           "summary": "Selects the boundary row parser; matching uses four-character prefixes."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document each row format, degree-of-freedom semantics, and set references."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-boundary-records"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "abaqus-style", "when": "FORMAT is ABAQUS or omitted", "rows": [{"name": "constraint", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "Selects an existing node set first, otherwise an existing numeric node label."}, {"name": "first_degree_of_freedom", "value_type": "integer(1..3)", "required": true, "summary": "First constrained translational component."}, {"name": "last_degree_of_freedom", "value_type": "integer(1..3)", "required": true, "summary": "Last constrained translational component."}, {"name": "value", "value_type": "real", "required": true, "summary": "Prescribed value applied to every component in the inclusive range."}]}], "constraints": ["Rows are comma-delimited and require first_degree_of_freedom <= last_degree_of_freedom.", "Later rows replace earlier prescribed values on the same node/component."]},
+          {"name": "list-directed", "when": "FORMAT is LIST", "rows": [{"name": "constraint", "repetition": "repeated", "fields": [{"name": "node_label", "value_type": "existing-node-label", "required": true, "summary": "Selects one node; node-set names are not accepted in this format."}, {"name": "ux", "value_type": "real", "required": true, "summary": "Prescribed X displacement."}, {"name": "uy", "value_type": "real", "required": true, "summary": "Prescribed Y displacement."}, {"name": "uz", "value_type": "real", "required": true, "summary": "Prescribed Z displacement."}]}], "constraints": ["Every row activates all three translational components."]},
+          {"name": "polynomial", "when": "FORMAT is POLYNOMIAL", "rows": [{"name": "constraint", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-set-name-for-safe-generation", "required": true, "summary": "Selects target nodes; the source also attempts numeric node labels through an unsafe branch."}, {"name": "degree_of_freedom", "value_type": "integer(1..3)", "required": true, "summary": "Constrained component."}, {"name": "coordinate", "value_type": "integer(1..3)", "required": true, "summary": "Node coordinate used as the polynomial argument."}, {"name": "order", "value_type": "integer(0..4)", "required": true, "summary": "Polynomial order."}, {"name": "coefficients", "value_type": "real-list(order+1)", "required": true, "summary": "Coefficients from constant through the requested order."}]}], "constraints": ["Rows are comma-delimited.", "The individual-node branch pauses and stores through the stale loop variable j rather than degree_of_freedom; Agent generation requires a node-set target until corrected."]}
+        ],
+        "dependencies": ["Every target must already exist in the current cluster.", "Coordinate and degree-of-freedom indices are one-based X/Y/Z components.", "These cluster-local values initialize node constraint state consumed by later BOUNDARY problems."]
+      }
     },
     {
       "id": "command.load",
@@ -1988,10 +2128,16 @@
       "canonical": "*LOAD",
       "dispatch_prefix": "*LOAD",
       "summary": "Applies cluster-local nodal loading records.",
-      "coverage": "identified",
+      "coverage": "documented",
       "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document load row fields, degree-of-freedom semantics, and reference targets."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-load-records"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{"name": "nodal-loads", "when": "always", "rows": [{"name": "load", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "Selects an existing node set first, otherwise an existing numeric node label."}, {"name": "degree_of_freedom", "value_type": "integer(1..3)", "required": true, "summary": "Selects X, Y, or Z translational load storage for the solid FE node."}, {"name": "value", "value_type": "real", "required": true, "summary": "Replaces the stored load value for the selected target nodes and degree of freedom."}]}], "constraints": ["Rows are comma-delimited.", "Later rows targeting the same node and degree of freedom replace earlier values rather than accumulate.", "A missing numeric node target stops the program; Agent validation also rejects missing node-set targets instead of relying on numeric fallback failure."]}],
+        "dependencies": ["Targets must refer to nodes or node sets already created in the current cluster.", "Node-set membership determines every node updated by that row."]
+      }
     },
     {
       "id": "command.field",
@@ -1999,17 +2145,23 @@
       "canonical": "*FIELD",
       "dispatch_prefix": "*FIEL",
       "summary": "Applies field values with a configured variable count.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "VARIABLES",
-          "value_type": "integer",
-          "required": false,
-          "summary": "Sets the number of field variables in each record."
+          "value_type": "integer(1..10)",
+          "required": true,
+          "summary": "Sets the number of field values following each target; it has no source default and must not exceed the ten allocated slots."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document field row grammar, default variable count, and consumers."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [{"name": "nodal-field-values", "when": "VARIABLES is present", "rows": [{"name": "field", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "Selects an existing node set first, otherwise an existing numeric node label."}, {"name": "values", "value_type": "real-list(VARIABLES)", "required": true, "summary": "Replaces the first VARIABLES field slots on every target node."}]}], "constraints": ["Rows are comma-delimited and must contain exactly VARIABLES values.", "VARIABLES is mandatory because the source local has no visible default.", "The source does not update node%nfield for node-set targets and writes it through an incorrect index for individual targets; Agent generation is blocked until this consumer-state defect is resolved or proven harmless."]}],
+        "dependencies": ["Targets must refer to nodes or node sets already created in the current cluster.", "Downstream material or analysis consumers determine the meaning and units of each field position."]
+      }
     },
     {
       "id": "command.selection",
@@ -2017,7 +2169,7 @@
       "canonical": "*SELECTION",
       "dispatch_prefix": "*SELE",
       "summary": "Defines an indexed node or element selection used by later operations.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "ID",
@@ -2034,8 +2186,17 @@
           "summary": "Selects whether the selection contains nodes or elements."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document selection body grammar and the dimension-card dependency."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection"],
+      "remaining_work": [],
+      "body": {
+        "style": "records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "node-selection", "when": "TYPE is NODE or omitted", "rows": [{"name": "members", "repetition": "repeated", "fields": [{"name": "targets", "value_type": "comma-separated-node-label-or-node-set-name-list", "required": true, "summary": "Adds resolved node indices; each token resolves as a node set before a numeric node label."}]}], "constraints": ["At most ten node-set labels may be recorded; individual node labels do not count toward that limit.", "Duplicate members are subject to the integer-list insertion behavior and should be normalized by Agent generation."]},
+          {"name": "element-selection", "when": "TYPE is ELEMENT", "rows": [{"name": "members", "repetition": "repeated", "fields": [{"name": "targets", "value_type": "comma-separated-element-label-or-element-set-name-list", "required": true, "summary": "Adds resolved element indices; each token resolves as an element set before a numeric element label."}]}], "constraints": ["At most ten element-set labels may be recorded.", "The source checks an unrelated inode variable after individual-element lookup; Agent generation permits existing element sets but blocks individual element labels until that defect is fixed or runtime-qualified."]}
+        ],
+        "dependencies": ["ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.", "All named sets and individual entities must already exist in the current cluster.", "Selection consumers reference the stored one-based ID."]
+      }
     },
     {
       "id": "command.tolerance",
@@ -2043,18 +2204,25 @@
       "canonical": "*TOLERANCE",
       "dispatch_prefix": "*TOLE",
       "summary": "Overrides one of the model tolerances used by geometry and crack operations.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "TYPE",
           "value_type": "enum",
-          "required": true,
+          "required": false,
           "allowed_values": ["PTOL", "ITOL", "FTOL", "OTOL"],
-          "summary": "Selects the tolerance category."
+          "default": "PTOL",
+          "summary": "Selects proximity, parametric-inversion, shape-function, or outside-parametric tolerance; source matching of the value is uppercase-sensitive."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document the value record, units, defaults, and numerical constraints for each type."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "tolerance-value", "when": "always", "rows": [{"name": "value", "repetition": "once", "fields": [{"name": "value", "value_type": "nonnegative-real", "required": true, "summary": "Replaces the selected cluster tolerance."}]}], "constraints": ["The source reader accepts any real without range checking; Agent generation requires nonnegative values.", "Allocated defaults are PTOL=1e-6, ITOL=1e-8, FTOL=1e-10, and OTOL=0.", "PTOL has coordinate-length units; ITOL, FTOL, and OTOL are dimensionless parametric or shape-function tolerances."]}],
+        "dependencies": ["PTOL affects proximity operations, ITOL affects parametric location, FTOL affects penalty-connection shape-function contributions, and OTOL extends accepted parametric element bounds."]
+      }
     },
     {
       "id": "command.integration",
@@ -2115,10 +2283,16 @@
       "canonical": "*BUILD",
       "dispatch_prefix": "*BUIL",
       "summary": "Forces intermediate construction of element information before cluster input ends.",
-      "coverage": "identified",
+      "coverage": "documented",
       "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document body grammar, idempotency, ordering constraints, and downstream effects."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-build-spacing"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "no-data-action", "when": "always", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "*BUILD", "value_type": "command-only-no-data-row", "required": true, "summary": "Immediately updates element data and creates finite-element topology, then continues with the next command."}]}], "constraints": ["The command has no following data row.", "Canonical generation places it only after required nodes and elements exist.", "Repeated execution is blocked from Agent generation because the source does not declare topology construction idempotent."]}],
+        "dependencies": ["All element connectivity must resolve to already-created nodes before topology construction."]
+      }
     },
     {
       "id": "command.stop",
@@ -2126,10 +2300,16 @@
       "canonical": "*STOP",
       "dispatch_prefix": "*STOP",
       "summary": "Finishes the current FE cluster reader after updating element data.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.current-vtms-deck-notch"],
-      "remaining_work": ["Confirm ordering requirements and behavior with nested include files."]
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "cluster-terminator", "when": "always", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "*STOP", "value_type": "command-only-no-data-row", "required": true, "summary": "Updates stale element coordinate data, exits the FE command loop, and completes the current cluster."}]}], "constraints": ["The command has no following data row and must be the final logical command of a cluster.", "A *STOP encountered inside an include exits the entire cluster rather than only the included stream; Agent generation therefore emits it only in the root cluster stream."]}],
+        "dependencies": ["Every element connectivity label must resolve before the implicit final update.", "Commands after *STOP in the same cluster are unreachable."]
+      }
     },
     {
       "id": "command.include",
@@ -2137,7 +2317,7 @@
       "canonical": "*INCLUDE",
       "dispatch_prefix": "*INCL",
       "summary": "Reads additional FE cluster commands from a nested include stack; every FILE target is resolved from the original BSAM input directory and EOF resumes the parent stream.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "FILE",
@@ -2147,7 +2327,13 @@
         }
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-include-open", "evidence.fe-include-unwind"],
-      "remaining_work": ["Controlled executable probes remain for cycle failure and non-canonical path spellings; source-preserving edits across included files are not yet supported."]
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "include-switch", "when": "always", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "FILE", "value_type": "unquoted-relative-path-on-command-line", "required": true, "summary": "Opens the file and begins reading its FE commands; no following path record is consumed."}]}], "constraints": ["If multiple FILE options occur, the final one is used.", "BSAM resolves every target against the original input directory, including nested includes.", "Included-file EOF closes that stream and resumes its parent; *STOP instead ends the whole cluster.", "The Agent rejects absolute paths, workspace escapes, missing files, and include cycles before execution.", "Source-preserving edits inside included files remain blocked until multi-file patch planning is implemented."]}],
+        "dependencies": ["The target must be a readable FE-command fragment reachable inside the configured workspace.", "Included definitions share the current cluster and must obey the same ordering, capacity, identity, and reference rules."]
+      }
     },
     {
       "id": "command.shift",
@@ -2155,7 +2341,7 @@
       "canonical": "*SHIFT",
       "dispatch_prefix": "*SHIF",
       "summary": "Translates all nodes or nodes in a named node set.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "ALL",
@@ -2170,8 +2356,14 @@
           "summary": "Selects one existing node set and is mutually exclusive with ALL."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document translation-vector row grammar and coordinate effects."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "translation-vector", "when": "always", "rows": [{"name": "translation", "repetition": "once", "fields": [{"name": "dx", "value_type": "real", "required": true, "summary": "Adds this value to X."}, {"name": "dy", "value_type": "real", "required": true, "summary": "Adds this value to Y."}, {"name": "dz", "value_type": "real", "required": true, "summary": "Adds this value to Z."}]}], "constraints": ["Exactly one non-comment vector row is consumed.", "ALL and NSET are mutually exclusive and omission selects ALL."]}],
+        "dependencies": ["NSET must resolve in the current cluster and selects its existing member nodes.", "Only nodes created before the command are translated.", "The operation marks cached element coordinates stale for the next BUILD or STOP update."]
+      }
     },
     {
       "id": "command.scale",
@@ -2179,7 +2371,7 @@
       "canonical": "*SCALE",
       "dispatch_prefix": "*SCAL",
       "summary": "Scales all nodes or nodes in a named node set.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "ALL",
@@ -2194,8 +2386,14 @@
           "summary": "Selects one existing node set and is mutually exclusive with ALL."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document scale factors, origin behavior, and coordinate effects."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "axis-scale-factors", "when": "always", "rows": [{"name": "scales", "repetition": "once", "fields": [{"name": "sx", "value_type": "nonzero-real", "required": true, "summary": "Multiplies X about the global origin."}, {"name": "sy", "value_type": "nonzero-real", "required": true, "summary": "Multiplies Y about the global origin."}, {"name": "sz", "value_type": "nonzero-real", "required": true, "summary": "Multiplies Z about the global origin."}]}], "constraints": ["Exactly one non-comment factor row is consumed.", "ALL and NSET are mutually exclusive and omission selects ALL.", "The source accepts zero factors, but Agent generation rejects them because they collapse the mesh; negative factors intentionally reflect an axis."]}],
+        "dependencies": ["NSET must resolve in the current cluster and selects its existing member nodes.", "At least one previously created node must be selected or BSAM stops.", "The operation marks cached element coordinates stale for the next BUILD or STOP update."]
+      }
     },
     {
       "id": "command.exclusion",
@@ -2203,25 +2401,37 @@
       "canonical": "*EXCLUSION",
       "dispatch_prefix": "*EXCL",
       "summary": "Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "shape",
           "value_type": "mutually-exclusive flags",
-          "required": true,
+          "required": false,
           "allowed_values": ["BOX", "PLANE", "PREVIOUS"],
-          "summary": "Selects the exclusion geometry/source."
+          "default": "BOX",
+          "summary": "Selects the exclusion geometry/source; omission selects BOX."
         },
         {
           "name": "side",
           "value_type": "mutually-exclusive flags",
           "required": false,
           "allowed_values": ["INSIDE", "OUTSIDE"],
+          "default": "INSIDE",
           "summary": "Selects which side of BOX or PLANE is excluded; invalid with PREVIOUS."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.current-vtms-deck-tric"],
-      "remaining_work": ["Document box, plane, and previous-crack data records and coordinate tolerances."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-exclusion-records", "evidence.current-vtms-deck-tric"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [
+          {"name": "box", "when": "shape is BOX or omitted", "rows": [{"name": "bounds", "repetition": "once", "fields": [{"name": "xmin", "value_type": "real", "required": true, "summary": "First X bound."}, {"name": "ymin", "value_type": "real", "required": true, "summary": "First Y bound."}, {"name": "zmin", "value_type": "real", "required": true, "summary": "First Z bound."}, {"name": "xmax", "value_type": "real", "required": true, "summary": "Second X bound."}, {"name": "ymax", "value_type": "real", "required": true, "summary": "Second Y bound."}, {"name": "zmax", "value_type": "real", "required": true, "summary": "Second Z bound."}]}], "constraints": ["Agent generation requires each minimum bound to be no greater than its maximum.", "The active element test does not apply PTOL and exits its node loop as soon as its running flag is true; creation of new BOX exclusions is blocked pending correction or an accepted executable qualification of this behavior."]},
+          {"name": "plane", "when": "shape is PLANE", "rows": [{"name": "plane-band", "repetition": "once", "fields": [{"name": "point_x", "value_type": "real", "required": true, "summary": "X coordinate of a point on the plane."}, {"name": "point_y", "value_type": "real", "required": true, "summary": "Y coordinate of a point on the plane."}, {"name": "point_z", "value_type": "real", "required": true, "summary": "Z coordinate of a point on the plane."}, {"name": "normal_x", "value_type": "real", "required": true, "summary": "Plane-normal X component."}, {"name": "normal_y", "value_type": "real", "required": true, "summary": "Plane-normal Y component."}, {"name": "normal_z", "value_type": "real", "required": true, "summary": "Plane-normal Z component."}, {"name": "distance", "value_type": "nonnegative-real", "required": true, "summary": "Half-width of the signed-distance band."}]}], "constraints": ["The normal must be nonzero and is normalized by the reader.", "INSIDE excludes elements with at least one node in the band; OUTSIDE excludes elements with no node in the band."]},
+          {"name": "previous", "when": "shape is PREVIOUS", "rows": [{"name": "diameter", "repetition": "once", "fields": [{"name": "maximum_diameter", "value_type": "positive-real", "required": true, "summary": "Stores the cluster maximum diameter used by the subsequent previous-crack exclusion path."}]}], "constraints": ["INSIDE and OUTSIDE are invalid with PREVIOUS."]}
+        ],
+        "dependencies": ["BOX and PLANE exclusions act on elements after their coordinate caches are updated.", "PREVIOUS supplies crack-related maximum-diameter state rather than directly marking elements."]
+      }
     },
     {
       "id": "command.flip",
@@ -2229,7 +2439,7 @@
       "canonical": "*FLIP",
       "dispatch_prefix": "*FLIP",
       "summary": "Swaps two coordinate axes for subsequent/read cluster geometry.",
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "TYPE",
@@ -2240,8 +2450,14 @@
           "summary": "Selects the directed axis exchange."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document operation ordering and effects on orientations and existing entities."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "command-line-rotation", "when": "always", "rows": [{"name": "mapping", "repetition": "once", "fields": [{"name": "TYPE", "value_type": "enum(XY,YX,XZ,ZX,YZ,ZY)", "required": false, "summary": "Chooses a 90-degree directed coordinate mapping on the command line; omission selects XY."}]}], "constraints": ["The TYPE value is uppercase-sensitive.", "Mappings are XY=(-Y,X,Z), YX=(Y,-X,Z), XZ=(-Z,Y,X), ZX=(Z,Y,-X), YZ=(X,-Z,Y), and ZY=(X,Z,-Y).", "The command consumes no following data row."]}],
+        "dependencies": ["Only nodes already created in the cluster are rotated.", "The operation does not rotate separately stored orientation vectors and marks cached element coordinates stale; ordering relative to ORIENTATION is therefore engineering-significant."]
+      }
     },
     {
       "id": "command.spacing",
@@ -2249,10 +2465,16 @@
       "canonical": "*SPACING",
       "dispatch_prefix": "*SPAC",
       "summary": "Defines crack spacing behavior for the cluster.",
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Trace CRACK_SPACING_INPUT and document strict, value, and relaxed modes plus defaults."]
+      "coverage": "documented",
+      "parameters": [{"name": "mode", "value_type": "mutually-exclusive-command-line-option", "required": false, "allowed_values": ["STRICT", "VALUE", "RELAXED"], "default": "STRICT", "summary": "STRICT stores zero, VALUE requires a positive spacing, and RELAXED stores the negative sentinel used to disable strict spacing."}, {"name": "value", "value_type": "positive-real", "required": false, "summary": "Required only for VALUE and stored as the cluster minimum crack spacing."}],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-build-spacing"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "command-line-only", "when": "always", "rows": [{"name": "spacing-mode", "repetition": "once", "fields": [{"name": "option", "value_type": "STRICT-or-VALUE=<positive-real>-or-RELAXED", "required": false, "summary": "Sets spacing on the command line; no data row follows."}]}], "constraints": ["Option names are matched case-insensitively by their first three characters.", "VALUE must be greater than zero or BSAM stops.", "The allocated cluster default is strict spacing with a stored value of zero."]}],
+        "dependencies": ["The stored value controls later crack insertion spacing checks for this cluster."]
+      }
     },
     {
       "id": "command.section",
@@ -2304,18 +2526,33 @@
       "canonical": "*CRACK",
       "dispatch_prefix": "*CRAC",
       "summary": "Dispatches cluster crack definition, region, spacing, initiation, and function variants.",
-      "coverage": "identified",
-      "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Split and document DEFINITION, REGION, SPACING, INITIATION, and FUNCTION variant schemas and dependencies."]
+      "coverage": "documented",
+      "parameters": [{"name": "operation", "value_type": "command-name-suffix", "required": true, "allowed_values": ["DEFINITION", "REGION", "SPACING", "INITIATION", "FUNCTION"], "summary": "Selects the command family through the uppercased characters 6 through 10 of the full command token."}],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-crack-controls"],
+      "remaining_work": [],
+      "body": {
+        "style": "nested-records",
+        "termination": "next-command-or-eof",
+        "variants": [
+          {"name": "blocked-definition", "when": "operation is DEFINITION", "rows": [{"name": "plane-or-cylinder", "repetition": "repeated", "fields": [{"name": "point", "value_type": "three-reals", "required": true, "summary": "Point on the crack definition."}, {"name": "normal", "value_type": "three-reals", "required": true, "summary": "Definition direction/normal."}, {"name": "radius", "value_type": "optional-real-for-cylinder", "required": false, "summary": "Cylinder radius when TYPE=Cylinder."}]}], "constraints": ["The intended command-line TYPE values are PLANE and CYLINDER, with PLANE as the local default.", "The active reader tests the already-parsed command/value buffer before advancing to the first data row: without TYPE it consumes no definitions, while with TYPE it attempts to parse the TYPE value as numeric data. This operation is blocked from Agent generation."]},
+          {"name": "region-by-element-set", "when": "operation is REGION and ELSET is supplied", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "action", "value_type": "enum(REPLACE,ADD,REMOVE)", "required": false, "summary": "Defaults to REPLACE."}, {"name": "ELSET", "value_type": "existing-element-set-name", "required": true, "summary": "Selects all members without a following data row."}]}], "constraints": ["REPLACE first disables cracking for every element, then enables the selected set; ADD enables it and REMOVE disables it."]},
+          {"name": "region-by-box", "when": "operation is REGION and COORDINATES or BOX is supplied", "rows": [{"name": "bounds", "repetition": "once", "fields": [{"name": "xmin", "value_type": "real", "required": true, "summary": "Minimum X."}, {"name": "ymin", "value_type": "real", "required": true, "summary": "Minimum Y."}, {"name": "zmin", "value_type": "real", "required": true, "summary": "Minimum Z."}, {"name": "xmax", "value_type": "real", "required": true, "summary": "Maximum X."}, {"name": "ymax", "value_type": "real", "required": true, "summary": "Maximum Y."}, {"name": "zmax", "value_type": "real", "required": true, "summary": "Maximum Z."}]}], "constraints": ["The action is REPLACE by default; bounds must be ordered."]},
+          {"name": "region-by-sphere", "when": "operation is REGION and SPHERE is supplied", "rows": [{"name": "sphere", "repetition": "once", "fields": [{"name": "center_x", "value_type": "real", "required": true, "summary": "Center X."}, {"name": "center_y", "value_type": "real", "required": true, "summary": "Center Y."}, {"name": "center_z", "value_type": "real", "required": true, "summary": "Center Z."}, {"name": "radius", "value_type": "positive-real", "required": true, "summary": "Sphere radius."}]}], "constraints": ["The action is REPLACE by default."]},
+          {"name": "region-by-cylinder", "when": "operation is REGION and CYLINDER is supplied", "rows": [{"name": "cylinder", "repetition": "once", "fields": [{"name": "start_x", "value_type": "real", "required": true, "summary": "Axis start X."}, {"name": "start_y", "value_type": "real", "required": true, "summary": "Axis start Y."}, {"name": "start_z", "value_type": "real", "required": true, "summary": "Axis start Z."}, {"name": "end_x", "value_type": "real", "required": true, "summary": "Axis end X."}, {"name": "end_y", "value_type": "real", "required": true, "summary": "Axis end Y."}, {"name": "end_z", "value_type": "real", "required": true, "summary": "Axis end Z."}, {"name": "radius", "value_type": "positive-real", "required": true, "summary": "Cylinder radius."}]}], "constraints": ["Axis endpoints must differ; the action is REPLACE by default."]},
+          {"name": "spacing", "when": "operation is SPACING", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "mode", "value_type": "STRICT-or-VALUE=<positive-real>-or-RELAXED", "required": false, "summary": "Same command-line state change as standalone *SPACING; no data row follows."}]}], "constraints": ["STRICT is the allocated default."]},
+          {"name": "initiation", "when": "operation is INITIATION", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "LOCATION", "value_type": "enum-prefix(INTEGRATION POINTS,NODES,CENTER)", "required": true, "summary": "Stores integration-point, nodal, or center initiation mode; no data row follows."}]}], "constraints": ["LOCATION is required because the allocated cluster state has no visible initializer."]},
+          {"name": "function", "when": "operation is FUNCTION", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "TYPE", "value_type": "enum-prefix(SIMPLE,WEIGHTED)", "required": false, "summary": "Selects the crack weighting function on the command line; omission keeps WEIGHTED."}]}], "constraints": ["The final TYPE option must supply the residual parsed value used by this branch; canonical generation places it last."]}
+        ],
+        "dependencies": ["REGION set and geometry targets act only on elements already created in the current cluster.", "Crack region and initiation state is consumed by subsequent crack insertion and analysis operations.", "DEFINITION is preservation-only until its active record-advance defect is corrected."]
+      }
     },
     {
       "id": "command.transform",
       "parent_block_id": "block.clusters",
       "canonical": "*TRANSFORM",
       "dispatch_prefix": "*TRAN",
-      "summary": "Transforms cluster geometry to its inertial coordinate system with optional flattening.",
-      "coverage": "partially-documented",
+      "summary": "Centers cluster geometry and rotates it into its computed principal inertial coordinate system.",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "INERTIA",
@@ -2327,11 +2564,17 @@
           "name": "FLATTEN",
           "value_type": "real",
           "required": false,
-          "summary": "Requests flattening and supplies the replacement thickness."
+          "summary": "Parsed but not passed to the transformation routine; blocked from Agent generation because it has no active effect."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch"],
-      "remaining_work": ["Document the data body, axis selection, and effects on orientations, sets, and existing entities."]
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-inertial-transform"],
+      "remaining_work": [],
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "inertial-command-line-action", "when": "INERTIA is present", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "INERTIA", "value_type": "required-command-line-flag", "required": true, "summary": "Triggers the transformation immediately; no data row follows."}]}], "constraints": ["The cluster is translated so its volume centroid is at the origin, then rotated to the ordered principal inertia frame.", "FLATTEN is parsed but ignored by the called routine.", "A node with exactly one or two constrained components causes BSAM to stop; a fully constrained vector is rotated.", "Loads and separately stored orientation vectors are not rotated by this routine, so Agent generation is blocked when either is already present."]}],
+        "dependencies": ["Elements must already be built with valid nonzero total volume and current coordinate caches.", "The transformation changes every existing node but preserves label and set membership.", "A later BUILD or STOP must refresh element coordinate caches."]
+      }
     }
   ],
   "nested_constructs": [

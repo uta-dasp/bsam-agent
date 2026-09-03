@@ -34,7 +34,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.15.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.18.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -46,6 +46,7 @@ Status: in progress. Registry `0.15.0` currently inventories 13 top-level blocks
 ### M1.2 Grammar completion
 
 - [x] Enumerate all 28 active MATERIALS types and document structured types 50, 998, and 999.
+- [x] Document all 29 finite-element CLUSTERS command grammars, explicitly blocking unsafe source paths.
 - [ ] Record exact command matching, record layouts, termination, and repetition.
 - [ ] Complete parameter types, defaults, allowed values, ranges, and units.
 - [ ] Record conditional variants and cross-parameter constraints.

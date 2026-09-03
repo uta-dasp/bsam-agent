@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.15.0`
-- Registry SHA-256: `A1BDCFABF5A44F2BDBEA3C78D8890C20E4A923137A3B8AF7DA3ECFD43B8C72DF`
+- Registry version: `0.18.0`
+- Registry SHA-256: `7E1E94659DE8F0AE37B0DA1DC1450294C82AC0B21F27297794674A5883D552B5`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -22,7 +22,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `SOLVER` | no | exact-case-sensitive | `SOLVE_INI` | documented | Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent. |
 | `UFUNCTIONS` | no | exact-case-sensitive | `UFUNCTION_INI` | documented | Defines named user functions parsed as *end-delimited entries. |
 | `MOISTURE` | no | exact-case-sensitive | `MOI_INI` | documented | Configures optional coupling to the external moisture simulation workflow. |
-| `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | partially-documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
+| `CLUSTERS` | yes | exact-case-sensitive | `IAP_INI / FE_READ_INPUTFILE` | documented | Defines one or more solid finite-element clusters and their mesh, sets, orientation, and mesh-level controls. |
 | `BOUNDARY` | yes | exact-case-sensitive | `IBN_INI` | partially-documented | Defines boundary problems, loads, connections, convergence, stepping, and output controls. |
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | documented | Defines constitutive law records that reference material and failure definitions. |
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
@@ -182,14 +182,12 @@ Defines one or more solid finite-element clusters and their mesh, sets, orientat
 - Lookup token/matcher: `CLUSTERS` / exact-case-sensitive
 - Required: yes
 - Termination: `*STOP per cluster`, `END CLUSTERS` (canonical)
-- Coverage: partially-documented
+- Coverage: documented
 - Evidence: [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
 
 Remaining specification work:
 
-- Document all command data-body grammars and element-type constraints.
-- Build the node/element/set/orientation dependency model required for safe ply transformations.
-- Classify END APPROXIMATION, which remains accepted in VTMS project exports, as a compatibility diagnostic.
+- Complete the node/element/set/orientation reverse-dependency model required for general structural edits.
 
 ### `BOUNDARY`
 
@@ -594,37 +592,46 @@ The parser dispatches on the first five characters (the leading `*` plus four le
 
 | Command | Dispatch | Coverage | Known line parameters | Purpose |
 |---|---|---|---|---|
-| `*TYPE` | `*TYPE` | partially-documented | — | Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters. |
+| `*TYPE` | `*TYPE` | documented | `representation` | Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters. |
 | `*DIMENSIONS` | `*DIME` | documented | — | Allocates cluster dimensions before mesh entities are read. |
-| `*NAME` | `*NAME` | partially-documented | `name` | Assigns a name to the current cluster. |
-| `*CONSTITUTIVE` | `*CONS` | identified | — | Assigns the constitutive record used by the current cluster. |
+| `*NAME` | `*NAME` | documented | `name` | Assigns a name to the current cluster. |
+| `*CONSTITUTIVE` | `*CONS` | documented | `constitutive_id` | Assigns the constitutive record used by the current cluster. |
 | `*NODE` | `*NODE` | documented | `NSET` | Reads explicit node labels and coordinates, optionally adding them to a node set. |
-| `*NGEN` | `*NGEN` | partially-documented | `NSET`, `BIAS`, `ARC` | Generates nodes from compact generation records. |
-| `*NCOPY` | `*NCOP` | partially-documented | `NSET` | Copies nodes using compact copy records. |
+| `*NGEN` | `*NGEN` | documented | `NSET`, `BIAS`, `ARC` | Generates nodes from compact generation records. |
+| `*NCOPY` | `*NCOP` | documented | `NSET` | Copies nodes using compact copy records. |
 | `*ELEMENT` | `*ELEM` | documented | `TYPE`, `ELSET` | Reads explicit elements and connectivity into a named element set. |
-| `*ELGEN` | `*ELGE` | partially-documented | `TYPE` | Generates elements from compact connectivity-generation records. |
+| `*ELGEN` | `*ELGE` | documented | `TYPE` | Generates elements from compact connectivity-generation records. |
 | `*NSET` | `*NSET` | documented | `NSET`, `GENERATE`, `BOX` | Creates or extends a node set from explicit labels, a generated range, or a coordinate box. |
 | `*ELSET` | `*ELSE` | documented | `ELSET`, `GENERATE` | Creates or extends an element set from explicit labels or a generated range. |
-| `*BOUNDARY` | `*BOUN` | partially-documented | `FORMAT` | Applies cluster-local boundary data using supported row formats. |
-| `*LOAD` | `*LOAD` | identified | — | Applies cluster-local nodal loading records. |
-| `*FIELD` | `*FIEL` | partially-documented | `VARIABLES` | Applies field values with a configured variable count. |
-| `*SELECTION` | `*SELE` | partially-documented | `ID`, `TYPE` | Defines an indexed node or element selection used by later operations. |
-| `*TOLERANCE` | `*TOLE` | partially-documented | `TYPE` | Overrides one of the model tolerances used by geometry and crack operations. |
+| `*BOUNDARY` | `*BOUN` | documented | `FORMAT` | Applies cluster-local boundary data using supported row formats. |
+| `*LOAD` | `*LOAD` | documented | — | Applies cluster-local nodal loading records. |
+| `*FIELD` | `*FIEL` | documented | `VARIABLES` | Applies field values with a configured variable count. |
+| `*SELECTION` | `*SELE` | documented | `ID`, `TYPE` | Defines an indexed node or element selection used by later operations. |
+| `*TOLERANCE` | `*TOLE` | documented | `TYPE` | Overrides one of the model tolerances used by geometry and crack operations. |
 | `*INTEGRATION` | `*INTE` | documented | — | Sets the integration scheme for supported X3D8 elements. |
 | `*ORIENTATION` | `*ORIE` | documented | `NAME` | Defines nodal or elemental orientation data. |
-| `*BUILD` | `*BUIL` | identified | — | Forces intermediate construction of element information before cluster input ends. |
-| `*STOP` | `*STOP` | partially-documented | — | Finishes the current FE cluster reader after updating element data. |
-| `*INCLUDE` | `*INCL` | partially-documented | `FILE` | Reads additional FE cluster commands from a nested include stack; every FILE target is resolved from the original BSAM input directory and EOF resumes the parent stream. |
-| `*SHIFT` | `*SHIF` | partially-documented | `ALL`, `NSET` | Translates all nodes or nodes in a named node set. |
-| `*SCALE` | `*SCAL` | partially-documented | `ALL`, `NSET` | Scales all nodes or nodes in a named node set. |
-| `*EXCLUSION` | `*EXCL` | partially-documented | `shape`, `side` | Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable. |
-| `*FLIP` | `*FLIP` | partially-documented | `TYPE` | Swaps two coordinate axes for subsequent/read cluster geometry. |
-| `*SPACING` | `*SPAC` | identified | — | Defines crack spacing behavior for the cluster. |
+| `*BUILD` | `*BUIL` | documented | — | Forces intermediate construction of element information before cluster input ends. |
+| `*STOP` | `*STOP` | documented | — | Finishes the current FE cluster reader after updating element data. |
+| `*INCLUDE` | `*INCL` | documented | `FILE` | Reads additional FE cluster commands from a nested include stack; every FILE target is resolved from the original BSAM input directory and EOF resumes the parent stream. |
+| `*SHIFT` | `*SHIF` | documented | `ALL`, `NSET` | Translates all nodes or nodes in a named node set. |
+| `*SCALE` | `*SCAL` | documented | `ALL`, `NSET` | Scales all nodes or nodes in a named node set. |
+| `*EXCLUSION` | `*EXCL` | documented | `shape`, `side` | Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable. |
+| `*FLIP` | `*FLIP` | documented | `TYPE` | Swaps two coordinate axes for subsequent/read cluster geometry. |
+| `*SPACING` | `*SPAC` | documented | `mode`, `value` | Defines crack spacing behavior for the cluster. |
 | `*SECTION` | `*SECT` | documented | `ELSET`, `LAYERS`, `CONNECTION` | Assigns layered section information to an existing element set. |
-| `*CRACK` | `*CRAC` | identified | — | Dispatches cluster crack definition, region, spacing, initiation, and function variants. |
-| `*TRANSFORM` | `*TRAN` | partially-documented | `INERTIA`, `FLATTEN` | Transforms cluster geometry to its inertial coordinate system with optional flattening. |
+| `*CRACK` | `*CRAC` | documented | `operation` | Dispatches cluster crack definition, region, spacing, initiation, and function variants. |
+| `*TRANSFORM` | `*TRAN` | documented | `INERTIA`, `FLATTEN` | Centers cluster geometry and rotates it into its computed principal inertial coordinate system. |
 
 ## Documented command bodies
+
+### `*TYPE` body
+
+Termination: fixed-count. Dependencies: The accepted representation maps to internal cluster type 100.
+
+- **solid-fe** (always):
+  - `representation` [once]: `representation`:case-insensitive-prefix(soli)
+  - Constraint: *TYPE must be the first non-comment record for each cluster.
+  - Constraint: A second *TYPE encountered by the FE command reader stops the program.
 
 ### `*DIMENSIONS` body
 
@@ -636,11 +643,20 @@ Termination: fixed-count. Dependencies: Capacities must cover all entities produ
 
 ### `*NAME` body
 
-Termination: next-command. Dependencies: Every cluster-qualified set reference uses the normalized lowercase cluster name.
+Termination: fixed-count. Dependencies: Every cluster-qualified set reference uses the normalized lowercase cluster name.; If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name.; Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference.
 
 - **cluster-name** (*NAME is dispatched):
-  - `name` [once]: `name`:string
+  - `name` [once]: `name`:one-list-directed-token-up-to-80-characters
   - Constraint: The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.
+  - Constraint: The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness because name-based consumers otherwise select or compare ambiguously.
+
+### `*CONSTITUTIVE` body
+
+Termination: fixed-count. Dependencies: The ID must resolve to an existing CONSTITUTIVE declaration.; Deleting or reordering CONSTITUTIVE entries must update this reference atomically.
+
+- **constitutive-reference** (always):
+  - `constitutive` [once]: `constitutive_id`:positive-integer
+  - Constraint: The BSAM reader stores the integer without bounds checking; the Agent must reject zero, negative, and unresolved IDs.
 
 ### `*NODE` body
 
@@ -650,13 +666,53 @@ Termination: next-command-or-eof. Dependencies: DIMENSIONS node_capacity must be
   - `node` [repeated]: `node_label`:positive-integer, `x`:real, `y`:real, `z`:real
   - Constraint: Comment and blank lines are ignored; the next non-comment line beginning with * ends the command.
 
+### `*NGEN` body
+
+Termination: next-command-or-eof. Dependencies: All endpoint nodes and sets must be defined before NGEN.; DIMENSIONS node_capacity and the node-label lookup allocation must cover all generated nodes and labels.; NSET creates or appends both endpoints and generated nodes when supplied.; BIAS must be positive to keep the interpolation finite and monotone.
+
+- **straight-between-nodes** (ARC is absent and the first endpoint token is not a node-set name):
+  - `generation` [repeated]: `start_node`:existing-node-label, `end_node`:existing-node-label, `label_increment`:nonzero-integer
+  - Constraint: Increment sign must progress from start_node toward end_node and divide the label interval without colliding with existing labels.
+  - Constraint: Coordinates use s=((label-start)/(end-start))^BIAS along the endpoint segment.
+- **straight-between-paired-node-sets** (ARC is absent and the first endpoint token resolves to a node set):
+  - `generation` [repeated]: `start_set`:existing-node-set-name, `end_set`:existing-node-set-name, `label_increment`:nonzero-integer
+  - Constraint: Both sets must exist and contain the same number of nodes in corresponding order.
+  - Constraint: Every endpoint-label interval must be compatible with the common increment and produce globally unique labels.
+- **circular-arc** (ARC is present):
+  - `center` [once]: `cx`:real, `cy`:real, `cz`:real
+  - `generation` [repeated]: `start_node`:existing-node-label, `end_node`:existing-node-label, `label_increment`:nonzero-integer
+  - Constraint: Endpoint radii must be nonzero and their radial vectors must not be collinear because the local arc frame normalizes their cross product.
+  - Constraint: The implementation uses the start radius for all generated nodes and advances the end angle counterclockwise by at most one revolution.
+
+### `*NCOPY` body
+
+Termination: next-command-or-eof. Dependencies: source_set must already exist and contain at least one node.; DIMENSIONS node_capacity and the node-label lookup allocation must cover every copy.; NSET creates or appends generated copies when supplied; source nodes are not added.
+
+- **translated-node-set-copies** (always):
+  - `copy` [repeated]: `source_set`:existing-node-set-name, `copy_count`:positive-integer, `label_offset`:nonzero-integer, `dx`:real, `dy`:real, `dz`:real
+  - Constraint: Generated copy j has label source_label+j*label_offset and coordinates source_coordinates+j*(dx,dy,dz).
+  - Constraint: All generated labels must be positive and globally unique.
+
 ### `*ELEMENT` body
 
 Termination: next-command-or-eof. Dependencies: TYPE is required.; Referenced nodes must already exist.; DIMENSIONS element_capacity must be large enough.
 
 - **explicit-elements** (always):
   - `element` [repeated]: `element_label`:positive-integer, `node_labels`:integer-list(element-type-width)
-  - Constraint: Every connectivity node label must resolve to a node; row width depends on TYPE.
+  - Constraint: C3D8, Y3D8, X3D8, and LC3D8 require 8 connectivity labels; C3D4 requires 4; C3D10 and B3D10 require 10.
+  - Constraint: Every connectivity node label must resolve to a node before BUILD or STOP.
+  - Constraint: Element labels must be positive and unique; Agent validation rejects duplicates before the source lookup is overwritten.
+
+### `*ELGEN` body
+
+Termination: next-command-or-eof. Dependencies: The seed element and every referenced/generated connectivity node must already exist.; DIMENSIONS element_capacity must cover row_count*column_count*layer_count minus the seed position.
+
+- **structured-label-offset-grid** (always):
+  - `generation` [repeated]: `seed_element`:existing-element-label, `row_count`:positive-integer, `column_count`:positive-integer, `layer_count`:positive-integer, `row_node_offset`:integer, `column_node_offset`:integer, `layer_node_offset`:integer
+  - Constraint: The seed occupies position 1,1,1; every other position creates one element whose label increments sequentially from seed_element.
+  - Constraint: TYPE must match the seed topology and determines whether 4, 8, or 10 connectivity labels are shifted.
+  - Constraint: Every shifted node label must already exist and every generated element label must be unique.
+  - Constraint: ELGEN has no ELSET option and does not add generated elements to a set.
 
 ### `*NSET` body
 
@@ -680,6 +736,65 @@ Termination: next-command-or-eof. Dependencies: All selected element labels must
 - **generated-range** (GENERATE):
   - `range` [repeated]: `first_label`:positive-integer, `last_label`:positive-integer, `increment`:nonzero-integer
 
+### `*BOUNDARY` body
+
+Termination: next-command-or-eof. Dependencies: Every target must already exist in the current cluster.; Coordinate and degree-of-freedom indices are one-based X/Y/Z components.; These cluster-local values initialize node constraint state consumed by later BOUNDARY problems.
+
+- **abaqus-style** (FORMAT is ABAQUS or omitted):
+  - `constraint` [repeated]: `target`:node-label-or-node-set-name, `first_degree_of_freedom`:integer(1..3), `last_degree_of_freedom`:integer(1..3), `value`:real
+  - Constraint: Rows are comma-delimited and require first_degree_of_freedom <= last_degree_of_freedom.
+  - Constraint: Later rows replace earlier prescribed values on the same node/component.
+- **list-directed** (FORMAT is LIST):
+  - `constraint` [repeated]: `node_label`:existing-node-label, `ux`:real, `uy`:real, `uz`:real
+  - Constraint: Every row activates all three translational components.
+- **polynomial** (FORMAT is POLYNOMIAL):
+  - `constraint` [repeated]: `target`:node-set-name-for-safe-generation, `degree_of_freedom`:integer(1..3), `coordinate`:integer(1..3), `order`:integer(0..4), `coefficients`:real-list(order+1)
+  - Constraint: Rows are comma-delimited.
+  - Constraint: The individual-node branch pauses and stores through the stale loop variable j rather than degree_of_freedom; Agent generation requires a node-set target until corrected.
+
+### `*LOAD` body
+
+Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or node sets already created in the current cluster.; Node-set membership determines every node updated by that row.
+
+- **nodal-loads** (always):
+  - `load` [repeated]: `target`:node-label-or-node-set-name, `degree_of_freedom`:integer(1..3), `value`:real
+  - Constraint: Rows are comma-delimited.
+  - Constraint: Later rows targeting the same node and degree of freedom replace earlier values rather than accumulate.
+  - Constraint: A missing numeric node target stops the program; Agent validation also rejects missing node-set targets instead of relying on numeric fallback failure.
+
+### `*FIELD` body
+
+Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or node sets already created in the current cluster.; Downstream material or analysis consumers determine the meaning and units of each field position.
+
+- **nodal-field-values** (VARIABLES is present):
+  - `field` [repeated]: `target`:node-label-or-node-set-name, `values`:real-list(VARIABLES)
+  - Constraint: Rows are comma-delimited and must contain exactly VARIABLES values.
+  - Constraint: VARIABLES is mandatory because the source local has no visible default.
+  - Constraint: The source does not update node%nfield for node-set targets and writes it through an incorrect index for individual targets; Agent generation is blocked until this consumer-state defect is resolved or proven harmless.
+
+### `*SELECTION` body
+
+Termination: next-command-or-eof. Dependencies: ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.; All named sets and individual entities must already exist in the current cluster.; Selection consumers reference the stored one-based ID.
+
+- **node-selection** (TYPE is NODE or omitted):
+  - `members` [repeated]: `targets`:comma-separated-node-label-or-node-set-name-list
+  - Constraint: At most ten node-set labels may be recorded; individual node labels do not count toward that limit.
+  - Constraint: Duplicate members are subject to the integer-list insertion behavior and should be normalized by Agent generation.
+- **element-selection** (TYPE is ELEMENT):
+  - `members` [repeated]: `targets`:comma-separated-element-label-or-element-set-name-list
+  - Constraint: At most ten element-set labels may be recorded.
+  - Constraint: The source checks an unrelated inode variable after individual-element lookup; Agent generation permits existing element sets but blocks individual element labels until that defect is fixed or runtime-qualified.
+
+### `*TOLERANCE` body
+
+Termination: fixed-count. Dependencies: PTOL affects proximity operations, ITOL affects parametric location, FTOL affects penalty-connection shape-function contributions, and OTOL extends accepted parametric element bounds.
+
+- **tolerance-value** (always):
+  - `value` [once]: `value`:nonnegative-real
+  - Constraint: The source reader accepts any real without range checking; Agent generation requires nonnegative values.
+  - Constraint: Allocated defaults are PTOL=1e-6, ITOL=1e-8, FTOL=1e-10, and OTOL=0.
+  - Constraint: PTOL has coordinate-length units; ITOL, FTOL, and OTOL are dimensionless parametric or shape-function tolerances.
+
 ### `*INTEGRATION` body
 
 Termination: next-command-or-eof. Dependencies: The target element must already exist.
@@ -700,6 +815,92 @@ Termination: next-command-or-eof. Dependencies: The selected node/element or set
   - `orientation` [repeated]: `target`:element-label-or-element-set-name, `v1_x`:real, `v1_y`:real, `v1_z`:real, `v3_x`:real, `v3_y`:real, `v3_z`:real, `fiber_volume`:real
   - Constraint: V1 and V3 must be nonzero and mutually normal; the parser normalizes them and derives V2.
 
+### `*BUILD` body
+
+Termination: fixed-count. Dependencies: All element connectivity must resolve to already-created nodes before topology construction.
+
+- **no-data-action** (always):
+  - `command` [once]: `*BUILD`:command-only-no-data-row
+  - Constraint: The command has no following data row.
+  - Constraint: Canonical generation places it only after required nodes and elements exist.
+  - Constraint: Repeated execution is blocked from Agent generation because the source does not declare topology construction idempotent.
+
+### `*STOP` body
+
+Termination: fixed-count. Dependencies: Every element connectivity label must resolve before the implicit final update.; Commands after *STOP in the same cluster are unreachable.
+
+- **cluster-terminator** (always):
+  - `command` [once]: `*STOP`:command-only-no-data-row
+  - Constraint: The command has no following data row and must be the final logical command of a cluster.
+  - Constraint: A *STOP encountered inside an include exits the entire cluster rather than only the included stream; Agent generation therefore emits it only in the root cluster stream.
+
+### `*INCLUDE` body
+
+Termination: fixed-count. Dependencies: The target must be a readable FE-command fragment reachable inside the configured workspace.; Included definitions share the current cluster and must obey the same ordering, capacity, identity, and reference rules.
+
+- **include-switch** (always):
+  - `command` [once]: `FILE`:unquoted-relative-path-on-command-line
+  - Constraint: If multiple FILE options occur, the final one is used.
+  - Constraint: BSAM resolves every target against the original input directory, including nested includes.
+  - Constraint: Included-file EOF closes that stream and resumes its parent; *STOP instead ends the whole cluster.
+  - Constraint: The Agent rejects absolute paths, workspace escapes, missing files, and include cycles before execution.
+  - Constraint: Source-preserving edits inside included files remain blocked until multi-file patch planning is implemented.
+
+### `*SHIFT` body
+
+Termination: fixed-count. Dependencies: NSET must resolve in the current cluster and selects its existing member nodes.; Only nodes created before the command are translated.; The operation marks cached element coordinates stale for the next BUILD or STOP update.
+
+- **translation-vector** (always):
+  - `translation` [once]: `dx`:real, `dy`:real, `dz`:real
+  - Constraint: Exactly one non-comment vector row is consumed.
+  - Constraint: ALL and NSET are mutually exclusive and omission selects ALL.
+
+### `*SCALE` body
+
+Termination: fixed-count. Dependencies: NSET must resolve in the current cluster and selects its existing member nodes.; At least one previously created node must be selected or BSAM stops.; The operation marks cached element coordinates stale for the next BUILD or STOP update.
+
+- **axis-scale-factors** (always):
+  - `scales` [once]: `sx`:nonzero-real, `sy`:nonzero-real, `sz`:nonzero-real
+  - Constraint: Exactly one non-comment factor row is consumed.
+  - Constraint: ALL and NSET are mutually exclusive and omission selects ALL.
+  - Constraint: The source accepts zero factors, but Agent generation rejects them because they collapse the mesh; negative factors intentionally reflect an axis.
+
+### `*EXCLUSION` body
+
+Termination: fixed-count. Dependencies: BOX and PLANE exclusions act on elements after their coordinate caches are updated.; PREVIOUS supplies crack-related maximum-diameter state rather than directly marking elements.
+
+- **box** (shape is BOX or omitted):
+  - `bounds` [once]: `xmin`:real, `ymin`:real, `zmin`:real, `xmax`:real, `ymax`:real, `zmax`:real
+  - Constraint: Agent generation requires each minimum bound to be no greater than its maximum.
+  - Constraint: The active element test does not apply PTOL and exits its node loop as soon as its running flag is true; creation of new BOX exclusions is blocked pending correction or an accepted executable qualification of this behavior.
+- **plane** (shape is PLANE):
+  - `plane-band` [once]: `point_x`:real, `point_y`:real, `point_z`:real, `normal_x`:real, `normal_y`:real, `normal_z`:real, `distance`:nonnegative-real
+  - Constraint: The normal must be nonzero and is normalized by the reader.
+  - Constraint: INSIDE excludes elements with at least one node in the band; OUTSIDE excludes elements with no node in the band.
+- **previous** (shape is PREVIOUS):
+  - `diameter` [once]: `maximum_diameter`:positive-real
+  - Constraint: INSIDE and OUTSIDE are invalid with PREVIOUS.
+
+### `*FLIP` body
+
+Termination: fixed-count. Dependencies: Only nodes already created in the cluster are rotated.; The operation does not rotate separately stored orientation vectors and marks cached element coordinates stale; ordering relative to ORIENTATION is therefore engineering-significant.
+
+- **command-line-rotation** (always):
+  - `mapping` [once]: `TYPE`:enum(XY,YX,XZ,ZX,YZ,ZY)
+  - Constraint: The TYPE value is uppercase-sensitive.
+  - Constraint: Mappings are XY=(-Y,X,Z), YX=(Y,-X,Z), XZ=(-Z,Y,X), ZX=(Z,Y,-X), YZ=(X,-Z,Y), and ZY=(X,Z,-Y).
+  - Constraint: The command consumes no following data row.
+
+### `*SPACING` body
+
+Termination: fixed-count. Dependencies: The stored value controls later crack insertion spacing checks for this cluster.
+
+- **command-line-only** (always):
+  - `spacing-mode` [once]: `option`:STRICT-or-VALUE=<positive-real>-or-RELAXED
+  - Constraint: Option names are matched case-insensitively by their first three characters.
+  - Constraint: VALUE must be greater than zero or BSAM stops.
+  - Constraint: The allocated cluster default is strict spacing with a stored value of zero.
+
 ### `*SECTION` body
 
 Termination: next-command-or-eof. Dependencies: ELSET must name an existing element set.; DIMENSIONS section_capacity must include this section.; Every material_id must resolve in MATERIALS.; A ply-count edit must update LAYERS and the layer-row sequence atomically.
@@ -708,6 +909,47 @@ Termination: next-command-or-eof. Dependencies: ELSET must name an existing elem
   - `layer` [count-from-command-parameter]: `thickness`:positive-real, `material_id`:positive-integer
   - Constraint: The number of non-comment layer rows must equal LAYERS; fewer rows are fatal.
   - Constraint: Layer thicknesses are divided by their total before assignment.
+
+### `*CRACK` body
+
+Termination: next-command-or-eof. Dependencies: REGION set and geometry targets act only on elements already created in the current cluster.; Crack region and initiation state is consumed by subsequent crack insertion and analysis operations.; DEFINITION is preservation-only until its active record-advance defect is corrected.
+
+- **blocked-definition** (operation is DEFINITION):
+  - `plane-or-cylinder` [repeated]: `point`:three-reals, `normal`:three-reals, `radius`:optional-real-for-cylinder
+  - Constraint: The intended command-line TYPE values are PLANE and CYLINDER, with PLANE as the local default.
+  - Constraint: The active reader tests the already-parsed command/value buffer before advancing to the first data row: without TYPE it consumes no definitions, while with TYPE it attempts to parse the TYPE value as numeric data. This operation is blocked from Agent generation.
+- **region-by-element-set** (operation is REGION and ELSET is supplied):
+  - `command` [once]: `action`:enum(REPLACE,ADD,REMOVE), `ELSET`:existing-element-set-name
+  - Constraint: REPLACE first disables cracking for every element, then enables the selected set; ADD enables it and REMOVE disables it.
+- **region-by-box** (operation is REGION and COORDINATES or BOX is supplied):
+  - `bounds` [once]: `xmin`:real, `ymin`:real, `zmin`:real, `xmax`:real, `ymax`:real, `zmax`:real
+  - Constraint: The action is REPLACE by default; bounds must be ordered.
+- **region-by-sphere** (operation is REGION and SPHERE is supplied):
+  - `sphere` [once]: `center_x`:real, `center_y`:real, `center_z`:real, `radius`:positive-real
+  - Constraint: The action is REPLACE by default.
+- **region-by-cylinder** (operation is REGION and CYLINDER is supplied):
+  - `cylinder` [once]: `start_x`:real, `start_y`:real, `start_z`:real, `end_x`:real, `end_y`:real, `end_z`:real, `radius`:positive-real
+  - Constraint: Axis endpoints must differ; the action is REPLACE by default.
+- **spacing** (operation is SPACING):
+  - `command` [once]: `mode`:STRICT-or-VALUE=<positive-real>-or-RELAXED
+  - Constraint: STRICT is the allocated default.
+- **initiation** (operation is INITIATION):
+  - `command` [once]: `LOCATION`:enum-prefix(INTEGRATION POINTS,NODES,CENTER)
+  - Constraint: LOCATION is required because the allocated cluster state has no visible initializer.
+- **function** (operation is FUNCTION):
+  - `command` [once]: `TYPE`:enum-prefix(SIMPLE,WEIGHTED)
+  - Constraint: The final TYPE option must supply the residual parsed value used by this branch; canonical generation places it last.
+
+### `*TRANSFORM` body
+
+Termination: fixed-count. Dependencies: Elements must already be built with valid nonzero total volume and current coordinate caches.; The transformation changes every existing node but preserves label and set membership.; A later BUILD or STOP must refresh element coordinate caches.
+
+- **inertial-command-line-action** (INERTIA is present):
+  - `command` [once]: `INERTIA`:required-command-line-flag
+  - Constraint: The cluster is translated so its volume centroid is at the origin, then rotated to the ordered principal inertia frame.
+  - Constraint: FLATTEN is parsed but ignored by the called routine.
+  - Constraint: A node with exactly one or two constrained components causes BSAM to stop; a fully constrained vector is rotated.
+  - Constraint: Loads and separately stored orientation vectors are not rotated by this routine, so Agent generation is blocked when either is already present.
 
 ## Nested block constructs
 
@@ -1141,6 +1383,30 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.fe-include-unwind` — source: `source/libbsam/mod_fe_input.f90:1179-1189` — On included-file EOF, closes the current include unit and resumes the parent include or root FE stream.
 <a id="evidencefe-core-records"></a>
 - `evidence.fe-core-records` — source: `source/libbsam/mod_fe_input.f90:1556-2651` — Defines the DIMENSIONS, NODE, ELEMENT, NSET, and ELSET data-row grammars and next-command termination.
+<a id="evidencefe-cluster-controls"></a>
+- `evidence.fe-cluster-controls` — source: `source/libbsam/mod_fe_input.f90:1588-1692` — Defines the fixed one-record NAME, TYPE, and CONSTITUTIVE readers, including the reserved top-level token check for cluster names.
+<a id="evidencefe-load-records"></a>
+- `evidence.fe-load-records` — source: `source/libbsam/mod_fe_input.f90:2889-2975` — Defines repeated target, degree-of-freedom, and value rows for cluster-local nodal loads and resolves each target as a node set before a node label.
+<a id="evidencefe-build-spacing"></a>
+- `evidence.fe-build-spacing` — source: `source/libbsam/mod_fe_input.f90:4111-4999` — Defines the no-body BUILD action and the strict, positive-value, and relaxed crack-spacing command-line options.
+<a id="evidencefe-field-selection"></a>
+- `evidence.fe-field-selection` — source: `source/libbsam/mod_fe_input.f90:2983-3341` — Defines repeated field-value rows and indexed node/element selection rows, including target resolution and selection limits.
+<a id="evidencefe-coordinate-operations"></a>
+- `evidence.fe-coordinate-operations` — source: `source/libbsam/mod_fe_input.f90:3350-3695` — Defines the single-vector SHIFT, TOLERANCE, and SCALE bodies and all six command-line FLIP coordinate mappings.
+<a id="evidencefe-exclusion-records"></a>
+- `evidence.fe-exclusion-records` — source: `source/libbsam/mod_fe_input.f90:1328-1522` — Defines BOX, PLANE, and PREVIOUS exclusion data and their element-exclusion or crack-diameter effects.
+<a id="evidencefe-node-generation"></a>
+- `evidence.fe-node-generation` — source: `source/libbsam/mod_fe_input.f90:1807-2255` — Defines straight, paired-set, and arc NGEN record variants plus translated node-set NCOPY records.
+<a id="evidencefe-element-generation"></a>
+- `evidence.fe-element-generation` — source: `source/libbsam/mod_fe_input.f90:2263-2472` — Defines explicit element connectivity and structured grid-offset ELGEN records.
+<a id="evidencefe-element-types"></a>
+- `evidence.fe-element-types` — source: `source/libbsam/mod_fe_element_library.f90:30-117` — Enumerates the six allocatable element types and dispatches their topology sizes.
+<a id="evidencefe-boundary-records"></a>
+- `evidence.fe-boundary-records` — source: `source/libbsam/mod_fe_input.f90:2661-2879` — Defines ABAQUS, LIST, and POLYNOMIAL cluster-local boundary rows, target resolution, and polynomial-order handling.
+<a id="evidencefe-crack-controls"></a>
+- `evidence.fe-crack-controls` — source: `source/libbsam/mod_fe_input.f90:3100-5229` — Defines cluster crack definitions and the REGION, SPACING, INITIATION, and FUNCTION command-line state mutations and geometry records.
+<a id="evidencefe-inertial-transform"></a>
+- `evidence.fe-inertial-transform` — source: `source/libbsam/mod_fe_input.f90:4148-4365` — Centers a built cluster at its volume centroid, computes its principal inertial frame, rotates existing nodes and full boundary vectors, and leaves partial boundary vectors unchanged only by stopping.
 <a id="evidencefe-integration-orientation"></a>
 - `evidence.fe-integration-orientation` — source: `source/libbsam/mod_fe_input.f90:3696-3994` — Defines nested integration-point records and nodal or elemental orientation records.
 <a id="evidencefe-section-reader"></a>

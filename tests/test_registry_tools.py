@@ -20,7 +20,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(58, counts["evidence"])
+        self.assertEqual(70, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -66,6 +66,67 @@ class RegistryToolsTests(unittest.TestCase):
         section = commands["*SECTION"]
         self.assertEqual("count-from-command-parameter", section["body"]["variants"][0]["rows"][0]["repetition"])
         self.assertTrue(any("atomically" in item for item in section["body"]["dependencies"]))
+
+    def test_cluster_control_and_load_grammars_are_registered(self) -> None:
+        commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}
+        for token in ("*TYPE", "*NAME", "*CONSTITUTIVE", "*LOAD", "*BUILD", "*SPACING"):
+            self.assertEqual("documented", commands[token]["coverage"], token)
+            self.assertIn("body", commands[token], token)
+        self.assertEqual(["solid"], commands["*TYPE"]["parameters"][0]["allowed_values"])
+        load_text = json.dumps(commands["*LOAD"]).lower()
+        self.assertIn("integer(1..3)", load_text)
+        self.assertIn("replace earlier values", load_text)
+        spacing = {item["name"]: item for item in commands["*SPACING"]["parameters"]}
+        self.assertEqual(["STRICT", "VALUE", "RELAXED"], spacing["mode"]["allowed_values"])
+        self.assertEqual("STRICT", spacing["mode"]["default"])
+        self.assertIn("idempotent", json.dumps(commands["*BUILD"]).lower())
+
+    def test_field_selection_and_coordinate_operation_grammars_are_registered(self) -> None:
+        commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}
+        for token in ("*FIELD", "*SELECTION", "*TOLERANCE", "*SHIFT", "*SCALE", "*EXCLUSION", "*FLIP"):
+            self.assertEqual("documented", commands[token]["coverage"], token)
+            self.assertIn("body", commands[token], token)
+        field_text = json.dumps(commands["*FIELD"]).lower()
+        self.assertIn("integer(1..10)", field_text)
+        self.assertIn("generation is blocked", field_text)
+        selection_text = json.dumps(commands["*SELECTION"]).lower()
+        self.assertIn("at most ten", selection_text)
+        self.assertIn("blocks individual element labels", selection_text)
+        tolerance = {item["name"]: item for item in commands["*TOLERANCE"]["parameters"]}
+        self.assertEqual("PTOL", tolerance["TYPE"]["default"])
+        exclusion = {item["name"]: item for item in commands["*EXCLUSION"]["parameters"]}
+        self.assertEqual("BOX", exclusion["shape"]["default"])
+        self.assertIn("xy=(-y,x,z)", json.dumps(commands["*FLIP"]).lower())
+
+    def test_generation_element_and_cluster_boundary_grammars_are_registered(self) -> None:
+        commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}
+        for token in ("*NGEN", "*NCOPY", "*ELEMENT", "*ELGEN", "*BOUNDARY"):
+            self.assertEqual("documented", commands[token]["coverage"], token)
+            self.assertIn("body", commands[token], token)
+        ngen_variants = {item["name"] for item in commands["*NGEN"]["body"]["variants"]}
+        self.assertEqual(
+            {"straight-between-nodes", "straight-between-paired-node-sets", "circular-arc"},
+            ngen_variants,
+        )
+        element_types = commands["*ELEMENT"]["parameters"][0]["allowed_values"]
+        self.assertEqual(["C3D8", "Y3D8", "X3D8", "LC3D8", "C3D4", "C3D10", "B3D10"], element_types)
+        self.assertNotIn("B3D10", commands["*ELGEN"]["parameters"][0]["allowed_values"])
+        boundary_variants = {item["name"] for item in commands["*BOUNDARY"]["body"]["variants"]}
+        self.assertEqual({"abaqus-style", "list-directed", "polynomial"}, boundary_variants)
+        self.assertIn("stale loop variable", json.dumps(commands["*BOUNDARY"]).lower())
+
+    def test_every_cluster_command_has_a_documented_grammar(self) -> None:
+        self.assertEqual(
+            [],
+            [item["canonical"] for item in self.registry["cluster_commands"] if item["coverage"] != "documented"],
+        )
+        commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}
+        crack_variants = {item["name"] for item in commands["*CRACK"]["body"]["variants"]}
+        self.assertIn("blocked-definition", crack_variants)
+        self.assertIn("region-by-cylinder", crack_variants)
+        self.assertIn("parsed but ignored", json.dumps(commands["*TRANSFORM"]).lower())
+        self.assertIn("root cluster stream", json.dumps(commands["*STOP"]).lower())
+        self.assertIn("include cycles", json.dumps(commands["*INCLUDE"]).lower())
 
     def test_boundary_active_constructs_are_registered(self) -> None:
         tokens = {item["canonical"] for item in self.registry["nested_constructs"]}
