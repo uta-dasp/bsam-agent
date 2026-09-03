@@ -224,7 +224,7 @@ class OrchestratorTests(unittest.TestCase):
             pending = agent.turn("Apply that change to changed.in")
             applied = agent.turn("/confirm")
             output = (root / "changed.in").read_bytes()
-        self.assertEqual("propose", preview.phase)
+        self.assertEqual("confirm", preview.phase)
         self.assertIn("-absolute=1", preview.tool_result["source_diff"])  # type: ignore[index]
         self.assertTrue(pending.requires_confirmation)
         self.assertEqual("verify", applied.phase)
@@ -271,11 +271,31 @@ class OrchestratorTests(unittest.TestCase):
             (root / "model.in").write_bytes(deck)
             agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
             result = agent.turn("Please make the time-increment reduction ratio 0.5 in model.in")
-        self.assertEqual("propose", result.phase)
+        self.assertEqual("confirm", result.phase)
         called_contract = provider.requests[0].messages[0].content
         self.assertIn("d_reduction", called_contract)
         self.assertIn("BOUNDARY/CONVERGENCE", called_contract)
         self.assertIn("d_reduction=0.5", result.tool_result["source_diff"])  # type: ignore[index]
+
+    def test_approval_word_confirms_previewed_change(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\nd_reduction=0.25\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(FakeProvider(), config(), LocalAgentApi(root))
+            preview = agent.turn(
+                "Change d_reduction in model.in to 0.5 and create a new file"
+            )
+            applied = agent.turn("approved")
+            output = (root / "model.changed.in").read_bytes()
+        self.assertTrue(preview.requires_confirmation)
+        self.assertEqual("verify", applied.phase)
+        self.assertIn(b"d_reduction=0.5", output)
 
     def test_ambiguous_parameter_request_asks_for_context(self) -> None:
         routed = decision(

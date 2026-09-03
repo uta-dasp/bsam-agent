@@ -191,6 +191,7 @@ Exit: a user can converse locally with BSAM Agent to inspect a project, request 
 - [x] Present the model with a registry-generated high-level parameter catalog instead of requiring internal block, construct, and plan-path knowledge.
 - [x] Generate safe plan and non-overwriting output defaults for a natural registered-parameter request.
 - [x] Chain a successful preview to a separately confirmed apply when the user requests a new output file.
+- [x] Make every successful preview immediately confirmable with a displayed safe destination, including natural approval words.
 - [x] Retain the latest reviewed plan so conversational follow-ups such as `apply that change` resolve deterministically, including across resumed sessions.
 - [x] Return explicit clarification guidance for missing, unknown, or context-ambiguous parameters.
 - [x] Replace generic model refusals for edit requests with an actionable summary of currently supported operations.

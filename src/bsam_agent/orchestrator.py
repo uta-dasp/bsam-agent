@@ -289,7 +289,8 @@ class ChatOrchestrator:
         text = user_text.strip()
         if not text:
             return self._result("understand", "Enter a request or /confirm.", error="empty_request")
-        if text.casefold() == "/confirm":
+        confirmation_words = {"/confirm", "confirm", "approve", "approved", "yes"}
+        if text.casefold() in confirmation_words:
             return self._confirm()
         if text.casefold() == "/cancel":
             return self._cancel()
@@ -745,11 +746,7 @@ def _conversation_defaults(
 def _preview_follow_up(
     tool: str, arguments: dict[str, Any], user_text: str,
 ) -> PendingAction | None:
-    if tool not in PREVIEW_TOOLS or not re.search(
-        r"\b(?:create|write|save|produce)\b.*\b(?:new|output|file|deck)\b|"
-        r"\bdo\s+not\s+overwrite\b",
-        user_text, re.IGNORECASE,
-    ):
+    if tool not in PREVIEW_TOOLS:
         return None
     source = arguments.get("source") or arguments.get("template")
     plan_path = arguments.get("plan_path")

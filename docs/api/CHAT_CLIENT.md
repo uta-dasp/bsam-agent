@@ -15,7 +15,7 @@ python -m bsam_agent chat `
   --session .bsam-agent\conversations\notch.json
 ```
 
-`/confirm` executes exactly the pending guarded action, `/cancel` discards it, and `/quit` exits. A different provider configuration selects another model. The workspace root binds every tool path. The optional `--session` file saves raw local chat text and pending state so the conversation can resume; omit it for an ephemeral conversation. Digest-only audit metadata is enabled by default beneath `.bsam-agent/audit`; `--no-audit` disables it.
+`/confirm` executes exactly the pending guarded action; `confirm`, `approve`, `approved`, and `yes` are accepted equivalents. `/cancel` discards it, and `/quit` exits. A different provider configuration selects another model. The workspace root binds every tool path. The optional `--session` file saves raw local chat text and pending state so the conversation can resume; omit it for an ephemeral conversation. Digest-only audit metadata is enabled by default beneath `.bsam-agent/audit`; `--no-audit` disables it.
 
 Start with a deterministic inspection:
 
@@ -29,7 +29,7 @@ A uniquely registered parameter can be changed with safe plan and output default
 Change d_reduction in projects/notch_v1/notch_v1.in to 0.5 and create a new file. Do not overwrite the original.
 ```
 
-The client previews the diff first. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file.
+Every successful change preview creates a pending apply action and displays its destination. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file.
 
 For a preview-only request, the conversation remembers the reviewed plan. A later `apply that change to output.in` selects that exact plan and still requires `/confirm`. Parameter names and their BSAM locations come from the capability registry; the model is not required to invent internal block or construct names. Missing or ambiguous parameter context produces a clarification instead of a guessed edit.
 
