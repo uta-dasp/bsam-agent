@@ -7,7 +7,10 @@ The pinned runtime is llama.cpp b10621 (`v0.3.0`, commit `c1d0e7a0`). Meta Llama
 From PowerShell, create a session-only API key and start the runtime with a local model path. Supplying a file path prevents network model fetching; llama.cpp has no telemetry configured by BSAM Agent.
 
 ```powershell
-$env:BSAM_LOCAL_API_KEY = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$keyBytes = New-Object byte[] 32
+$keyGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+try { $keyGenerator.GetBytes($keyBytes) } finally { $keyGenerator.Dispose() }
+$env:BSAM_LOCAL_API_KEY = -join ($keyBytes | ForEach-Object { $_.ToString("x2") })
 $runtime = "D:\Partha\BSAM\runtimes\llama.cpp\b10621\llama-server.exe"
 $model = "D:\Partha\BSAM\models\meta-llama-4-scout-17b-16e-instruct\Llama-4-Scout-17B-16E-Instruct-Q4_K_M.gguf"
 & $runtime --model $model --host 127.0.0.1 --port 18080 `
