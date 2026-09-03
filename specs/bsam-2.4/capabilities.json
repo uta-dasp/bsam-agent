@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.20.0",
+  "registry_version": "0.21.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1367,18 +1367,125 @@
             "constraints": ["The named header parser recognizes only type=mises or type=50 and an optional name pair.", "Canonical generation restricts type 50 to the seven J2 keys even though the shared class dispatcher exposes other bulk keys."]
           },
           {
-            "name": "legacy-numeric-types",
-            "when": "the numeric type is any active type other than 50, 998, or 999",
+            "name": "legacy-orthotropic-family",
+            "when": "type is 1, 5, 6, 7, 100, or 101-106",
             "rows": [
-              {"name": "type-specific-body", "repetition": "once", "fields": [{"name": "records", "value_type": "legacy-type-specific-record-sequence", "required": true, "summary": "Fixed or counted records consumed by the selected legacy implementation."}]}
+              {"name": "feature-option", "repetition": "zero-to-five-before-properties", "fields": [{"name": "option", "value_type": "enum(*fiber <real>,*cfv_,*shear,*tension,*bimodular <compression-modulus> <strain-threshold>)", "required": false, "summary": "Enables one of the source-recognized legacy feature flags."}]},
+              {"name": "engineering-and-strength-properties", "repetition": "ordered-record-sequence", "fields": [{"name": "records", "value_type": "E1-Xt-Xc; E2-Yt-Yc-[MAX_ANGLE value]; E3; nu13-GXT-FXT-FGT; nu23[-GXC-FXC-FGC for 103/104/106]; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2-or-six-type-100-values", "required": true, "summary": "Ordered list-directed records consumed by the ordinary legacy path."}]},
+              {"name": "fatigue", "repetition": "optional-once", "fields": [{"name": "header", "value_type": "*S-N with optional RRATIO=<real>", "required": true, "summary": "Introduces one following row containing S1, S2, and eta."}, {"name": "values", "value_type": "three-reals", "required": true, "summary": "Bulk S-N parameters."}]},
+              {"name": "inline-statistics", "repetition": "optional-up-to-five", "fields": [{"name": "header", "value_type": "const(*stat)", "required": true, "summary": "Starts material-local variation."}, {"name": "definition", "value_type": "type 1: [ELE] then count-alpha-control-volume, count property indices, optional #generator integer; type 2: count-file, then count property indices; type 3: #approximation and #seed(COORD XYZ x y z|ELEM|FILE NAME value MAXSEED n MAXELEM n), then the type-1 coefficient/index rows", "required": true, "summary": "Exact positional legacy statistical records."}, {"name": "end", "value_type": "prefix(*en)", "required": true, "summary": "Terminates the inline statistical list."}]}
             ],
-            "constraints": ["These 25 types are recognized and preservable, but Agent generation and field edits remain blocked until each exact record schema is documented.", "Type 800 additionally reads a referenced COMPRO output file from disk."]
+            "constraints": ["The alternate *strength form consumes the same properties as individual scalar rows and is preservation-only.", "*shear and type 105 replace the G13 and G12 records with uf= user-function IDs; their creation requires resolved UFUNCTIONS references.", "Type 100 consumes six values after alpha1 instead of one alpha2 value.", "Types 103, 104, and 106 require the compression fracture row on nu23.", "The five-pass option scanner and inline statistical grammar are order-sensitive; the Agent preserves them but blocks creation until a runtime-verified profile exists."]
+          },
+          {
+            "name": "legacy-isotropic-type-10",
+            "when": "type is 10",
+            "rows": [
+              {"name": "elastic", "repetition": "once", "fields": [{"name": "E", "value_type": "positive-real", "required": true, "summary": "Young's modulus."}, {"name": "nu", "value_type": "real", "required": true, "summary": "Poisson ratio."}, {"name": "alpha", "value_type": "real", "required": true, "summary": "Thermal expansion coefficient."}]},
+              {"name": "strength", "repetition": "once", "fields": [{"name": "Xt", "value_type": "real", "required": true, "summary": "Tensile strength."}, {"name": "Xc", "value_type": "real", "required": true, "summary": "Compressive strength."}, {"name": "S", "value_type": "real", "required": true, "summary": "Shear strength."}]}
+            ],
+            "constraints": ["The parser imposes no intrinsic unit system; all values must use the deck's consistent engineering units."]
+          },
+          {
+            "name": "legacy-interface-type-12",
+            "when": "type is 12",
+            "rows": [
+              {"name": "penalty", "repetition": "once", "fields": [{"name": "K", "value_type": "positive-real", "required": true, "summary": "Interface penalty stiffness."}, {"name": "tolerance", "value_type": "nonnegative-real", "required": true, "summary": "Displacement tolerance."}, {"name": "KNORMAL", "value_type": "optional-keyed-real-on-same-row", "required": false, "summary": "Normal penalty override; defaults to -1."}]},
+              {"name": "strength", "repetition": "once", "fields": [{"name": "Xt-Xc-S", "value_type": "three-reals", "required": true, "summary": "Interface tensile, compressive, and shear strengths."}]},
+              {"name": "toughness", "repetition": "once", "fields": [{"name": "GIc-GIIc", "value_type": "two-positive-reals", "required": true, "summary": "Mode-I and mode-II critical energy release rates."}]},
+              {"name": "ordered-option", "repetition": "optional-in-source-order", "fields": [{"name": "records", "value_type": "*damage; *maxgap <real>; *friction <real>; *Paris [RRATIO=<real>] plus four Paris constants then eta; *S-N [RRATIO=<real>] plus S1-S2-eta", "required": false, "summary": "Legacy interface damage, contact, and fatigue options."}]}
+            ],
+            "constraints": ["Defaults are maxgap=1e12, friction=0, KNORMAL=-1, and zeroed fatigue storage.", "The option scanner repeatedly probes a fixed order and is fragile under reordering; the Agent preserves existing option records but only generates the three required base rows until a runtime-verified option profile exists."]
+          },
+          {
+            "name": "user-function-interface-type-15",
+            "when": "type is 15",
+            "rows": [
+              {"name": "controls", "repetition": "once", "fields": [{"name": "penalty-Xt-Gc", "value_type": "three-reals", "required": true, "summary": "Penalty, tensile strength, and fracture toughness controls."}]},
+              {"name": "gap-bounds", "repetition": "once", "fields": [{"name": "U1-U2", "value_type": "two-reals", "required": true, "summary": "Linear-limit and zero-stiffness separation bounds."}]},
+              {"name": "mode-I-function", "repetition": "once", "fields": [{"name": "ufunction_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Mode-I compliance function."}]},
+              {"name": "mode-II-function", "repetition": "once", "fields": [{"name": "ufunction_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Mode-II compliance function."}]},
+              {"name": "phase-function", "repetition": "once", "fields": [{"name": "ufunction_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Phase function."}]}
+            ],
+            "constraints": ["All three function IDs must resolve to earlier UFUNCTIONS declarations."]
+          },
+          {
+            "name": "legacy-anisotropic-types-2-and-3",
+            "when": "type is 2 or 3",
+            "rows": [
+              {"name": "engineering-properties", "repetition": "twelve-ordered-records", "fields": [{"name": "records", "value_type": "E1-Xt-Xc; E2-Yt-Yc; E3; nu13-GIc-GIIc-GIIIc; nu23; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2", "required": true, "summary": "Strength and physical-property records; engineering elastic constants are stored but not used to build stiffness."}]},
+              {"name": "stiffness", "repetition": "six-rows-for-type-2-or-four-rows-for-type-3", "fields": [{"name": "coefficients", "value_type": "six reals per row except final type-3 row has three", "required": true, "summary": "Type 2 supplies all 36 C-matrix values; type 3 supplies 21 upper-triangular values in source order."}]}
+            ],
+            "constraints": ["Type 2 full-matrix row order is C11..C16 through C61..C66.", "Type 3 source comments contain a duplicate C45 label in the final row; the Agent preserves positional values and blocks semantic editing of those 21 stiffness slots until the consumer mapping is verified."]
+          },
+          {
+            "name": "combined-anisotropic-type-11",
+            "when": "type is 11",
+            "rows": [
+              {"name": "mixture", "repetition": "once", "fields": [{"name": "material_1", "value_type": "positive-material-id", "required": true, "summary": "First source material."}, {"name": "material_2", "value_type": "positive-material-id", "required": true, "summary": "Second source material."}, {"name": "fraction_1", "value_type": "real", "required": true, "summary": "First fraction."}, {"name": "fraction_2", "value_type": "real", "required": true, "summary": "Second fraction."}]}
+            ],
+            "constraints": ["Both material IDs must resolve without forming a cycle; the Agent requires fractions in [0,1] summing to one within tolerance."]
+          },
+          {
+            "name": "variable-orthotropic-type-4",
+            "when": "type is 4",
+            "rows": [
+              {"name": "function-properties", "repetition": "twelve-ordered-records", "fields": [{"name": "records", "value_type": "uf(E1)-Xt-Xc; uf(E2)-Yt-Yc; uf(E3); uf(nu13)-GIc-GIIc-GIIIc; uf(nu23); uf(nu12); uf(G13); uf(G23); uf(G12)-S-S13; uf(rho); uf(alpha1); uf(alpha2)", "required": true, "summary": "Twelve user-function selectors with strength/toughness constants on applicable rows."}]}
+            ],
+            "constraints": ["Every selector is a positive UFUNCTIONS ID and must resolve before material creation."]
+          },
+          {
+            "name": "variable-isotropic-types-40-and-41",
+            "when": "type is 40 or 41",
+            "rows": [
+              {"name": "functions", "repetition": "once", "fields": [{"name": "selectors", "value_type": "type-40: legacy three IDs or keyed E/G/U/ALF IDs; type-41: four IDs for E(J1),E(J2),nu,alpha", "required": true, "summary": "User-function selectors controlling elastic response."}]},
+              {"name": "strength", "repetition": "once", "fields": [{"name": "Xt-Xc-S", "value_type": "three-reals", "required": true, "summary": "Isotropic tensile, compressive, and shear strengths."}]}
+            ],
+            "constraints": ["All nonzero selector IDs must resolve to UFUNCTIONS entries.", "The type-40 keyed reader does not enforce its documented pick-two relationship or required key set; Agent generation is blocked until a runtime-verified key combination is registered."]
+          },
+          {
+            "name": "heterogeneous-types-200-and-210",
+            "when": "type is 200 or 210",
+            "rows": [
+              {"name": "type-200-control", "repetition": "type-200-only", "fields": [{"name": "UCStatus", "value_type": "integer", "required": true, "summary": "Zero invokes an external BSAM unit-cell command; other values reuse output."}, {"name": "UC_file", "value_type": "input-relative-path", "required": true, "summary": "Base unit-cell input/output path."}, {"name": "delta", "value_type": "optional-*delta-then-real", "required": false, "summary": "Microscale temperature change; defaults to zero."}]},
+              {"name": "type-210-properties", "repetition": "type-210-only", "fields": [{"name": "records", "value_type": "optional *strength; E1-Xt-Xc; E2-Yt-Yc; E3; nu13-GIc-GIIc-GIIIc; nu23; nu12; G13; G23; G12-S-S13; rho; alpha1; six alpha/strain values; when *strength is present two six-value phase-strength rows; optional *stat type-1 block; UCStatus; UC_file; optional *delta then real", "required": true, "summary": "Exact Boeing two-phase input sequence before its external enhancement-factor data."}]}
+            ],
+            "constraints": ["Both variants consume rigid external output formats after the input records.", "UCStatus=0 executes a source-built shell command using the supplied path; Agent generation is blocked.", "External files are read through fixed unit 19 and type 210 appends .txt; safe workspace paths, exact companion formats, and atomic multi-file plans are required before editing can be enabled."]
+          },
+          {
+            "name": "interpolated-heterogeneous-type-300",
+            "when": "type is 300",
+            "rows": [
+              {"name": "count", "repetition": "once", "fields": [{"name": "N", "value_type": "positive-integer", "required": true, "summary": "Number of source materials."}]},
+              {"name": "source", "repetition": "N-times", "fields": [{"name": "material_id", "value_type": "positive-material-id", "required": true, "summary": "Source heterogeneous material."}, {"name": "volume_fraction", "value_type": "real", "required": true, "summary": "Interpolation fraction for that material."}]},
+              {"name": "default-volume-fraction", "repetition": "once", "fields": [{"name": "value", "value_type": "real", "required": true, "summary": "Default interpolation volume fraction."}]}
+            ],
+            "constraints": ["Every material ID must refer to an earlier compatible heterogeneous material.", "The parser does not validate counts or fractions; the Agent requires N greater than zero and fractions in [0,1], and blocks creation until interpolation normalization is established from the consumer."]
+          },
+          {
+            "name": "viscoelastic-type-500",
+            "when": "type is 500",
+            "rows": [
+              {"name": "header", "repetition": "once", "fields": [{"name": "term_count", "value_type": "positive-integer", "required": true, "summary": "Number of following viscoelastic coefficient rows."}, {"name": "function_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Source-selected user function."}]},
+              {"name": "term", "repetition": "term_count-times", "fields": [{"name": "parameter", "value_type": "integer", "required": true, "summary": "Term parameter."}, {"name": "coefficient", "value_type": "real", "required": true, "summary": "Term coefficient."}]}
+            ],
+            "constraints": ["term_count controls allocation directly and must be positive and bounded by Agent policy.", "function_id must resolve to UFUNCTIONS; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile."]
+          },
+          {
+            "name": "compro-type-800",
+            "when": "type is 800",
+            "rows": [
+              {"name": "cluster", "repetition": "once", "fields": [{"name": "cluster_id", "value_type": "positive-cluster-id", "required": true, "summary": "Finite-element cluster whose integration-point data and orientations are replaced."}]},
+              {"name": "file", "repetition": "once", "fields": [{"name": "filename", "value_type": "input-relative-path", "required": true, "summary": "COMPRO output file."}]},
+              {"name": "strength", "repetition": "once", "fields": [{"name": "Xt-Xc-Yt-Yc-S-S13", "value_type": "six-reals", "required": true, "summary": "Strength values retained outside the COMPRO file."}]},
+              {"name": "external-entry", "repetition": "eight-times-per-cluster-element", "fields": [{"name": "element_marker", "value_type": "integer", "required": true, "summary": "Parsed external marker."}, {"name": "integration_marker", "value_type": "integer", "required": true, "summary": "Parsed external marker."}, {"name": "values", "value_type": "28-reals", "required": true, "summary": "COMPRO integration-point payload; orientation vectors occupy slots 14-22."}]}
+            ],
+            "constraints": ["The cluster must already exist and contain finite elements.", "The external file must contain exactly eight rows per element in current element order.", "Type 800 mutates element orientations, swaps integration points 3/4 and 7/8, and validates nonzero orientation vectors; generation and editing remain blocked until an atomic multi-file plan and an executable-verified COMPRO fixture exist."]
           }
         ],
         "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically."]
       },
       "remaining_work": [
-        "Document the exact record grammar and numerical constraints for the 25 legacy numeric types.",
         "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.",
         "Map material-type compatibility to each constitutive and element family."
       ]

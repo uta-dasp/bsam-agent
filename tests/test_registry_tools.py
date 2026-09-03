@@ -265,15 +265,23 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("hkin", parameters["structured_bulk_key"]["allowed_values"])
         self.assertIn("penalty_stiffness", parameters["structured_interface_key"]["allowed_values"])
         variants = {item["name"]: item for item in block["body"]["variants"]}
-        self.assertEqual(
-            {"structured-bulk-type-999", "structured-interface-type-998", "structured-j2-type-50", "legacy-numeric-types"},
-            set(variants),
-        )
+        self.assertEqual(15, len(variants))
+        for name in (
+            "legacy-orthotropic-family",
+            "legacy-isotropic-type-10",
+            "legacy-interface-type-12",
+            "legacy-anisotropic-types-2-and-3",
+            "heterogeneous-types-200-and-210",
+            "compro-type-800",
+        ):
+            self.assertIn(name, variants)
         contract = json.dumps(block).lower()
         self.assertIn("load_vector keyword has no dispatch case", contract)
         self.assertIn("canonical generation uses initval", contract)
         self.assertIn("table_<name>", contract)
         self.assertIn("replace the entire type-specific body atomically", contract)
+        self.assertIn("eight rows per element", contract)
+        self.assertIn("blocks creation until a runtime-verified", contract)
 
     def test_numeric_user_function_variants_are_bounded(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "USER")

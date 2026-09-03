@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.20.0`
-- Registry SHA-256: `8D7C7E5FC57150424AAE7717E37771DC9BC2C5B82759EF768F78D721B9CD94AB`
+- Registry version: `0.21.0`
+- Registry SHA-256: `5C64E2069A4400958FDCA6775FDEE11A0F582D4C011A1B1560DACF263D98514C`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
@@ -379,7 +379,6 @@ Known parameters:
 
 Remaining specification work:
 
-- Document the exact record grammar and numerical constraints for the 25 legacy numeric types.
 - Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.
 - Map material-type compatibility to each constitutive and element family.
 
@@ -406,10 +405,75 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - `material-end` [once]: `*end`:exact-lowercase-sentinel
   - Constraint: The named header parser recognizes only type=mises or type=50 and an optional name pair.
   - Constraint: Canonical generation restricts type 50 to the seven J2 keys even though the shared class dispatcher exposes other bulk keys.
-- **legacy-numeric-types** (the numeric type is any active type other than 50, 998, or 999):
-  - `type-specific-body` [once]: `records`:legacy-type-specific-record-sequence
-  - Constraint: These 25 types are recognized and preservable, but Agent generation and field edits remain blocked until each exact record schema is documented.
-  - Constraint: Type 800 additionally reads a referenced COMPRO output file from disk.
+- **legacy-orthotropic-family** (type is 1, 5, 6, 7, 100, or 101-106):
+  - `feature-option` [zero-to-five-before-properties]: `option`:enum(*fiber <real>,*cfv_,*shear,*tension,*bimodular <compression-modulus> <strain-threshold>)
+  - `engineering-and-strength-properties` [ordered-record-sequence]: `records`:E1-Xt-Xc; E2-Yt-Yc-[MAX_ANGLE value]; E3; nu13-GXT-FXT-FGT; nu23[-GXC-FXC-FGC for 103/104/106]; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2-or-six-type-100-values
+  - `fatigue` [optional-once]: `header`:*S-N with optional RRATIO=<real>, `values`:three-reals
+  - `inline-statistics` [optional-up-to-five]: `header`:const(*stat), `definition`:type 1: [ELE] then count-alpha-control-volume, count property indices, optional #generator integer; type 2: count-file, then count property indices; type 3: #approximation and #seed(COORD XYZ x y z|ELEM|FILE NAME value MAXSEED n MAXELEM n), then the type-1 coefficient/index rows, `end`:prefix(*en)
+  - Constraint: The alternate *strength form consumes the same properties as individual scalar rows and is preservation-only.
+  - Constraint: *shear and type 105 replace the G13 and G12 records with uf= user-function IDs; their creation requires resolved UFUNCTIONS references.
+  - Constraint: Type 100 consumes six values after alpha1 instead of one alpha2 value.
+  - Constraint: Types 103, 104, and 106 require the compression fracture row on nu23.
+  - Constraint: The five-pass option scanner and inline statistical grammar are order-sensitive; the Agent preserves them but blocks creation until a runtime-verified profile exists.
+- **legacy-isotropic-type-10** (type is 10):
+  - `elastic` [once]: `E`:positive-real, `nu`:real, `alpha`:real
+  - `strength` [once]: `Xt`:real, `Xc`:real, `S`:real
+  - Constraint: The parser imposes no intrinsic unit system; all values must use the deck's consistent engineering units.
+- **legacy-interface-type-12** (type is 12):
+  - `penalty` [once]: `K`:positive-real, `tolerance`:nonnegative-real, `KNORMAL`:optional-keyed-real-on-same-row
+  - `strength` [once]: `Xt-Xc-S`:three-reals
+  - `toughness` [once]: `GIc-GIIc`:two-positive-reals
+  - `ordered-option` [optional-in-source-order]: `records`:*damage; *maxgap <real>; *friction <real>; *Paris [RRATIO=<real>] plus four Paris constants then eta; *S-N [RRATIO=<real>] plus S1-S2-eta
+  - Constraint: Defaults are maxgap=1e12, friction=0, KNORMAL=-1, and zeroed fatigue storage.
+  - Constraint: The option scanner repeatedly probes a fixed order and is fragile under reordering; the Agent preserves existing option records but only generates the three required base rows until a runtime-verified option profile exists.
+- **user-function-interface-type-15** (type is 15):
+  - `controls` [once]: `penalty-Xt-Gc`:three-reals
+  - `gap-bounds` [once]: `U1-U2`:two-reals
+  - `mode-I-function` [once]: `ufunction_id`:positive-ufunction-id
+  - `mode-II-function` [once]: `ufunction_id`:positive-ufunction-id
+  - `phase-function` [once]: `ufunction_id`:positive-ufunction-id
+  - Constraint: All three function IDs must resolve to earlier UFUNCTIONS declarations.
+- **legacy-anisotropic-types-2-and-3** (type is 2 or 3):
+  - `engineering-properties` [twelve-ordered-records]: `records`:E1-Xt-Xc; E2-Yt-Yc; E3; nu13-GIc-GIIc-GIIIc; nu23; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2
+  - `stiffness` [six-rows-for-type-2-or-four-rows-for-type-3]: `coefficients`:six reals per row except final type-3 row has three
+  - Constraint: Type 2 full-matrix row order is C11..C16 through C61..C66.
+  - Constraint: Type 3 source comments contain a duplicate C45 label in the final row; the Agent preserves positional values and blocks semantic editing of those 21 stiffness slots until the consumer mapping is verified.
+- **combined-anisotropic-type-11** (type is 11):
+  - `mixture` [once]: `material_1`:positive-material-id, `material_2`:positive-material-id, `fraction_1`:real, `fraction_2`:real
+  - Constraint: Both material IDs must resolve without forming a cycle; the Agent requires fractions in [0,1] summing to one within tolerance.
+- **variable-orthotropic-type-4** (type is 4):
+  - `function-properties` [twelve-ordered-records]: `records`:uf(E1)-Xt-Xc; uf(E2)-Yt-Yc; uf(E3); uf(nu13)-GIc-GIIc-GIIIc; uf(nu23); uf(nu12); uf(G13); uf(G23); uf(G12)-S-S13; uf(rho); uf(alpha1); uf(alpha2)
+  - Constraint: Every selector is a positive UFUNCTIONS ID and must resolve before material creation.
+- **variable-isotropic-types-40-and-41** (type is 40 or 41):
+  - `functions` [once]: `selectors`:type-40: legacy three IDs or keyed E/G/U/ALF IDs; type-41: four IDs for E(J1),E(J2),nu,alpha
+  - `strength` [once]: `Xt-Xc-S`:three-reals
+  - Constraint: All nonzero selector IDs must resolve to UFUNCTIONS entries.
+  - Constraint: The type-40 keyed reader does not enforce its documented pick-two relationship or required key set; Agent generation is blocked until a runtime-verified key combination is registered.
+- **heterogeneous-types-200-and-210** (type is 200 or 210):
+  - `type-200-control` [type-200-only]: `UCStatus`:integer, `UC_file`:input-relative-path, `delta`:optional-*delta-then-real
+  - `type-210-properties` [type-210-only]: `records`:optional *strength; E1-Xt-Xc; E2-Yt-Yc; E3; nu13-GIc-GIIc-GIIIc; nu23; nu12; G13; G23; G12-S-S13; rho; alpha1; six alpha/strain values; when *strength is present two six-value phase-strength rows; optional *stat type-1 block; UCStatus; UC_file; optional *delta then real
+  - Constraint: Both variants consume rigid external output formats after the input records.
+  - Constraint: UCStatus=0 executes a source-built shell command using the supplied path; Agent generation is blocked.
+  - Constraint: External files are read through fixed unit 19 and type 210 appends .txt; safe workspace paths, exact companion formats, and atomic multi-file plans are required before editing can be enabled.
+- **interpolated-heterogeneous-type-300** (type is 300):
+  - `count` [once]: `N`:positive-integer
+  - `source` [N-times]: `material_id`:positive-material-id, `volume_fraction`:real
+  - `default-volume-fraction` [once]: `value`:real
+  - Constraint: Every material ID must refer to an earlier compatible heterogeneous material.
+  - Constraint: The parser does not validate counts or fractions; the Agent requires N greater than zero and fractions in [0,1], and blocks creation until interpolation normalization is established from the consumer.
+- **viscoelastic-type-500** (type is 500):
+  - `header` [once]: `term_count`:positive-integer, `function_id`:positive-ufunction-id
+  - `term` [term_count-times]: `parameter`:integer, `coefficient`:real
+  - Constraint: term_count controls allocation directly and must be positive and bounded by Agent policy.
+  - Constraint: function_id must resolve to UFUNCTIONS; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile.
+- **compro-type-800** (type is 800):
+  - `cluster` [once]: `cluster_id`:positive-cluster-id
+  - `file` [once]: `filename`:input-relative-path
+  - `strength` [once]: `Xt-Xc-Yt-Yc-S-S13`:six-reals
+  - `external-entry` [eight-times-per-cluster-element]: `element_marker`:integer, `integration_marker`:integer, `values`:28-reals
+  - Constraint: The cluster must already exist and contain finite elements.
+  - Constraint: The external file must contain exactly eight rows per element in current element order.
+  - Constraint: Type 800 mutates element orientations, swaps integration points 3/4 and 7/8, and validates nonzero orientation vectors; generation and editing remain blocked until an atomic multi-file plan and an executable-verified COMPRO fixture exist.
 
 ### `FAILURE`
 
