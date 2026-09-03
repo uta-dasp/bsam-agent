@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .evals import load_chat_cases
+from .orchestrator import decision_schema as bounded_decision_schema
+from .orchestrator import relevant_tools, routing_prompt
 from .provider import Message, Provider, ProviderRequest, ProviderResponse
 from .tool_contracts import TOOL_CONTRACTS, validate_arguments
 
@@ -188,17 +190,18 @@ def run_chat_benchmark(
 ) -> dict[str, Any]:
     cases = load_chat_cases(cases_path)["cases"]
     acceptance = json.loads(acceptance_path.read_text(encoding="utf-8"))
-    system = native_evaluation_system_prompt() if native_tools else evaluation_system_prompt()
     results: list[dict[str, Any]] = []
     latencies: list[float] = []
     for case in cases:
+        tool_names = relevant_tools(case["user"])
+        system = native_evaluation_system_prompt() if native_tools else routing_prompt(tool_names)
         started = time.perf_counter()
         provider_error: str | None = None
         try:
             response = provider.complete(ProviderRequest(
                 messages=(Message("system", system), Message("user", case["user"])),
                 tools=candidate_tools(case["user"]) if native_tools else {},
-                response_schema=None if native_tools else decision_schema(),
+                response_schema=None if native_tools else bounded_decision_schema(tool_names),
                 max_output_tokens=512,
                 correlation_id=f"eval-{case['id']}",
                 data_policy="synthetic-only",

@@ -26,6 +26,7 @@ models/
 config/provider.local.json
 evals/results/*.json
 !evals/results/.gitkeep
+.bsam-agent/
 
 # BSAM working data and generated artifacts
 workspace/

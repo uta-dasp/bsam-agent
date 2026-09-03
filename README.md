@@ -2,7 +2,7 @@
 
 BSAM Agent will create, understand, modify, validate, and run current-syntax BSAM input files on Windows. This repository is intentionally separate from the BSAM source tree and will not modify BSAM itself.
 
-Status: G4 local-model benchmarking is in progress while G1 coverage and G3 deterministic capability expansion continue. The runnable core includes lossless inspection, semantic validation, reviewed typed edits, mesh-template assembly, the approved notch 2-to-8-ply transformation, supervised BSAM execution, and a validated llama.cpp loopback adapter. Llama 3.1 8B and Llama 4 Scout both failed the chat acceptance gates, so the planned Llama 3.3 70B control benchmark is the next model-selection decision.
+Status: the guarded G4 chat orchestrator and terminal client are runnable while G1 coverage and G3 deterministic capability expansion continue. The CPU-local candidate is Llama 4 Scout Q4_K_M: its raw routing benchmark remains below the autonomous-dispatch threshold, but the 512 GiB workstation can run its faster repacked mode and deterministic code owns schemas, confirmation, paths, validation, and execution. Llama 3.1 8B remains only a transport baseline.
 
 ## Version 1 target
 
@@ -30,6 +30,7 @@ Status: G4 local-model benchmarking is in progress while G1 coverage and G3 dete
 - [Model tool contracts](docs/api/MODEL_TOOL_CONTRACTS.md)
 - [Model-provider adapters](docs/api/PROVIDER_ADAPTERS.md)
 - [Local model runtime](docs/api/LOCAL_MODEL_RUNTIME.md)
+- [Terminal chat client](docs/api/CHAT_CLIENT.md)
 - [BSAM syntax coverage ledger](docs/bsam/CURRENT_SYNTAX_COVERAGE.md)
 - [Generated BSAM 2.4 input API reference](docs/bsam/reference/BSAM_2_4_INPUT_API.md)
 - [Machine-readable BSAM 2.4 registry](specs/bsam-2.4/capabilities.json)

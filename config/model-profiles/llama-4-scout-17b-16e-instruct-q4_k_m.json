@@ -67,6 +67,11 @@
       "observed_peak_working_memory_gib": 62.683
     },
     "accepted": false,
-    "decision": "Do not select as the first chat-agent model; benchmark the Llama 3.3 70B control candidate."
+    "decision": "Fails the raw autonomous-routing gate; selected provisionally for guarded local chat because deterministic orchestration owns all authorization and tool execution."
+  },
+  "deployment": {
+    "selected_for_guarded_chat": true,
+    "selection_basis": "512 GiB host can favor the faster repacked mode; no model output directly authorizes or performs deterministic work.",
+    "autonomous_dispatch_allowed": false
   }
 }

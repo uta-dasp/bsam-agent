@@ -1,6 +1,6 @@
 # Local model runtime
 
-The pinned runtime is llama.cpp b10621 (`v0.3.0`, commit `c1d0e7a0`). Meta Llama 3.1 8B and Llama 4 Scout Q4_K_M are verified benchmark candidates, but neither passed chat acceptance. Exact provenance and checksums are in `config/model-profiles/`. Model weights and the machine-local provider configuration remain outside Git.
+The pinned runtime is llama.cpp b10621 (`v0.3.0`, commit `c1d0e7a0`). Meta Llama 4 Scout Q4_K_M is the provisional guarded-chat model; Meta Llama 3.1 8B remains a transport baseline. Scout did not pass the raw autonomous-routing gate, so deterministic orchestration—not model text—owns authorization and execution. Exact provenance and checksums are in `config/model-profiles/`. Model weights and the machine-local provider configuration remain outside Git.
 
 ## Start the server
 
@@ -9,9 +9,9 @@ From PowerShell, create a session-only API key and start the runtime with a loca
 ```powershell
 $env:BSAM_LOCAL_API_KEY = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $runtime = "D:\Partha\BSAM\runtimes\llama.cpp\b10621\llama-server.exe"
-$model = "D:\Partha\BSAM\models\meta-llama-3.1-8b-instruct\Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+$model = "D:\Partha\BSAM\models\meta-llama-4-scout-17b-16e-instruct\Llama-4-Scout-17B-16E-Instruct-Q4_K_M.gguf"
 & $runtime --model $model --host 127.0.0.1 --port 18080 `
-  --api-key $env:BSAM_LOCAL_API_KEY -t 12 -tb 12 -c 8192 -np 1 `
+  --api-key $env:BSAM_LOCAL_API_KEY -t 24 -tb 24 -c 4096 -np 1 `
   --jinja --no-slots
 ```
 
@@ -35,7 +35,7 @@ python scripts\benchmark_local_model.py `
 
 Replace the memory value with the measured peak working set of `llama-server`; it is an acceptance input, not a model claim. The result JSON is ignored because it can contain raw synthetic prompts and responses. Stop the server with Ctrl+C.
 
-For Scout on this CPU, `--no-repack` reduced observed peak working memory substantially but made generation too slow for the acceptance gate. `--skip-chat-parsing` exposes Scout's native function-call text for the adapter's strict literal parser; it is an evaluation workaround for llama.cpp's incompatible PEG parser, not a model acceptance result.
+For Scout on this CPU, the default repacked mode is preferred: it used about 108 GiB but was materially faster, and the host has 512 GiB. `--no-repack` reduced observed peak memory to about 63 GiB but made responses substantially slower. `--skip-chat-parsing` is needed only for the native-tool experiment, not the selected structured-decision path.
 
 ## Security boundary
 

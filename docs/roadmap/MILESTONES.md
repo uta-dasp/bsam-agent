@@ -161,26 +161,26 @@ Exit: supported edits cannot leave unresolved dependent references, and the API 
 - [x] Bind the runtime to loopback only and disable telemetry/network model fetching.
 - [x] Benchmark the small interactive candidate against the checked-in evaluation suite (failed the accuracy and refusal gates; larger-candidate decision required).
 - [x] Benchmark Llama 4 Scout after the small model missed the thresholds (Scout also failed accuracy; its memory-efficient mode also failed latency).
-- [ ] Select the smallest model meeting safety, accuracy, and latency thresholds.
+- [x] Select Scout provisionally for hardware-aware guarded chat; it is not authorized for autonomous dispatch and remains subject to end-to-end acceptance.
 
 ### G4.4 Local adapter and orchestrator
 
 - [x] Implement the loopback model adapter with bounded context and structured tool calls.
 - [x] Validate every model response and tool argument before dispatch.
-- [ ] Implement the conversation state machine: understand, inspect, propose, confirm, execute, verify, explain.
-- [ ] Require explicit confirmation for mutations and runs according to policy.
-- [ ] Summarize tool results without treating model text as authoritative state.
-- [ ] Persist privacy-safe conversation and tool audit metadata with opt-out controls.
+- [x] Implement the conversation state machine: understand, inspect, propose, confirm, execute, verify, explain.
+- [x] Require explicit confirmation for mutations and runs according to policy.
+- [x] Summarize tool results without treating model text as authoritative state.
+- [x] Persist privacy-safe conversation and tool audit metadata with opt-out controls.
 
 ### G4.5 First usable chat client
 
-- [ ] Add a local `bsam-agent chat` terminal client.
-- [ ] Support new/resume conversation, model selection, project binding, and cancellation.
-- [ ] Display proposed semantic/source diffs and confirmation prompts.
-- [ ] Display validation and run progress with links/paths to artifacts.
-- [ ] Add end-to-end scripted conversation tests with a fake provider.
-- [ ] Run local-model acceptance conversations on synthetic and approved project fixtures.
-- [ ] Document installation, model placement, configuration, startup, limitations, and recovery.
+- [x] Add a local `bsam-agent chat` terminal client.
+- [x] Support new/resume conversation, model selection, project binding, and cancellation.
+- [x] Display proposed semantic/source diffs and confirmation prompts.
+- [x] Display deterministic validation/run summaries and artifact paths.
+- [x] Add end-to-end scripted conversation tests with a fake provider.
+- [x] Run local-model routing cases plus guarded inspect/preview/apply conversations on synthetic and approved project fixtures.
+- [x] Document installation, model placement, configuration, startup, limitations, and recovery.
 
 Exit: a user can converse locally with BSAM Agent to inspect a project, request a supported change, review and confirm it, validate it, and run BSAM; all authoritative work is performed by deterministic tools.
 

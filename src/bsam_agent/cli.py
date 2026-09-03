@@ -9,6 +9,7 @@ from typing import Sequence
 
 from . import __version__
 from .api import serve
+from .chat import run_terminal_chat
 from .change import (
     ChangeError,
     apply_plan,
@@ -141,6 +142,19 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--workspace-root", required=True)
     serve_parser.add_argument("--port", type=int, default=8765)
 
+    chat_parser = subparsers.add_parser("chat", help="start a local model-assisted terminal chat")
+    chat_parser.add_argument("--workspace-root", required=True, help="contain all project files")
+    chat_parser.add_argument(
+        "--config", default="config/provider.local.json", help="local provider configuration"
+    )
+    chat_parser.add_argument(
+        "--no-audit", action="store_true", help="disable privacy-safe digest audit metadata"
+    )
+    chat_parser.add_argument(
+        "--session",
+        help="relative local transcript path to save and resume; contains raw chat text",
+    )
+
     import_parser = subparsers.add_parser(
         "import-mesh", help="import a manually prepared Abaqus-style .ele mesh"
     )
@@ -198,6 +212,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "serve":
             serve(Path(args.workspace_root), args.port)
             return 0
+        if args.command == "chat":
+            root = Path(args.workspace_root).resolve()
+            session_path = None
+            if args.session:
+                supplied = Path(args.session)
+                if supplied.is_absolute():
+                    raise ValueError("chat session path must be relative to the workspace")
+                session_path = (root / supplied).resolve()
+                if not session_path.is_relative_to(root):
+                    raise ValueError("chat session path escapes the workspace")
+            return run_terminal_chat(
+                Path(args.config), root, audit_enabled=not args.no_audit,
+                session_path=session_path,
+            )
         if args.command == "import-mesh":
             _print_json(import_ele(Path(args.mesh)).as_dict(), args.compact)
             return 0
