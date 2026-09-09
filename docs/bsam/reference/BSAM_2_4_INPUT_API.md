@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.75.0`
-- Registry SHA-256: `637AA35295DA8C7DAA7F47FDDA87947B6F5F420712C530202A271ED06C99FAD2`
+- Registry version: `0.76.0`
+- Registry SHA-256: `73A4DE073221BD1364B59D60DA02463BE2367E58C606140613784F64ACEA16EC`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1363,27 +1363,24 @@ Assigns layered section information to an existing element set.
 - Registry ID: `command.section`
 - Dispatch prefix: `*SECT`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-section-reader](#evidencefe-section-reader)
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-section-reader](#evidencefe-section-reader), [evidence.fe-section-connection-consumer](#evidencefe-section-connection-consumer)
 - Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
 - `ELSET` (element-set-name, required): Selects the existing element set receiving the section.
 - `LAYERS` (integer, required): Sets a positive number of layers.
-- `CONNECTION` (flag, optional): Enables the connection form handled by the section reader.
-
-Remaining specification work:
-
-- Confirm CONNECTION semantics.
+- `CONNECTION` (flag, optional): Treats layer definition IDs as CONSTITUTIVE selectors instead of MATERIALS selectors.
 
 #### `*SECTION` body
 
-Termination: next-command-or-eof. Dependencies: ELSET must name an existing element set.; DIMENSIONS section_capacity must include this section.; Every material_id must resolve in MATERIALS.; A ply-count edit must update LAYERS and the layer-row sequence atomically.
+Termination: next-command-or-eof. Dependencies: ELSET must name an existing element set.; DIMENSIONS section_capacity must include this section.; Every definition_id must resolve in the declaration family selected by CONNECTION.; A ply-count edit must update LAYERS and the layer-row sequence atomically.
 
 - **layer-stack** (always):
-  - `layer` [count-from-command-parameter]: `thickness`:positive-real, `material_id`:positive-integer
+  - `layer` [count-from-command-parameter]: `thickness`:positive-real, `definition_id`:positive-material-or-constitutive-id
   - Constraint: The number of non-comment layer rows must equal LAYERS; fewer rows are fatal.
   - Constraint: Layer thicknesses are divided by their total before assignment.
+  - Constraint: Without CONNECTION each definition_id resolves in MATERIALS; with CONNECTION each definition_id resolves in CONSTITUTIVE.
 
 ### `*CRACK`
 
@@ -1990,6 +1987,8 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.fe-integration-orientation` — source: `source/libbsam/mod_fe_input.f90:3696-3994` — Defines nested integration-point records and nodal or elemental orientation records.
 <a id="evidencefe-section-reader"></a>
 - `evidence.fe-section-reader` — source: `source/libbsam/mod_fe_input.f90:4003-4102` — Requires one thickness/material row per declared layer, normalizes thicknesses, and applies the section to the selected element set.
+<a id="evidencefe-section-connection-consumer"></a>
+- `evidence.fe-section-connection-consumer` — source: `source/libbsam/mod_fe_element_library.f90:815-1130` — When the section const flag is enabled by CONNECTION, element and failure paths use stored section IDs as constitutive selectors instead of the cluster constitutive ID.
 <a id="evidenceboundary-parser"></a>
 - `evidence.boundary-parser` — source: `source/libbsam/ibn_ini.f90:19-180` — Requires BOUNDARY and begins dispatch of boundary problem types and nested controls.
 <a id="evidenceboundary-active-dispatch"></a>

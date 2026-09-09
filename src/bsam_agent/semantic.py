@@ -3511,7 +3511,11 @@ def build_semantic_index(
             elif command == "*SECT":
                 elset = options.get("ELSET")
                 if elset:
-                    attributes: dict[str, Any] = {"layers": options.get("LAYERS")}
+                    connection_form = "CONNECTION" in options
+                    attributes: dict[str, Any] = {
+                        "layers": options.get("LAYERS"),
+                        "connection": connection_form,
+                    }
                     layer_rows: list[tuple[int, float, SourceLine]] = []
                     try:
                         layer_count = int(str(options.get("LAYERS", "")))
@@ -3536,8 +3540,11 @@ def build_semantic_index(
                     else:
                         attributes.update({
                             "layers": layer_count,
-                            "layer_material_ids": [item[0] for item in layer_rows],
                             "layer_thicknesses": [item[1] for item in layer_rows],
+                            (
+                                "layer_constitutive_ids" if connection_form
+                                else "layer_material_ids"
+                            ): [item[0] for item in layer_rows],
                         })
                     section = _entity(
                         index, "section", elset, source, command_line, cluster, attributes,
@@ -3547,8 +3554,13 @@ def build_semantic_index(
                         layer_rows, start=1,
                     ):
                         _reference(
-                            index, section, "uses-material",
-                            _key("material", str(material_id), None), source, line,
+                            index, section,
+                            "uses-constitutive" if connection_form else "uses-material",
+                            _key(
+                                "constitutive" if connection_form else "material",
+                                str(material_id), None,
+                            ),
+                            source, line,
                             {"position": position},
                         )
             elif command == "*CONS" and cluster and records:

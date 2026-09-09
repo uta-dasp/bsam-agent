@@ -21,6 +21,44 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_connection_section_layers_resolve_constitutive_identities(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            raw = deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*ELEMENT,TYPE=C3D4,ELSET=solid\n1,1,1,1,1\n"
+                b"*SECTION,ELSET=solid,LAYERS=2,CONNECTION\n.25,1\n.75,2\n"
+            ).replace(
+                b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+                b"CONSTITUTIVE\n1\n1 1 0\n1\n1 1 0\nEND CONSTITUTIVE\n"
+                b"FAILURE\n4\nEND FAILURE\n",
+            ).replace(
+                b"MATERIALS\n0\nEND MATERIALS\n",
+                b"MATERIALS\n10\n1 0 0\n1 1 1\nEND MATERIALS\n",
+            )
+            root.write_bytes(raw)
+            inspection = SourceSet.read(root).inspection()
+
+        section = next(
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "section"
+        )
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] == section["id"]
+            and item["kind"] == "uses-constitutive"
+        ]
+        self.assertTrue(section["attributes"]["connection"])
+        self.assertEqual(
+            [1, 2], section["attributes"]["layer_constitutive_ids"],
+        )
+        self.assertEqual(
+            ["constitutive:1", "constitutive:2"],
+            [item["target_key"] for item in references],
+        )
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_nodal_connection_expands_all_and_qualified_set_lists(self) -> None:
         raw = (
             b"INPUT\n3\nEND INPUT\n"

@@ -37,7 +37,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(74, counts["evidence"])
+        self.assertEqual(75, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
