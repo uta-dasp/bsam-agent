@@ -491,6 +491,41 @@ def augment_registered_boundary_semantics(
         _validate_registered_values(index, construct, parameters)
 
 
+def augment_input_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Expose the current INPUT format as a registered, source-located record."""
+    all_lines = tuple(lines)
+    header = next((line for line in all_lines if line.stripped == "INPUT"), None)
+    if header is None:
+        return
+    definition = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.input"
+    )
+    record = next((
+        line for line in _top_block_body(all_lines, "INPUT")
+        if line.stripped and not line.stripped.startswith(("#", "**"))
+    ), None)
+    parameters: dict[str, tuple[dict[str, Any], ...]] = {}
+    if record is not None:
+        parameters["type"] = ({
+            "value": record.stripped,
+            "spelling": "type",
+            "location": _location(source, record).as_dict(),
+        },)
+    index.capability_records.append(RegisteredConstruct(
+        id=f"block.input[1]@{source}:{header.number}",
+        capability_id="block.input",
+        canonical="INPUT",
+        occurrence=1,
+        location=_location(source, header),
+        parameters=parameters,
+        operations=operational_support(definition),
+    ))
+    _validate_registered_values(index, definition, parameters)
+
+
 def _solver_parameter(
     definition: dict[str, Any], value: Any, spelling: str, source: str, line: SourceLine,
 ) -> dict[str, Any]:
@@ -2051,6 +2086,7 @@ def augment_root_semantics(
 ) -> None:
     """Add documented root control entities and their FE/cluster references."""
     all_lines = tuple(lines)
+    augment_input_semantics(index, source, all_lines)
     augment_registered_boundary_semantics(index, source, all_lines)
     augment_solver_semantics(index, source, all_lines)
     augment_structured_material_semantics(index, source, all_lines)

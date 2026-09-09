@@ -51,6 +51,22 @@ def provider_config() -> ProviderConfig:
 
 
 class CapabilitySliceTests(unittest.TestCase):
+    def test_input_format_is_a_registered_source_located_record(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(boundary_deck(b"d_reduction=0.5\n"))
+            records = SourceSet.read(path).inspection()["semantic_model"][
+                "capability_records"
+            ]
+
+        input_record = next(
+            item for item in records if item["capability_id"] == "block.input"
+        )
+        self.assertEqual(1, input_record["location"]["line"])
+        self.assertEqual("3", input_record["parameters"]["type"][0]["value"])
+        self.assertEqual("verified", input_record["operations"]["parse"])
+        self.assertEqual("verified", input_record["operations"]["semantic"])
+
     def test_every_boundary_construct_declares_verified_typed_read_paths(self) -> None:
         boundary = [
             item for item in capability_manifest()
@@ -220,7 +236,7 @@ class CapabilitySliceTests(unittest.TestCase):
         self.assertEqual("registered-default", default["matches"][0]["effective_source"])
         self.assertEqual(100000000, default["matches"][0]["default"])
         self.assertTrue(ambiguous["summary"]["ambiguous"])
-        self.assertEqual({"*BOUNDARY CONDITION", "*LOADING SEQUENCE"}, {
+        self.assertEqual({"INPUT", "*BOUNDARY CONDITION", "*LOADING SEQUENCE"}, {
             item["canonical"] for item in ambiguous["matches"]
         })
 
