@@ -30,6 +30,48 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_interface_and_viscoelastic_materials_resolve_numeric_users(self) -> None:
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            "MATERIALS\n"
+            "15\n1 2 3\n0.1 0.2\n1\n2\n3\n"
+            "500\n2 4\n1 0.5\n2 0.25\n"
+            "END MATERIALS\n"
+            "USER\n" + "1\n0\n1\n" * 4 + "END USER\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        materials = [
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        ]
+        self.assertEqual(
+            {"mode_i": 1, "mode_ii": 2, "phase": 3},
+            materials[0]["attributes"]["numeric_user_selectors"],
+        )
+        self.assertEqual(
+            {"function": 4},
+            materials[1]["attributes"]["numeric_user_selectors"],
+        )
+        material_ids = {item["id"] for item in materials}
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] in material_ids
+            and item["kind"] == "uses-numeric-user-function"
+        ]
+        self.assertEqual([
+            "numeric-user-function:1", "numeric-user-function:2",
+            "numeric-user-function:3", "numeric-user-function:4",
+        ], [item["target_key"] for item in references])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_composite_materials_resolve_prior_material_identities(self) -> None:
         raw = (
             "INPUT\n3\nEND INPUT\n"

@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.69.0",
+  "registry_version": "0.70.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1490,7 +1490,7 @@
               {"name": "mode-II-function", "repetition": "once", "fields": [{"name": "ufunction_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Mode-II compliance function."}]},
               {"name": "phase-function", "repetition": "once", "fields": [{"name": "ufunction_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Phase function."}]}
             ],
-            "constraints": ["All three function IDs must resolve to earlier UFUNCTIONS declarations."]
+            "constraints": ["All three function IDs must resolve to declaration-order USER function entries."]
           },
           {
             "name": "legacy-anisotropic-types-2-and-3",
@@ -1552,7 +1552,7 @@
               {"name": "header", "repetition": "once", "fields": [{"name": "term_count", "value_type": "positive-integer", "required": true, "summary": "Number of following viscoelastic coefficient rows."}, {"name": "function_id", "value_type": "positive-ufunction-id", "required": true, "summary": "Source-selected user function."}]},
               {"name": "term", "repetition": "term_count-times", "fields": [{"name": "parameter", "value_type": "integer", "required": true, "summary": "Term parameter."}, {"name": "coefficient", "value_type": "real", "required": true, "summary": "Term coefficient."}]}
             ],
-            "constraints": ["term_count controls allocation directly and must be positive and bounded by Agent policy.", "function_id must resolve to UFUNCTIONS; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile."]
+            "constraints": ["term_count controls allocation directly and must be positive and bounded by Agent policy.", "function_id must resolve to a declaration-order USER function entry; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile."]
           },
           {
             "name": "compro-type-800",

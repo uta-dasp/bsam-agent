@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.69.0`
-- Registry SHA-256: `9C781071172ADB01CB5544E5125FCD9E150F62AB6B9507406AC4D6E727145D21`
+- Registry version: `0.70.0`
+- Registry SHA-256: `273E28EE5A34B538AEE753055B537BA01DA9EA257C09DEAC3C15817D4E796209`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -442,7 +442,7 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - `mode-I-function` [once]: `ufunction_id`:positive-ufunction-id
   - `mode-II-function` [once]: `ufunction_id`:positive-ufunction-id
   - `phase-function` [once]: `ufunction_id`:positive-ufunction-id
-  - Constraint: All three function IDs must resolve to earlier UFUNCTIONS declarations.
+  - Constraint: All three function IDs must resolve to declaration-order USER function entries.
 - **legacy-anisotropic-types-2-and-3** (type is 2 or 3):
   - `engineering-properties` [twelve-ordered-records]: `records`:E1-Xt-Xc; E2-Yt-Yc; E3; nu13-GIc-GIIc-GIIIc; nu23; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2
   - `stiffness` [six-rows-for-type-2-or-four-rows-for-type-3]: `coefficients`:six reals per row except final type-3 row has three
@@ -475,7 +475,7 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - `header` [once]: `term_count`:positive-integer, `function_id`:positive-ufunction-id
   - `term` [term_count-times]: `parameter`:integer, `coefficient`:real
   - Constraint: term_count controls allocation directly and must be positive and bounded by Agent policy.
-  - Constraint: function_id must resolve to UFUNCTIONS; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile.
+  - Constraint: function_id must resolve to a declaration-order USER function entry; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile.
 - **compro-type-800** (type is 800):
   - `cluster` [once]: `cluster_id`:positive-cluster-id
   - `file` [once]: `filename`:input-relative-path

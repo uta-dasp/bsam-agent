@@ -2576,6 +2576,41 @@ def augment_material_declaration_semantics(
                 user_selectors = [
                     (name, target, body[0]) for name, target in selectors.items()
                 ]
+        elif material_type == 15:
+            names = ("mode_i", "mode_ii", "phase")
+            selector_lines = body[2:5]
+            try:
+                values = [int(_record_fields(line)[0]) for line in selector_lines]
+                if len(values) != 3 or any(value <= 0 for value in values):
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 15 requires three positive USER function IDs",
+                    source, header,
+                )
+            else:
+                selectors = dict(zip(names, values))
+                attributes["numeric_user_selectors"] = selectors
+                user_selectors = [
+                    (name, target, line) for name, target, line in zip(
+                        names, values, selector_lines,
+                    )
+                ]
+        elif material_type == 500:
+            try:
+                target = int(_record_fields(body[0])[1])
+                if target <= 0:
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 500 requires a positive USER function ID",
+                    source, header,
+                )
+            else:
+                attributes["numeric_user_selectors"] = {"function": target}
+                user_selectors = [("function", target, body[0])]
         elif material_type == 11:
             fields = _record_fields(body[0])
             try:
