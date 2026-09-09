@@ -30,6 +30,43 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_composite_materials_resolve_prior_material_identities(self) -> None:
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            "MATERIALS\n"
+            "999\nE=1\n*end\n"
+            "999\nE=2\n*end\n"
+            "11\n1 2 0.25 0.75\n"
+            "300\n2\n1 0.25\n2 0.75\n0.5\n"
+            "END MATERIALS\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        materials = [
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        ]
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["kind"] == "uses-material"
+            and item["source_entity_id"] in {materials[2]["id"], materials[3]["id"]}
+        ]
+        self.assertEqual([1, 2], materials[2]["attributes"]["material_ids"])
+        self.assertEqual([0.25, 0.75], materials[2]["attributes"]["fractions"])
+        self.assertEqual([1, 2], materials[3]["attributes"]["material_ids"])
+        self.assertEqual(0.5, materials[3]["attributes"]["default_fraction"])
+        self.assertEqual([
+            "material:1", "material:2", "material:1", "material:2",
+        ], [item["target_key"] for item in references])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_variable_isotropic_materials_resolve_numeric_user_selectors(self) -> None:
         raw = (
             "INPUT\n3\nEND INPUT\n"
@@ -118,7 +155,7 @@ class StructuredMaterialCapabilityTests(unittest.TestCase):
             "2\n" + rows(18) +
             "3\n" + rows(16) +
             "4\n" + rows(12) +
-            "11\n" + rows(1) +
+            "11\n1 2 0.5 0.5\n"
             "40\n1 1 1\n1 1 1\n"
             "41\n1 1 1 1\n1 1 1\n"
             "200\n" + rows(2) + "*delta\n1\n" +

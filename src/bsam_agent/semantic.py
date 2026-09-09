@@ -2504,6 +2504,7 @@ def augment_material_declaration_semantics(
         if structured is not None:
             attributes["structured_entity_id"] = structured.id
         user_selectors: list[tuple[str, int, SourceLine]] = []
+        material_dependencies: list[tuple[int, SourceLine]] = []
         if material_type == 4:
             selector_lines = body[:12]
             try:
@@ -2575,6 +2576,53 @@ def augment_material_declaration_semantics(
                 user_selectors = [
                     (name, target, body[0]) for name, target in selectors.items()
                 ]
+        elif material_type == 11:
+            fields = _record_fields(body[0])
+            try:
+                material_ids = [int(value) for value in fields[:2]]
+                fractions = [_fortran_real(value) for value in fields[2:4]]
+                if (
+                    len(material_ids) != 2 or len(fractions) != 2
+                    or any(value <= 0 or value >= ordinal for value in material_ids)
+                    or any(not math.isfinite(value) or not 0 <= value <= 1 for value in fractions)
+                    or not math.isclose(sum(fractions), 1.0, rel_tol=1e-9, abs_tol=1e-12)
+                ):
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 11 requires two prior material IDs and fractions summing to one",
+                    source, header,
+                )
+            else:
+                attributes["material_ids"] = material_ids
+                attributes["fractions"] = fractions
+                material_dependencies = [(target, body[0]) for target in material_ids]
+        elif material_type == 300:
+            try:
+                count = int(_record_fields(body[0])[0])
+                source_rows = body[1:1 + count]
+                material_ids = [int(_record_fields(line)[0]) for line in source_rows]
+                fractions = [_fortran_real(_record_fields(line)[1]) for line in source_rows]
+                default_fraction = _fortran_real(_record_fields(body[1 + count])[0])
+                if (
+                    count <= 0 or len(material_ids) != count
+                    or any(value <= 0 or value >= ordinal for value in material_ids)
+                    or any(not math.isfinite(value) or not 0 <= value <= 1 for value in fractions)
+                    or not math.isfinite(default_fraction) or not 0 <= default_fraction <= 1
+                ):
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 300 requires prior material IDs and bounded fractions",
+                    source, header,
+                )
+            else:
+                attributes["material_ids"] = material_ids
+                attributes["fractions"] = fractions
+                attributes["default_fraction"] = default_fraction
+                material_dependencies = list(zip(material_ids, source_rows))
         material = _entity(
             index, "material", str(ordinal), source, header, None, attributes,
         )
@@ -2583,6 +2631,12 @@ def augment_material_declaration_semantics(
                 index, material, "uses-numeric-user-function",
                 _key("numeric-user-function", str(target), None), source, line,
                 {"position": position, "selector": selector},
+            )
+        for position, (target, line) in enumerate(material_dependencies, start=1):
+            _reference(
+                index, material, "uses-material",
+                _key("material", str(target), None), source, line,
+                {"position": position},
             )
     return True
 
