@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.55.0`
-- Registry SHA-256: `6C6EE954FFBA28BDD6391BC6F2A192567C9621CA5A4C7D04E35CA8D44C6A3CF1`
+- Registry version: `0.56.0`
+- Registry SHA-256: `64C4A7658112175593DA94F5F6C1B738DCDF614709657A5A17B3A93CB91F30F6`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1476,6 +1476,7 @@ Starts a boundary problem and selects mechanical, thermal, or contact dispatch.
 - Match prefix: `*type`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -1506,6 +1507,7 @@ Configures damage-increment control, update, damping, iteration, and exit thresh
 - Match prefix: `*g-co`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=implemented, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -1535,6 +1537,7 @@ Enables geometric nonlinearity for the current mechanical or thermal problem.
 - Match prefix: `*geo_`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 ### `*SOLVER`
 
@@ -1544,6 +1547,7 @@ Selects how declared solver IDs are assigned to nonlinear iterations for the cur
 - Match prefix: `*solv`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.solver-parser](#evidencesolver-parser)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1557,6 +1561,7 @@ Sets the current boundary-problem name from the following record.
 - Match prefix: `*name`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -1579,6 +1584,7 @@ Selects restart/new-run handling for the current boundary problem.
 - Match prefix: `*stat`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1663,6 +1669,7 @@ Defines penalty, nodal, and surface-contact connections between cluster selectio
 - Match prefix: `*conn`
 - Coverage: documented
 - Evidence: [evidence.boundary-connections](#evidenceboundary-connections), [evidence.boundary-connection-execution](#evidenceboundary-connection-execution), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -1706,6 +1713,7 @@ Defines load-step histories, cyclic controls, and optional repeated fatigue bloc
 - Match prefix: `*load`
 - Coverage: documented
 - Evidence: [evidence.boundary-loading](#evidenceboundary-loading), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 

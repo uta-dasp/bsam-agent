@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.55.0",
+  "registry_version": "0.56.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3022,6 +3022,12 @@
       "parameters": [{"name": "problem_type", "value_type": "enum-record", "required": true, "allowed_values": ["mechanical", "thermal", "contact"], "summary": "The following cleaned record is matched by its first four characters."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "nested-records",
         "termination": "fixed-count",
@@ -3044,6 +3050,12 @@
       "parameters": [{"name": "UPDATE", "value_type": "flag", "required": false, "default": false, "summary": "Enables damage update control."}, {"name": "DAMP", "value_type": "flag", "required": false, "default": false, "edit_operations": {"insert": "verified", "remove": "verified"}, "summary": "Enables damage damping."}, {"name": "G_ITER", "value_type": "positive-integer", "required": false, "default": 1000, "summary": "Sets the damage-control iteration limit."}, {"name": "GMIN", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Minimum damage increment for exit; G_TH is an accepted alias."}, {"name": "GMAX", "value_type": "nonnegative-real", "required": false, "default": 1000000000, "summary": "Maximum damage increment for exit."}, {"name": "GTHR", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Active-control damage increment threshold."}, {"name": "NO_DAMAGE_LOCK", "value_type": "flag", "required": false, "default": false, "summary": "NO_D disables the default damage lock."}],
       "evidence_ids": ["evidence.boundary-active-dispatch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "implemented", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -3061,19 +3073,33 @@
       "coverage": "documented",
       "parameters": [],
       "evidence_ids": ["evidence.boundary-active-dispatch"],
-      "remaining_work": []
+      "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      }
     },
     {
       "id": "construct.boundary-solver-schedule",
       "parent_block_id": "block.boundary",
       "canonical": "*SOLVER",
+      "entity_kind": "solver-schedule",
+      "routing_terms": ["boundary solver schedule", "solver schedule", "solver schedules"],
       "match_prefix": "*solv",
       "kind": "keyword",
       "summary": "Selects how declared solver IDs are assigned to nonlinear iterations for the current boundary problem.",
       "coverage": "documented",
       "parameters": [{"name": "schedule", "value_type": "enum-record", "required": true, "allowed_values": [1, 2], "default": 1, "summary": "Schedule 1 always uses solver 1; schedule 2 uses solver 1 at iteration 0 and solver 2 afterward."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.solver-parser"],
-      "remaining_work": []
+      "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      }
     },
     {
       "id": "construct.boundary-name",
@@ -3086,6 +3112,12 @@
       "parameters": [{"name": "name", "value_type": "string-record", "required": false, "summary": "Boundary problem name; defaults to boundname plus the problem index when absent."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -3104,6 +3136,12 @@
       "parameters": [{"name": "status", "value_type": "string-record", "required": false, "allowed_values": ["restart", "no restart", "new"], "default": "restart", "summary": "restart maps to run option 1, no restart maps to -1, and new maps to the generic new-run option 0."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -3185,6 +3223,8 @@
       "id": "construct.boundary-connections",
       "parent_block_id": "block.boundary",
       "canonical": "*CONNECTIONS",
+      "entity_kind": "connection",
+      "routing_terms": ["connection", "connections", "boundary connection", "boundary connections"],
       "match_prefix": "*conn",
       "kind": "record-group",
       "summary": "Defines penalty, nodal, and surface-contact connections between cluster selections.",
@@ -3198,6 +3238,12 @@
       ],
       "evidence_ids": ["evidence.boundary-connections", "evidence.boundary-connection-execution", "evidence.boundary-selectors", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "nested-records",
         "termination": "next-command",
@@ -3252,6 +3298,12 @@
       ],
       "evidence_ids": ["evidence.boundary-loading", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "nested-records",
         "termination": "next-command",

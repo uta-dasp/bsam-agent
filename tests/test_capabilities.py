@@ -51,6 +51,23 @@ def provider_config() -> ProviderConfig:
 
 
 class CapabilitySliceTests(unittest.TestCase):
+    def test_every_boundary_construct_declares_verified_typed_read_paths(self) -> None:
+        boundary = [
+            item for item in capability_manifest()
+            if item["kind"] == "nested-construct" and item["parent"] == "BOUNDARY"
+        ]
+
+        self.assertEqual(12, len(boundary))
+        self.assertTrue(all(
+            item["operations"]["parse"] == "verified"
+            and item["operations"]["semantic"] == "verified"
+            and item["operations"]["inspect"] == "verified"
+            for item in boundary
+        ))
+        kinds = {item["id"]: item.get("entity_kind") for item in boundary}
+        self.assertEqual("solver-schedule", kinds["construct.boundary-solver-schedule"])
+        self.assertEqual("connection", kinds["construct.boundary-connections"])
+
     def test_specification_and_operational_maturity_are_separate(self) -> None:
         convergence = next(
             item for item in capability_manifest()
