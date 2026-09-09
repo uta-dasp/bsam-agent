@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.66.0`
-- Registry SHA-256: `87D9B818B98FA0F6FF883945EBEE7FF422163EDFAA2DBAC9C9969DC6B1BC37DC`
+- Registry version: `0.67.0`
+- Registry SHA-256: `024185862BD1DE7C93369C1C72FCB141FFA1480D584D927BAAF23B942C626206`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -376,7 +376,7 @@ Defines bulk and interface material records, including current structured materi
 - Required: yes
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
 - Coverage: partially-documented
-- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.user-active-consumer](#evidenceuser-active-consumer), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
 - Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
@@ -453,7 +453,7 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - Constraint: Both material IDs must resolve without forming a cycle; the Agent requires fractions in [0,1] summing to one within tolerance.
 - **variable-orthotropic-type-4** (type is 4):
   - `function-properties` [twelve-ordered-records]: `records`:uf(E1)-Xt-Xc; uf(E2)-Yt-Yc; uf(E3); uf(nu13)-GIc-GIIc-GIIIc; uf(nu23); uf(nu12); uf(G13); uf(G23); uf(G12)-S-S13; uf(rho); uf(alpha1); uf(alpha2)
-  - Constraint: Every selector is a positive UFUNCTIONS ID and must resolve before material creation.
+  - Constraint: Every selector is a positive declaration-order USER function ID and must resolve before material creation.
 - **variable-isotropic-types-40-and-41** (type is 40 or 41):
   - `functions` [once]: `selectors`:type-40: legacy three IDs or keyed E/G/U/ALF IDs; type-41: four IDs for E(J1),E(J2),nu,alpha
   - `strength` [once]: `Xt-Xc-S`:three-reals

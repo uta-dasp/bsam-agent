@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.66.0",
+  "registry_version": "0.67.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1411,7 +1411,7 @@
           "summary": "Material-parameter values may be constants or table_<name>, stat_<name>_<initial>, ufunc_<name>, a combined table/stat expression, and for bulk material parameters poly_<table-name>... ."
         }
       ],
-      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.current-vtms-deck-tric"],
+      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.user-active-consumer", "evidence.current-vtms-deck-tric"],
       "operations": {
         "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
@@ -1515,7 +1515,7 @@
             "rows": [
               {"name": "function-properties", "repetition": "twelve-ordered-records", "fields": [{"name": "records", "value_type": "uf(E1)-Xt-Xc; uf(E2)-Yt-Yc; uf(E3); uf(nu13)-GIc-GIIc-GIIIc; uf(nu23); uf(nu12); uf(G13); uf(G23); uf(G12)-S-S13; uf(rho); uf(alpha1); uf(alpha2)", "required": true, "summary": "Twelve user-function selectors with strength/toughness constants on applicable rows."}]}
             ],
-            "constraints": ["Every selector is a positive UFUNCTIONS ID and must resolve before material creation."]
+            "constraints": ["Every selector is a positive declaration-order USER function ID and must resolve before material creation."]
           },
           {
             "name": "variable-isotropic-types-40-and-41",

@@ -30,6 +30,40 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_type_four_material_resolves_numeric_user_selectors(self) -> None:
+        selector_rows = (
+            "1 10 11\n2 12 13\n3\n4 1 2 3\n5\n6\n"
+            "7\n8\n9 1 2\n10\n11\n12\n"
+        )
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            f"MATERIALS\n4\n{selector_rows}END MATERIALS\n"
+            "USER\n" + "1\n0\n1\n" * 12 + "END USER\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        material = next(
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        )
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] == material["id"]
+            and item["kind"] == "uses-numeric-user-function"
+        ]
+        self.assertEqual(list(range(1, 13)), material["attributes"]["numeric_user_ids"])
+        self.assertEqual([
+            f"numeric-user-function:{item}" for item in range(1, 13)
+        ], [item["target_key"] for item in references])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_complete_material_block_receives_declaration_order_identities(self) -> None:
         rows = lambda count: "".join("1\n" for _ in range(count))
         material_body = (
@@ -59,6 +93,7 @@ class StructuredMaterialCapabilityTests(unittest.TestCase):
             "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
             "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
             f"MATERIALS\n{material_body}END MATERIALS\n"
+            "USER\n1\n0\n1\nEND USER\n"
             "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
         ).encode("latin-1")
         with tempfile.TemporaryDirectory() as directory:

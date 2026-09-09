@@ -2309,10 +2309,12 @@ def _consume_material_statistics(
     return cursor if cursor <= len(records) else None
 
 
-def _material_spans(lines: Iterable[SourceLine]) -> list[tuple[int, SourceLine, SourceLine]] | None:
+def _material_spans(
+    lines: Iterable[SourceLine],
+) -> list[tuple[int, SourceLine, SourceLine, tuple[SourceLine, ...]]] | None:
     """Mirror MAT_INI record consumption; return nothing unless the whole block is proven."""
     records = _material_record_lines(lines)
-    spans: list[tuple[int, SourceLine, SourceLine]] = []
+    spans: list[tuple[int, SourceLine, SourceLine, tuple[SourceLine, ...]]] = []
     cursor = 0
     while cursor < len(records):
         header = records[cursor]
@@ -2325,6 +2327,7 @@ def _material_spans(lines: Iterable[SourceLine]) -> list[tuple[int, SourceLine, 
         if material_type not in _MATERIAL_TYPES:
             return None
         end_line = header
+        body_start = cursor
 
         if material_type in {50, 998, 999}:
             end = next((
@@ -2474,7 +2477,7 @@ def _material_spans(lines: Iterable[SourceLine]) -> list[tuple[int, SourceLine, 
                 return None
             end_line = records[cursor + 2]
             cursor += 3
-        spans.append((material_type, header, end_line))
+        spans.append((material_type, header, end_line, tuple(records[body_start:cursor])))
     return spans
 
 
@@ -2489,7 +2492,7 @@ def augment_material_declaration_semantics(
         item.location.line: item for item in index.entities
         if item.kind == "structured-material" and item.location.source == source
     }
-    for ordinal, (material_type, header, end_line) in enumerate(spans, start=1):
+    for ordinal, (material_type, header, end_line, body) in enumerate(spans, start=1):
         structured = structured_by_line.get(header.number)
         attributes: dict[str, Any] = {
             "type": material_type,
@@ -2500,7 +2503,33 @@ def augment_material_declaration_semantics(
         }
         if structured is not None:
             attributes["structured_entity_id"] = structured.id
-        _entity(index, "material", str(ordinal), source, header, None, attributes)
+        selector_lines: tuple[SourceLine, ...] = ()
+        if material_type == 4:
+            selector_lines = body[:12]
+            try:
+                user_ids = [int(_record_fields(line)[0]) for line in selector_lines]
+                if len(user_ids) != 12 or any(value <= 0 for value in user_ids):
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 4 requires twelve positive USER function IDs",
+                    source, header,
+                )
+                selector_lines = ()
+            else:
+                attributes["numeric_user_ids"] = user_ids
+        material = _entity(
+            index, "material", str(ordinal), source, header, None, attributes,
+        )
+        for position, (target, line) in enumerate(zip(
+            attributes.get("numeric_user_ids", []), selector_lines,
+        ), start=1):
+            _reference(
+                index, material, "uses-numeric-user-function",
+                _key("numeric-user-function", str(target), None), source, line,
+                {"position": position},
+            )
     return True
 
 
