@@ -9,7 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
-from bsam_agent.orchestrator import ChatOrchestrator, ConversationState, _summarize_result
+from bsam_agent.orchestrator import (
+    ChatOrchestrator, ConversationState, _summarize_result, relevant_tools,
+)
 from bsam_agent.provider import ProviderConfig, ProviderRequest, ProviderResponse, Usage
 
 
@@ -68,6 +70,17 @@ class FakeApi:
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_structural_language_exposes_generic_capability_tools(self) -> None:
+        tools = relevant_tools("Add nodes 2 and 3 to node set corner")
+        self.assertIn("preview_modify_entity", tools)
+        self.assertNotIn("preview_add_set_members", tools)
+
+    def test_composition_language_exposes_one_review_boundary(self) -> None:
+        self.assertEqual(
+            ("preview_compose_changes", "review_change", "apply_change"),
+            relevant_tools("Combine these two plans into one reviewed plan"),
+        )
+
     def test_dispatches_read_only_tool_and_records_digest_only_audit(self) -> None:
         provider = FakeProvider(decision(
             "dispatch", "inspect_model", {"source": "model.in"}, response="invented",
@@ -198,8 +211,10 @@ class OrchestratorTests(unittest.TestCase):
         value = ConversationState().as_dict()
         value["schema_version"] = "0.1.0"
         value.pop("last_plan")
+        value.pop("task")
         restored = ConversationState.from_dict(value)
         self.assertIsNone(restored.last_plan)
+        self.assertIsNone(restored.task)
 
     def test_end_to_end_preview_confirm_and_apply_with_fake_provider(self) -> None:
         deck = (
@@ -254,6 +269,59 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("model.changed.in", preview.message)
         self.assertEqual("verify", applied.phase)
         self.assertIn(b"d_reduction=0.5", output)
+
+    def test_natural_optional_parameter_removal_uses_registered_policy(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\n"
+            b"absolute=1\nmaxiterations=30\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        provider = FakeProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            preview = agent.turn(
+                "Remove maxiterations from model.in, create a new file, and validate it. "
+                "Do not overwrite the original."
+            )
+            applied = agent.turn("/confirm")
+            output = (root / "model.changed.in").read_bytes()
+        self.assertEqual([], provider.requests)
+        self.assertEqual("preview_parameter_removal", preview.tool)
+        self.assertEqual("confirm", preview.phase)
+        self.assertNotIn(b"maxiterations=30", output)
+        self.assertEqual("verify", applied.phase)
+        self.assertEqual(
+            ["inspect_model", "preview_parameter_removal", "apply_change", "validate_model"],
+            [item["tool"] for item in agent.state.task.steps],
+        )
+        self.assertEqual(
+            0, applied.tool_result["post_apply_validation"]["summary"]["errors"]  # type: ignore[index]
+        )
+
+    def test_natural_boolean_flag_change_uses_registered_policy(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*g-control\n"
+            b"*convergence\nabsolute=1\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        provider = FakeProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            preview = agent.turn("Set DAMP in model.in to true and validate the result.")
+            applied = agent.turn("/confirm")
+            output = (root / "model.changed.in").read_bytes()
+        self.assertEqual([], provider.requests)
+        self.assertEqual("preview_parameter_change", preview.tool)
+        self.assertIn(b"*g-control,DAMP", output)
+        self.assertEqual("verify", applied.phase)
 
     def test_model_routes_high_level_parameter_intent_through_registry(self) -> None:
         deck = (

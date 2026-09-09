@@ -47,16 +47,35 @@ I = Field("integer")
 B = Field("boolean")
 N = Field("number")
 AI = Field("array", items="integer")
+AS = Field("array", items="string")
+O = Field("object")
 
 
 TOOL_CONTRACTS: dict[str, ToolContract] = {
     "get_capabilities": ToolContract({}, ("api_version", "registry_version", "bsam", "tools")),
     "inspect_model": ToolContract({"source": S}, ("source_set_sha256", "semantic_model", "summary")),
+    "query_model": ToolContract({
+        "source": S,
+        "query": S,
+        "capability": Field("string", required=False),
+        "parameter": Field("string", required=False),
+        "entity_id": Field("string", required=False),
+        "entity_kind": Field("string", required=False),
+        "entity_name": Field("string", required=False),
+        "occurrence": Field("integer", required=False),
+    }, ("source_set_sha256", "query", "matches", "summary")),
     "validate_model": ToolContract({"source": S}, ("source_set_sha256", "diagnostics", "summary")),
     "import_mesh": ToolContract({"source": S}, ("format", "provenance", "summary")),
     "preview_parameter_change": ToolContract({
         "source": S, "block": S, "construct": S, "parameter": S, "value": S,
         "plan_path": S, "occurrence": Field("integer", required=False),
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_parameter_removal": ToolContract({
+        "source": S, "block": S, "construct": S, "parameter": S,
+        "plan_path": S, "occurrence": Field("integer", required=False),
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_compose_changes": ToolContract({
+        "source": S, "plan_paths": AS, "plan_path": S,
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "preview_add_node": ToolContract({
         "source": S, "cluster": S, "label": I, "x": S, "y": S, "z": S, "plan_path": S,
@@ -86,6 +105,21 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
     "preview_rename_boundary_condition": ToolContract({
         "source": S, "old_name": S, "new_name": S, "plan_path": S,
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_rename_entity": ToolContract({
+        "source": S, "capability": S, "entity_name": S, "new_name": S, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_create_entity": ToolContract({
+        "source": S, "capability": S, "attributes": O, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_modify_entity": ToolContract({
+        "source": S, "capability": S, "entity_name": S, "changes": O, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_delete_entity": ToolContract({
+        "source": S, "capability": S, "entity_name": S, "context": O, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
+    "preview_refresh_change": ToolContract({
+        "source": S, "stale_plan_path": S, "plan_path": S,
+    }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "review_change": ToolContract({"plan_path": S}, ("plan_id", "plan_digest", "source_diff", "validation")),
     "apply_change": ToolContract({
         "plan_path": S, "destination": S, "confirm": B,
@@ -103,9 +137,12 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
 TOOL_DESCRIPTIONS: dict[str, str] = {
     "get_capabilities": "List supported BSAM capabilities and tool contracts before handling an unknown feature.",
     "inspect_model": "Inspect an existing BSAM deck and return its structure, semantic entities, diagnostics, and summary.",
+    "query_model": "Run a focused semantic query for registered constructs, parameters, entities, or references.",
     "validate_model": "Validate an existing BSAM deck without changing or running it.",
     "import_mesh": "Inspect and validate a manually prepared Abaqus-style .ele mesh without modifying a deck.",
     "preview_parameter_change": "Create a review plan for one registered parameter in a named BSAM block and construct.",
+    "preview_parameter_removal": "Create a review plan to remove one isolated optional parameter whose registered omission semantics are verified.",
+    "preview_compose_changes": "Compose 2 to 8 independent same-revision typed plans into one validated review and confirmation boundary.",
     "preview_add_node": "Create a review plan to add one finite-element node.",
     "preview_add_element": "Create a review plan to add one finite element with existing node labels.",
     "preview_delete_node": "Create a review plan to delete one unreferenced node.",
@@ -115,6 +152,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "preview_expand_notch_plies": "Create the approved notch_v1 review plan that expands two plies to eight plies.",
     "preview_migrate_legacy_solver": "Create a review plan that migrates a legacy type-9 solver body to current PARDISO syntax.",
     "preview_rename_boundary_condition": "Create a review plan that renames a boundary condition and updates its loading references.",
+    "preview_rename_entity": "Create a dependency-aware rename plan through a capability whose rename operation is verified.",
+    "preview_create_entity": "Create a structural entity through a capability whose create operation is verified; attributes are capability-specific.",
+    "preview_modify_entity": "Modify a structural entity through a capability whose modify operation is verified; changes are capability-specific.",
+    "preview_delete_entity": "Delete a structural entity through a capability whose delete operation is verified and dependency checks permit it.",
+    "preview_refresh_change": "Re-preview a digest-valid stale plan against the changed source by replaying its typed selector and requested values.",
     "review_change": "Recheck an existing revision-bound change plan and return its exact source and semantic diff.",
     "apply_change": "Apply one reviewed change plan to a new deck; confirm must be true or policy refuses execution.",
     "run_bsam": "Run one validated deck in an isolated output directory; confirm must be true or policy refuses execution.",
@@ -151,6 +193,7 @@ def validate_arguments(tool: str, value: Any) -> dict[str, Any]:
         "number": lambda item: isinstance(item, (int, float)) and not isinstance(item, bool),
         "boolean": lambda item: isinstance(item, bool),
         "array": lambda item: isinstance(item, list),
+        "object": lambda item: isinstance(item, dict),
     }
     for name, item in value.items():
         field = contract.fields[name]

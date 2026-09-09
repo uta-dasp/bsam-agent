@@ -15,17 +15,26 @@ from .change import (
     plan_add_element,
     plan_add_node,
     plan_add_set_members,
+    plan_compose_changes,
     plan_create_set,
+    plan_create_entity,
+    plan_delete_entity,
     plan_delete_node,
     plan_expand_notch_plies,
     plan_import_mesh,
     plan_migrate_legacy_solver,
+    plan_modify_entity,
     plan_parameter_change,
+    plan_parameter_removal,
     plan_rename_boundary_condition,
+    plan_rename_entity,
+    plan_refresh_change,
     review_plan,
     write_plan,
 )
+from .capabilities import capability_manifest
 from .mesh import import_ele
+from .query import query_model
 from .registry import load_registry
 from .run import request_run_stop, run_bsam, run_status
 from .source_set import SourceSet
@@ -129,6 +138,7 @@ class LocalAgentApi:
                     ],
                     "transformations": registry["transformations"],
                     "obsolete_tokens": registry["obsolete_tokens"],
+                    "operational_manifest": capability_manifest(registry),
                 },
                 "tools": list(self.tools),
                 "tool_contracts": contract_manifest(),
@@ -145,6 +155,21 @@ class LocalAgentApi:
                 "diagnostics": inspection["diagnostics"],
                 "summary": inspection["summary"],
             }
+        if tool == "query_model":
+            args = self._args(arguments, {"source", "query"})
+            source_set = SourceSet.read(
+                self._path(args["source"], "source"), self.workspace_root
+            )
+            return query_model(
+                source_set,
+                str(args["query"]),
+                capability=str(args["capability"]) if "capability" in args else None,
+                parameter=str(args["parameter"]) if "parameter" in args else None,
+                entity_id=str(args["entity_id"]) if "entity_id" in args else None,
+                entity_kind=str(args["entity_kind"]) if "entity_kind" in args else None,
+                entity_name=str(args["entity_name"]) if "entity_name" in args else None,
+                occurrence=int(args["occurrence"]) if "occurrence" in args else None,
+            )
         if tool == "import_mesh":
             args = self._args(arguments, {"source"})
             return import_ele(self._path(args["source"], "source")).as_dict()
@@ -158,6 +183,82 @@ class LocalAgentApi:
                 self._path(args["source"], "source"), str(args["block"]),
                 str(args["construct"]), str(args["parameter"]), str(args["value"]),
                 int(args.get("occurrence", 1)), self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_parameter_removal":
+            args = self._args(
+                arguments,
+                {"source", "block", "construct", "parameter", "plan_path"},
+                {"occurrence"},
+            )
+            plan = plan_parameter_removal(
+                self._path(args["source"], "source"), str(args["block"]),
+                str(args["construct"]), str(args["parameter"]),
+                int(args.get("occurrence", 1)), self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_compose_changes":
+            args = self._args(arguments, {"source", "plan_paths", "plan_path"})
+            plan = plan_compose_changes(
+                self._path(args["source"], "source"),
+                [self._path(item, "component plan path") for item in args["plan_paths"]],
+                self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_rename_entity":
+            args = self._args(
+                arguments,
+                {"source", "capability", "entity_name", "new_name", "plan_path"},
+            )
+            plan = plan_rename_entity(
+                self._path(args["source"], "source"), str(args["capability"]),
+                str(args["entity_name"]), str(args["new_name"]), self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_create_entity":
+            args = self._args(
+                arguments, {"source", "capability", "attributes", "plan_path"},
+            )
+            plan = plan_create_entity(
+                self._path(args["source"], "source"), str(args["capability"]),
+                args["attributes"], self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_modify_entity":
+            args = self._args(
+                arguments,
+                {"source", "capability", "entity_name", "changes", "plan_path"},
+            )
+            plan = plan_modify_entity(
+                self._path(args["source"], "source"), str(args["capability"]),
+                str(args["entity_name"]), args["changes"], self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_delete_entity":
+            args = self._args(
+                arguments,
+                {"source", "capability", "entity_name", "context", "plan_path"},
+            )
+            plan = plan_delete_entity(
+                self._path(args["source"], "source"), str(args["capability"]),
+                str(args["entity_name"]), args["context"], self.workspace_root,
+            )
+            write_plan(plan, self._path(args["plan_path"], "plan_path"))
+            return plan
+        if tool == "preview_refresh_change":
+            args = self._args(
+                arguments, {"source", "stale_plan_path", "plan_path"},
+            )
+            plan = plan_refresh_change(
+                self._path(args["source"], "source"),
+                self._path(args["stale_plan_path"], "stale_plan_path"),
+                self.workspace_root,
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))
             return plan

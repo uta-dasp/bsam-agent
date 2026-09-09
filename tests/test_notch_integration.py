@@ -31,9 +31,24 @@ class NotchProjectIntegrationTests(unittest.TestCase):
             inspection["sha256"],
         )
         semantic = inspection["semantic_model"]["summary"]
-        self.assertEqual(15501, semantic["entities"])
-        self.assertEqual(53706, semantic["resolved_references"])
+        self.assertEqual(20551, semantic["entities"])
+        self.assertEqual(58749, semantic["resolved_references"])
         self.assertEqual(0, semantic["unresolved_references"])
+        solvers = [
+            entity
+            for entity in inspection["semantic_model"]["entities"]
+            if entity["kind"] == "solver"
+        ]
+        self.assertEqual(1, len(solvers))
+        self.assertEqual("legacy", solvers[0]["attributes"]["syntax"])
+        materials = [
+            entity
+            for entity in inspection["semantic_model"]["entities"]
+            if entity["kind"] == "structured-material"
+        ]
+        self.assertEqual([999, 998, 998, 998], [
+            entity["attributes"]["type"] for entity in materials
+        ])
 
         plan = plan_parameter_change(
             NOTCH, "BOUNDARY", "CONVERGENCE", "d_reduction", "0.30"
@@ -51,7 +66,7 @@ class NotchProjectIntegrationTests(unittest.TestCase):
         self.assertEqual([75, 15] * 4, plan["selector"]["layup_degrees"])
         self.assertEqual(5, len(plan["patches"]))
         self.assertEqual(0, plan["validation"]["summary"]["errors"])
-        self.assertEqual(61983, plan["validation"]["semantic_summary"]["entities"])
+        self.assertEqual(82105, plan["validation"]["semantic_summary"]["entities"])
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -72,7 +87,7 @@ class NotchProjectIntegrationTests(unittest.TestCase):
             self.assertEqual(1, text.count("comp=z"))
             inspection = SourceSet.read(output).inspection()
             self.assertEqual(0, inspection["summary"]["errors"])
-            self.assertEqual(61983, inspection["semantic_model"]["summary"]["entities"])
+            self.assertEqual(82105, inspection["semantic_model"]["summary"]["entities"])
 
 
 if __name__ == "__main__":

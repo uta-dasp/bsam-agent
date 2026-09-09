@@ -122,6 +122,8 @@ class SourceSetTests(unittest.TestCase):
             self.assertEqual(2, status)
             self.assertEqual(64, len(result["source_set_sha256"]))
             self.assertEqual(1, result["summary"]["errors"])
+            self.assertEqual({"references": 1}, result["summary"]["by_level"])
+            self.assertEqual({"source-defined": 1}, result["summary"]["by_provenance"])
             self.assertEqual("BSAM-E203", result["diagnostics"][0]["code"])
             source_set = SourceSet.read(deck)
             self.assertEqual(1, len(source_set.references))
@@ -141,6 +143,38 @@ class SourceSetTests(unittest.TestCase):
 
             self.assertEqual(1, len(source_set.references))
             self.assertEqual(0, source_set.inspection()["summary"]["errors"])
+
+    def test_nested_include_semantics_inherit_and_return_cluster_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deck = root / "model.in"
+            mesh = root / "mesh.inc"
+            nodes = root / "nodes.inc"
+            deck.write_bytes(root_deck(
+                b"*NAME\r\nfirst\r\n*INCLUDE,FILE=mesh.inc\r\n"
+                b"*ELEMENT,TYPE=C3D4\r\n10,11,11,11,11\r\n"
+            ))
+            mesh.write_bytes(
+                b"*INCLUDE,FILE=nodes.inc\n*NSET,NSET=edge\n1,2\n"
+                b"*NAME\nsecond\n*NODE\n11,0,0,0\n"
+            )
+            nodes.write_bytes(b"*NODE\r\n1,0,0,0\r\n2,1,0,0\r\n")
+
+            inspection = SourceSet.read(deck).inspection()
+            keys = {
+                item["key"] for item in inspection["semantic_model"]["entities"]
+            }
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertTrue({
+                "cluster:first/node:1", "cluster:first/node:2",
+                "cluster:first/node-set:edge", "cluster:second/node:11",
+                "cluster:second/element:10",
+            } <= keys)
+            self.assertEqual(
+                inspection["semantic_model"]["summary"]["references"],
+                inspection["semantic_model"]["summary"]["resolved_references"],
+            )
 
 
 if __name__ == "__main__":

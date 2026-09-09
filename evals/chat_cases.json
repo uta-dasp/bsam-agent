@@ -127,6 +127,203 @@
         "tool": null, "arguments": {}, "outcome": "answer",
         "response_contains": ["zero errors", "one compatibility warning"]
       }
+    },
+    {
+      "id": "query-registered-boundary-parameter",
+      "user": "What is the CONVERGENCE d_reduction value in model.in?",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "get-parameter",
+          "capability": "construct.boundary-convergence", "parameter": "d_reduction"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "unsupported-convergence-create",
+      "user": "Create a new CONVERGENCE construct in model.in.",
+      "expected": {
+        "tool": null, "arguments": {}, "outcome": "refuse",
+        "error_code": "unsupported_capability"
+      }
+    },
+    {
+      "id": "query-solver-threads",
+      "user": "What is n_threads in model.in?",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "get-parameter", "parameter": "n_threads"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "preview-current-solver-threads",
+      "user": "In model.in, preview changing SOLVER n_threads to 4 and write plans/threads.json.",
+      "expected": {
+        "tool": "preview_parameter_change",
+        "arguments": {
+          "source": "model.in", "block": "SOLVER", "construct": "SOLVER",
+          "parameter": "n_threads", "value": "4", "plan_path": "plans/threads.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "preview-generic-node-create",
+      "user": "In model.in, add node 6 at (3, 4, 5) to cluster ply1 and write plans/node.json.",
+      "expected": {
+        "tool": "preview_create_entity",
+        "arguments": {
+          "source": "model.in", "capability": "command.node",
+          "attributes": {"cluster": "ply1", "label": 6, "x": "3", "y": "4", "z": "5"},
+          "plan_path": "plans/node.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "preview-generic-node-set-extension",
+      "user": "Add nodes 2 and 3 to node set corner in cluster ply1 and write plans/extend.json.",
+      "expected": {
+        "tool": "preview_modify_entity",
+        "arguments": {
+          "source": "model.in", "capability": "command.nset", "entity_name": "corner",
+          "changes": {"cluster": "ply1", "add_members": [2, 3]},
+          "plan_path": "plans/extend.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "unsupported-generic-element-delete",
+      "user": "Delete element 1 from cluster ply1 in model.in.",
+      "expected": {
+        "tool": "preview_delete_entity",
+        "arguments": {
+          "source": "model.in", "capability": "command.element", "entity_name": "1",
+          "context": {"cluster": "ply1"}, "plan_path": "plans/delete-element.json"
+        },
+        "outcome": "refuse", "error_code": "unsupported_capability"
+      }
+    },
+    {
+      "id": "refresh-stale-plan",
+      "user": "Re-preview stale plans/change.json against model.in and save plans/change-refreshed.json.",
+      "expected": {
+        "tool": "preview_refresh_change",
+        "arguments": {
+          "source": "model.in", "stale_plan_path": "plans/change.json",
+          "plan_path": "plans/change-refreshed.json"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-table-entities",
+      "user": "List the named tables in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities", "entity_kind": "table"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-user-function-entities",
+      "user": "List the named user functions in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities",
+          "entity_kind": "user-function"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-statistical-distributions",
+      "user": "List the statistical distributions in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities",
+          "entity_kind": "statistical-distribution"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-structured-materials",
+      "user": "List the structured materials in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities",
+          "entity_kind": "structured-material"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "query-table-references-by-name",
+      "user": "Show references to table stiffness in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "references-to",
+          "entity_kind": "table", "entity_name": "stiffness"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-constitutive-declarations",
+      "user": "List the constitutive laws in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities", "entity_kind": "constitutive"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-failure-declarations",
+      "user": "Show the failure criteria in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities", "entity_kind": "failure"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "list-material-declarations",
+      "user": "List materials in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "list-entities", "entity_kind": "material"
+        },
+        "outcome": "dispatch"
+      }
+    },
+    {
+      "id": "query-constitutive-references-by-ordinal",
+      "user": "Show references to constitutive 1 in model.in.",
+      "expected": {
+        "tool": "query_model",
+        "arguments": {
+          "source": "model.in", "query": "references-to",
+          "entity_kind": "constitutive", "entity_name": "1"
+        },
+        "outcome": "dispatch"
+      }
     }
   ]
 }

@@ -11,6 +11,52 @@ from typing import Any
 from .registry import load_registry
 
 
+VALIDATION_LEVELS = frozenset({
+    "syntax",
+    "structure",
+    "references",
+    "bsam-semantic-constraints",
+    "numeric-constraints",
+    "execution-compatibility",
+    "engineering-plausibility",
+})
+VALIDATION_PROVENANCE = frozenset({
+    "source-defined",
+    "documentation-defined",
+    "mathematical-impossibility",
+    "engineering-heuristic",
+    "agent-policy",
+})
+
+_DIAGNOSTIC_CLASSIFICATION: dict[str, tuple[str, str]] = {
+    "BSAM-E100": ("structure", "source-defined"),
+    "BSAM-W110": ("syntax", "source-defined"),
+    "BSAM-W111": ("syntax", "source-defined"),
+    "BSAM-W120": ("structure", "documentation-defined"),
+    "BSAM-E200": ("structure", "source-defined"),
+    "BSAM-E201": ("structure", "agent-policy"),
+    "BSAM-E202": ("structure", "agent-policy"),
+    "BSAM-E203": ("references", "source-defined"),
+    "BSAM-E204": ("references", "agent-policy"),
+    "BSAM-E300": ("structure", "source-defined"),
+    "BSAM-E301": ("references", "source-defined"),
+    "BSAM-E302": ("references", "source-defined"),
+    "BSAM-E303": ("references", "source-defined"),
+    "BSAM-E310": ("bsam-semantic-constraints", "source-defined"),
+    "BSAM-E311": ("bsam-semantic-constraints", "source-defined"),
+    "BSAM-E312": ("bsam-semantic-constraints", "source-defined"),
+    "BSAM-E313": ("references", "source-defined"),
+    "BSAM-E320": ("structure", "source-defined"),
+    "BSAM-E321": ("numeric-constraints", "source-defined"),
+    "BSAM-E330": ("structure", "source-defined"),
+    "BSAM-E331": ("numeric-constraints", "source-defined"),
+    "BSAM-E340": ("bsam-semantic-constraints", "source-defined"),
+    "BSAM-E350": ("structure", "source-defined"),
+    "BSAM-E360": ("structure", "source-defined"),
+    "BSAM-E370": ("structure", "source-defined"),
+}
+
+
 @dataclass(frozen=True)
 class SourceLine:
     number: int
@@ -47,12 +93,29 @@ class Diagnostic:
     line: int | None = None
     replacement: str | None = None
     source: str | None = None
+    level: str | None = None
+    provenance: str | None = None
+
+    def __post_init__(self) -> None:
+        classified = _DIAGNOSTIC_CLASSIFICATION.get(self.code)
+        if classified is None and (self.level is None or self.provenance is None):
+            raise ValueError(f"diagnostic {self.code} requires explicit level and provenance")
+        level = self.level or classified[0]  # type: ignore[index]
+        provenance = self.provenance or classified[1]  # type: ignore[index]
+        if level not in VALIDATION_LEVELS:
+            raise ValueError(f"unknown validation level: {level}")
+        if provenance not in VALIDATION_PROVENANCE:
+            raise ValueError(f"unknown validation provenance: {provenance}")
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "provenance", provenance)
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
             "code": self.code,
             "severity": self.severity,
             "message": self.message,
+            "level": self.level,
+            "provenance": self.provenance,
         }
         if self.line is not None:
             result["line"] = self.line
@@ -61,6 +124,15 @@ class Diagnostic:
         if self.source is not None:
             result["source"] = self.source
         return result
+
+
+def diagnostic_summary(diagnostics: list[Diagnostic]) -> dict[str, Any]:
+    return {
+        "errors": sum(item.severity == "error" for item in diagnostics),
+        "warnings": sum(item.severity == "warning" for item in diagnostics),
+        "by_level": dict(sorted(Counter(item.level for item in diagnostics).items())),
+        "by_provenance": dict(sorted(Counter(item.provenance for item in diagnostics).items())),
+    }
 
 
 def _split_line(raw_line: bytes) -> tuple[bytes, bytes]:
@@ -216,8 +288,5 @@ class SourceDocument:
             "blocks": self.blocks(),
             "cluster_commands": self.cluster_commands(),
             "diagnostics": [item.as_dict() for item in diagnostics],
-            "summary": {
-                "errors": sum(item.severity == "error" for item in diagnostics),
-                "warnings": sum(item.severity == "warning" for item in diagnostics),
-            },
+            "summary": diagnostic_summary(diagnostics),
         }

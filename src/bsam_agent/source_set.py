@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from .document import Diagnostic, SourceDocument, SourceLine
+from .document import Diagnostic, SourceDocument, SourceLine, diagnostic_summary
 from .semantic import SemanticIndex, augment_root_semantics, build_semantic_index
 
 
@@ -231,6 +231,47 @@ class SourceSet:
         """Render every unchanged source file byte-for-byte."""
         return {path: document.render_bytes() for path, document in self.documents.items()}
 
+    def _semantic_sources(
+        self, replacements: dict[Path, bytes],
+    ) -> list[tuple[Path, str, list[SourceLine]]]:
+        """Expand reachable includes inline so FE cluster state follows the reader stack."""
+        documents: dict[Path, SourceDocument] = {}
+        for path, document in self.documents.items():
+            documents[path] = (
+                SourceDocument.from_bytes(replacements[path], str(path))
+                if path in replacements else document
+            )
+        labels = {
+            path: (
+                "<root>" if path == self.root else
+                os.path.relpath(path, self.input_directory).replace("\\", "/")
+            )
+            for path in documents
+        }
+        include_targets = {
+            (reference.source, reference.line): reference.target
+            for reference in self.references
+            if reference.target is not None
+            and reference.status in {"resolved", "already-loaded"}
+        }
+        result: list[tuple[Path, str, list[SourceLine]]] = []
+
+        def expand(path: Path, ancestry: tuple[Path, ...]) -> None:
+            segment: list[SourceLine] = []
+            for line in self._candidate_lines(path, documents[path]):
+                segment.append(line)
+                target = include_targets.get((path, line.number))
+                if target is None or target in ancestry:
+                    continue
+                result.append((path, labels[path], segment))
+                segment = []
+                expand(target, (*ancestry, target))
+            if segment:
+                result.append((path, labels[path], segment))
+
+        expand(self.root, (self.root,))
+        return result
+
     def diagnostics(
         self,
         semantic_index: SemanticIndex | None = None,
@@ -247,20 +288,15 @@ class SourceSet:
             line=item.line,
             replacement=item.replacement,
             source=str(self.root),
+            level=item.level,
+            provenance=item.provenance,
         ) for item in root_document.diagnostics()]
         semantic = semantic_index or self.semantic_index(replacements)
         return [*root_diagnostics, *self._graph_diagnostics, *semantic.diagnostics]
 
     def semantic_index(self, replacements: dict[Path, bytes] | None = None) -> SemanticIndex:
         replacements = replacements or {}
-        sources = []
-        for path, document in self.documents.items():
-            if path in replacements:
-                document = SourceDocument.from_bytes(replacements[path], str(path))
-            relative = "<root>" if path == self.root else os.path.relpath(
-                path, self.input_directory
-            ).replace("\\", "/")
-            sources.append((path, relative, self._candidate_lines(path, document)))
+        sources = self._semantic_sources(replacements)
         index = build_semantic_index(sources, resolve=False)
         root_document = self.documents[self.root]
         if self.root in replacements:
@@ -300,9 +336,6 @@ class SourceSet:
             },
             "semantic_model": semantic_index.as_dict(),
             "diagnostics": [item.as_dict() for item in diagnostics],
-            "summary": {
-                "errors": sum(item.severity == "error" for item in diagnostics),
-                "warnings": sum(item.severity == "warning" for item in diagnostics),
-            },
+            "summary": diagnostic_summary(diagnostics),
         })
         return root_inspection

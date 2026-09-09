@@ -6,23 +6,24 @@ import hashlib
 import json
 import math
 import re
+from copy import deepcopy
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
 from typing import Any
 
-from .document import SourceDocument, SourceLine
+from .document import SourceDocument, SourceLine, diagnostic_summary
 from .mesh import MeshModel, import_ele, render_bsam_commands
 from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.7.0"
+PLAN_SCHEMA_VERSION = "1.9.0"
 SUPPORTED_PLAN_SCHEMA_VERSIONS = {
     "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0",
-    PLAN_SCHEMA_VERSION,
+    "1.7.0", "1.8.0", PLAN_SCHEMA_VERSION,
 }
-AUDIT_SCHEMA_VERSION = "1.0.0"
+AUDIT_SCHEMA_VERSION = "1.1.0"
 
 
 class ChangeError(ValueError):
@@ -69,6 +70,21 @@ def _patched_bytes_many(document: SourceDocument, patches: list[dict[str, Any]])
     return updated
 
 
+def _patched_source_files(
+    source_set: SourceSet, patches: list[dict[str, Any]],
+) -> dict[Path, bytes]:
+    grouped: dict[Path, list[dict[str, Any]]] = {}
+    for patch in patches:
+        source = Path(str(patch.get("source", source_set.root))).resolve()
+        if source not in source_set.documents:
+            raise ChangeError("planned patch source is not in the bound source set")
+        grouped.setdefault(source, []).append(patch)
+    return {
+        source: _patched_bytes_many(source_set.documents[source], items)
+        for source, items in grouped.items()
+    }
+
+
 def _source_diff(source: Path, before: bytes, after: bytes) -> str:
     before_lines = before.decode("latin-1").splitlines()
     after_lines = after.decode("latin-1").splitlines()
@@ -87,10 +103,7 @@ def _validation_result(source_set: SourceSet, replacements: dict[Path, bytes]) -
     return {
         "diagnostics": [item.as_dict() for item in diagnostics],
         "semantic_summary": semantic.as_dict()["summary"],
-        "summary": {
-            "errors": sum(item.severity == "error" for item in diagnostics),
-            "warnings": sum(item.severity == "warning" for item in diagnostics),
-        },
+        "summary": diagnostic_summary(diagnostics),
     }
 
 
@@ -101,40 +114,59 @@ def _validate_raw_value(value: str) -> None:
         raise ChangeError("replacement value must not be empty")
 
 
-def _cluster_boundary(document: SourceDocument, cluster: str) -> SourceLine:
+def _semantic_source_path(source_set: SourceSet, source: str) -> Path:
+    return (
+        source_set.root
+        if source == "<root>"
+        else (source_set.input_directory / source).resolve()
+    )
+
+
+def _cluster_source_boundary(
+    source_set: SourceSet, cluster: str,
+) -> tuple[Path, SourceDocument, SourceLine]:
     if not cluster.strip():
         raise ChangeError("cluster name must not be empty")
-    matches: list[SourceLine] = []
-    for block in (item for item in document.blocks() if item["name"] == "CLUSTERS"):
-        final = block["end_line"] or len(document.lines)
-        for index in range(block["start_line"], final):
-            line = document.lines[index]
-            if line.text.lstrip().upper()[:5] != "*NAME":
-                continue
-            name_line = next(
-                (
-                    item for item in document.lines[index + 1:final]
-                    if item.stripped and not item.stripped.startswith("**")
-                ),
-                None,
-            )
-            if name_line is None or name_line.stripped.casefold() != cluster.casefold():
-                continue
-            boundary = next(
-                (
-                    item for item in document.lines[name_line.number:final]
-                    if item.text.lstrip().upper()[:5] in {"*TYPE", "*STOP"}
-                ),
-                None,
-            )
-            if boundary is None:
-                raise ChangeError(f"cluster {cluster} has no following *TYPE or *STOP boundary")
-            matches.append(boundary)
+    key = f"cluster:{cluster.casefold()}"
+    matches = [
+        item for item in source_set.semantic_index().entities
+        if item.kind == "cluster" and item.key == key
+    ]
     if not matches:
-        raise ChangeError(f"cluster {cluster} was not found in the root deck")
+        raise ChangeError(f"cluster {cluster} was not found in the source set")
     if len(matches) > 1:
-        raise ChangeError(f"cluster name {cluster} is ambiguous in the root deck")
-    return matches[0]
+        raise ChangeError(f"cluster name {cluster} is ambiguous in the source set")
+    entity = matches[0]
+    source_path = _semantic_source_path(source_set, entity.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("cluster source location is not in the bound source set")
+    boundary = next(
+        (
+            item for item in document.lines[entity.location.line:]
+            if item.text.lstrip().upper()[:5] in {"*NAME", "*TYPE", "*STOP"}
+        ),
+        None,
+    )
+    if boundary is not None and boundary.text.lstrip().upper()[:5] == "*NAME":
+        raise ChangeError(f"cluster {cluster} has no boundary before the next *NAME")
+    if boundary is None:
+        if source_path == source_set.root:
+            raise ChangeError(f"cluster {cluster} has no following *TYPE or *STOP boundary")
+        boundary = SourceLine(
+            number=len(document.lines) + 1,
+            start=len(document.raw),
+            end=len(document.raw),
+            content=b"",
+            newline=b"",
+        )
+    return source_path, document, boundary
+
+
+def _record_prefix(document: SourceDocument, boundary: SourceLine, newline: bytes) -> bytes:
+    if boundary.start == 0 or document.raw[:boundary.start].endswith((b"\r", b"\n")):
+        return b""
+    return newline
 
 
 def _node_patch(
@@ -158,15 +190,15 @@ def _node_patch(
     if any(item.key == key for item in source_set.semantic_index().entities):
         raise ChangeError(f"node {label} already exists in cluster {cluster}")
 
-    document = source_set.documents[source_set.root]
-    boundary = _cluster_boundary(document, cluster)
+    source_path, document, boundary = _cluster_source_boundary(source_set, cluster)
     newline = next((line.newline for line in document.lines if line.newline), b"\n")
     record = (
-        b"*NODE" + newline
+        _record_prefix(document, boundary, newline) + b"*NODE" + newline
         + f"{label},{coordinates[0]},{coordinates[1]},{coordinates[2]}".encode("latin-1")
         + newline
     )
     return {
+        "source": str(source_path),
         "start": boundary.start,
         "end": boundary.start,
         "line": boundary.number,
@@ -209,10 +241,16 @@ def _typed_plan(
     inputs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     source = source_set.root
-    document = source_set.documents[source]
+    root_document = source_set.documents[source]
+    patch_source = Path(str(patch.get("source", source))).resolve()
+    document = source_set.documents.get(patch_source)
+    if document is None:
+        raise ChangeError("planned patch source is not in the bound source set")
     updated = _patched_bytes(document, patch)
-    updated_document = SourceDocument.from_bytes(updated, str(source))
-    validation = _validation_result(source_set, {source: updated})
+    replacements = {patch_source: updated}
+    root_raw = replacements.get(source, root_document.raw)
+    updated_document = SourceDocument.from_bytes(root_raw, str(source))
+    validation = _validation_result(source_set, replacements)
     if validation["summary"]["errors"]:
         messages = "; ".join(
             item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
@@ -222,17 +260,17 @@ def _typed_plan(
         "schema_version": PLAN_SCHEMA_VERSION,
         "source": str(source),
         "workspace_root": str(source_set.workspace_root),
-        "base_sha256": document.sha256,
+        "base_sha256": root_document.sha256,
         "base_source_set_sha256": source_set.sha256,
         "proposed_sha256": updated_document.sha256,
-        "proposed_source_set_sha256": source_set.digest_with({source: updated}),
+        "proposed_source_set_sha256": source_set.digest_with(replacements),
         "operation": operation,
         "selector": selector,
         "patch": patch,
         "changed_model_paths": [model_path],
-        "affected_files": [str(source)],
+        "affected_files": [str(patch_source)],
         "changes": [{"operation": change_operation, "target": model_path, "summary": preview}],
-        "source_diff": _source_diff(source, document.raw, updated),
+        "source_diff": _source_diff(patch_source, document.raw, updated),
         "validation": validation,
         "preview": preview,
     }
@@ -283,17 +321,17 @@ def _element_patch(
     if elset is not None:
         _validate_raw_value(elset)
 
-    document = source_set.documents[source_set.root]
-    boundary = _cluster_boundary(document, cluster)
+    source_path, document, boundary = _cluster_source_boundary(source_set, cluster)
     newline = next((line.newline for line in document.lines if line.newline), b"\n")
     options = f"*ELEMENT,TYPE={requested_type}"
     if elset:
         options += f",ELSET={elset}"
     record = (
-        options.encode("latin-1") + newline
+        _record_prefix(document, boundary, newline) + options.encode("latin-1") + newline
         + (str(label) + "," + ",".join(map(str, node_labels))).encode("ascii") + newline
     )
     return {
+        "source": str(source_path),
         "start": boundary.start,
         "end": boundary.start,
         "line": boundary.number,
@@ -329,30 +367,50 @@ def plan_add_element(
     )
 
 
-def _delete_node_patch(source_set: SourceSet, cluster: str, label: int) -> dict[str, Any]:
-    key = f"cluster:{cluster.casefold()}/node:{label}"
+def _delete_mesh_entity_patch(
+    source_set: SourceSet, cluster: str, label: int, entity_kind: str,
+) -> dict[str, Any]:
+    if entity_kind not in {"node", "element"}:
+        raise ChangeError("mesh entity deletion supports nodes or elements")
+    key = f"cluster:{cluster.casefold()}/{entity_kind}:{label}"
     semantic = source_set.semantic_index()
     matches = [item for item in semantic.entities if item.key == key]
     if not matches:
-        raise ChangeError(f"node {label} was not found in cluster {cluster}")
+        raise ChangeError(f"{entity_kind} {label} was not found in cluster {cluster}")
     if len(matches) > 1:
-        raise ChangeError(f"node {label} is ambiguous in cluster {cluster}")
+        raise ChangeError(f"{entity_kind} {label} is ambiguous in cluster {cluster}")
     entity = matches[0]
-    if entity.location.source != "<root>":
-        raise ChangeError("deleting entities from included files is not yet supported")
-    dependents = [item for item in semantic.references if item.target_key == key]
+    if entity.attributes.get("generated_by"):
+        raise ChangeError(
+            f"generated {entity_kind} {label} cannot be deleted as one explicit record"
+        )
+    dependents = [
+        item for item in semantic.references
+        if item.target_key == key
+        or (item.source_entity_id == entity.id and item.kind == "member-of")
+    ]
     if dependents:
         kinds = ", ".join(sorted({item.kind for item in dependents}))
-        raise ChangeError(f"node {label} has dependent references ({kinds}); deletion is blocked")
-    document = source_set.documents[source_set.root]
+        raise ChangeError(
+            f"{entity_kind} {label} has dependent references ({kinds}); deletion is blocked"
+        )
+    source_path = _semantic_source_path(source_set, entity.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError(f"{entity_kind} source location is not in the bound source set")
     line = document.lines[entity.location.line - 1]
     return {
+        "source": str(source_path),
         "start": line.start,
         "end": line.end,
         "line": line.number,
         "old": document.raw[line.start:line.end].decode("latin-1"),
         "new": "",
     }
+
+
+def _delete_node_patch(source_set: SourceSet, cluster: str, label: int) -> dict[str, Any]:
+    return _delete_mesh_entity_patch(source_set, cluster, label, "node")
 
 
 def plan_delete_node(
@@ -367,6 +425,22 @@ def plan_delete_node(
     preview = f"line {patch['line']}: delete unreferenced node {label} from cluster {cluster}"
     return _typed_plan(
         source_set, patch, "delete-node", {"cluster": cluster, "label": label},
+        model_path, preview, "delete",
+    )
+
+
+def plan_delete_element(
+    source: Path,
+    cluster: str,
+    label: int,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch = _delete_mesh_entity_patch(source_set, cluster, label, "element")
+    model_path = f"CLUSTERS[{cluster.casefold()}].elements[{label}]"
+    preview = f"line {patch['line']}: delete unreferenced element {label} from cluster {cluster}"
+    return _typed_plan(
+        source_set, patch, "delete-element", {"cluster": cluster, "label": label},
         model_path, preview, "delete",
     )
 
@@ -410,15 +484,15 @@ def _set_patch(
         if duplicates:
             raise ChangeError(f"set already contains members: {', '.join(map(str, duplicates))}")
 
-    document = source_set.documents[source_set.root]
-    boundary = _cluster_boundary(document, cluster)
+    source_path, document, boundary = _cluster_source_boundary(source_set, cluster)
     newline = next((line.newline for line in document.lines if line.newline), b"\n")
     command = "*NSET,NSET=" if member_kind == "node" else "*ELSET,ELSET="
     record = (
-        (command + name).encode("latin-1") + newline
+        _record_prefix(document, boundary, newline) + (command + name).encode("latin-1") + newline
         + ",".join(map(str, members)).encode("ascii") + newline
     )
     return {
+        "source": str(source_path),
         "start": boundary.start,
         "end": boundary.start,
         "line": boundary.number,
@@ -469,6 +543,464 @@ def plan_add_set_members(
     )
 
 
+def _remove_set_member_patch(
+    source_set: SourceSet,
+    cluster: str,
+    member_kind: str,
+    name: str,
+    member: int,
+) -> dict[str, Any]:
+    if member_kind not in {"node", "element"}:
+        raise ChangeError("set kind must be node or element")
+    if member <= 0:
+        raise ChangeError("set member must be a positive label")
+    semantic = source_set.semantic_index()
+    prefix = f"cluster:{cluster.casefold()}/"
+    set_kind = f"{member_kind}-set"
+    set_key = f"{prefix}{set_kind}:{name.casefold()}"
+    entities = [item for item in semantic.entities if item.key == set_key]
+    if not entities:
+        raise ChangeError(f"{set_kind} {name} was not found in cluster {cluster}")
+    entity_ids = {item.id for item in entities}
+    membership = [
+        item for item in semantic.references
+        if item.source_entity_id in entity_ids and item.kind == "contains"
+    ]
+    target = f"{prefix}{member_kind}:{member}"
+    matches = [item for item in membership if item.target_key == target]
+    if not matches:
+        raise ChangeError(f"{set_kind} {name} does not contain member {member}")
+    if len(matches) > 1:
+        raise ChangeError(f"member {member} is ambiguous in {set_kind} {name}")
+    if len({item.target_key for item in membership}) <= 1:
+        raise ChangeError(f"removing member {member} would leave {set_kind} {name} empty")
+    location = matches[0].location
+    source_path = _semantic_source_path(source_set, location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("set member source location is not in the bound source set")
+    line = document.lines[location.line - 1]
+    code = line.text.split("#", 1)[0]
+    tokens = list(re.finditer(rf"(?<!\d){member}(?!\d)", code))
+    if len(tokens) != 1:
+        raise ChangeError(
+            f"member {member} no longer resolves to one exact token on line {line.number}"
+        )
+    token = tokens[0]
+    fields = [item.strip() for item in code.split(",") if item.strip()]
+    if len(fields) == 1:
+        start, end = line.start, line.end
+    elif not code[:token.start()].strip():
+        local_end = token.end()
+        while local_end < len(code) and code[local_end].isspace():
+            local_end += 1
+        if local_end >= len(code) or code[local_end] != ",":
+            raise ChangeError("first set member is not followed by a comma; removal is blocked")
+        local_end += 1
+        while local_end < len(code) and code[local_end].isspace():
+            local_end += 1
+        start, end = line.start + token.start(), line.start + local_end
+    else:
+        local_start = token.start()
+        while local_start > 0 and code[local_start - 1].isspace():
+            local_start -= 1
+        if local_start <= 0 or code[local_start - 1] != ",":
+            raise ChangeError("set member is not preceded by a comma; removal is blocked")
+        start, end = line.start + local_start - 1, line.start + token.end()
+    return {
+        "source": str(source_path),
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": "",
+    }
+
+
+def plan_remove_set_member(
+    source: Path,
+    cluster: str,
+    member_kind: str,
+    name: str,
+    member: int,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch = _remove_set_member_patch(
+        source_set, cluster, member_kind, name, member,
+    )
+    set_kind = f"{member_kind}-sets"
+    model_path = (
+        f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}].members[{member}]"
+    )
+    preview = f"line {patch['line']}: remove member {member} from {member_kind} set {name}"
+    return _typed_plan(
+        source_set, patch, "remove-set-member",
+        {
+            "cluster": cluster, "member_kind": member_kind,
+            "name": name, "member": member,
+        },
+        model_path, preview, "delete",
+    )
+
+
+def _delete_set_patch(
+    source_set: SourceSet, cluster: str, member_kind: str, name: str,
+) -> dict[str, Any]:
+    if member_kind not in {"node", "element"}:
+        raise ChangeError("set kind must be node or element")
+    semantic = source_set.semantic_index()
+    set_kind = f"{member_kind}-set"
+    key = f"cluster:{cluster.casefold()}/{set_kind}:{name.casefold()}"
+    matches = [item for item in semantic.entities if item.key == key]
+    if not matches:
+        raise ChangeError(f"{set_kind} {name} was not found in cluster {cluster}")
+    if len(matches) != 1:
+        raise ChangeError(f"{set_kind} {name} has multiple definitions; deletion is blocked")
+    entity = matches[0]
+    if entity.attributes.get("mode") != "explicit":
+        raise ChangeError(f"only one explicit {set_kind} definition can be deleted")
+    dependents = [
+        item for item in semantic.references
+        if item.target_key == key and item.source_entity_id != entity.id
+    ]
+    if dependents:
+        kinds = ", ".join(sorted({item.kind for item in dependents}))
+        raise ChangeError(f"{set_kind} {name} has dependent references ({kinds}); deletion is blocked")
+
+    source_path = _semantic_source_path(source_set, entity.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("set source location is not in the bound source set")
+    command_index = entity.location.line - 1
+    following = document.lines[command_index + 1:]
+    next_command = next(
+        (
+            offset for offset, line in enumerate(following, start=command_index + 1)
+            if line.stripped.startswith("*") and not line.stripped.startswith("**")
+        ),
+        len(document.lines),
+    )
+    span_lines = document.lines[command_index:next_command]
+    if any(line.stripped.startswith("**") for line in span_lines):
+        raise ChangeError("commented set definitions require manual review before deletion")
+    active_lines = [line for line in span_lines if line.stripped]
+    if len(active_lines) < 2:
+        raise ChangeError("explicit set has no removable member records")
+    start, end = active_lines[0].start, active_lines[-1].end
+    return {
+        "source": str(source_path),
+        "start": start,
+        "end": end,
+        "line": active_lines[0].number,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": "",
+    }
+
+
+def plan_delete_set(
+    source: Path,
+    cluster: str,
+    member_kind: str,
+    name: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch = _delete_set_patch(source_set, cluster, member_kind, name)
+    set_kind = f"{member_kind}-sets"
+    model_path = f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}]"
+    preview = f"line {patch['line']}: delete unreferenced {member_kind} set {name}"
+    return _typed_plan(
+        source_set, patch, "delete-set",
+        {"cluster": cluster, "member_kind": member_kind, "name": name},
+        model_path, preview, "delete",
+    )
+
+
+def _nodal_record_target_patch(
+    source_set: SourceSet,
+    capability: str,
+    cluster: str,
+    current_target: str,
+    new_target: str,
+    occurrence: int | None,
+) -> tuple[dict[str, Any], int, str]:
+    _validate_raw_value(new_target)
+    mapping = {
+        "command.boundary": "nodal-boundary",
+        "command.load": "nodal-load",
+    }
+    entity_kind = mapping.get(capability)
+    if entity_kind is None:
+        raise ChangeError(f"nodal target editing is unavailable for {capability}")
+    semantic = source_set.semantic_index()
+    candidates = [
+        item for item in semantic.entities
+        if item.kind == entity_kind
+        and str(item.attributes.get("cluster", "")).casefold() == cluster.casefold()
+        and str(item.attributes.get("target", "")).casefold() == current_target.casefold()
+    ]
+    if not candidates:
+        raise ChangeError(
+            f"target {current_target} was not found in {capability} for cluster {cluster}"
+        )
+    if occurrence is None:
+        if len(candidates) != 1:
+            raise ChangeError(
+                f"target {current_target} is ambiguous in {capability} for cluster {cluster}; "
+                "specify occurrence"
+            )
+        selected, selected_occurrence = candidates[0], 1
+    else:
+        if occurrence < 1 or occurrence > len(candidates):
+            raise ChangeError(
+                f"occurrence {occurrence} is outside the {len(candidates)} matching records"
+            )
+        selected, selected_occurrence = candidates[occurrence - 1], occurrence
+
+    format_name = str(selected.attributes.get("format", "ABAQ"))
+    node_only = capability == "command.boundary" and format_name == "LIST"
+    set_only = capability == "command.boundary" and format_name == "POLY"
+    prefix = f"cluster:{cluster.casefold()}/"
+    node_key = f"{prefix}node:{new_target.casefold()}"
+    set_key = f"{prefix}node-set:{new_target.casefold()}"
+    keys = {item.key for item in semantic.entities}
+    if set_only:
+        if set_key not in keys:
+            raise ChangeError("POLYNOMIAL boundary targets must be an existing node set")
+    elif node_only:
+        if not new_target.isdigit() or node_key not in keys:
+            raise ChangeError("LIST boundary targets must be an existing numeric node")
+    elif set_key not in keys and (not new_target.isdigit() or node_key not in keys):
+        raise ChangeError("new target must be an existing node set or numeric node")
+
+    source_path = _semantic_source_path(source_set, selected.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("nodal record source location is not in the bound source set")
+    line = document.lines[selected.location.line - 1]
+    match = re.match(r"\s*(?P<target>[^,\s]+)", line.text)
+    if match is None or match.group("target").casefold() != current_target.casefold():
+        raise ChangeError("nodal record target no longer resolves to one exact leading token")
+    start = line.start + match.start("target")
+    end = line.start + match.end("target")
+    return ({
+        "source": str(source_path),
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": new_target,
+    }, selected_occurrence, entity_kind)
+
+
+def plan_retarget_nodal_record(
+    source: Path,
+    capability: str,
+    cluster: str,
+    current_target: str,
+    new_target: str,
+    occurrence: int | None = None,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch, selected_occurrence, entity_kind = _nodal_record_target_patch(
+        source_set, capability, cluster, current_target, new_target, occurrence,
+    )
+    model_path = (
+        f"CLUSTERS[{cluster.casefold()}].{entity_kind}[{selected_occurrence}].target"
+    )
+    preview = (
+        f"line {patch['line']}: retarget {capability} record from "
+        f"{current_target} to {new_target}"
+    )
+    return _typed_plan(
+        source_set, patch, "retarget-nodal-record",
+        {
+            "capability": capability, "cluster": cluster,
+            "current_target": current_target, "new_target": new_target,
+            "occurrence": selected_occurrence,
+        },
+        model_path, preview, "modify",
+    )
+
+
+def _section_target_patch(
+    source_set: SourceSet,
+    cluster: str,
+    current_target: str,
+    new_target: str,
+    occurrence: int | None,
+) -> tuple[dict[str, Any], int]:
+    _validate_raw_value(new_target)
+    semantic = source_set.semantic_index()
+    candidates = [
+        item for item in semantic.entities
+        if item.kind == "section"
+        and str(item.attributes.get("cluster", "")).casefold() == cluster.casefold()
+        and item.name.casefold() == current_target.casefold()
+    ]
+    if not candidates:
+        raise ChangeError(
+            f"section target {current_target} was not found in cluster {cluster}"
+        )
+    if occurrence is None:
+        if len(candidates) != 1:
+            raise ChangeError(
+                f"section target {current_target} is ambiguous in cluster {cluster}; "
+                "specify occurrence"
+            )
+        selected, selected_occurrence = candidates[0], 1
+    else:
+        if occurrence < 1 or occurrence > len(candidates):
+            raise ChangeError(
+                f"occurrence {occurrence} is outside the {len(candidates)} matching sections"
+            )
+        selected, selected_occurrence = candidates[occurrence - 1], occurrence
+    new_key = f"cluster:{cluster.casefold()}/element-set:{new_target.casefold()}"
+    if not any(item.key == new_key for item in semantic.entities):
+        raise ChangeError("new section target must be an existing element set")
+
+    source_path = _semantic_source_path(source_set, selected.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("section source location is not in the bound source set")
+    line = document.lines[selected.location.line - 1]
+    spans = _value_spans(line, "ELSET")
+    if len(spans) != 1:
+        raise ChangeError("section ELSET no longer resolves to one exact command value")
+    start, end = spans[0]
+    old = document.raw[start:end].decode("latin-1")
+    if old.casefold() != current_target.casefold():
+        raise ChangeError(f"section ELSET does not reference {current_target}")
+    return ({
+        "source": str(source_path),
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": old,
+        "new": new_target,
+    }, selected_occurrence)
+
+
+def plan_retarget_section(
+    source: Path,
+    cluster: str,
+    current_target: str,
+    new_target: str,
+    occurrence: int | None = None,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch, selected_occurrence = _section_target_patch(
+        source_set, cluster, current_target, new_target, occurrence,
+    )
+    model_path = f"CLUSTERS[{cluster.casefold()}].sections[{selected_occurrence}].elset"
+    preview = (
+        f"line {patch['line']}: retarget section from {current_target} to {new_target}"
+    )
+    return _typed_plan(
+        source_set, patch, "retarget-section",
+        {
+            "cluster": cluster, "current_target": current_target,
+            "new_target": new_target, "occurrence": selected_occurrence,
+        },
+        model_path, preview, "modify",
+    )
+
+
+def _coordinate_operation_target_patch(
+    source_set: SourceSet,
+    capability: str,
+    cluster: str,
+    current_target: str,
+    new_target: str,
+    occurrence: int | None,
+) -> tuple[dict[str, Any], int, str]:
+    operation_name = {"command.shift": "shift", "command.scale": "scale"}.get(capability)
+    if operation_name is None:
+        raise ChangeError(f"coordinate target editing is unavailable for {capability}")
+    _validate_raw_value(new_target)
+    semantic = source_set.semantic_index()
+    candidates = [
+        item for item in semantic.entities
+        if item.kind == "coordinate-operation"
+        and str(item.attributes.get("cluster", "")).casefold() == cluster.casefold()
+        and str(item.attributes.get("operation", "")).casefold() == operation_name
+        and str(item.attributes.get("target", "")).casefold() == current_target.casefold()
+    ]
+    if not candidates:
+        raise ChangeError(
+            f"{operation_name} target {current_target} was not found in cluster {cluster}"
+        )
+    if occurrence is None:
+        if len(candidates) != 1:
+            raise ChangeError(
+                f"{operation_name} target {current_target} is ambiguous in cluster {cluster}; "
+                "specify occurrence"
+            )
+        selected, selected_occurrence = candidates[0], 1
+    else:
+        if occurrence < 1 or occurrence > len(candidates):
+            raise ChangeError(
+                f"occurrence {occurrence} is outside the {len(candidates)} matching operations"
+            )
+        selected, selected_occurrence = candidates[occurrence - 1], occurrence
+    if current_target.casefold() == "all":
+        raise ChangeError("ALL-target coordinate operations have no NSET value to retarget")
+    new_key = f"cluster:{cluster.casefold()}/node-set:{new_target.casefold()}"
+    if not any(item.key == new_key for item in semantic.entities):
+        raise ChangeError("new coordinate-operation target must be an existing node set")
+    source_path = _semantic_source_path(source_set, selected.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("coordinate-operation source is not in the bound source set")
+    line = document.lines[selected.location.line - 1]
+    spans = _value_spans(line, "NSET")
+    if len(spans) != 1:
+        raise ChangeError("coordinate-operation NSET no longer resolves to one exact value")
+    start, end = spans[0]
+    old = document.raw[start:end].decode("latin-1")
+    if old.casefold() != current_target.casefold():
+        raise ChangeError(f"coordinate-operation NSET does not reference {current_target}")
+    return ({
+        "source": str(source_path), "start": start, "end": end,
+        "line": line.number, "old": old, "new": new_target,
+    }, selected_occurrence, operation_name)
+
+
+def plan_retarget_coordinate_operation(
+    source: Path,
+    capability: str,
+    cluster: str,
+    current_target: str,
+    new_target: str,
+    occurrence: int | None = None,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch, selected_occurrence, operation_name = _coordinate_operation_target_patch(
+        source_set, capability, cluster, current_target, new_target, occurrence,
+    )
+    model_path = (
+        f"CLUSTERS[{cluster.casefold()}].coordinate-operations"
+        f"[{operation_name}:{selected_occurrence}].nset"
+    )
+    preview = (
+        f"line {patch['line']}: retarget {operation_name} from "
+        f"{current_target} to {new_target}"
+    )
+    return _typed_plan(
+        source_set, patch, "retarget-coordinate-operation",
+        {
+            "capability": capability, "cluster": cluster,
+            "current_target": current_target, "new_target": new_target,
+            "occurrence": selected_occurrence,
+        },
+        model_path, preview, "modify",
+    )
+
+
 def _mesh_import_patch(
     source_set: SourceSet,
     cluster: str,
@@ -490,11 +1022,11 @@ def _mesh_import_patch(
     ]
     if existing:
         raise ChangeError(f"target cluster {cluster} is not empty")
-    document = source_set.documents[source_set.root]
-    boundary = _cluster_boundary(document, cluster)
+    source_path, document, boundary = _cluster_source_boundary(source_set, cluster)
     newline = next((line.newline for line in document.lines if line.newline), b"\n")
-    rendered = render_bsam_commands(mesh, newline)
+    rendered = _record_prefix(document, boundary, newline) + render_bsam_commands(mesh, newline)
     return ({
+        "source": str(source_path),
         "start": boundary.start,
         "end": boundary.start,
         "line": boundary.number,
@@ -532,41 +1064,68 @@ def plan_import_mesh(
 
 def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
     registry = load_registry()
-    block_by_name = {item["canonical"].upper(): item["id"] for item in registry["top_level_blocks"]}
+    block_records = {item["canonical"].upper(): item for item in registry["top_level_blocks"]}
+    block_by_name = {name: item["id"] for name, item in block_records.items()}
     block_id = block_by_name.get(block_name.upper())
     if block_id is None:
         raise ChangeError(f"unknown registered block: {block_name}")
     requested = construct_name.upper()
     if not requested.startswith("*"):
         requested = "*" + requested
+    if block_id == "block.solver" and construct_name.casefold() in {
+        "solver", "block.solver",
+    }:
+        return {
+            **block_records["SOLVER"],
+            "canonical": "SOLVER",
+            "match_prefix": "*type",
+        }
     matches = [
         item for item in registry["nested_constructs"]
-        if item["parent_block_id"] == block_id and item["canonical"].upper() == requested
+        if item["parent_block_id"] == block_id and (
+            item["canonical"].upper() == requested
+            or item["id"].casefold() == construct_name.casefold()
+        )
     ]
     if not matches:
         raise ChangeError(f"unknown registered construct {construct_name} in {block_name}")
     return matches[0]
 
 
-def _validate_replacement(construct: dict[str, Any], parameter: str, value: str) -> None:
+def _parameter_definition(
+    construct: dict[str, Any], parameter: str,
+) -> dict[str, Any]:
     parameters = {item["name"].lower(): item for item in construct["parameters"]}
     definition = parameters.get(parameter.lower())
     if definition is None:
         raise ChangeError(
             f"parameter {parameter} is not registered for {construct['canonical']}; untyped edits are blocked"
         )
+    return definition
+
+
+def _validate_replacement(construct: dict[str, Any], parameter: str, value: str) -> None:
+    definition = _parameter_definition(construct, parameter)
     value_type = definition["value_type"].lower()
     try:
-        if "integer" in value_type:
+        if value_type == "flag":
+            if value.casefold() not in {"true", "false"}:
+                raise ValueError
+            parsed = 0
+        elif "integer" in value_type:
             parsed: int | float = int(value)
         elif "real" in value_type:
             parsed = float(value)
+            if not math.isfinite(parsed):
+                raise ValueError
         else:
             parsed = 0
     except ValueError as exc:
         raise ChangeError(f"value {value!r} is not a valid {definition['value_type']}") from exc
     if value_type.startswith("positive-") and parsed <= 0:
         raise ChangeError(f"value for {parameter} must be positive")
+    if value_type.startswith("nonnegative-") and parsed < 0:
+        raise ChangeError(f"value for {parameter} must be nonnegative")
     allowed = definition.get("allowed_values")
     if allowed is not None and value.lower() not in {str(item).lower() for item in allowed}:
         raise ChangeError(f"value for {parameter} must be one of: {', '.join(map(str, allowed))}")
@@ -640,6 +1199,105 @@ def _value_spans(line: SourceLine, parameter: str) -> list[tuple[int, int]]:
             cursor = value_end
             continue
         cursor = found + 1
+
+
+def _flag_spans(
+    line: SourceLine, construct: dict[str, Any], parameter: str,
+) -> list[tuple[int, int]]:
+    searchable = line.text.split("#", 1)[0]
+    result: list[tuple[int, int]] = []
+    definition = _parameter_definition(construct, parameter)
+    for match in re.finditer(r"[^\s,=]+", searchable):
+        token = match.group(0).casefold()
+        candidates = [
+            item for item in construct.get("parameters", [])
+            if str(item.get("name", "")).casefold() == token
+            or (
+                len(token) >= 4
+                and str(item.get("name", "")).casefold()[:4] == token[:4]
+            )
+        ]
+        if len(candidates) == 1 and candidates[0] is definition:
+            result.append((line.start + match.start(), line.start + match.end()))
+    return result
+
+
+def _flag_parameter_plan(
+    source_set: SourceSet,
+    construct: dict[str, Any],
+    block: str,
+    parameter: str,
+    value: str,
+    occurrence: int,
+    command_line_number: int,
+) -> dict[str, Any]:
+    source = source_set.root
+    document = source_set.documents[source]
+    definition = _parameter_definition(construct, parameter)
+    line = document.lines[command_line_number - 1]
+    spans = _flag_spans(line, construct, parameter)
+    if len(spans) > 1:
+        raise ChangeError(
+            f"flag {parameter} is ambiguous on line {line.number}"
+        )
+    enabled = value.casefold() == "true"
+    if enabled == bool(spans):
+        raise ChangeError("requested value is identical to the existing value")
+    edit_operation = "insert" if enabled else "remove"
+    if definition.get("edit_operations", {}).get(edit_operation) != "verified":
+        raise ChangeError(
+            f"{edit_operation} of flag parameter {parameter} is not verified"
+        )
+    if enabled:
+        code = line.text.split("#", 1)[0]
+        local = len(code.rstrip())
+        start = end = line.start + local
+        old = ""
+        new = f",{definition['name']}"
+        operation = "insert-optional-flag"
+        summary = f"line {line.number}: enable {definition['name']}"
+        change_operation = "create"
+    else:
+        start, end = spans[0]
+        local_start = start - line.start
+        while local_start > 0 and line.text[local_start - 1].isspace():
+            local_start -= 1
+        if local_start > 0 and line.text[local_start - 1] == ",":
+            local_start -= 1
+        elif local_start == start - line.start:
+            raise ChangeError(
+                f"flag {parameter} is not separately delimited; removal is blocked"
+            )
+        start = line.start + local_start
+        old = document.raw[start:end].decode("latin-1")
+        new = ""
+        operation = "remove-optional-flag"
+        summary = f"line {line.number}: disable {definition['name']}"
+        change_operation = "delete"
+    patch = {
+        "source": str(source),
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": old,
+        "new": new,
+    }
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
+    return _typed_plan(
+        source_set,
+        patch,
+        operation,
+        {
+            "block": block.upper(),
+            "construct": construct["canonical"],
+            "construct_occurrence": occurrence,
+            "parameter": parameter,
+            "requested_value": value.casefold(),
+        },
+        model_path,
+        summary,
+        change_operation,
+    )
 
 
 def _boundary_condition_rename_patches(
@@ -752,6 +1410,223 @@ def plan_rename_boundary_condition(
     plan["plan_digest"] = digest
     plan["plan_id"] = digest[:16]
     return plan
+
+
+def plan_rename_entity(
+    source: Path,
+    capability: str,
+    entity_name: str,
+    new_name: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Dispatch a generic rename only through an explicitly verified capability adapter."""
+    registry = load_registry()
+    matches = [
+        item for item in [
+            *registry["top_level_blocks"],
+            *registry["cluster_commands"],
+            *registry["nested_constructs"],
+        ]
+        if item["id"].casefold() == capability.casefold()
+    ]
+    if len(matches) != 1:
+        raise ChangeError(f"capability identity does not resolve uniquely: {capability}")
+    record = matches[0]
+    if record.get("operations", {}).get("rename") != "verified":
+        status = record.get("operations", {}).get("rename", "unassessed")
+        raise ChangeError(
+            f"rename is {status} for {record['id']}; no structural change was planned"
+        )
+    adapters = {
+        "construct.boundary-conditions": plan_rename_boundary_condition,
+    }
+    adapter = adapters.get(record["id"])
+    if adapter is None:
+        raise ChangeError(f"verified rename adapter is missing for {record['id']}")
+    return adapter(source, entity_name, new_name, workspace_root)
+
+
+def _verified_operation_record(capability: str, operation: str) -> dict[str, Any]:
+    registry = load_registry()
+    matches = [
+        item for item in [
+            *registry["top_level_blocks"],
+            *registry["cluster_commands"],
+            *registry["nested_constructs"],
+        ]
+        if item["id"].casefold() == capability.casefold()
+    ]
+    if len(matches) != 1:
+        raise ChangeError(f"capability identity does not resolve uniquely: {capability}")
+    record = matches[0]
+    if record.get("operations", {}).get(operation) != "verified":
+        status = record.get("operations", {}).get(operation, "unassessed")
+        raise ChangeError(
+            f"{operation} is {status} for {record['id']}; no structural change was planned"
+        )
+    return record
+
+
+def _structural_payload(
+    value: Any, required: set[str], optional: set[str] | None = None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ChangeError("structural operation payload must be an object")
+    optional = optional or set()
+    missing = sorted(required - value.keys())
+    extra = sorted(value.keys() - required - optional)
+    if missing:
+        raise ChangeError(f"structural operation payload is missing: {', '.join(missing)}")
+    if extra:
+        raise ChangeError(f"structural operation payload has unknown fields: {', '.join(extra)}")
+    return value
+
+
+def _integer_list(value: Any, field: str) -> list[int]:
+    if not isinstance(value, list) or any(
+        not isinstance(item, int) or isinstance(item, bool) for item in value
+    ):
+        raise ChangeError(f"{field} must be an array of integers")
+    return value
+
+
+def plan_create_entity(
+    source: Path,
+    capability: str,
+    attributes: dict[str, Any],
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Create an entity through an explicitly verified capability adapter."""
+    record = _verified_operation_record(capability, "create")
+    if record["id"] == "command.node":
+        data = _structural_payload(attributes, {"cluster", "label", "x", "y", "z"})
+        if not isinstance(data["label"], int) or isinstance(data["label"], bool):
+            raise ChangeError("label must be an integer")
+        return plan_add_node(
+            source, str(data["cluster"]), data["label"], str(data["x"]),
+            str(data["y"]), str(data["z"]), workspace_root,
+        )
+    if record["id"] == "command.element":
+        data = _structural_payload(
+            attributes, {"cluster", "label", "element_type", "node_labels"}, {"elset"}
+        )
+        if not isinstance(data["label"], int) or isinstance(data["label"], bool):
+            raise ChangeError("label must be an integer")
+        return plan_add_element(
+            source, str(data["cluster"]), data["label"], str(data["element_type"]),
+            _integer_list(data["node_labels"], "node_labels"),
+            str(data["elset"]) if data.get("elset") is not None else None,
+            workspace_root,
+        )
+    if record["id"] in {"command.nset", "command.elset"}:
+        data = _structural_payload(attributes, {"cluster", "name", "members"})
+        member_kind = "node" if record["id"] == "command.nset" else "element"
+        return plan_create_set(
+            source, str(data["cluster"]), member_kind, str(data["name"]),
+            _integer_list(data["members"], "members"), workspace_root,
+        )
+    raise ChangeError(f"verified create adapter is missing for {record['id']}")
+
+
+def plan_modify_entity(
+    source: Path,
+    capability: str,
+    entity_name: str,
+    changes: dict[str, Any],
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Modify an entity through an explicitly verified capability adapter."""
+    record = _verified_operation_record(capability, "modify")
+    if record["id"] in {"command.nset", "command.elset"}:
+        if not isinstance(changes, dict):
+            raise ChangeError("structural operation payload must be an object")
+        actions = {"add_members", "remove_member"}.intersection(changes)
+        if len(actions) != 1:
+            raise ChangeError(
+                "set modification requires exactly one of add_members or remove_member"
+            )
+        action = next(iter(actions))
+        data = _structural_payload(changes, {"cluster", action})
+        member_kind = "node" if record["id"] == "command.nset" else "element"
+        if action == "add_members":
+            return plan_add_set_members(
+                source, str(data["cluster"]), member_kind, entity_name,
+                _integer_list(data["add_members"], "add_members"), workspace_root,
+            )
+        if not isinstance(data["remove_member"], int) or isinstance(
+            data["remove_member"], bool
+        ):
+            raise ChangeError("remove_member must be an integer")
+        return plan_remove_set_member(
+            source, str(data["cluster"]), member_kind, entity_name,
+            data["remove_member"], workspace_root,
+        )
+    if record["id"] in {"command.boundary", "command.load"}:
+        data = _structural_payload(changes, {"cluster", "new_target"}, {"occurrence"})
+        occurrence = data.get("occurrence")
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or isinstance(occurrence, bool)
+        ):
+            raise ChangeError("occurrence must be an integer")
+        return plan_retarget_nodal_record(
+            source, record["id"], str(data["cluster"]), entity_name,
+            str(data["new_target"]), occurrence, workspace_root,
+        )
+    if record["id"] == "command.section":
+        data = _structural_payload(changes, {"cluster", "new_target"}, {"occurrence"})
+        occurrence = data.get("occurrence")
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or isinstance(occurrence, bool)
+        ):
+            raise ChangeError("occurrence must be an integer")
+        return plan_retarget_section(
+            source, str(data["cluster"]), entity_name,
+            str(data["new_target"]), occurrence, workspace_root,
+        )
+    if record["id"] in {"command.shift", "command.scale"}:
+        data = _structural_payload(changes, {"cluster", "new_target"}, {"occurrence"})
+        occurrence = data.get("occurrence")
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or isinstance(occurrence, bool)
+        ):
+            raise ChangeError("occurrence must be an integer")
+        return plan_retarget_coordinate_operation(
+            source, record["id"], str(data["cluster"]), entity_name,
+            str(data["new_target"]), occurrence, workspace_root,
+        )
+    raise ChangeError(f"verified modify adapter is missing for {record['id']}")
+
+
+def plan_delete_entity(
+    source: Path,
+    capability: str,
+    entity_name: str,
+    context: dict[str, Any],
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Delete an entity through an explicitly verified capability adapter."""
+    record = _verified_operation_record(capability, "delete")
+    if record["id"] == "command.node":
+        data = _structural_payload(context, {"cluster"})
+        try:
+            label = int(entity_name)
+        except ValueError as exc:
+            raise ChangeError("node entity_name must be an integer label") from exc
+        return plan_delete_node(source, str(data["cluster"]), label, workspace_root)
+    if record["id"] == "command.element":
+        data = _structural_payload(context, {"cluster"})
+        try:
+            label = int(entity_name)
+        except ValueError as exc:
+            raise ChangeError("element entity_name must be an integer label") from exc
+        return plan_delete_element(source, str(data["cluster"]), label, workspace_root)
+    if record["id"] in {"command.nset", "command.elset"}:
+        data = _structural_payload(context, {"cluster"})
+        member_kind = "node" if record["id"] == "command.nset" else "element"
+        return plan_delete_set(
+            source, str(data["cluster"]), member_kind, entity_name, workspace_root,
+        )
+    raise ChangeError(f"verified delete adapter is missing for {record['id']}")
 
 
 def _block_span(document: SourceDocument, name: str) -> tuple[int, int]:
@@ -1150,29 +2025,63 @@ def plan_parameter_change(
     document = source_set.documents[source]
     construct = _construct_record(block, construct_name)
     _validate_replacement(construct, parameter, value)
+    definition = _parameter_definition(construct, parameter)
     start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
+    if str(definition["value_type"]).casefold() == "flag":
+        return _flag_parameter_plan(
+            source_set, construct, block, parameter, value, occurrence, start_line,
+        )
     candidates: list[tuple[SourceLine, int, int]] = []
     for line in document.lines[start_line:end_line]:
         candidates.extend((line, *span) for span in _value_spans(line, parameter))
-    if not candidates:
-        raise ChangeError(
-            f"parameter {parameter} was not found in {construct['canonical']} occurrence {occurrence}"
-        )
     if len(candidates) > 1:
         lines = ", ".join(str(item[0].number) for item in candidates)
         raise ChangeError(f"parameter {parameter} is ambiguous in the selected construct (lines {lines})")
-    line, start, end = candidates[0]
-    old_bytes = document.raw[start:end]
-    new_bytes = value.encode("latin-1")
-    if old_bytes == new_bytes:
-        raise ChangeError("requested value is identical to the existing value")
-    patch = {
-        "start": start,
-        "end": end,
-        "line": line.number,
-        "old": old_bytes.decode("latin-1"),
-        "new": value,
-    }
+    if candidates:
+        line, start, end = candidates[0]
+        old_bytes = document.raw[start:end]
+        new_bytes = value.encode("latin-1")
+        if old_bytes == new_bytes:
+            raise ChangeError("requested value is identical to the existing value")
+        patch = {
+            "start": start,
+            "end": end,
+            "line": line.number,
+            "old": old_bytes.decode("latin-1"),
+            "new": value,
+        }
+        operation = "set-existing-parameter"
+        preview = f"line {line.number}: {parameter} = {old_bytes.decode('latin-1')} -> {value}"
+    else:
+        if definition.get("edit_operations", {}).get("insert") != "verified":
+            raise ChangeError(
+                f"parameter {parameter} was not found in {construct['canonical']} occurrence "
+                f"{occurrence}; insertion is not verified"
+            )
+        insertion = document.lines[end_line].start if end_line < len(document.lines) else len(document.raw)
+        line_number = (
+            document.lines[end_line].number if end_line < len(document.lines)
+            else len(document.lines) + 1
+        )
+        newline = next(
+            (item.newline for item in reversed(document.lines[:end_line]) if item.newline),
+            b"\n",
+        )
+        prefix = b"" if insertion == 0 or document.raw[:insertion].endswith((b"\r", b"\n")) else newline
+        record = prefix + f"{definition['name']}={value}".encode("latin-1") + newline
+        patch = {
+            "start": insertion,
+            "end": insertion,
+            "line": line_number,
+            "old": "",
+            "new": record.decode("latin-1"),
+        }
+        operation = "insert-optional-parameter"
+        default = (
+            f"registered default {definition['default']}"
+            if "default" in definition else "absent"
+        )
+        preview = f"line {line_number}: add {definition['name']} = {value} (was {default})"
     updated = _patched_bytes(document, patch)
     updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
     validation = _validation_result(source_set, {source: updated})
@@ -1180,7 +2089,6 @@ def plan_parameter_change(
         messages = "; ".join(item["message"] for item in validation["diagnostics"] if item["severity"] == "error")
         raise ChangeError(f"planned source set failed dependency validation: {messages}")
     model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
-    preview = f"line {line.number}: {parameter} = {old_bytes.decode('latin-1')} -> {value}"
     plan: dict[str, Any] = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "source": str(source.resolve()),
@@ -1189,12 +2097,13 @@ def plan_parameter_change(
         "base_source_set_sha256": source_set.sha256,
         "proposed_sha256": updated_document.sha256,
         "proposed_source_set_sha256": source_set.digest_with({source: updated}),
-        "operation": "set-existing-parameter",
+        "operation": operation,
         "selector": {
             "block": block.upper(),
             "construct": construct["canonical"],
             "construct_occurrence": occurrence,
             "parameter": parameter,
+            "requested_value": value,
         },
         "patch": patch,
         "changed_model_paths": [model_path],
@@ -1214,6 +2123,81 @@ def plan_parameter_change(
     return plan
 
 
+def plan_parameter_removal(
+    source: Path,
+    block: str,
+    construct_name: str,
+    parameter: str,
+    occurrence: int = 1,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Plan removal of one explicit optional parameter with verified reset semantics."""
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    document = source_set.documents[source]
+    construct = _construct_record(block, construct_name)
+    definition = _parameter_definition(construct, parameter)
+    if definition.get("edit_operations", {}).get("remove") != "verified":
+        raise ChangeError(f"removal of parameter {parameter} is not verified")
+    if definition.get("required") or "default" not in definition:
+        raise ChangeError(f"parameter {parameter} cannot be safely reset by omission")
+    start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
+    candidates: list[tuple[SourceLine, int, int]] = []
+    for line in document.lines[start_line:end_line]:
+        candidates.extend((line, *span) for span in _value_spans(line, parameter))
+    if not candidates:
+        raise ChangeError(
+            f"parameter {parameter} was not found in {construct['canonical']} occurrence {occurrence}"
+        )
+    if len(candidates) > 1:
+        lines = ", ".join(str(item[0].number) for item in candidates)
+        raise ChangeError(f"parameter {parameter} is ambiguous in the selected construct (lines {lines})")
+    line, value_start, value_end = candidates[0]
+    if "#" in line.text or "," in line.text:
+        raise ChangeError(
+            f"parameter {parameter} shares line {line.number}; minimal removal is not verified"
+        )
+    local_start = value_start - line.start
+    local_end = value_end - line.start
+    before = line.text[:local_start]
+    after = line.text[local_end:]
+    expected_prefix = re.fullmatch(
+        rf"\s*{re.escape(parameter)}\s*=\s*", before, re.IGNORECASE,
+    )
+    if expected_prefix is None or after.strip():
+        raise ChangeError(
+            f"parameter {parameter} is not an isolated record; minimal removal is not verified"
+        )
+    old_record = document.raw[line.start:line.end]
+    patch = {
+        "source": str(source),
+        "start": line.start,
+        "end": line.end,
+        "line": line.number,
+        "old": old_record.decode("latin-1"),
+        "new": "",
+    }
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
+    preview = (
+        f"line {line.number}: remove explicit {parameter}; restore registered default "
+        f"{definition['default']}"
+    )
+    return _typed_plan(
+        source_set,
+        patch,
+        "remove-optional-parameter",
+        {
+            "block": block.upper(),
+            "construct": construct["canonical"],
+            "construct_occurrence": occurrence,
+            "parameter": parameter,
+        },
+        model_path,
+        preview,
+        "delete",
+    )
+
+
 def write_plan(plan: dict[str, Any], destination: Path) -> None:
     if destination.exists():
         raise ChangeError(f"plan destination already exists: {destination}")
@@ -1221,9 +2205,7 @@ def write_plan(plan: dict[str, Any], destination: Path) -> None:
         stream.write(json.dumps(plan, indent=2, sort_keys=True) + "\n")
 
 
-def load_plan(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as stream:
-        plan = json.load(stream)
+def _validate_plan_object(plan: Any) -> dict[str, Any]:
     if not isinstance(plan, dict):
         raise ChangeError("change plan must be a JSON object")
     if plan.get("schema_version") not in SUPPORTED_PLAN_SCHEMA_VERSIONS:
@@ -1244,14 +2226,174 @@ def load_plan(path: Path) -> dict[str, Any]:
     return plan
 
 
+def load_plan(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as stream:
+        plan = json.load(stream)
+    return _validate_plan_object(plan)
+
+
+def plan_refresh_change(
+    source: Path,
+    stale_plan_path: Path,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Re-preview a digest-valid stale plan by replaying only its typed selector."""
+    source = source.resolve()
+    plan = load_plan(stale_plan_path.resolve())
+    planned_source = Path(str(plan["source"])).resolve()
+    if planned_source != source:
+        raise ChangeError("stale plan source does not match the requested source")
+    current = SourceSet.read(source, workspace_root)
+    same_root = current.documents[source].sha256 == plan["base_sha256"]
+    expected_set = plan.get("base_source_set_sha256")
+    same_set = (
+        expected_set == current.sha256
+        or (expected_set is None and len(current.documents) == 1)
+    )
+    if same_root and same_set:
+        raise ChangeError("change plan is not stale; review the existing plan instead")
+
+    operation = str(plan["operation"])
+    selector = plan["selector"]
+    if not isinstance(selector, dict):
+        raise ChangeError("stale plan selector is malformed")
+    if operation in {
+        "set-existing-parameter", "insert-optional-parameter",
+        "insert-optional-flag", "remove-optional-flag",
+    }:
+        patch = plan.get("patch")
+        if not isinstance(patch, dict) or not isinstance(patch.get("new"), str):
+            raise ChangeError("stale parameter plan is missing its requested value")
+        requested_value = selector.get("requested_value")
+        if not isinstance(requested_value, str):
+            if operation != "set-existing-parameter":
+                raise ChangeError("stale parameter plan is missing its requested value")
+            requested_value = patch["new"]
+        return plan_parameter_change(
+            source, str(selector["block"]), str(selector["construct"]),
+            str(selector["parameter"]), requested_value,
+            int(selector["construct_occurrence"]), workspace_root,
+        )
+    if operation == "remove-optional-parameter":
+        return plan_parameter_removal(
+            source, str(selector["block"]), str(selector["construct"]),
+            str(selector["parameter"]), int(selector["construct_occurrence"]),
+            workspace_root,
+        )
+    if operation == "rename-boundary-condition":
+        return plan_rename_boundary_condition(
+            source, str(selector["old_name"]), str(selector["new_name"]), workspace_root,
+        )
+    if operation == "add-node":
+        coordinates = selector.get("coordinates")
+        if not isinstance(coordinates, list) or len(coordinates) != 3:
+            raise ChangeError("stale add-node selector is malformed")
+        return plan_add_node(
+            source, str(selector["cluster"]), int(selector["label"]),
+            *(str(item) for item in coordinates), workspace_root=workspace_root,
+        )
+    if operation == "add-element":
+        node_labels = selector.get("node_labels")
+        if not isinstance(node_labels, list):
+            raise ChangeError("stale add-element selector is malformed")
+        return plan_add_element(
+            source, str(selector["cluster"]), int(selector["label"]),
+            str(selector["element_type"]), [int(item) for item in node_labels],
+            str(selector["elset"]) if selector.get("elset") is not None else None,
+            workspace_root,
+        )
+    if operation == "delete-node":
+        return plan_delete_node(
+            source, str(selector["cluster"]), int(selector["label"]), workspace_root,
+        )
+    if operation == "delete-element":
+        return plan_delete_element(
+            source, str(selector["cluster"]), int(selector["label"]), workspace_root,
+        )
+    if operation in {"create-set", "add-set-members"}:
+        members = selector.get("members")
+        if not isinstance(members, list):
+            raise ChangeError(f"stale {operation} selector is malformed")
+        planner = plan_create_set if operation == "create-set" else plan_add_set_members
+        return planner(
+            source, str(selector["cluster"]), str(selector["member_kind"]),
+            str(selector["name"]), [int(item) for item in members], workspace_root,
+        )
+    if operation == "remove-set-member":
+        return plan_remove_set_member(
+            source, str(selector["cluster"]), str(selector["member_kind"]),
+            str(selector["name"]), int(selector["member"]), workspace_root,
+        )
+    if operation == "delete-set":
+        return plan_delete_set(
+            source, str(selector["cluster"]), str(selector["member_kind"]),
+            str(selector["name"]), workspace_root,
+        )
+    if operation == "retarget-nodal-record":
+        return plan_retarget_nodal_record(
+            source, str(selector["capability"]), str(selector["cluster"]),
+            str(selector["current_target"]), str(selector["new_target"]),
+            int(selector["occurrence"]), workspace_root,
+        )
+    if operation == "retarget-section":
+        return plan_retarget_section(
+            source, str(selector["cluster"]), str(selector["current_target"]),
+            str(selector["new_target"]), int(selector["occurrence"]), workspace_root,
+        )
+    if operation == "retarget-coordinate-operation":
+        return plan_retarget_coordinate_operation(
+            source, str(selector["capability"]), str(selector["cluster"]),
+            str(selector["current_target"]), str(selector["new_target"]),
+            int(selector["occurrence"]), workspace_root,
+        )
+    if operation == "migrate-legacy-solver":
+        return plan_migrate_legacy_solver(source, workspace_root)
+    if operation == "expand-notch-plies":
+        return plan_expand_notch_plies(source, workspace_root)
+    if operation == "import-mesh":
+        mesh = selector.get("mesh")
+        if not isinstance(mesh, dict) or not isinstance(mesh.get("path"), str):
+            raise ChangeError("stale import-mesh selector is malformed")
+        return plan_import_mesh(
+            source, Path(mesh["path"]), str(selector["cluster"]), workspace_root,
+        )
+    raise ChangeError(f"stale-plan recovery is unsupported for operation {operation}")
+
+
 def _validated_plan_proposal(
     plan: dict[str, Any],
     source: Path,
     document: SourceDocument,
     source_set: SourceSet,
-) -> tuple[bytes, SourceDocument, list[str], str, dict[str, Any]]:
+) -> tuple[dict[Path, bytes], SourceDocument, list[str], str, dict[str, Any]]:
     """Re-derive a plan through registered typing and exact source selection."""
     operation = plan.get("operation")
+    if operation == "compose-changes":
+        components = plan.get("components")
+        if not isinstance(components, list):
+            raise ChangeError("composite change plan is missing its components")
+        expected = _composite_plan(components, source_set)
+        checked_fields = (
+            "selector", "components", "patches", "changed_model_paths",
+            "affected_files", "changes", "inputs", "source_diff", "validation",
+            "preview", "proposed_sha256", "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(
+                    f"composite change plan {field} does not match its typed components"
+                )
+        replacements = _patched_source_files(source_set, expected["patches"])
+        root_raw = replacements.get(source.resolve(), document.raw)
+        updated_document = SourceDocument.from_bytes(root_raw, str(source.resolve()))
+        return (
+            replacements,
+            updated_document,
+            expected["changed_model_paths"],
+            expected["source_diff"],
+            expected["validation"],
+        )
+
     if operation == "rename-boundary-condition":
         selector = plan.get("selector")
         if not isinstance(selector, dict):
@@ -1277,7 +2419,7 @@ def _validated_plan_proposal(
         updated = _patched_bytes_many(document, expected["patches"])
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         return (
-            updated,
+            {source.resolve(): updated},
             updated_document,
             expected["changed_model_paths"],
             expected["source_diff"],
@@ -1298,7 +2440,7 @@ def _validated_plan_proposal(
         updated = _patched_bytes_many(document, patches)
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         return (
-            updated,
+            {source.resolve(): updated},
             updated_document,
             expected["changed_model_paths"],
             expected["source_diff"],
@@ -1318,7 +2460,7 @@ def _validated_plan_proposal(
         updated = _patched_bytes(document, expected["patch"])
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         return (
-            updated,
+            {source.resolve(): updated},
             updated_document,
             expected["changed_model_paths"],
             expected["source_diff"],
@@ -1326,7 +2468,9 @@ def _validated_plan_proposal(
         )
 
     if operation in {
-        "add-node", "add-element", "delete-node", "create-set", "add-set-members", "import-mesh"
+        "add-node", "add-element", "delete-node", "delete-element", "create-set", "add-set-members",
+        "remove-set-member", "delete-set", "retarget-nodal-record", "retarget-section",
+        "retarget-coordinate-operation", "import-mesh",
     }:
         selector = plan.get("selector")
         if not isinstance(selector, dict):
@@ -1335,7 +2479,7 @@ def _validated_plan_proposal(
             cluster = str(selector["cluster"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ChangeError(f"{operation} selector is malformed") from exc
-        if operation in {"add-node", "add-element", "delete-node"}:
+        if operation in {"add-node", "add-element", "delete-node", "delete-element"}:
             try:
                 label = int(selector["label"])
             except (KeyError, TypeError, ValueError) as exc:
@@ -1378,6 +2522,14 @@ def _validated_plan_proposal(
             model_path = f"CLUSTERS[{cluster.casefold()}].nodes[{label}]"
             preview = f"line {patch['line']}: delete unreferenced node {label} from cluster {cluster}"
             change_operation = "delete"
+        elif operation == "delete-element":
+            patch = _delete_mesh_entity_patch(source_set, cluster, label, "element")
+            model_path = f"CLUSTERS[{cluster.casefold()}].elements[{label}]"
+            preview = (
+                f"line {patch['line']}: delete unreferenced element {label} "
+                f"from cluster {cluster}"
+            )
+            change_operation = "delete"
         elif operation in {"create-set", "add-set-members"}:
             member_kind = str(selector.get("member_kind", ""))
             name = str(selector.get("name", ""))
@@ -1407,6 +2559,91 @@ def _validated_plan_proposal(
                     f"{member_kind} set {name}"
                 )
                 change_operation = "modify"
+        elif operation == "remove-set-member":
+            member_kind = str(selector.get("member_kind", ""))
+            name = str(selector.get("name", ""))
+            try:
+                member = int(selector["member"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ChangeError("remove-set-member selector is malformed") from exc
+            patch = _remove_set_member_patch(
+                source_set, cluster, member_kind, name, member,
+            )
+            set_kind = f"{member_kind}-sets"
+            model_path = (
+                f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}]"
+                f".members[{member}]"
+            )
+            preview = (
+                f"line {patch['line']}: remove member {member} from "
+                f"{member_kind} set {name}"
+            )
+            change_operation = "delete"
+        elif operation == "delete-set":
+            member_kind = str(selector.get("member_kind", ""))
+            name = str(selector.get("name", ""))
+            patch = _delete_set_patch(source_set, cluster, member_kind, name)
+            set_kind = f"{member_kind}-sets"
+            model_path = f"CLUSTERS[{cluster.casefold()}].{set_kind}[{name.casefold()}]"
+            preview = f"line {patch['line']}: delete unreferenced {member_kind} set {name}"
+            change_operation = "delete"
+        elif operation == "retarget-nodal-record":
+            capability = str(selector.get("capability", ""))
+            current_target = str(selector.get("current_target", ""))
+            new_target = str(selector.get("new_target", ""))
+            try:
+                occurrence = int(selector["occurrence"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ChangeError("retarget-nodal-record selector is malformed") from exc
+            patch, selected_occurrence, entity_kind = _nodal_record_target_patch(
+                source_set, capability, cluster, current_target, new_target, occurrence,
+            )
+            model_path = (
+                f"CLUSTERS[{cluster.casefold()}].{entity_kind}[{selected_occurrence}].target"
+            )
+            preview = (
+                f"line {patch['line']}: retarget {capability} record from "
+                f"{current_target} to {new_target}"
+            )
+            change_operation = "modify"
+        elif operation == "retarget-section":
+            current_target = str(selector.get("current_target", ""))
+            new_target = str(selector.get("new_target", ""))
+            try:
+                occurrence = int(selector["occurrence"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ChangeError("retarget-section selector is malformed") from exc
+            patch, selected_occurrence = _section_target_patch(
+                source_set, cluster, current_target, new_target, occurrence,
+            )
+            model_path = (
+                f"CLUSTERS[{cluster.casefold()}].sections[{selected_occurrence}].elset"
+            )
+            preview = (
+                f"line {patch['line']}: retarget section from "
+                f"{current_target} to {new_target}"
+            )
+            change_operation = "modify"
+        elif operation == "retarget-coordinate-operation":
+            capability = str(selector.get("capability", ""))
+            current_target = str(selector.get("current_target", ""))
+            new_target = str(selector.get("new_target", ""))
+            try:
+                occurrence = int(selector["occurrence"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ChangeError("retarget-coordinate-operation selector is malformed") from exc
+            patch, selected_occurrence, operation_name = _coordinate_operation_target_patch(
+                source_set, capability, cluster, current_target, new_target, occurrence,
+            )
+            model_path = (
+                f"CLUSTERS[{cluster.casefold()}].coordinate-operations"
+                f"[{operation_name}:{selected_occurrence}].nset"
+            )
+            preview = (
+                f"line {patch['line']}: retarget {operation_name} from "
+                f"{current_target} to {new_target}"
+            )
+            change_operation = "modify"
         else:
             mesh_input = selector.get("mesh")
             if not isinstance(mesh_input, dict):
@@ -1435,10 +2672,16 @@ def _validated_plan_proposal(
                 raise ChangeError("change plan mesh provenance does not match its input")
         if plan.get("patch") != patch:
             raise ChangeError(f"change plan patch does not match its typed {operation} selector")
-        updated = _patched_bytes(document, patch)
-        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
-        source_diff = _source_diff(source, document.raw, updated)
-        validation = _validation_result(source_set, {source.resolve(): updated})
+        patch_source = Path(str(patch.get("source", source))).resolve()
+        patch_document = source_set.documents.get(patch_source)
+        if patch_document is None:
+            raise ChangeError("planned patch source is not in the bound source set")
+        updated = _patched_bytes(patch_document, patch)
+        replacements = {patch_source: updated}
+        root_raw = replacements.get(source.resolve(), document.raw)
+        updated_document = SourceDocument.from_bytes(root_raw, str(source.resolve()))
+        source_diff = _source_diff(patch_source, patch_document.raw, updated)
+        validation = _validation_result(source_set, replacements)
         expected_changes = [{"operation": change_operation, "target": model_path, "summary": preview}]
         if plan.get("proposed_sha256") not in {None, updated_document.sha256}:
             raise ChangeError("change plan proposed-output digest is invalid")
@@ -1452,9 +2695,79 @@ def _validated_plan_proposal(
             raise ChangeError("change plan model path does not match its typed selector")
         if plan.get("changes") != expected_changes or plan.get("preview") != preview:
             raise ChangeError("change plan semantic changes do not match its typed selector")
-        if plan.get("affected_files") != [str(source.resolve())]:
+        if plan.get("affected_files") != [str(patch_source)]:
             raise ChangeError("change plan affected files do not match its source")
-        return updated, updated_document, [model_path], source_diff, validation
+        return replacements, updated_document, [model_path], source_diff, validation
+
+    if plan.get("operation") == "remove-optional-parameter":
+        selector = plan.get("selector")
+        if not isinstance(selector, dict):
+            raise ChangeError("removed parameter plan is missing its selector")
+        try:
+            expected = plan_parameter_removal(
+                source,
+                str(selector["block"]),
+                str(selector["construct"]),
+                str(selector["parameter"]),
+                int(selector["construct_occurrence"]),
+                source_set.workspace_root,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ChangeError("removed parameter selector is malformed") from exc
+        checked_fields = (
+            "operation", "selector", "patch", "changed_model_paths", "affected_files",
+            "changes", "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(
+                    f"removed parameter plan {field} does not match its typed selector"
+                )
+        updated = _patched_bytes(document, expected["patch"])
+        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+        return (
+            {source.resolve(): updated}, updated_document,
+            expected["changed_model_paths"], expected["source_diff"], expected["validation"],
+        )
+
+    if plan.get("operation") in {
+        "insert-optional-parameter", "insert-optional-flag", "remove-optional-flag",
+    }:
+        selector = plan.get("selector")
+        patch = plan.get("patch")
+        if not isinstance(selector, dict) or not isinstance(patch, dict):
+            raise ChangeError("change plan is missing its selector or patch")
+        if not isinstance(patch.get("new"), str):
+            raise ChangeError("change plan new value must be a string")
+        try:
+            expected = plan_parameter_change(
+                source,
+                str(selector["block"]),
+                str(selector["construct"]),
+                str(selector["parameter"]),
+                str(selector["requested_value"]),
+                int(selector["construct_occurrence"]),
+                source_set.workspace_root,
+            )
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            raise ChangeError("inserted parameter selector or patch is malformed") from exc
+        checked_fields = (
+            "operation", "selector", "patch", "changed_model_paths", "affected_files",
+            "changes", "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(
+                    f"parameter plan {field} does not match its typed selector"
+                )
+        updated = _patched_bytes(document, expected["patch"])
+        updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
+        return (
+            {source.resolve(): updated}, updated_document,
+            expected["changed_model_paths"], expected["source_diff"], expected["validation"],
+        )
 
     if plan.get("operation") != "set-existing-parameter":
         raise ChangeError("unsupported change-plan operation")
@@ -1475,10 +2788,12 @@ def _validated_plan_proposal(
         planned_line = int(patch["line"])
     except (KeyError, TypeError, ValueError) as exc:
         raise ChangeError("change plan selector or patch is malformed") from exc
-
     _validate_raw_value(new_value)
     construct = _construct_record(block, construct_name)
     _validate_replacement(construct, parameter, new_value)
+    requested_value = selector.get("requested_value")
+    if requested_value is not None and requested_value != new_value:
+        raise ChangeError("change plan requested value does not match its exact patch")
     start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
     candidates: list[tuple[SourceLine, int, int]] = []
     for line in document.lines[start_line:end_line]:
@@ -1524,7 +2839,97 @@ def _validated_plan_proposal(
     expected_files = [str(source.resolve())]
     if plan.get("affected_files") is not None and plan["affected_files"] != expected_files:
         raise ChangeError("change plan affected files do not match its source")
-    return updated, updated_document, [model_path], source_diff, validation
+    return {source.resolve(): updated}, updated_document, [model_path], source_diff, validation
+
+
+def _composite_plan(
+    components: list[dict[str, Any]], source_set: SourceSet,
+) -> dict[str, Any]:
+    """Build one validated plan from independent, same-revision typed plans."""
+    if not 2 <= len(components) <= 8:
+        raise ChangeError("a composite change plan requires between 2 and 8 component plans")
+    source = source_set.root.resolve()
+    document = source_set.documents[source]
+    patches: list[dict[str, Any]] = []
+    model_paths: list[str] = []
+    changes: list[dict[str, Any]] = []
+    inputs: list[dict[str, Any]] = []
+    component_ids: list[str] = []
+
+    for raw_component in components:
+        component = _validate_plan_object(raw_component)
+        if component.get("operation") == "compose-changes":
+            raise ChangeError("nested composite change plans are not supported")
+        if Path(str(component["source"])).resolve() != source:
+            raise ChangeError("component plans must target the same source deck")
+        if component.get("base_sha256") != document.sha256:
+            raise ChangeError("component plans must share the same source revision")
+        if component.get("base_source_set_sha256") != source_set.sha256:
+            raise ChangeError("component plans must share the same source-set revision")
+        _validated_plan_proposal(component, source, document, source_set)
+        patches.extend(component.get("patches") or [component["patch"]])
+        for model_path in component.get("changed_model_paths", []):
+            if model_path not in model_paths:
+                model_paths.append(model_path)
+        changes.extend(deepcopy(component.get("changes", [])))
+        for item in component.get("inputs", []):
+            if item not in inputs:
+                inputs.append(deepcopy(item))
+        component_ids.append(str(component["plan_id"]))
+
+    replacements = _patched_source_files(source_set, patches)
+    root_raw = replacements.get(source, document.raw)
+    updated_document = SourceDocument.from_bytes(root_raw, str(source))
+    validation = _validation_result(source_set, replacements)
+    if validation["summary"]["errors"]:
+        messages = "; ".join(
+            item["message"] for item in validation["diagnostics"]
+            if item["severity"] == "error"
+        )
+        raise ChangeError(f"composite source set failed dependency validation: {messages}")
+    preview = (
+        f"{len(components)} deterministic operations: "
+        + "; ".join(str(item["preview"]) for item in components)
+    )
+    plan: dict[str, Any] = {
+        "schema_version": PLAN_SCHEMA_VERSION,
+        "source": str(source),
+        "workspace_root": str(source_set.workspace_root),
+        "base_sha256": document.sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "proposed_sha256": updated_document.sha256,
+        "proposed_source_set_sha256": source_set.digest_with(replacements),
+        "operation": "compose-changes",
+        "selector": {"component_plan_ids": component_ids},
+        "components": deepcopy(components),
+        "patches": deepcopy(patches),
+        "changed_model_paths": model_paths,
+        "affected_files": [str(path) for path in replacements],
+        "changes": changes,
+        "inputs": inputs,
+        "source_diff": "".join(
+            _source_diff(path, source_set.documents[path].raw, replacements[path])
+            for path in replacements
+        ),
+        "validation": validation,
+        "preview": preview,
+    }
+    digest = _plan_digest(plan)
+    plan["plan_digest"] = digest
+    plan["plan_id"] = digest[:16]
+    return plan
+
+
+def plan_compose_changes(
+    source: Path,
+    plan_paths: list[Path],
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Compose independent typed plans against one revision into one review boundary."""
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    components = [load_plan(path.resolve()) for path in plan_paths]
+    return _composite_plan(components, source_set)
 
 
 def _source_set_for_plan(plan: dict[str, Any], source: Path) -> SourceSet:
@@ -1552,10 +2957,10 @@ def review_plan(path: Path) -> dict[str, Any]:
     document = source_set.documents[source.resolve()]
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
-    _, updated_document, model_paths, source_diff, validation = _validated_plan_proposal(
+    replacements, updated_document, model_paths, source_diff, validation = _validated_plan_proposal(
         plan, source, document, source_set
     )
-    proposed_source_set_sha256 = source_set.digest_with({source.resolve(): updated_document.raw})
+    proposed_source_set_sha256 = source_set.digest_with(replacements)
     if plan.get("proposed_source_set_sha256") not in {None, proposed_source_set_sha256}:
         raise ChangeError("change plan proposed source-set digest is invalid")
     return {
@@ -1582,6 +2987,27 @@ def _default_audit_path(destination: Path) -> Path:
     return Path(str(destination) + ".audit.json")
 
 
+def _source_set_output_map(
+    source_set: SourceSet, destination: Path,
+) -> dict[Path, Path]:
+    """Map a source set to a new root location without changing include spellings."""
+    destination = destination.resolve()
+    if destination.parent == source_set.input_directory:
+        return {source_set.root: destination}
+    output = {source_set.root: destination}
+    for source_path in source_set.documents:
+        if source_path == source_set.root:
+            continue
+        try:
+            relative = source_path.relative_to(source_set.input_directory)
+        except ValueError as exc:
+            raise ChangeError(
+                "source-set copying requires include files beneath the input directory"
+            ) from exc
+        output[source_path] = (destination.parent / relative).resolve()
+    return output
+
+
 def apply_plan(
     plan_path: Path,
     destination: Path,
@@ -1599,21 +3025,28 @@ def apply_plan(
     if audit_destination.resolve() == destination.resolve():
         raise ChangeError("audit destination must be separate from the output deck")
     source_set = _source_set_for_plan(plan, source)
-    if len(source_set.documents) > 1 and destination.resolve().parent != source.resolve().parent:
-        raise ChangeError(
-            "a deck with include files must be written in its original input directory; "
-            "source-set copying is not implemented"
-        )
     document = source_set.documents[source.resolve()]
     if document.sha256 != plan["base_sha256"]:
         raise ChangeError("source changed after planning; create a new change plan")
     patches = plan.get("patches") or [plan["patch"]]
-    updated, updated_document, model_paths, source_diff, validation = _validated_plan_proposal(
+    replacements, updated_document, model_paths, source_diff, validation = _validated_plan_proposal(
         plan, source, document, source_set
     )
-    output_source_set_sha256 = source_set.digest_with({source.resolve(): updated})
+    output_source_set_sha256 = source_set.digest_with(replacements)
     if plan.get("proposed_source_set_sha256") not in {None, output_source_set_sha256}:
         raise ChangeError("updated source set does not match the plan's proposed digest")
+    output_map = _source_set_output_map(source_set, destination)
+    included_replacements = [path for path in replacements if path != source_set.root]
+    if included_replacements and destination.resolve().parent == source_set.input_directory:
+        raise ChangeError(
+            "a plan that changes include files requires a separate destination directory"
+        )
+    output_paths = list(output_map.values())
+    conflicts = [path for path in output_paths if path.exists()]
+    if conflicts:
+        raise ChangeError(f"source-set output already exists: {conflicts[0]}")
+    if audit_destination.resolve() in {path.resolve() for path in output_paths}:
+        raise ChangeError("audit destination must be separate from every source-set output")
 
     registry = load_registry()
     audit: dict[str, Any] = {
@@ -1632,7 +3065,8 @@ def apply_plan(
         "base_source_set_sha256": source_set.sha256,
         "output_source_set_sha256": output_source_set_sha256,
         "changed_model_paths": model_paths,
-        "affected_files": [str(destination.resolve())],
+        "affected_files": [str(output_map[path]) for path in replacements],
+        "output_files": [str(path) for path in output_paths],
         "inputs": plan.get("inputs", []),
         "source_diff": source_diff,
         "validation": validation,
@@ -1642,13 +3076,23 @@ def apply_plan(
     audit_digest = _plan_digest(audit)
     audit["audit_digest"] = audit_digest
     audit["audit_id"] = audit_digest[:16]
-    with destination.open("xb") as stream:
-        stream.write(updated)
+    written: list[Path] = []
     try:
+        for source_path, output_path in output_map.items():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            raw = replacements.get(source_path, source_set.documents[source_path].raw)
+            with output_path.open("xb") as stream:
+                stream.write(raw)
+            written.append(output_path)
+        copied = SourceSet.read(destination.resolve(), destination.resolve().parent)
+        if copied.sha256 != output_source_set_sha256:
+            raise ChangeError("copied source set does not match the reviewed output digest")
         with audit_destination.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(json.dumps(audit, indent=2, sort_keys=True) + "\n")
-    except OSError:
-        destination.unlink(missing_ok=True)
+    except (OSError, ValueError, ChangeError):
+        audit_destination.unlink(missing_ok=True)
+        for path in reversed(written):
+            path.unlink(missing_ok=True)
         raise
     return {
         "plan_id": plan["plan_id"],
@@ -1662,6 +3106,7 @@ def apply_plan(
         "changed_model_paths": audit["changed_model_paths"],
         "changed_line": patches[0]["line"],
         "changed_lines": [patch["line"] for patch in patches],
+        "output_files": audit["output_files"],
         "inputs": audit["inputs"],
         "validation": validation,
         "audit": str(audit_destination.resolve()),

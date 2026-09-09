@@ -631,12 +631,16 @@ components:
     ValidationIssue:
       type: object
       additionalProperties: false
-      required: [code, severity, message]
+      required: [code, severity, message, level, provenance]
       properties:
         code:
           type: string
         severity:
           enum: [error, warning, information]
+        level:
+          enum: [syntax, structure, references, bsam-semantic-constraints, numeric-constraints, execution-compatibility, engineering-plausibility]
+        provenance:
+          enum: [source-defined, documentation-defined, mathematical-impossibility, engineering-heuristic, agent-policy]
         message:
           type: string
         model_path:

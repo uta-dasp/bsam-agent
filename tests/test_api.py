@@ -19,7 +19,7 @@ from bsam_agent.tool_contracts import TOOL_CONTRACTS, contract_manifest
 
 DECK = (
     b"INPUT\n3\nEND INPUT\n"
-    b"BOUNDARY\n*type\nmechanical\n*convergence\nabsolute=1\nEND BOUNDARY\n"
+    b"BOUNDARY\n*type\nmechanical\n*convergence\nabsolute=1\nmaxiterations=20\nEND BOUNDARY\n"
     b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
     b"MATERIALS\n0\nEND MATERIALS\n"
     b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
@@ -81,6 +81,13 @@ class LocalApiTests(unittest.TestCase):
             self.assertEqual(set(api.tools), set(TOOL_CONTRACTS))
             self.assertEqual(contract_manifest(), capabilities["tool_contracts"])
             self.assertGreater(len(capabilities["capabilities"]["cluster_commands"]), 10)
+            operational = capabilities["capabilities"]["operational_manifest"]
+            convergence = next(
+                item for item in operational
+                if item["id"] == "construct.boundary-convergence"
+            )
+            self.assertEqual("verified", convergence["operations"]["inspect"])
+            self.assertEqual("unsupported", convergence["operations"]["create"])
             transformations = capabilities["capabilities"]["transformations"]
             self.assertEqual("transformation.notch-expand-plies", transformations[0]["id"])
             self.assertTrue(transformations[0]["applicability"])
@@ -97,6 +104,29 @@ class LocalApiTests(unittest.TestCase):
                 "plan_path": "change.json",
             })
             self.assertTrue((root / "change.json").is_file())
+            removal = api.dispatch("preview_parameter_removal", {
+                "source": "model.in",
+                "block": "BOUNDARY",
+                "construct": "CONVERGENCE",
+                "parameter": "maxiterations",
+                "plan_path": "remove-parameter.json",
+            })
+            self.assertEqual("remove-optional-parameter", removal["operation"])
+            api.dispatch("preview_parameter_change", {
+                "source": "model.in",
+                "block": "BOUNDARY",
+                "construct": "CONVERGENCE",
+                "parameter": "maxiterations",
+                "value": "30",
+                "plan_path": "change-2.json",
+            })
+            composite = api.dispatch("preview_compose_changes", {
+                "source": "model.in",
+                "plan_paths": ["change.json", "change-2.json"],
+                "plan_path": "composite.json",
+            })
+            self.assertEqual("compose-changes", composite["operation"])
+            self.assertEqual(2, len(composite["patches"]))
             solver_source = root / "legacy-solver.in"
             solver_source.write_bytes(DECK.replace(
                 b"BOUNDARY\n",

@@ -66,6 +66,18 @@
       "median_response_seconds": 32.35,
       "observed_peak_working_memory_gib": 62.683
     },
+    "registry_0_30_0_rebenchmark": {
+      "date": "2026-09-04",
+      "cases": 33,
+      "mode": "structured-decision",
+      "schema_valid_rate": 0.9696969696969697,
+      "tool_and_argument_accuracy": 0.30303030303030304,
+      "policy_refusal_rate": 0.125,
+      "outcome_accuracy": 0.7878787878787878,
+      "median_response_seconds": 22.44,
+      "observed_peak_working_memory_gib": 110.3,
+      "accepted": false
+    },
     "accepted": false,
     "decision": "Fails the raw autonomous-routing gate; selected provisionally for guarded local chat because deterministic orchestration owns all authorization and tool execution."
   },

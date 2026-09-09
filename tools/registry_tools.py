@@ -24,6 +24,11 @@ VALID_COVERAGE = {
     "documented",
     "runtime-verified",
 }
+VALID_OPERATIONS = {
+    "parse", "semantic", "inspect", "modify", "create", "delete", "rename",
+    "generate", "static_validation", "execute",
+}
+VALID_OPERATION_STATUS = {"unassessed", "unsupported", "implemented", "verified"}
 
 
 class RegistryError(ValueError):
@@ -175,6 +180,20 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             )
         if item["coverage"] not in VALID_COVERAGE:
             raise RegistryError(f"{item['id']} has invalid coverage {item['coverage']}")
+        operations = item.get("operations", {})
+        unknown_operations = sorted(set(operations) - VALID_OPERATIONS)
+        if unknown_operations:
+            raise RegistryError(
+                f"{item['id']} has unknown operations: {', '.join(unknown_operations)}"
+            )
+        invalid_statuses = sorted({
+            str(status) for status in operations.values()
+            if status not in VALID_OPERATION_STATUS
+        })
+        if invalid_statuses:
+            raise RegistryError(
+                f"{item['id']} has invalid operation status: {', '.join(invalid_statuses)}"
+            )
         if not item["summary"].strip():
             raise RegistryError(f"{item['id']} has an empty summary")
         missing_evidence = sorted(set(item["evidence_ids"]) - set(evidence_by_id))
@@ -326,6 +345,13 @@ def _render_parameter(parameter: dict[str, Any]) -> str:
         )
     if "default" in parameter:
         details.append(f"default: `{json.dumps(parameter['default'], ensure_ascii=False)}`")
+    if parameter.get("edit_operations"):
+        details.append(
+            "edit: " + ", ".join(
+                f"{name}={status}"
+                for name, status in parameter["edit_operations"].items()
+            )
+        )
     suffix = f" ({'; '.join(details)})" if details else ""
     return (
         f"- `{parameter['name']}` ({parameter['value_type']}, {required}){suffix}: "
@@ -333,9 +359,18 @@ def _render_parameter(parameter: dict[str, Any]) -> str:
     )
 
 
+def _render_operations(lines: list[str], record: dict[str, Any]) -> None:
+    if record.get("operations"):
+        lines.append(
+            "- Operational support: " + ", ".join(
+                f"`{name}`={status}" for name, status in record["operations"].items()
+            )
+        )
+
+
 def _render_body(lines: list[str], title: str, body: dict[str, Any]) -> None:
     lines.extend([
-        f"### `{title}` body",
+        f"#### `{title}` body",
         "",
         f"Termination: {body['termination']}. Dependencies: "
         + ("; ".join(body["dependencies"]) or "none"),
@@ -372,7 +407,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Registry SHA-256: `{registry_digest}`",
         f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, and {counts['transformations']} registered transformations",
         "",
-        "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.",
+        "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
         "## Top-level blocks",
         "",
@@ -409,6 +444,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
                 f"- Evidence: {evidence}",
             ]
         )
+        _render_operations(lines, block)
         if block["parameters"]:
             lines.extend(["", "Known parameters:", ""])
             for parameter in block["parameters"]:
@@ -442,12 +478,31 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
             )
         )
 
-    lines.extend(["", "## Documented command bodies", ""])
+    lines.extend(["", "## Cluster command details", ""])
     for command in data["cluster_commands"]:
+        evidence = ", ".join(evidence_links[item] for item in command["evidence_ids"])
+        lines.extend([
+            f"### `{command['canonical']}`",
+            "",
+            command["summary"],
+            "",
+            f"- Registry ID: `{command['id']}`",
+            f"- Dispatch prefix: `{command['dispatch_prefix']}`",
+            f"- Coverage: {command['coverage']}",
+            f"- Evidence: {evidence}",
+        ])
+        _render_operations(lines, command)
+        if command["parameters"]:
+            lines.extend(["", "Known parameters:", ""])
+            for parameter in command["parameters"]:
+                lines.append(_render_parameter(parameter))
+        if command["remaining_work"]:
+            lines.extend(["", "Remaining specification work:", ""])
+            lines.extend(f"- {item}" for item in command["remaining_work"])
+        lines.append("")
         body = command.get("body")
-        if not body:
-            continue
-        _render_body(lines, command["canonical"], body)
+        if body:
+            _render_body(lines, command["canonical"], body)
 
     lines.extend([
         "## Nested block constructs",
@@ -480,6 +535,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
             f"- Coverage: {construct['coverage']}",
             f"- Evidence: {evidence}",
         ])
+        _render_operations(lines, construct)
         if construct["parameters"]:
             lines.extend(["", "Known parameters:", ""])
             for parameter in construct["parameters"]:

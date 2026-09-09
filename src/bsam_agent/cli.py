@@ -16,12 +16,14 @@ from .change import (
     plan_add_set_members,
     plan_add_element,
     plan_add_node,
+    plan_compose_changes,
     plan_delete_node,
     plan_create_set,
     plan_expand_notch_plies,
     plan_import_mesh,
     plan_migrate_legacy_solver,
     plan_parameter_change,
+    plan_parameter_removal,
     plan_rename_boundary_condition,
     review_plan,
     write_plan,
@@ -62,6 +64,29 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument("--occurrence", type=int, default=1)
     plan_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
     plan_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    remove_parameter_parser = subparsers.add_parser(
+        "plan-remove-parameter",
+        help="plan removal of an isolated optional parameter with verified omission semantics",
+    )
+    remove_parameter_parser.add_argument("deck")
+    remove_parameter_parser.add_argument("--block", required=True)
+    remove_parameter_parser.add_argument("--construct", required=True)
+    remove_parameter_parser.add_argument("--parameter", required=True)
+    remove_parameter_parser.add_argument("--occurrence", type=int, default=1)
+    remove_parameter_parser.add_argument(
+        "--workspace-root", help="contain the deck and all include targets"
+    )
+    remove_parameter_parser.add_argument("--out", required=True, help="new JSON plan path")
+
+    compose_parser = subparsers.add_parser(
+        "plan-compose-changes",
+        help="compose independent same-revision typed plans into one reviewed plan",
+    )
+    compose_parser.add_argument("deck")
+    compose_parser.add_argument("plans", nargs="+", help="2 to 8 component JSON plans")
+    compose_parser.add_argument("--workspace-root", help="contain the deck and all include targets")
+    compose_parser.add_argument("--out", required=True, help="new composite JSON plan path")
 
     node_parser = subparsers.add_parser("plan-add-node", help="plan a typed node insertion")
     node_parser.add_argument("deck")
@@ -268,6 +293,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.parameter,
                 args.value,
                 args.occurrence,
+                Path(args.workspace_root) if args.workspace_root else None,
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "plan-remove-parameter":
+            plan = plan_parameter_removal(
+                Path(args.deck), args.block, args.construct, args.parameter,
+                args.occurrence,
+                Path(args.workspace_root) if args.workspace_root else None,
+            )
+            write_plan(plan, Path(args.out))
+            _print_json(plan)
+            return 0
+        if args.command == "plan-compose-changes":
+            plan = plan_compose_changes(
+                Path(args.deck), [Path(item) for item in args.plans],
                 Path(args.workspace_root) if args.workspace_root else None,
             )
             write_plan(plan, Path(args.out))

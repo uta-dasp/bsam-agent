@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from .api import ApiError, LocalAgentApi
+from .capabilities import capability_manifest
 from .provider import Message, Provider, ProviderConfig, ProviderRequest, ProviderResponse
 from .registry import load_registry
 from .tool_contracts import TOOL_CONTRACTS, TOOL_DESCRIPTIONS, validate_arguments
@@ -26,6 +28,17 @@ POLICY_ERROR_CODES = (
 CONVERSATION_PHASES = frozenset({
     "understand", "inspect", "propose", "confirm", "execute", "verify", "explain",
 })
+_ROUTING_GENERIC_TERMS = frozenset({"type", "name", "file", "value", "last", "all"})
+_INTENT_TOOLS = {
+    "inspect": ("query_model", "inspect_model"),
+    "query": ("query_model", "inspect_model"),
+    "create": ("preview_create_entity",),
+    "modify": ("preview_parameter_change", "preview_modify_entity"),
+    "delete": ("preview_parameter_removal", "preview_delete_entity"),
+    "rename": ("preview_rename_entity",),
+    "validate": ("validate_model", "inspect_model"),
+    "run": ("run_bsam", "validate_model"),
+}
 
 
 @dataclass(frozen=True)
@@ -41,6 +54,97 @@ class LastPlan:
 
 
 @dataclass
+class TaskState:
+    """Bounded engineering-task state, intentionally separate from message history."""
+
+    objective: str
+    source: str
+    requested_outcomes: list[str]
+    status: str = "understand"
+    resolved_capabilities: list[str] = field(default_factory=list)
+    engineering_assumptions: list[str] = field(default_factory=list)
+    missing_decisions: list[str] = field(default_factory=list)
+    clarification: dict[str, Any] | None = None
+    plan_path: str | None = None
+    destination: str | None = None
+    steps: list[dict[str, Any]] = field(default_factory=list)
+    validation_state: dict[str, Any] | None = None
+    run_state: dict[str, Any] | None = None
+    failures: list[dict[str, Any]] = field(default_factory=list)
+    attempt_fingerprints: list[str] = field(default_factory=list)
+    failed_fingerprints: list[str] = field(default_factory=list)
+    recovery_count: int = 0
+    max_steps: int = 12
+    max_recoveries: int = 2
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "objective": self.objective,
+            "source": self.source,
+            "requested_outcomes": self.requested_outcomes,
+            "status": self.status,
+            "resolved_capabilities": self.resolved_capabilities,
+            "engineering_assumptions": self.engineering_assumptions,
+            "missing_decisions": self.missing_decisions,
+            "clarification": self.clarification,
+            "plan_path": self.plan_path,
+            "destination": self.destination,
+            "steps": self.steps,
+            "validation_state": self.validation_state,
+            "run_state": self.run_state,
+            "failures": self.failures,
+            "attempt_fingerprints": self.attempt_fingerprints,
+            "failed_fingerprints": self.failed_fingerprints,
+            "recovery_count": self.recovery_count,
+            "max_steps": self.max_steps,
+            "max_recoveries": self.max_recoveries,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> TaskState:
+        if not isinstance(value, dict):
+            raise ValueError("task state must be an object")
+        expected = set(cls("", "", []).as_dict())
+        if set(value) != expected:
+            raise ValueError("task state fields are invalid")
+        if not isinstance(value["objective"], str) or not isinstance(value["source"], str):
+            raise ValueError("task objective or source is invalid")
+        for name in (
+            "requested_outcomes", "resolved_capabilities", "engineering_assumptions",
+            "missing_decisions", "steps", "failures", "attempt_fingerprints",
+            "failed_fingerprints",
+        ):
+            if not isinstance(value[name], list):
+                raise ValueError(f"task {name} is invalid")
+        if value["status"] not in {
+            "understand", "inspect", "clarify", "propose", "confirm", "execute", "verify",
+            "complete", "failed",
+        }:
+            raise ValueError("task status is invalid")
+        clarification = value["clarification"]
+        if clarification is not None:
+            if not isinstance(clarification, dict) or set(clarification) != {
+                "kind", "tool", "arguments", "choices",
+            }:
+                raise ValueError("task clarification is invalid")
+            if (
+                clarification["kind"] != "parameter-context"
+                or clarification["tool"] not in {
+                    "preview_parameter_change", "preview_parameter_removal",
+                }
+                or not isinstance(clarification["arguments"], dict)
+                or not isinstance(clarification["choices"], list)
+            ):
+                raise ValueError("task clarification values are invalid")
+        for name in ("recovery_count", "max_steps", "max_recoveries"):
+            if not isinstance(value[name], int) or isinstance(value[name], bool) or value[name] < 0:
+                raise ValueError(f"task {name} is invalid")
+        if len(value["steps"]) > value["max_steps"]:
+            raise ValueError("task state exceeds its step bound")
+        return cls(**deepcopy(value))
+
+
+@dataclass
 class ConversationState:
     conversation_id: str = field(default_factory=lambda: uuid4().hex)
     phase: str = "understand"
@@ -48,12 +152,13 @@ class ConversationState:
     history: list[Message] = field(default_factory=list)
     pending_action: PendingAction | None = None
     last_plan: LastPlan | None = None
+    task: TaskState | None = None
 
     def as_dict(self) -> dict[str, Any]:
         pending = self.pending_action
         last_plan = self.last_plan
         return {
-            "schema_version": "0.2.0",
+            "schema_version": "0.4.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -64,11 +169,12 @@ class ConversationState:
             "last_plan": None if last_plan is None else {
                 "plan_path": last_plan.plan_path, "source": last_plan.source,
             },
+            "task": None if self.task is None else self.task.as_dict(),
         }
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0"}:
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
@@ -76,6 +182,8 @@ class ConversationState:
         }
         if value["schema_version"] == "0.2.0":
             expected.add("last_plan")
+        elif value["schema_version"] in {"0.3.0", "0.4.0"}:
+            expected.update({"last_plan", "task"})
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
         if not isinstance(value["conversation_id"], str) or not value["conversation_id"]:
@@ -120,9 +228,13 @@ class ConversationState:
             ):
                 raise ValueError("last plan is invalid")
             last_plan = LastPlan(last_plan_value["plan_path"], last_plan_value["source"])
+        task_value = deepcopy(value.get("task"))
+        if task_value is not None and value["schema_version"] == "0.3.0":
+            task_value.setdefault("clarification", None)
+        task = TaskState.from_dict(task_value) if task_value is not None else None
         return cls(
             value["conversation_id"], value["phase"], value["turn_number"], history,
-            pending, last_plan,
+            pending, last_plan, task,
         )
 
 
@@ -148,6 +260,70 @@ class ChatTurn:
         }
 
 
+def _normalized_routing_text(value: str) -> str:
+    return " ".join(re.sub(r"[_*.-]+", " ", value.casefold()).split())
+
+
+def capability_applicability(user_text: str) -> tuple[dict[str, Any], ...]:
+    """Match user-facing registry spellings to capabilities without authorizing operations."""
+    registry = load_registry()
+    records = [
+        *registry["top_level_blocks"], *registry["cluster_commands"],
+        *registry["nested_constructs"],
+    ]
+    manifests = {item["id"]: item for item in capability_manifest(registry)}
+    haystack = f" {_normalized_routing_text(user_text)} "
+    matches: list[dict[str, Any]] = []
+    for record in records:
+        terms = {
+            str(record["canonical"]).lstrip("*"),
+            str(record["id"]).rsplit(".", 1)[-1],
+        }
+        terms.update(str(term) for term in record.get("routing_terms", []))
+        for parameter in record.get("parameters", []):
+            if not isinstance(parameter, dict):
+                continue
+            terms.add(str(parameter.get("name", "")))
+            terms.update(str(alias) for alias in parameter.get("aliases", []))
+            terms.update(str(term) for term in parameter.get("routing_terms", []))
+        normalized = {
+            _normalized_routing_text(term) for term in terms
+            if term and _normalized_routing_text(term) not in _ROUTING_GENERIC_TERMS
+        }
+        if any(f" {term} " in haystack for term in normalized):
+            matches.append(manifests[str(record["id"])])
+    return tuple(matches)
+
+
+def _requested_high_level_intent(text: str) -> str | None:
+    if re.search(r"\b(?:add|append|insert)\b.+\bto\b.+\b(?:set|list)\b", text):
+        return "modify"
+    patterns = (
+        ("run", r"\b(?:run|launch|execute)\b"),
+        ("rename", r"\b(?:rename|retitle)\b"),
+        ("delete", r"\b(?:delete|remove)\b"),
+        ("create", r"\b(?:add|create|insert|append)\b"),
+        ("modify", r"\b(?:change|changing|set|adjust|make|modify|update|increase|decrease|raise|lower|reduce)\b"),
+        ("validate", r"\b(?:validate|check)\b"),
+        ("inspect", r"\b(?:inspect|summarize|summary|describe|report)\b"),
+        ("query", r"\b(?:what\s+is|which|how\s+many|show|get|query|list|references?)\b"),
+    )
+    return next((intent for intent, pattern in patterns if re.search(pattern, text)), None)
+
+
+def _capability_derived_tools(user_text: str) -> tuple[str, ...]:
+    intent = _requested_high_level_intent(user_text.casefold())
+    if intent is None:
+        return ()
+    applicable = capability_applicability(user_text)
+    if not any(
+        item["intents"][intent] in {"implemented", "verified"}
+        for item in applicable
+    ):
+        return ()
+    return _INTENT_TOOLS[intent]
+
+
 def relevant_tools(user_text: str) -> tuple[str, ...]:
     """Bound the router prompt to likely tools without authorizing any action."""
     text = user_text.casefold()
@@ -161,16 +337,31 @@ def relevant_tools(user_text: str) -> tuple[str, ...]:
         return ("run_bsam", "validate_model", "get_run_status")
     if "unknown" in text or "undocumented" in text or "sounds plausible" in text:
         return ("get_capabilities", "preview_parameter_change", "validate_model")
-    if "rename" in text:
-        return ("preview_rename_boundary_condition", "review_change")
+    if re.search(r"\b(?:compose|combine|merge)\b", text) and (
+        "plan" in text or ".json" in text
+    ):
+        return ("preview_compose_changes", "review_change", "apply_change")
+    if re.search(r"\b(?:remove|delete)\b", text) and any(
+        f" {_normalized_routing_text(item['name'])} "
+        in f" {_normalized_routing_text(text)} "
+        for item in _parameter_catalog()
+    ):
+        return ("preview_parameter_removal", "review_change", "apply_change")
     if "two-to-eight" in text or "eight-ply" in text or "8-ply" in text:
         return ("preview_expand_notch_plies", "review_change")
     if "apply" in text:
         return ("apply_change", "review_change")
+    if re.search(r"\b(?:migrate|legacy)\b", text) and (
+        "solver" in text or "pardiso" in text
+    ):
+        return ("preview_migrate_legacy_solver", "inspect_model", "validate_model")
+    derived = _capability_derived_tools(user_text)
+    if derived:
+        return derived
     if re.search(r"\b(?:preview|change|changing|set|adjust|make|modify|update)\b", text):
         return ("preview_parameter_change", "review_change", "apply_change")
     if "stale" in text or "recheck" in text or "review" in text:
-        return ("review_change", "apply_change", "validate_model")
+        return ("preview_refresh_change", "review_change", "apply_change", "validate_model")
     if "rewrite" in text or "render" in text:
         return ("get_capabilities", "review_change", "apply_change")
     if "mesh" in text:
@@ -185,13 +376,13 @@ def relevant_tools(user_text: str) -> tuple[str, ...]:
             "preview_add_element", "preview_create_set", "preview_add_set_members",
             "inspect_model",
         )
-    if "solver" in text or "pardiso" in text:
-        return ("preview_migrate_legacy_solver", "inspect_model", "validate_model")
     if "inspect" in text or "summar" in text:
-        return ("inspect_model", "validate_model", "get_capabilities")
+        return ("query_model", "inspect_model", "validate_model", "get_capabilities")
     if "validate" in text or "check" in text:
         return ("validate_model", "inspect_model")
-    return ("get_capabilities", "inspect_model", "validate_model")
+    if capability_applicability(user_text):
+        return ("query_model", "preview_parameter_change", "get_capabilities", "inspect_model")
+    return ("get_capabilities", "query_model", "inspect_model", "validate_model")
 
 
 def decision_schema(tool_names: tuple[str, ...]) -> dict[str, Any]:
@@ -225,7 +416,9 @@ def routing_prompt(tool_names: tuple[str, ...]) -> str:
         "set confirm=false; the local application handles confirmation. Use outcome=refuse, "
         "tool=null, and arguments={} for unsupported raw rewriting. Changing an existing "
         "registered parameter is supported and must use preview_parameter_change, not refusal. "
-        "For that tool identify only source, parameter, and value; deterministic code resolves "
+        "Removing an optional registered parameter is supported only through "
+        "preview_parameter_removal. For parameter tools identify only source, parameter, and "
+        "the new value when required; deterministic code resolves "
         "the internal BSAM location and safe output paths. Use outcome=answer only when "
         "no tool is needed. Unknown BSAM features route to get_capabilities. Available tools: "
         + json.dumps(contracts, separators=(",", ":"), sort_keys=True)
@@ -233,17 +426,21 @@ def routing_prompt(tool_names: tuple[str, ...]) -> str:
 
 
 def _routing_request_schema(tool: str) -> dict[str, Any]:
-    if tool != "preview_parameter_change":
+    if tool not in {"preview_parameter_change", "preview_parameter_removal"}:
         return TOOL_CONTRACTS[tool].request_schema()
+    required = ["source", "parameter"]
+    properties: dict[str, Any] = {
+        "source": {"type": "string"},
+        "parameter": {"type": "string"},
+    }
+    if tool == "preview_parameter_change":
+        required.append("value")
+        properties["value"] = {"type": "string"}
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["source", "parameter", "value"],
-        "properties": {
-            "source": {"type": "string"},
-            "parameter": {"type": "string"},
-            "value": {"type": "string"},
-        },
+        "required": required,
+        "properties": properties,
         "registered_parameters": _parameter_catalog(),
     }
 
@@ -302,10 +499,31 @@ class ChatOrchestrator:
         correlation_id = f"chat-{self.state.conversation_id}-{self.state.turn_number}"
         self.state.phase = "understand"
         self._audit("user_turn", correlation_id=correlation_id, user_digest=_digest(text))
+        task = _task_from_request(text)
+        if task is not None:
+            self.state.task = task
+            self._audit(
+                "task_started", correlation_id=correlation_id,
+                task_objective_digest=_digest(task.objective), source=task.source,
+                requested_outcomes=task.requested_outcomes,
+            )
         tool_names = relevant_tools(text)
-        decision = _deterministic_inspection_request(text)
+        decision = (
+            _deterministic_clarification_response(text, self.state)
+            if task is None else None
+        )
+        if decision is None:
+            decision = _deterministic_query_request(text)
+        if decision is None:
+            decision = _deterministic_inspection_request(text)
+        if decision is None:
+            decision = _deterministic_parameter_removal_request(text)
         if decision is None:
             decision = _deterministic_parameter_request(text)
+        if decision is None:
+            decision = _deterministic_refresh_request(text, self.state)
+        if decision is None:
+            decision = _deterministic_unsupported_operation(text)
         if decision is None:
             decision = _deterministic_last_plan_request(text, self.state)
         if decision is None:
@@ -336,7 +554,7 @@ class ChatOrchestrator:
         if decision["outcome"] == "refuse":
             guidance = _unsupported_guidance(text)
             return self._result(
-                "explain", guidance or decision["response"] or "That request is not allowed.",
+                "explain", decision["response"] or guidance or "That request is not allowed.",
                 tool=decision["tool"], error=decision["error_code"] or "refused",
             )
         if decision["outcome"] == "answer":
@@ -356,6 +574,26 @@ class ChatOrchestrator:
         try:
             validate_arguments(tool, arguments)
         except (KeyError, TypeError, ValueError) as exc:
+            if tool in {
+                "preview_parameter_change", "preview_parameter_removal",
+            } and self.state.task is not None:
+                candidates = _parameter_candidates(str(arguments.get("parameter", "")))
+                if len(candidates) > 1:
+                    self.state.task.status = "clarify"
+                    self.state.task.missing_decisions = [
+                        f"select parameter context: {item[0]}/{item[1]}" for item in candidates
+                    ]
+                    choices = []
+                    for block, construct, _canonical, _summary in candidates:
+                        choice = {"block": block, "construct": construct}
+                        if choice not in choices:
+                            choices.append(choice)
+                    self.state.task.clarification = {
+                        "kind": "parameter-context",
+                        "tool": tool,
+                        "arguments": deepcopy(arguments),
+                        "choices": choices,
+                    }
             return self._result(
                 "explain", _invalid_argument_guidance(tool, arguments, exc),
                 tool=tool, error="invalid_arguments",
@@ -465,48 +703,248 @@ class ChatOrchestrator:
     def _execute(
         self, tool: str, arguments: dict[str, Any], *, user_text: str = "",
     ) -> ChatTurn:
-        if tool in {"inspect_model", "validate_model", "import_mesh", "get_capabilities"}:
+        if tool in {"inspect_model", "query_model", "validate_model", "import_mesh", "get_capabilities"}:
             self.state.phase = "inspect"
         elif tool in PREVIEW_TOOLS or tool == "review_change":
             self.state.phase = "propose"
         else:
             self.state.phase = "execute"
+        task = self.state.task
+        if task is not None and len(task.steps) >= task.max_steps:
+            task.status = "failed"
+            return self._result(
+                "explain", f"Task stopped at its {task.max_steps}-step safety bound.",
+                tool=tool, error="step_limit_reached",
+            )
+        if (
+            task is not None
+            and tool == "preview_refresh_change"
+            and task.recovery_count >= task.max_recoveries
+        ):
+            task.status = "failed"
+            return self._result(
+                "explain", f"Task stopped at its {task.max_recoveries}-recovery safety bound.",
+                tool=tool, error="recovery_limit_reached",
+            )
+        fingerprint = _action_fingerprint(tool, arguments)
+        if task is not None and fingerprint in task.failed_fingerprints:
+            task.status = "failed"
+            return self._result(
+                "explain", "The identical action already failed in this task; it was not repeated.",
+                tool=tool, error="repeated_failed_action",
+            )
+        if (
+            task is not None
+            and tool in PREVIEW_TOOLS
+            and "validate" in task.requested_outcomes
+            and not task.steps
+        ):
+            inspected = self._task_read_only_step("inspect_model", {"source": task.source})
+            if isinstance(inspected, ChatTurn):
+                return inspected
+            if inspected.get("summary", {}).get("errors", 0):
+                task.status = "failed"
+                task.validation_state = inspected.get("summary")
+                return self._result(
+                    "explain",
+                    "The source model has blocking validation errors; no change plan was created.",
+                    tool="inspect_model", result=inspected, error="validation_failed",
+                )
         self._audit("tool_started", tool=tool, arguments_digest=_digest(arguments))
         try:
             result = self.api.dispatch(tool, arguments)
         except ApiError as exc:
             self._audit("tool_failed", tool=tool, error_code=exc.code)
-            return self._result("explain", str(exc), tool=tool, error=exc.code)
+            self._record_task_failure(tool, arguments, exc.code, str(exc))
+            category = _failure_category(exc.code, str(exc))
+            return self._result(
+                "explain", f"{exc} {_failure_guidance(category)}".strip(),
+                tool=tool, error=exc.code,
+            )
         except (OSError, TypeError, ValueError) as exc:
             self._audit("tool_failed", tool=tool, error_code="tool_error")
-            return self._result("explain", str(exc), tool=tool, error="tool_error")
+            self._record_task_failure(tool, arguments, "tool_error", str(exc))
+            category = _failure_category("tool_error", str(exc))
+            return self._result(
+                "explain", f"{exc} {_failure_guidance(category)}".strip(),
+                tool=tool, error="tool_error",
+            )
+        self._record_task_step(tool, arguments, result)
         if tool in PREVIEW_TOOLS or tool == "review_change":
             phase = "propose"
-        elif tool in {"inspect_model", "import_mesh", "get_capabilities"}:
+        elif tool in {"inspect_model", "query_model", "import_mesh", "get_capabilities"}:
             phase = "explain"
         else:
             phase = "verify"
         message = _summarize_result(tool, result)
+        if task is not None and tool == "run_bsam" and task.status == "failed":
+            message += " " + _failure_guidance(task.failures[-1]["category"])
         if tool in PREVIEW_TOOLS:
             source = arguments.get("source") or arguments.get("template")
             plan_path = arguments.get("plan_path")
             if isinstance(source, str) and isinstance(plan_path, str):
                 self.state.last_plan = LastPlan(plan_path, source)
+                if task is not None:
+                    task.plan_path = plan_path
+                    task.status = "propose"
                 message += f" Plan: {plan_path}."
         pending = _preview_follow_up(tool, arguments, user_text)
         if pending is not None:
             self.state.pending_action = pending
+            if task is not None:
+                task.destination = str(pending.arguments["destination"])
+                task.status = "confirm"
             phase = "confirm"
             message += (
                 f" The reviewed output will be written to {pending.arguments['destination']}. "
                 "Type /confirm to create it or /cancel."
             )
+        if tool == "apply_change" and task is not None and "validate" in task.requested_outcomes:
+            validation = self._task_read_only_step(
+                "validate_model", {"source": str(arguments["destination"])},
+            )
+            if isinstance(validation, ChatTurn):
+                return validation
+            result = {**result, "post_apply_validation": validation}
+            task.validation_state = validation.get("summary")
+            errors = validation.get("summary", {}).get("errors", 0)
+            if errors:
+                task.status = "failed"
+                task.failures.append({
+                    "category": "validation_failure", "tool": "validate_model",
+                    "message": f"post-apply validation reported {errors} error(s)",
+                })
+                message += f" Post-apply validation found {errors} error(s)."
+            else:
+                task.status = "complete"
+                message += " Post-apply validation completed with zero errors."
         self._audit("tool_completed", tool=tool, result_digest=_digest(result), phase=phase)
         return self._result(
             phase, message, tool=tool, result=result,
             requires_confirmation=pending is not None,
             error="confirmation_required" if pending is not None else None,
         )
+
+    def _task_read_only_step(
+        self, tool: str, arguments: dict[str, Any],
+    ) -> dict[str, Any] | ChatTurn:
+        task = self.state.task
+        if task is None:
+            raise RuntimeError("task read-only step requires task state")
+        if len(task.steps) >= task.max_steps:
+            task.status = "failed"
+            return self._result(
+                "explain", f"Task stopped at its {task.max_steps}-step safety bound.",
+                tool=tool, error="step_limit_reached",
+            )
+        fingerprint = _action_fingerprint(tool, arguments)
+        if fingerprint in task.failed_fingerprints:
+            task.status = "failed"
+            return self._result(
+                "explain", "The identical read-only action already failed; it was not repeated.",
+                tool=tool, error="repeated_failed_action",
+            )
+        self._audit("tool_started", tool=tool, arguments_digest=_digest(arguments), automatic=True)
+        try:
+            result = self.api.dispatch(tool, arguments)
+        except ApiError as exc:
+            self._record_task_failure(tool, arguments, exc.code, str(exc))
+            category = _failure_category(exc.code, str(exc))
+            return self._result(
+                "explain", f"{exc} {_failure_guidance(category)}".strip(),
+                tool=tool, error=exc.code,
+            )
+        except (OSError, TypeError, ValueError) as exc:
+            self._record_task_failure(tool, arguments, "tool_error", str(exc))
+            category = _failure_category("tool_error", str(exc))
+            return self._result(
+                "explain", f"{exc} {_failure_guidance(category)}".strip(),
+                tool=tool, error="tool_error",
+            )
+        self._record_task_step(tool, arguments, result)
+        self._audit(
+            "tool_completed", tool=tool, result_digest=_digest(result),
+            phase="inspect", automatic=True,
+        )
+        return result
+
+    def _record_task_step(
+        self, tool: str, arguments: dict[str, Any], result: dict[str, Any],
+    ) -> None:
+        task = self.state.task
+        if task is None:
+            return
+        fingerprint = _action_fingerprint(tool, arguments)
+        task.attempt_fingerprints.append(fingerprint)
+        task.steps.append({
+            "index": len(task.steps) + 1,
+            "tool": tool,
+            "arguments_digest": _digest(arguments),
+            "result_digest": _digest(result),
+            "status": "completed",
+        })
+        if tool == "inspect_model":
+            task.status = "inspect"
+        elif tool in PREVIEW_TOOLS:
+            task.status = "propose"
+            if tool in {"preview_parameter_change", "preview_parameter_removal"}:
+                capability = f"{arguments.get('block')}/{arguments.get('construct')}"
+                if capability not in task.resolved_capabilities:
+                    task.resolved_capabilities.append(capability)
+            elif tool == "preview_refresh_change":
+                task.recovery_count += 1
+            elif tool == "preview_rename_boundary_condition":
+                capability = "construct.boundary-conditions"
+                if capability not in task.resolved_capabilities:
+                    task.resolved_capabilities.append(capability)
+            elif tool == "preview_rename_entity":
+                capability = str(arguments.get("capability", ""))
+                if capability and capability not in task.resolved_capabilities:
+                    task.resolved_capabilities.append(capability)
+            elif tool in {
+                "preview_create_entity", "preview_modify_entity", "preview_delete_entity",
+            }:
+                capability = str(arguments.get("capability", ""))
+                if capability and capability not in task.resolved_capabilities:
+                    task.resolved_capabilities.append(capability)
+        elif tool == "apply_change":
+            task.status = "execute"
+        elif tool == "validate_model":
+            task.status = "verify"
+            task.validation_state = result.get("summary")
+        elif tool == "run_bsam":
+            task.run_state = {
+                key: result.get(key) for key in ("state", "classification", "output_directory")
+            }
+            classification = str(result.get("classification", "unknown")).casefold()
+            if classification in {"failed", "disrupted"}:
+                category = str(result.get("failure_category") or "execution_failure")
+                task.failures.append({
+                    "category": category,
+                    "tool": tool,
+                    "message": str(result.get("diagnostic") or f"run classified {classification}"),
+                })
+                task.failed_fingerprints.append(fingerprint)
+                task.status = "failed"
+            else:
+                task.status = "execute"
+
+    def _record_task_failure(
+        self, tool: str, arguments: dict[str, Any], code: str, message: str,
+    ) -> None:
+        task = self.state.task
+        if task is None:
+            return
+        fingerprint = _action_fingerprint(tool, arguments)
+        task.attempt_fingerprints.append(fingerprint)
+        task.failed_fingerprints.append(fingerprint)
+        task.failures.append({
+            "category": _failure_category(code, message),
+            "tool": tool,
+            "code": code,
+            "message": message,
+        })
+        task.status = "failed"
 
     def _result(
         self,
@@ -545,6 +983,83 @@ def _digest(value: Any) -> str:
     if not isinstance(value, str):
         value = json.dumps(value, separators=(",", ":"), sort_keys=True)
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _action_fingerprint(tool: str, arguments: dict[str, Any]) -> str:
+    return _digest({"tool": tool, "arguments": arguments})
+
+
+def _failure_category(code: str, message: str) -> str:
+    text = f"{code} {message}".casefold()
+    if "source set changed" in text or "source changed after planning" in text or "stale" in text:
+        return "stale_revision"
+    if "reference" in text or "unresolved" in text:
+        return "missing_reference"
+    if "unsupported" in text:
+        return "unsupported_capability"
+    if "syntax" in text or "parse" in text:
+        return "syntax_failure"
+    if "value" in text or code == "invalid_arguments":
+        return "invalid_value"
+    if "execution" in text or "run" in text:
+        return "execution_failure"
+    return "tool_failure"
+
+
+def _failure_guidance(category: str) -> str:
+    guidance = {
+        "stale_revision": (
+            "The stale plan was not applied; inspect the changed source or re-preview its "
+            "typed request with preview_refresh_change."
+        ),
+        "missing_reference": (
+            "Inspect the unresolved reference and its target before proposing another change."
+        ),
+        "invalid_value": (
+            "Use the registered parameter type and allowed values before creating a new plan."
+        ),
+        "syntax_failure": (
+            "Inspect the reported source location and correct only the documented syntax."
+        ),
+        "unsupported_capability": (
+            "Query operational capability metadata; do not invent syntax for this operation."
+        ),
+        "execution_input_failure": (
+            "Review the structured input-processing evidence; no engineering values were changed."
+        ),
+        "execution_failure": (
+            "Review the structured run evidence; no physical or numerical controls were changed."
+        ),
+    }
+    return guidance.get(category, "No automatic recovery was attempted.")
+
+
+def _task_from_request(text: str) -> TaskState | None:
+    source = _source_path_from_text(text)
+    if source is None:
+        return None
+    if re.search(r"\b(?:run|launch)\b", text, re.IGNORECASE):
+        return TaskState(
+            objective=text,
+            source=source,
+            requested_outcomes=["run", "verify"],
+        )
+    mutation = re.search(
+        r"\b(?:change|set|update|modify|rename|compose|combine|merge|add|create|insert|append|delete|remove|extend)\b",
+        text,
+        re.IGNORECASE,
+    )
+    validate = re.search(r"\b(?:validate|check)\b", text, re.IGNORECASE)
+    if mutation is None or validate is None:
+        return None
+    paths = _input_paths_from_text(text)
+    destination = paths[1] if len(paths) > 1 else _default_destination(source)
+    return TaskState(
+        objective=text,
+        source=source,
+        requested_outcomes=["modify", "validate"],
+        destination=destination,
+    )
 
 
 def _normalize_arguments(
@@ -595,15 +1110,27 @@ def _parameter_candidates(name: str) -> list[tuple[str, str, str, str]]:
         if isinstance(item, dict)
     }
     matches: list[tuple[str, str, str, str]] = []
-    for construct in registry.get("nested_constructs", []):
+    records = [
+        *registry.get("nested_constructs", []),
+        *(
+            item for item in registry.get("top_level_blocks", [])
+            if item.get("operations", {}).get("modify") in {"implemented", "verified"}
+        ),
+    ]
+    for construct in records:
         if not isinstance(construct, dict):
             continue
         for parameter in construct.get("parameters", []):
             if not isinstance(parameter, dict):
                 continue
             canonical = str(parameter.get("name", ""))
-            if canonical.casefold() == name.casefold():
+            terms = [canonical, *(str(item) for item in parameter.get("routing_terms", []))]
+            if _normalized_routing_text(name) in {
+                _normalized_routing_text(term) for term in terms
+            }:
                 block = blocks.get(construct.get("parent_block_id"), "")
+                if not block and str(construct.get("id", "")).startswith("block."):
+                    block = str(construct.get("canonical", "")).lstrip("*")
                 nested = str(construct.get("canonical", "")).lstrip("*")
                 if block and nested:
                     matches.append((
@@ -624,10 +1151,22 @@ def _parameter_catalog() -> list[dict[str, Any]]:
     result = []
     for name in names:
         candidates = _parameter_candidates(name)
+        routing_terms = sorted({
+            str(term)
+            for construct in [
+                *registry.get("nested_constructs", []),
+                *registry.get("top_level_blocks", []),
+            ]
+            if isinstance(construct, dict)
+            for parameter in construct.get("parameters", [])
+            if isinstance(parameter, dict) and parameter.get("name") == name
+            for term in parameter.get("routing_terms", [])
+        }, key=str.casefold)
         result.append({
             "name": name,
             "meaning": candidates[0][3] if len(candidates) == 1 else "context-dependent",
             "locations": [f"{item[0]}/{item[1]}" for item in candidates],
+            "routing_terms": routing_terms,
         })
     return result
 
@@ -643,38 +1182,269 @@ def _default_destination(source: str) -> str:
     return str(path.with_name(f"{path.stem}.changed{path.suffix}")).replace("\\", "/")
 
 
+def _deterministic_clarification_response(
+    text: str, state: ConversationState,
+) -> dict[str, Any] | None:
+    task = state.task
+    if task is None or task.status != "clarify" or task.clarification is None:
+        return None
+    clarification = task.clarification
+    normalized = f" {_normalized_routing_text(text)} "
+    matched: list[dict[str, str]] = []
+    for choice in clarification["choices"]:
+        block = str(choice.get("block", ""))
+        construct = str(choice.get("construct", ""))
+        terms = {
+            _normalized_routing_text(construct),
+            _normalized_routing_text(f"{block} {construct}"),
+            _normalized_routing_text(f"{block}/{construct}"),
+        }
+        if any(term and f" {term} " in normalized for term in terms):
+            matched.append(choice)
+    if len(matched) == 1:
+        arguments = deepcopy(clarification["arguments"])
+        arguments.update(matched[0])
+        task.status = "propose"
+        task.missing_decisions = []
+        task.clarification = None
+        return {
+            "outcome": "dispatch", "tool": clarification["tool"],
+            "arguments": arguments, "error_code": None, "response": None,
+        }
+    choices = ", ".join(
+        f"{item['block']}/{item['construct']}" for item in clarification["choices"]
+    )
+    return {
+        "outcome": "answer", "tool": None, "arguments": {}, "error_code": None,
+        "response": f"Please select one parameter context: {choices}.",
+    }
+
+
 def _deterministic_parameter_request(text: str) -> dict[str, Any] | None:
     """Recognize the narrow, registry-backed parameter-edit form without model guessing."""
     if not re.search(
         r"\b(?:create|write|save|produce)\b.*\b(?:new|output|file|deck)\b|"
-        r"\bdo\s+not\s+overwrite\b",
+        r"\bdo\s+not\s+overwrite\b|\b(?:validate|check)\b",
         text, re.IGNORECASE,
     ):
         return None
     change = re.search(
-        r"\b(?:change|set|update)\s+(?:the\s+)?(?P<parameter>[A-Za-z][A-Za-z0-9_-]*)"
-        r"\b.*?\bto\s+(?P<value>[^\s,;]+)",
+        r"\b(?:change|set|update)\s+(?:the\s+)?(?P<parameter_context>.+?)"
+        r"\s+\bto\s+(?P<value>[^\s,;]+)",
         text, re.IGNORECASE,
     )
     source = _source_path_from_text(text)
     if change is None or source is None:
         return None
-    location = _parameter_location(change.group("parameter"))
-    if location is None:
-        return None
-    block, construct, parameter = location
+    parameter_context = change.group("parameter_context")
+    normalized_context = f" {_normalized_routing_text(parameter_context)} "
+    mentioned_terms = [
+        term
+        for item in _parameter_catalog()
+        for term in [item["name"], *item.get("routing_terms", [])]
+        if f" {_normalized_routing_text(term)} " in normalized_context
+    ]
+    requested_parameter = (
+        max(mentioned_terms, key=lambda item: len(_normalized_routing_text(item)))
+        if mentioned_terms
+        else parameter_context.split()[0]
+    )
+    candidates = _parameter_candidates(requested_parameter)
+    if not candidates:
+        parameter = requested_parameter
+    else:
+        parameter = candidates[0][2]
     value = change.group("value").rstrip(".!?")
     arguments = {
         "source": source,
-        "block": block,
-        "construct": construct,
         "parameter": parameter,
         "value": value,
         "plan_path": _default_plan_path(source, parameter),
     }
+    if len(candidates) == 1:
+        block, construct, _canonical, _summary = candidates[0]
+        arguments.update({"block": block, "construct": construct})
     return {
         "outcome": "dispatch", "tool": "preview_parameter_change",
         "arguments": arguments, "error_code": None, "response": None,
+    }
+
+
+def _deterministic_parameter_removal_request(text: str) -> dict[str, Any] | None:
+    """Recognize removal of a named registered parameter without guessing context."""
+    source = _source_path_from_text(text)
+    if source is None or not re.search(
+        r"\b(?:remove|delete)\b", text, re.IGNORECASE,
+    ):
+        return None
+    normalized = f" {_normalized_routing_text(text)} "
+    mentioned = [
+        item for item in _parameter_catalog()
+        if any(
+            f" {_normalized_routing_text(term)} " in normalized
+            for term in [item["name"], *item.get("routing_terms", [])]
+        )
+    ]
+    if not mentioned:
+        return None
+    requested = max(
+        mentioned,
+        key=lambda item: max(
+            len(_normalized_routing_text(term))
+            for term in [item["name"], *item.get("routing_terms", [])]
+            if f" {_normalized_routing_text(term)} " in normalized
+        ),
+    )
+    parameter = str(requested["name"])
+    candidates = _parameter_candidates(parameter)
+    arguments: dict[str, Any] = {
+        "source": source,
+        "parameter": parameter,
+        "plan_path": _default_plan_path(source, f"remove-{parameter}"),
+    }
+    if len(candidates) == 1:
+        block, construct, canonical, _summary = candidates[0]
+        arguments.update({
+            "block": block, "construct": construct, "parameter": canonical,
+        })
+    return {
+        "outcome": "dispatch", "tool": "preview_parameter_removal",
+        "arguments": arguments, "error_code": None, "response": None,
+    }
+
+
+def _deterministic_query_request(text: str) -> dict[str, Any] | None:
+    """Resolve focused read-only parameter queries from registry identities."""
+    source = _source_path_from_text(text)
+    if source is None or not re.search(
+        r"\b(?:what\s+is|show|get|inspect|query|list)\b", text, re.IGNORECASE,
+    ):
+        return None
+    reference_matches: list[tuple[int, str, str]] = []
+    for item in capability_applicability(text):
+        entity_kind = item.get("entity_kind")
+        if not entity_kind or item["intents"]["query"] not in {"implemented", "verified"}:
+            continue
+        terms = [*item.get("routing_terms", []), str(item["canonical"]).lstrip("*")]
+        for term in sorted(set(terms), key=len, reverse=True):
+            words = [re.escape(word) for word in _normalized_routing_text(term).split()]
+            if not words:
+                continue
+            term_pattern = r"[ _-]+".join(words)
+            matched = re.search(
+                rf"\breferences?\s+(?:to|for)\s+(?:the\s+)?{term_pattern}\s+"
+                r"(?P<name>[A-Za-z0-9.-]+)",
+                text, re.IGNORECASE,
+            )
+            if matched:
+                reference_matches.append((
+                    len(_normalized_routing_text(term)),
+                    str(entity_kind), matched.group("name"),
+                ))
+                break
+    reference_selectors: set[tuple[str, str]] = set()
+    if reference_matches:
+        longest = max(item[0] for item in reference_matches)
+        reference_selectors = {
+            (kind, name) for score, kind, name in reference_matches if score == longest
+        }
+    if len(reference_selectors) == 1:
+        entity_kind, entity_name = next(iter(reference_selectors))
+        return {
+            "outcome": "dispatch", "tool": "query_model",
+            "arguments": {
+                "source": source, "query": "references-to",
+                "entity_kind": entity_kind, "entity_name": entity_name,
+            },
+            "error_code": None, "response": None,
+        }
+    named_entity_kind = None
+    if re.search(r"\bstructured materials?\b", text, re.IGNORECASE):
+        named_entity_kind = "structured-material"
+    else:
+        registered_kinds = {
+            str(item["entity_kind"])
+            for item in capability_applicability(text)
+            if item.get("entity_kind")
+            and item["intents"]["query"] in {"implemented", "verified"}
+        }
+        registered_kinds = {
+            kind for kind in registered_kinds
+            if not any(other.startswith(kind + "-") for other in registered_kinds)
+        }
+        if len(registered_kinds) == 1:
+            named_entity_kind = next(iter(registered_kinds))
+    if named_entity_kind and re.search(
+        r"\b(?:show|query|list)\b", text, re.IGNORECASE,
+    ):
+        return {
+            "outcome": "dispatch", "tool": "query_model",
+            "arguments": {
+                "source": source, "query": "list-entities", "entity_kind": named_entity_kind,
+            },
+            "error_code": None, "response": None,
+        }
+    catalog = _parameter_catalog()
+    normalized_text = f" {_normalized_routing_text(text)} "
+    mentioned = [
+        item["name"] for item in catalog
+        if any(
+            f" {_normalized_routing_text(term)} " in normalized_text
+            for term in [item["name"], *item.get("routing_terms", [])]
+        )
+    ]
+    if not mentioned:
+        return None
+    parameter = max(mentioned, key=len)
+    arguments: dict[str, Any] = {
+        "source": source, "query": "get-parameter", "parameter": parameter,
+    }
+    capabilities = [
+        item for item in capability_manifest()
+        if item["kind"] == "nested-construct"
+        and str(item["canonical"]).lstrip("*").casefold() != parameter.casefold()
+        and re.search(
+            rf"\b{re.escape(str(item['canonical']).lstrip('*'))}\b", text, re.IGNORECASE,
+        )
+    ]
+    if len(capabilities) == 1:
+        arguments["capability"] = capabilities[0]["id"]
+    return {
+        "outcome": "dispatch", "tool": "query_model", "arguments": arguments,
+        "error_code": None, "response": None,
+    }
+
+
+def _deterministic_unsupported_operation(text: str) -> dict[str, Any] | None:
+    """Refuse an explicitly unsupported registered operation with precise support evidence."""
+    operation_match = re.search(
+        r"\b(create|delete|rename|generate)\b", text, re.IGNORECASE,
+    )
+    if operation_match is None:
+        return None
+    operation = operation_match.group(1).casefold()
+    mentioned = [
+        item for item in capability_manifest()
+        if re.search(
+            rf"\b{re.escape(str(item['canonical']).lstrip('*'))}\b", text, re.IGNORECASE,
+        )
+    ]
+    if len(mentioned) != 1 or mentioned[0]["operations"].get(operation) != "unsupported":
+        return None
+    item = mentioned[0]
+    supported = [
+        name for name, status in item["operations"].items()
+        if status in {"implemented", "verified"}
+    ]
+    return {
+        "outcome": "refuse",
+        "tool": None,
+        "arguments": {},
+        "error_code": "unsupported_capability",
+        "response": (
+            f"{item['canonical']} is registered, but {operation} is explicitly unsupported. "
+            f"Available operational support: {', '.join(supported) or 'none'}. No change was made."
+        ),
     }
 
 
@@ -712,9 +1482,29 @@ def _deterministic_last_plan_request(
     }
 
 
+def _deterministic_refresh_request(
+    text: str, state: ConversationState,
+) -> dict[str, Any] | None:
+    last_plan = state.last_plan
+    if last_plan is None or not re.search(
+        r"\b(?:refresh|recreate|replan|re-preview|repreview)\b", text, re.IGNORECASE,
+    ):
+        return None
+    if not re.search(r"\b(?:stale|plan|change|preview)\b", text, re.IGNORECASE):
+        return None
+    return {
+        "outcome": "dispatch", "tool": "preview_refresh_change",
+        "arguments": {
+            "source": last_plan.source,
+            "stale_plan_path": last_plan.plan_path,
+        },
+        "error_code": None, "response": None,
+    }
+
+
 def _add_safe_defaults(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
     result = dict(arguments)
-    if tool == "preview_parameter_change" and "parameter" in result:
+    if tool in {"preview_parameter_change", "preview_parameter_removal"} and "parameter" in result:
         location = _parameter_location(str(result["parameter"]))
         if location is not None:
             block, construct, canonical = location
@@ -766,8 +1556,9 @@ def _unsupported_guidance(user_text: str) -> str | None:
         return (
             "I could not map that request to one safe deterministic operation. "
             "I can currently inspect or validate a deck, change one existing registered "
-            "parameter, expand the approved notch model from 2 to 8 plies, migrate its "
-            "legacy solver, or review/apply an existing plan."
+            "parameter, remove a registry-authorized optional parameter, compose independent "
+            "reviewed plans, expand the approved notch model "
+            "from 2 to 8 plies, migrate its legacy solver, or review/apply an existing plan."
         )
     return None
 
@@ -775,13 +1566,13 @@ def _unsupported_guidance(user_text: str) -> str | None:
 def _invalid_argument_guidance(
     tool: str, arguments: dict[str, Any], error: Exception,
 ) -> str:
-    if tool != "preview_parameter_change":
+    if tool not in {"preview_parameter_change", "preview_parameter_removal"}:
         return str(error)
     missing = [
         label for key, label in (
             ("source", "the relative `.in` source path"),
             ("parameter", "the parameter name"),
-            ("value", "the new value"),
+            *((("value", "the new value"),) if tool == "preview_parameter_change" else ()),
         )
         if not arguments.get(key)
     ]
@@ -804,6 +1595,25 @@ def _invalid_argument_guidance(
 
 
 def _summarize_result(tool: str, result: dict[str, Any]) -> str:
+    if tool == "query_model":
+        summary = result.get("summary", {})
+        matches = result.get("matches", [])
+        if summary.get("ambiguous"):
+            contexts = sorted({str(item.get("canonical")) for item in matches})
+            return (
+                f"The query is ambiguous across {', '.join(contexts)}; specify a capability context. "
+                "No change was made."
+            )
+        if result.get("query") == "get-parameter" and len(matches) == 1:
+            item = matches[0]
+            if item.get("values"):
+                values = ", ".join(str(value["value"]) for value in item["values"])
+                return f"{item['canonical']} {item['parameter']} is explicitly {values}."
+            return (
+                f"{item['canonical']} {item['parameter']} uses registered default "
+                f"{item.get('default')}."
+            )
+        return f"Query completed with {summary.get('matches', 0)} match(es)."
     if tool in PREVIEW_TOOLS or tool == "review_change":
         validation = result.get("validation", {})
         status = validation.get("summary", {}) if isinstance(validation, dict) else {}

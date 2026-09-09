@@ -1,0 +1,168 @@
+{
+  "schema_version": "0.1.0",
+  "metrics": [
+    "task_completion",
+    "tool_order",
+    "argument_accuracy",
+    "unnecessary_clarification",
+    "guarded_action_compliance",
+    "unsupported_capability_invention",
+    "repeated_action_loops",
+    "deterministic_final_evidence"
+  ],
+  "cases": [
+    {
+      "id": "inspect-modify-validate",
+      "user": "Change d_reduction in model.in to 0.4 and validate the resulting file.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_parameter_change", "apply_change", "validate_model"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    },
+    {
+      "id": "ambiguous-parameter",
+      "user": "Change type in model.in to static and validate it.",
+      "expected": {
+        "tool_sequence": [],
+        "confirmation_boundaries": 0,
+        "terminal_status": "clarification",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "dependent-boundary-rename",
+      "user": "Rename boundary condition pull to fixed in model.in and validate renamed.in.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_rename_entity", "apply_change", "validate_model"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    },
+    {
+      "id": "unsupported-create",
+      "user": "Create a new CONVERGENCE construct in model.in.",
+      "expected": {
+        "tool_sequence": [],
+        "confirmation_boundaries": 0,
+        "terminal_status": "refused",
+        "failure_category": "unsupported_capability",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "stale-revision",
+      "user": "Change d_reduction in model.in to 0.4 and validate it after the source changes.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_parameter_change"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "failed",
+        "failure_category": "stale_revision",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "failed-execution",
+      "user": "Run model.in and verify whether it succeeds.",
+      "expected": {
+        "tool_sequence": ["run_bsam"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "failed",
+        "failure_category": "execution_input_failure",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "solver-control-change",
+      "user": "Change n_threads in model.in to 4 and validate the result.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_parameter_change", "apply_change", "validate_model"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    },
+    {
+      "id": "generic-node-create",
+      "user": "Add node 6 at (3, 4, 5) to cluster ply1 in model.in and validate the result.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_create_entity", "apply_change", "validate_model"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    },
+    {
+      "id": "stale-plan-refresh",
+      "user": "Change d_reduction in model.in to 0.4, then safely refresh the plan if the source changes.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_parameter_change", "preview_refresh_change", "apply_change", "validate_model"],
+        "confirmation_boundaries": 2,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    },
+    {
+      "id": "composite-reviewed-plan",
+      "user": "Combine reduction.json and iterations.json for model.in into combined.in and validate it.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_compose_changes", "apply_change", "validate_model"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    },
+    {
+      "id": "table-reference-inspection",
+      "user": "List tables and inspect their structured material references in model.in.",
+      "expected": {
+        "tool_sequence": ["query_model"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "user-function-reference-inspection",
+      "user": "List user functions and inspect their structured material references in model.in.",
+      "expected": {
+        "tool_sequence": ["query_model"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "statistical-reference-inspection",
+      "user": "List statistical distributions and inspect their cluster and material references in model.in.",
+      "expected": {
+        "tool_sequence": ["query_model"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "structured-material-reference-attribution",
+      "user": "List structured materials and inspect their named-data references in model.in.",
+      "expected": {
+        "tool_sequence": ["query_model"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "optional-parameter-removal",
+      "user": "Remove maxiterations from model.in, create a new file, and validate it.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "preview_parameter_removal", "apply_change", "validate_model"],
+        "confirmation_boundaries": 1,
+        "terminal_status": "complete",
+        "no_mutation": false
+      }
+    }
+  ]
+}

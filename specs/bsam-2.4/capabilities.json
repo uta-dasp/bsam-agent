@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.21.0",
+  "registry_version": "0.49.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -647,6 +647,8 @@
       "required": false,
       "parser": "SOLVE_INI",
       "summary": "Defines one or more linear solvers and solver-specific options; defaults to serial PARDISO when absent.",
+      "entity_kind": "solver",
+      "routing_terms": ["solver", "linear solver", "pardiso"],
       "termination": {
         "style": "end-line",
         "tokens": ["END SOLVER"],
@@ -665,12 +667,14 @@
           "name": "n_threads",
           "value_type": "integer",
           "required": false,
+          "routing_terms": ["thread count", "solver threads", "number of threads"],
           "summary": "Requests the OpenMP thread count for PARDISO/CPARDISO; values above the available maximum are capped. Current-format generation must emit this option because that path does not explicitly initialize a default."
         },
         {
           "name": "matrix_type",
           "value_type": "enum",
           "required": false,
+          "routing_terms": ["matrix type", "matrix classification"],
           "allowed_values": ["definite", "indefinite", "unsymmetric"],
           "summary": "Selects the matrix classification passed to PARDISO/CPARDISO. Numeric legacy input defaults to definite; current-format generation must emit the intended value because that path does not explicitly initialize a default."
         },
@@ -703,6 +707,7 @@
           "value_type": "real",
           "required": false,
           "default": 1e-8,
+          "edit_operations": {"insert": "verified", "remove": "verified"},
           "summary": "Sets the SHEFF relative tolerance."
         },
         {
@@ -729,6 +734,18 @@
       ],
       "evidence_ids": ["evidence.solver-parser", "evidence.sheff-solver-dispatch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified",
+        "semantic": "verified",
+        "inspect": "verified",
+        "modify": "verified",
+        "create": "unsupported",
+        "delete": "unsupported",
+        "rename": "unsupported",
+        "generate": "unsupported",
+        "static_validation": "verified",
+        "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
@@ -776,6 +793,8 @@
       "required": false,
       "parser": "UFUNCTION_INI",
       "summary": "Defines named user functions parsed as *end-delimited entries.",
+      "entity_kind": "user-function",
+      "routing_terms": ["user function", "user functions", "user-function", "ufunction", "ufunctions"],
       "termination": {
         "style": "end-line",
         "tokens": ["END UFUNCTIONS"],
@@ -804,6 +823,12 @@
       ],
       "evidence_ids": ["evidence.ufunction-parser", "evidence.ufunction-initializer", "evidence.ufunction-material-reference", "evidence.ufunction-interface-material-reference"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
@@ -946,12 +971,20 @@
       "required": true,
       "parser": "CON_INI",
       "summary": "Defines constitutive law records that reference material and failure definitions.",
+      "entity_kind": "constitutive",
+      "routing_terms": ["constitutive", "constitutive law", "constitutive definition"],
       "termination": {
         "style": "end-line",
         "tokens": ["END CONSTITUTIVE"],
         "certainty": "accepted-current"
       },
       "coverage": "documented",
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "parameters": [
         {
           "name": "type",
@@ -1120,6 +1153,8 @@
       "required": false,
       "parser": "TABLE_INI / table initializer",
       "summary": "Defines named lookup tables used by material data.",
+      "entity_kind": "table",
+      "routing_terms": ["table", "tables", "lookup table", "lookup tables"],
       "termination": {
         "style": "end-line",
         "tokens": ["*end per table", "END TABLES"],
@@ -1168,6 +1203,12 @@
       ],
       "evidence_ids": ["evidence.table-parser", "evidence.table-initializer", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
@@ -1195,6 +1236,8 @@
       "required": false,
       "parser": "STAT_DIST_INI / statistical distribution initializer",
       "summary": "Defines named statistical distributions that modify material data.",
+      "entity_kind": "statistical-distribution",
+      "routing_terms": ["statistical distribution", "statistical distributions", "statistics", "distribution", "distributions"],
       "termination": {
         "style": "end-line",
         "tokens": ["*end per distribution", "END STATISTICAL DISTRIBUTIONS"],
@@ -1261,6 +1304,12 @@
       ],
       "evidence_ids": ["evidence.stat-dist-parser", "evidence.stat-dist-initializer", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
@@ -1293,6 +1342,8 @@
       "required": true,
       "parser": "MAT_INI / material initializers",
       "summary": "Defines bulk and interface material records, including current structured material forms.",
+      "entity_kind": "material",
+      "routing_terms": ["material", "materials", "material definition", "material definitions"],
       "termination": {
         "style": "end-line",
         "tokens": ["*end for structured material entries", "END MATERIALS"],
@@ -1335,6 +1386,12 @@
         }
       ],
       "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.current-vtms-deck-tric"],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
@@ -1498,12 +1555,20 @@
       "required": false,
       "parser": "FAI_INI",
       "summary": "Defines failure criterion records referenced by constitutive laws and damage behavior.",
+      "entity_kind": "failure",
+      "routing_terms": ["failure", "failure criterion", "failure definition"],
       "termination": {
         "style": "end-line",
         "tokens": ["END FAILURE"],
         "certainty": "accepted-current"
       },
       "coverage": "documented",
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "parameters": [
         {
           "name": "type",
@@ -1996,6 +2061,8 @@
       "id": "command.node",
       "parent_block_id": "block.clusters",
       "canonical": "*NODE",
+      "entity_kind": "node",
+      "routing_terms": ["node", "nodes", "mesh node", "mesh nodes"],
       "dispatch_prefix": "*NODE",
       "summary": "Reads explicit node labels and coordinates, optionally adding them to a node set.",
       "coverage": "documented",
@@ -2009,6 +2076,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
       "remaining_work": ["Confirm duplicate-label and capacity-overrun diagnostics."],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "verified", "delete": "verified",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2030,6 +2103,8 @@
       "id": "command.ngen",
       "parent_block_id": "block.clusters",
       "canonical": "*NGEN",
+      "entity_kind": "node-generation",
+      "routing_terms": ["node generation", "node generations", "generated nodes", "ngen"],
       "dispatch_prefix": "*NGEN",
       "summary": "Generates nodes from compact generation records.",
       "coverage": "documented",
@@ -2056,6 +2131,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-node-generation"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2071,6 +2152,8 @@
       "id": "command.ncopy",
       "parent_block_id": "block.clusters",
       "canonical": "*NCOPY",
+      "entity_kind": "node-generation",
+      "routing_terms": ["node copy", "node copies", "copied nodes", "ncopy"],
       "dispatch_prefix": "*NCOP",
       "summary": "Copies nodes using compact copy records.",
       "coverage": "documented",
@@ -2084,6 +2167,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-node-generation"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2095,6 +2184,8 @@
       "id": "command.element",
       "parent_block_id": "block.clusters",
       "canonical": "*ELEMENT",
+      "entity_kind": "element",
+      "routing_terms": ["element", "elements", "finite element", "finite elements"],
       "dispatch_prefix": "*ELEM",
       "summary": "Reads explicit elements and connectivity into a named element set.",
       "coverage": "documented",
@@ -2115,6 +2206,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records", "evidence.fe-element-generation", "evidence.fe-element-types"],
       "remaining_work": ["Confirm duplicate-label and capacity-overrun diagnostics."],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "verified", "delete": "verified",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2134,6 +2231,8 @@
       "id": "command.elgen",
       "parent_block_id": "block.clusters",
       "canonical": "*ELGEN",
+      "entity_kind": "element-generation",
+      "routing_terms": ["element generation", "element generations", "generated elements", "elgen"],
       "dispatch_prefix": "*ELGE",
       "summary": "Generates elements from compact connectivity-generation records.",
       "coverage": "documented",
@@ -2148,6 +2247,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-element-generation", "evidence.fe-element-types"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2159,6 +2264,8 @@
       "id": "command.nset",
       "parent_block_id": "block.clusters",
       "canonical": "*NSET",
+      "entity_kind": "node-set",
+      "routing_terms": ["node set", "node sets", "nset", "nsets"],
       "dispatch_prefix": "*NSET",
       "summary": "Creates or extends a node set from explicit labels, a generated range, or a coordinate box.",
       "coverage": "documented",
@@ -2184,6 +2291,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
       "remaining_work": ["Confirm missing-label and duplicate-membership diagnostics."],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "verified", "delete": "verified",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2199,6 +2312,8 @@
       "id": "command.elset",
       "parent_block_id": "block.clusters",
       "canonical": "*ELSET",
+      "entity_kind": "element-set",
+      "routing_terms": ["element set", "element sets", "elset", "elsets"],
       "dispatch_prefix": "*ELSE",
       "summary": "Creates or extends an element set from explicit labels or a generated range.",
       "coverage": "documented",
@@ -2218,6 +2333,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
       "remaining_work": ["Confirm missing-label and duplicate-membership diagnostics."],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "verified", "delete": "verified",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2232,6 +2353,8 @@
       "id": "command.boundary",
       "parent_block_id": "block.clusters",
       "canonical": "*BOUNDARY",
+      "entity_kind": "nodal-boundary",
+      "routing_terms": ["nodal boundary", "nodal boundaries", "cluster boundary", "boundary record"],
       "dispatch_prefix": "*BOUN",
       "summary": "Applies cluster-local boundary data using supported row formats.",
       "coverage": "documented",
@@ -2247,6 +2370,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-boundary-records"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2262,12 +2391,20 @@
       "id": "command.load",
       "parent_block_id": "block.clusters",
       "canonical": "*LOAD",
+      "entity_kind": "nodal-load",
+      "routing_terms": ["nodal load", "nodal loads", "cluster load", "load record"],
       "dispatch_prefix": "*LOAD",
       "summary": "Applies cluster-local nodal loading records.",
       "coverage": "documented",
       "parameters": [],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-load-records"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2279,6 +2416,8 @@
       "id": "command.field",
       "parent_block_id": "block.clusters",
       "canonical": "*FIELD",
+      "entity_kind": "nodal-field",
+      "routing_terms": ["nodal field", "nodal fields", "field record"],
       "dispatch_prefix": "*FIEL",
       "summary": "Applies field values with a configured variable count.",
       "coverage": "documented",
@@ -2292,6 +2431,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2303,6 +2448,8 @@
       "id": "command.selection",
       "parent_block_id": "block.clusters",
       "canonical": "*SELECTION",
+      "entity_kind": "selection",
+      "routing_terms": ["selection", "selections", "node selection", "element selection"],
       "dispatch_prefix": "*SELE",
       "summary": "Defines an indexed node or element selection used by later operations.",
       "coverage": "documented",
@@ -2324,6 +2471,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2364,12 +2517,20 @@
       "id": "command.integration",
       "parent_block_id": "block.clusters",
       "canonical": "*INTEGRATION",
+      "entity_kind": "integration-scheme",
+      "routing_terms": ["integration scheme", "integration schemes", "integration points"],
       "dispatch_prefix": "*INTE",
       "summary": "Sets the integration scheme for supported X3D8 elements.",
       "coverage": "documented",
       "parameters": [],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation"],
       "remaining_work": ["Confirm behavior for non-X3D8 elements, repeated element headers, and nonpositive integration counts."],
+      "operations": {
+        "parse": "implemented", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "nested-records",
         "termination": "next-command-or-eof",
@@ -2389,6 +2550,8 @@
       "id": "command.orientation",
       "parent_block_id": "block.clusters",
       "canonical": "*ORIENTATION",
+      "entity_kind": "orientation-record",
+      "routing_terms": ["orientation record", "orientation records", "nodal orientation", "element orientation"],
       "dispatch_prefix": "*ORIE",
       "summary": "Defines nodal or elemental orientation data.",
       "coverage": "documented",
@@ -2403,6 +2566,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation"],
       "remaining_work": ["Confirm zero-vector handling in nodal mode and the exact interpretation of fiber_volume."],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2475,6 +2644,8 @@
       "id": "command.shift",
       "parent_block_id": "block.clusters",
       "canonical": "*SHIFT",
+      "entity_kind": "coordinate-operation",
+      "routing_terms": ["coordinate shift", "node shift", "translation operation"],
       "dispatch_prefix": "*SHIF",
       "summary": "Translates all nodes or nodes in a named node set.",
       "coverage": "documented",
@@ -2494,6 +2665,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -2505,6 +2682,8 @@
       "id": "command.scale",
       "parent_block_id": "block.clusters",
       "canonical": "*SCALE",
+      "entity_kind": "coordinate-operation",
+      "routing_terms": ["coordinate scale", "node scale", "scaling operation"],
       "dispatch_prefix": "*SCAL",
       "summary": "Scales all nodes or nodes in a named node set.",
       "coverage": "documented",
@@ -2524,6 +2703,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -2535,6 +2720,8 @@
       "id": "command.exclusion",
       "parent_block_id": "block.clusters",
       "canonical": "*EXCLUSION",
+      "entity_kind": "exclusion-region",
+      "routing_terms": ["exclusion region", "exclusion regions", "spatial exclusion"],
       "dispatch_prefix": "*EXCL",
       "summary": "Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable.",
       "coverage": "documented",
@@ -2558,6 +2745,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-exclusion-records", "evidence.current-vtms-deck-tric"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -2573,6 +2766,8 @@
       "id": "command.flip",
       "parent_block_id": "block.clusters",
       "canonical": "*FLIP",
+      "entity_kind": "coordinate-operation",
+      "routing_terms": ["coordinate flip", "axis flip", "axis rotation"],
       "dispatch_prefix": "*FLIP",
       "summary": "Swaps two coordinate axes for subsequent/read cluster geometry.",
       "coverage": "documented",
@@ -2588,6 +2783,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -2616,6 +2817,8 @@
       "id": "command.section",
       "parent_block_id": "block.clusters",
       "canonical": "*SECTION",
+      "entity_kind": "section",
+      "routing_terms": ["section", "sections", "section assignment", "section assignments"],
       "dispatch_prefix": "*SECT",
       "summary": "Assigns layered section information to an existing element set.",
       "coverage": "documented",
@@ -2641,6 +2844,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-section-reader"],
       "remaining_work": ["Confirm CONNECTION semantics and material-ID resolution diagnostics."],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "verified", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
@@ -2660,12 +2869,20 @@
       "id": "command.crack",
       "parent_block_id": "block.clusters",
       "canonical": "*CRACK",
+      "entity_kind": "crack-region",
+      "routing_terms": ["crack region", "crack regions"],
       "dispatch_prefix": "*CRAC",
       "summary": "Dispatches cluster crack definition, region, spacing, initiation, and function variants.",
       "coverage": "documented",
       "parameters": [{"name": "operation", "value_type": "command-name-suffix", "required": true, "allowed_values": ["DEFINITION", "REGION", "SPACING", "INITIATION", "FUNCTION"], "summary": "Selects the command family through the uppercased characters 6 through 10 of the full command token."}],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-crack-controls"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "nested-records",
         "termination": "next-command-or-eof",
@@ -2686,6 +2903,8 @@
       "id": "command.transform",
       "parent_block_id": "block.clusters",
       "canonical": "*TRANSFORM",
+      "entity_kind": "coordinate-operation",
+      "routing_terms": ["inertial transform", "inertial coordinate transform", "principal inertia transform"],
       "dispatch_prefix": "*TRAN",
       "summary": "Centers cluster geometry and rotates it into its computed principal inertial coordinate system.",
       "coverage": "documented",
@@ -2705,6 +2924,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-inertial-transform"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -2744,7 +2969,7 @@
       "kind": "keyword",
       "summary": "Configures damage-increment control, update, damping, iteration, and exit thresholds.",
       "coverage": "documented",
-      "parameters": [{"name": "UPDATE", "value_type": "flag", "required": false, "default": false, "summary": "Enables damage update control."}, {"name": "DAMP", "value_type": "flag", "required": false, "default": false, "summary": "Enables damage damping."}, {"name": "G_ITER", "value_type": "positive-integer", "required": false, "default": 1000, "summary": "Sets the damage-control iteration limit."}, {"name": "GMIN", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Minimum damage increment for exit; G_TH is an accepted alias."}, {"name": "GMAX", "value_type": "nonnegative-real", "required": false, "default": 1000000000, "summary": "Maximum damage increment for exit."}, {"name": "GTHR", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Active-control damage increment threshold."}, {"name": "NO_DAMAGE_LOCK", "value_type": "flag", "required": false, "default": false, "summary": "NO_D disables the default damage lock."}],
+      "parameters": [{"name": "UPDATE", "value_type": "flag", "required": false, "default": false, "summary": "Enables damage update control."}, {"name": "DAMP", "value_type": "flag", "required": false, "default": false, "edit_operations": {"insert": "verified", "remove": "verified"}, "summary": "Enables damage damping."}, {"name": "G_ITER", "value_type": "positive-integer", "required": false, "default": 1000, "summary": "Sets the damage-control iteration limit."}, {"name": "GMIN", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Minimum damage increment for exit; G_TH is an accepted alias."}, {"name": "GMAX", "value_type": "nonnegative-real", "required": false, "default": 1000000000, "summary": "Maximum damage increment for exit."}, {"name": "GTHR", "value_type": "nonnegative-real", "required": false, "default": 0, "summary": "Active-control damage increment threshold."}, {"name": "NO_DAMAGE_LOCK", "value_type": "flag", "required": false, "default": false, "summary": "NO_D disables the default damage lock."}],
       "evidence_ids": ["evidence.boundary-active-dispatch"],
       "remaining_work": [],
       "body": {
@@ -2818,6 +3043,8 @@
       "id": "construct.boundary-clusters",
       "parent_block_id": "block.boundary",
       "canonical": "*CLUSTERS",
+      "entity_kind": "cluster-selection",
+      "routing_terms": ["boundary clusters", "selected clusters", "cluster selection"],
       "match_prefix": "*clus",
       "kind": "record-group",
       "summary": "Restricts the boundary problem to a list of existing cluster names.",
@@ -2825,6 +3052,12 @@
       "parameters": [],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.boundary-selectors"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command",
@@ -2836,6 +3069,8 @@
       "id": "construct.boundary-conditions",
       "parent_block_id": "block.boundary",
       "canonical": "*BOUNDARY CONDITION",
+      "entity_kind": "boundary-condition",
+      "routing_terms": ["boundary condition", "boundary conditions"],
       "match_prefix": "*boun",
       "kind": "record-group",
       "summary": "Defines named boundary conditions as key/value pairs referencing cluster-qualified node sets.",
@@ -2850,6 +3085,18 @@
       ],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.boundary-components", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified",
+        "semantic": "verified",
+        "inspect": "verified",
+        "modify": "verified",
+        "create": "unsupported",
+        "delete": "unsupported",
+        "rename": "verified",
+        "generate": "unsupported",
+        "static_validation": "verified",
+        "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command",
@@ -2971,13 +3218,13 @@
         {"name": "relative", "value_type": "positive-real", "required": false, "default": 0.001, "summary": "Relative convergence tolerance; may share a row with absolute and divergence."},
         {"name": "absolute", "value_type": "positive-real", "required": false, "default": 100000000, "summary": "Absolute convergence tolerance."},
         {"name": "divergence", "value_type": "positive-real", "required": false, "default": 1000000, "summary": "Residual divergence multiplier parsed from a relative/absolute row."},
-        {"name": "maxiterations", "value_type": "positive-integer", "required": false, "default": 20, "summary": "Maximum nonlinear iterations; recognized by the maxi prefix."},
+        {"name": "maxiterations", "value_type": "positive-integer", "required": false, "default": 20, "edit_operations": {"insert": "verified", "remove": "verified"}, "summary": "Maximum nonlinear iterations; recognized by the maxi prefix."},
         {"name": "mintime", "value_type": "integer", "required": false, "default": 1, "summary": "Minimum time control; recognized by the mint prefix."},
         {"name": "invert", "value_type": "integer", "required": false, "default": -1, "summary": "Full stiffness-inversion interval; recognized by the inve prefix."}
         ,{"name": "D_AA", "value_type": "enum", "required": false, "allowed_values": [0, 1, 2], "default": 0, "summary": "Anderson acceleration: 0 inactive, 1 prediction, 2 correction."}
         ,{"name": "d_in", "value_type": "real", "required": false, "summary": "Initial automatic time increment; full labels such as d_initial match this prefix."}
         ,{"name": "it_restart", "value_type": "integer", "required": false, "default": 5000, "summary": "Iteration interval reset control recognized by it_r."}
-        ,{"name": "d_reduction", "value_type": "real", "required": false, "default": -1, "summary": "Time-increment reduction ratio recognized by d_re; a negative default disables reset."}
+        ,{"name": "d_reduction", "value_type": "real", "required": false, "default": -1, "routing_terms": ["time increment reduction ratio", "increment reduction ratio", "reduction ratio"], "summary": "Time-increment reduction ratio recognized by d_re; a negative default disables reset."}
         ,{"name": "d_min", "value_type": "real", "required": false, "default": 0, "summary": "Minimum time increment recognized by d_mi."}
         ,{"name": "it_opt", "value_type": "integer", "required": false, "default": 5000, "summary": "Optimum-iteration adjustment control recognized by it_o."}
         ,{"name": "d_max", "value_type": "real", "required": false, "default": 1, "summary": "Maximum time increment recognized by d_ma."}
@@ -2985,6 +3232,18 @@
       ],
       "evidence_ids": ["evidence.boundary-convergence", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified",
+        "semantic": "verified",
+        "inspect": "verified",
+        "modify": "verified",
+        "create": "unsupported",
+        "delete": "unsupported",
+        "rename": "unsupported",
+        "generate": "unsupported",
+        "static_validation": "verified",
+        "execute": "unassessed"
+      },
       "body": {
         "style": "records",
         "termination": "next-command",
@@ -3000,6 +3259,8 @@
       "id": "construct.boundary-output",
       "parent_block_id": "block.boundary",
       "canonical": "*OUTPUT",
+      "entity_kind": "output-selection",
+      "routing_terms": ["boundary output", "boundary outputs", "output selection", "output selections"],
       "match_prefix": "*outp",
       "kind": "record-group",
       "summary": "Defines output types and their target, coordinate-system, and intermediate-output options.",
@@ -3011,6 +3272,12 @@
       ],
       "evidence_ids": ["evidence.boundary-output", "evidence.boundary-output-execution", "evidence.boundary-data-formats", "evidence.boundary-selectors", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "verified", "execute": "unassessed"
+      },
       "body": {
         "style": "nested-records",
         "termination": "next-command",

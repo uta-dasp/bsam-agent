@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+import math
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
+from .capabilities import canonical_parameter, match_nested_construct, nested_constructs, operational_support
 from .document import Diagnostic, SourceLine
+from .registry import load_registry
 
 
 @dataclass(frozen=True)
@@ -73,10 +77,41 @@ class SemanticReference:
         return result
 
 
+@dataclass(frozen=True)
+class RegisteredConstruct:
+    """A lossless semantic view over one registry-matched construct occurrence."""
+
+    id: str
+    capability_id: str
+    canonical: str
+    occurrence: int
+    location: SourceLocation
+    parameters: dict[str, tuple[dict[str, Any], ...]] = field(default_factory=dict)
+    defaults: dict[str, Any] = field(default_factory=dict)
+    operations: dict[str, str] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        result = {
+            "id": self.id,
+            "capability_id": self.capability_id,
+            "canonical": self.canonical,
+            "occurrence": self.occurrence,
+            "location": self.location.as_dict(),
+            "parameters": {name: list(values) for name, values in self.parameters.items()},
+            "defaults": self.defaults,
+            "operations": self.operations,
+        }
+        if self.attributes:
+            result["attributes"] = self.attributes
+        return result
+
+
 @dataclass
 class SemanticIndex:
     entities: list[SemanticEntity] = field(default_factory=list)
     references: list[SemanticReference] = field(default_factory=list)
+    capability_records: list[RegisteredConstruct] = field(default_factory=list)
     diagnostics: list[Diagnostic] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -84,13 +119,15 @@ class SemanticIndex:
         for entity in self.entities:
             counts[entity.kind] = counts.get(entity.kind, 0) + 1
         return {
-            "schema_version": "0.2.0",
-            "coverage": "documented-fe-boundary-and-crack-records",
+            "schema_version": "0.4.0",
+            "coverage": "documented-fe-control-named-data-and-declaration-references",
             "entities": [item.as_dict() for item in self.entities],
             "references": [item.as_dict() for item in self.references],
+            "capability_records": [item.as_dict() for item in self.capability_records],
             "summary": {
                 "entities": len(self.entities),
                 "references": len(self.references),
+                "registered_constructs": len(self.capability_records),
                 "resolved_references": sum(item.status == "resolved" for item in self.references),
                 "unresolved_references": sum(item.status == "unresolved" for item in self.references),
                 "ambiguous_references": sum(item.status == "ambiguous" for item in self.references),
@@ -107,7 +144,9 @@ class SemanticIndex:
         for key, definitions in by_key.items():
             if len(definitions) > 1 and definitions[0].kind in {
                 "node", "element", "cluster", "constitutive", "boundary-condition",
-                "connection", "cluster-constitutive", "crack",
+                "connection", "cluster-constitutive", "crack", "table", "user-function",
+                "statistical-distribution", "failure",
+                "material", "selection",
             }:
                 for duplicate in definitions[1:]:
                     self.diagnostics.append(Diagnostic(
@@ -231,6 +270,60 @@ def _reference(index: SemanticIndex, source_entity: SemanticEntity, kind: str,
     ))
 
 
+def _reference_once(index: SemanticIndex, source_entity: SemanticEntity, kind: str,
+                    target_key: str, source: str, line: SourceLine,
+                    attributes: dict[str, Any] | None = None) -> None:
+    if any(
+        reference.source_entity_id == source_entity.id
+        and reference.kind == kind
+        and reference.target_key == target_key
+        for reference in index.references
+    ):
+        return
+    _reference(index, source_entity, kind, target_key, source, line, attributes)
+
+
+def _cluster_nodal_target_key(
+    index: SemanticIndex, target: str, cluster: str, *, node_only: bool = False,
+) -> tuple[str, str]:
+    """Mirror BSAM's set-first target lookup without guessing missing names."""
+    node_set_key = _key("node-set", target, cluster)
+    if not node_only and any(item.key == node_set_key for item in index.entities):
+        return node_set_key, "targets-node-set"
+    if target.isdigit():
+        return _key("node", target, cluster), "targets-node"
+    return node_set_key, "targets-node-set"
+
+
+def _set_member_entities(
+    index: SemanticIndex, set_key: str, member_kind: str,
+) -> list[SemanticEntity]:
+    set_ids = {item.id for item in index.entities if item.key == set_key}
+    entity_by_id = {item.id: item for item in index.entities}
+    entity_by_key = {item.key: item for item in index.entities}
+    result: list[SemanticEntity] = []
+    seen: set[str] = set()
+    for reference in index.references:
+        member: SemanticEntity | None = None
+        if reference.kind == "contains" and reference.source_entity_id in set_ids:
+            member = entity_by_key.get(reference.target_key)
+        elif reference.kind == "member-of" and reference.target_key == set_key:
+            member = entity_by_id.get(reference.source_entity_id)
+        if member is not None and member.kind == member_kind and member.key not in seen:
+            seen.add(member.key)
+            result.append(member)
+    return result
+
+
+def _bounded_generated_labels(start: int, end: int, increment: int) -> tuple[int, ...]:
+    if increment == 0 or (end - start) * increment <= 0:
+        return ()
+    count = max(0, (abs(end - start) - 1) // abs(increment))
+    if count > 100_000:
+        return ()
+    return tuple(range(start + increment, end, increment))
+
+
 def _command_spans(lines: Iterable[SourceLine]) -> list[tuple[SourceLine, list[SourceLine]]]:
     active: SourceLine | None = None
     body: list[SourceLine] = []
@@ -249,7 +342,12 @@ def _command_spans(lines: Iterable[SourceLine]) -> list[tuple[SourceLine, list[S
 
 
 def _top_block_body(lines: tuple[SourceLine, ...], name: str) -> list[SourceLine]:
-    start = next((index for index, line in enumerate(lines) if line.stripped == name), None)
+    start_tokens = {name}
+    if name == "STATISTICAL":
+        start_tokens.add("STATISTICAL DISTRIBUTIONS")
+    start = next(
+        (index for index, line in enumerate(lines) if line.stripped in start_tokens), None
+    )
     if start is None:
         return []
     terminators = {f"END {name}"}
@@ -262,29 +360,1758 @@ def _top_block_body(lines: tuple[SourceLine, ...], name: str) -> list[SourceLine
     return list(lines[start + 1:end])
 
 
+_KEY_VALUE = re.compile(r"([A-Za-z][A-Za-z0-9_-]*)\s*=\s*([^,\s]+)")
+
+
+def _registered_parameter_values(
+    construct: dict[str, Any], command_line: SourceLine, body: list[SourceLine], source: str,
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    found: dict[str, list[dict[str, Any]]] = {}
+    active_lines = [command_line, *(
+        line for line in body if line.stripped and not line.stripped.startswith("**")
+    )]
+    for line in active_lines:
+        searchable = line.text.split("#", 1)[0]
+        for match in _KEY_VALUE.finditer(searchable):
+            definition = canonical_parameter(construct, match.group(1))
+            if definition is None:
+                continue
+            name = str(definition["name"])
+            found.setdefault(name, []).append({
+                "value": match.group(2),
+                "spelling": match.group(1),
+                "location": _location(source, line).as_dict(),
+            })
+
+    flag_parameters = [
+        item for item in construct.get("parameters", []) if item.get("value_type") == "flag"
+    ]
+    if flag_parameters:
+        for token in re.split(r"[\s,]+", command_line.text.split("#", 1)[0]):
+            definition = canonical_parameter(construct, token)
+            if definition not in flag_parameters:
+                continue
+            name = str(definition["name"])
+            found.setdefault(name, []).append({
+                "value": True,
+                "spelling": token,
+                "location": _location(source, command_line).as_dict(),
+            })
+
+    parameters = construct.get("parameters", [])
+    if len(parameters) == 1 and not found:
+        record = next((line for line in active_lines[1:] if "=" not in line.text), None)
+        if record is not None:
+            definition = parameters[0]
+            found[str(definition["name"])] = [{
+                "value": record.stripped,
+                "spelling": str(definition["name"]),
+                "location": _location(source, record).as_dict(),
+            }]
+    return {name: tuple(values) for name, values in found.items()}
+
+
+def _validate_registered_values(
+    index: SemanticIndex, construct: dict[str, Any],
+    values: dict[str, tuple[dict[str, Any], ...]],
+) -> None:
+    if operational_support(construct)["static_validation"] != "verified":
+        return
+    definitions = {item["name"]: item for item in construct.get("parameters", [])}
+    for name, occurrences in values.items():
+        definition = definitions[name]
+        value_type = str(definition["value_type"]).casefold()
+        for occurrence in occurrences:
+            raw = occurrence["value"]
+            invalid = False
+            try:
+                numeric: int | float | None = None
+                if "integer" in value_type:
+                    numeric = int(str(raw))
+                elif "real" in value_type:
+                    numeric = float(str(raw))
+                if isinstance(numeric, float) and not math.isfinite(numeric):
+                    invalid = True
+                if value_type.startswith("positive-") and numeric is not None and numeric <= 0:
+                    invalid = True
+            except ValueError:
+                invalid = True
+            allowed = definition.get("allowed_values")
+            if allowed is not None:
+                raw_text = str(raw).casefold()
+                allowed_text = [str(item).casefold() for item in allowed]
+                prefix_matches = [item for item in allowed_text if item.startswith(raw_text)]
+                if raw_text not in allowed_text and not (
+                    len(raw_text) >= 3 and len(prefix_matches) == 1
+                ):
+                    invalid = True
+            if invalid:
+                location = occurrence["location"]
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310",
+                    severity="error",
+                    message=(
+                        f"invalid {construct['canonical']} parameter {name}={raw!r}; "
+                        f"expected {definition['value_type']}"
+                    ),
+                    line=location["line"],
+                    source=location["source"],
+                ))
+
+
+def augment_registered_boundary_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Match BOUNDARY constructs and parameters from registry data without rewriting source."""
+    all_lines = tuple(lines)
+    constructs = nested_constructs("block.boundary")
+    occurrences: dict[str, int] = {}
+    for command_line, body in _command_spans(_top_block_body(all_lines, "BOUNDARY")):
+        construct = match_nested_construct(command_line.text, constructs)
+        if construct is None:
+            continue
+        capability_id = str(construct["id"])
+        occurrences[capability_id] = occurrences.get(capability_id, 0) + 1
+        occurrence = occurrences[capability_id]
+        parameters = _registered_parameter_values(construct, command_line, body, source)
+        defaults = {
+            str(item["name"]): item["default"]
+            for item in construct.get("parameters", []) if "default" in item
+        }
+        index.capability_records.append(RegisteredConstruct(
+            id=f"{capability_id}[{occurrence}]@{source}:{command_line.number}",
+            capability_id=capability_id,
+            canonical=str(construct["canonical"]),
+            occurrence=occurrence,
+            location=_location(source, command_line),
+            parameters=parameters,
+            defaults=defaults,
+            operations=operational_support(construct),
+        ))
+        _validate_registered_values(index, construct, parameters)
+
+
+def _solver_parameter(
+    definition: dict[str, Any], value: Any, spelling: str, source: str, line: SourceLine,
+) -> dict[str, Any]:
+    return {
+        "value": value,
+        "spelling": spelling,
+        "location": _location(source, line).as_dict(),
+    }
+
+
+def augment_solver_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Parse authoritative current and legacy SOLVER record groups."""
+    all_lines = tuple(lines)
+    body = [
+        line for line in _top_block_body(all_lines, "SOLVER")
+        if line.stripped and not line.stripped.startswith(("#", "**"))
+    ]
+    if not body:
+        return
+    solver = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.solver"
+    )
+    definitions = {
+        str(item["name"]).casefold(): item for item in solver["parameters"]
+    }
+    defaults = {
+        str(item["name"]): item["default"]
+        for item in solver["parameters"] if "default" in item
+    }
+
+    def add_record(
+        ordinal: int, line: SourceLine, parameters: dict[str, list[dict[str, Any]]],
+        syntax: str,
+    ) -> None:
+        frozen = {name: tuple(values) for name, values in parameters.items()}
+        operations = operational_support(solver)
+        if syntax == "legacy":
+            operations = {**operations, "modify": "unsupported"}
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.solver[{ordinal}]@{source}:{line.number}",
+            capability_id="block.solver",
+            canonical="SOLVER",
+            occurrence=ordinal,
+            location=_location(source, line),
+            parameters=frozen,
+            defaults=defaults,
+            operations=operations,
+            attributes={"syntax": syntax},
+        ))
+        solver_type = next(iter(parameters.get("*type", [])), {}).get("value", "unknown")
+        _entity(
+            index, "solver", str(ordinal), source, line, None,
+            {"type": solver_type, "syntax": syntax},
+        )
+        if syntax == "current":
+            _validate_registered_values(index, solver, frozen)
+            if str(solver_type).casefold() in {"pardiso", "cpardiso"}:
+                for required in ("n_threads", "matrix_type"):
+                    if required not in parameters:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E311",
+                            severity="error",
+                            message=f"current {solver_type} solver requires explicit {required}",
+                            line=line.number,
+                            source=source,
+                        ))
+
+    if body[0].stripped.casefold().startswith("*type"):
+        cursor = 0
+        ordinal = 0
+        while cursor < len(body):
+            header = body[cursor]
+            if not header.stripped.casefold().startswith("*type"):
+                break
+            header_index = cursor
+            ordinal += 1
+            parameters: dict[str, list[dict[str, Any]]] = {}
+            while cursor < len(body):
+                line = body[cursor]
+                text = line.text.split("#", 1)[0].strip()
+                if cursor > header_index and text.casefold().startswith("*type"):
+                    break
+                if text.casefold() == "end solver":
+                    cursor += 1
+                    break
+                if "=" in text:
+                    spelling, raw = text.split("=", 1)
+                    name = spelling.strip().casefold()
+                    definition = definitions.get(name)
+                    if definition is not None:
+                        canonical = str(definition["name"])
+                        parameters.setdefault(canonical, []).append(
+                            _solver_parameter(definition, raw.strip(), spelling.strip(), source, line)
+                        )
+                cursor += 1
+            add_record(ordinal, header, parameters, "current")
+        return
+
+    type_line = body[0]
+    type_fields = _fields(type_line.text.split("#", 1)[0])
+    if not type_fields:
+        return
+    parameters = {
+        "*type": [_solver_parameter(definitions["*type"], type_fields[0], "type", source, type_line)]
+    }
+    if len(body) > 1:
+        thread_fields = _fields(body[1].text.split("#", 1)[0])
+        if thread_fields:
+            parameters["n_threads"] = [
+                _solver_parameter(definitions["n_threads"], thread_fields[0], "n_threads", source, body[1])
+            ]
+    if len(body) > 2:
+        marker = body[2].stripped.casefold()
+        matrix = "indefinite" if marker.startswith("*in") else (
+            "unsymmetric" if marker.startswith("*un") else "definite"
+        )
+        matrix_line = body[2]
+    else:
+        matrix = "definite"
+        matrix_line = type_line
+    parameters["matrix_type"] = [
+        _solver_parameter(definitions["matrix_type"], matrix, "marker", source, matrix_line)
+    ]
+    add_record(1, type_line, parameters, "legacy")
+
+
+def _table_error(
+    index: SemanticIndex, code: str, message: str, source: str, line: SourceLine,
+) -> None:
+    index.diagnostics.append(Diagnostic(
+        code=code, severity="error", message=message, line=line.number, source=source,
+    ))
+
+
+def _table_parameter(value: Any, spelling: str, source: str, line: SourceLine) -> dict[str, Any]:
+    return {
+        "value": value,
+        "spelling": spelling,
+        "location": _location(source, line).as_dict(),
+    }
+
+
+def _material_reference_owner(
+    index: SemanticIndex, source: str, line: SourceLine, text: str,
+) -> SemanticEntity:
+    owner = next((
+        item for item in index.entities
+        if item.kind == "structured-material"
+        and item.location.source == source
+        and int(item.attributes.get("body_start_line", 0)) <= line.number
+        <= int(item.attributes.get("body_end_line", -1))
+    ), None)
+    if owner is not None:
+        return owner
+    key = _key("material-parameter", f"line-{line.number}", None)
+    existing = next((item for item in index.entities if item.key == key), None)
+    if existing is not None:
+        return existing
+    return _entity(
+        index, "material-parameter", f"line-{line.number}", source, line, None,
+        {"record": text.strip(), "declaration": "unattributed-preserved"},
+    )
+
+
+def augment_structured_material_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Identify only exact unindented 998/999 material groups; preserve all legacy bodies."""
+    all_lines = tuple(lines)
+    material_record = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.materials"
+    )
+    body = _top_block_body(all_lines, "MATERIALS")
+    cursor = 0
+    occurrence = 0
+    while cursor < len(body):
+        line = body[cursor]
+        text = line.text.split("#", 1)[0].strip()
+        fields = _fields(text)
+        if line.text[:1].isspace() or not fields or fields[0] not in {"998", "999"}:
+            cursor += 1
+            continue
+        occurrence += 1
+        material_type = int(fields[0])
+        terminator = next(
+            (
+                position for position in range(cursor + 1, len(body))
+                if body[position].text.split("#", 1)[0].strip() == "*end"
+            ),
+            None,
+        )
+        next_header = next((
+            position for position in range(cursor + 1, len(body))
+            if not body[position].text[:1].isspace()
+            and _fields(body[position].text.split("#", 1)[0].strip())[:1]
+            in (["998"], ["999"])
+        ), None)
+        if next_header is not None and (terminator is None or next_header < terminator):
+            _table_error(
+                index, "BSAM-E350",
+                f"structured material type {material_type} is missing exact *end",
+                source, line,
+            )
+            end = next_header
+            body_end_line = body[end - 1].number if end > cursor + 1 else line.number
+            next_cursor = next_header
+        elif terminator is None:
+            _table_error(
+                index, "BSAM-E350",
+                f"structured material type {material_type} is missing exact *end",
+                source, line,
+            )
+            end = len(body)
+            body_end_line = body[-1].number if body else line.number
+            next_cursor = len(body)
+        else:
+            end = terminator
+            body_end_line = body[end].number
+            next_cursor = terminator + 1
+        parameter_lines = [
+            item for item in body[cursor + 1:end]
+            if "=" in item.text.split("#", 1)[0]
+            and not item.text.lstrip().startswith("**")
+        ]
+        material = _entity(
+            index, "structured-material", f"type-{material_type}-line-{line.number}",
+            source, line, None,
+            {
+                "type": material_type,
+                "syntax": "structured",
+                "body_start_line": line.number,
+                "body_end_line": body_end_line,
+                "parameter_record_count": len(parameter_lines),
+            },
+        )
+        parameters = {
+            "type": (_table_parameter(str(material_type), "type", source, line),),
+            "material_parameter": tuple(
+                _table_parameter(
+                    item.text.split("#", 1)[0].strip(), "key/value", source, item,
+                )
+                for item in parameter_lines
+            ),
+        }
+        instance_operations = operational_support(material_record)
+        instance_operations = {
+            **instance_operations,
+            "parse": "verified", "semantic": "verified", "inspect": "verified",
+            "static_validation": "verified",
+        }
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.materials.structured[{occurrence}]@{source}:{line.number}",
+            capability_id="block.materials",
+            canonical="MATERIALS",
+            occurrence=occurrence,
+            location=_location(source, line),
+            parameters=parameters,
+            operations=instance_operations,
+            attributes={"entity_id": material.id, "syntax": "structured"},
+        ))
+        cursor = next_cursor
+
+
+def augment_table_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Parse named rectangular TABLES and structured material table references."""
+    all_lines = tuple(lines)
+    table_record = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.tables"
+    )
+    active = [
+        (line, line.text.split("#", 1)[0].strip())
+        for line in _top_block_body(all_lines, "TABLES")
+        if line.text.split("#", 1)[0].strip()
+        and not line.text.lstrip().startswith("**")
+    ]
+    cursor = 0
+    occurrence = 0
+    while cursor < len(active):
+        header, header_text = active[cursor]
+        if not header_text.casefold().startswith("table-"):
+            _table_error(
+                index, "BSAM-E320", "TABLES entry must start with table-<name>", source, header,
+            )
+            cursor += 1
+            continue
+        occurrence += 1
+        name = header_text[6:].strip().casefold()
+        end = next(
+            (position for position in range(cursor + 1, len(active)) if active[position][1] == "*end"),
+            None,
+        )
+        if end is None:
+            _table_error(
+                index, "BSAM-E320", f"table {name or '<unnamed>'} is missing exact *end",
+                source, header,
+            )
+            entry = active[cursor + 1:]
+            cursor = len(active)
+        else:
+            entry = active[cursor + 1:end]
+            cursor = end + 1
+
+        parameters: dict[str, list[dict[str, Any]]] = {
+            "name": [_table_parameter(name, "table-", source, header)],
+        }
+        row_label = ""
+        column_label = ""
+        horizontal: list[float] = []
+        vertical: list[float] = []
+        values: list[list[float]] = []
+        valid_grid = True
+        if not name or "_" in name:
+            _table_error(
+                index, "BSAM-E320",
+                "table name must be non-empty and may not contain underscores",
+                source, header,
+            )
+            valid_grid = False
+        if not entry:
+            _table_error(index, "BSAM-E320", f"table {name} has no axis header", source, header)
+            valid_grid = False
+        else:
+            axis_line, axis_text = entry[0]
+            axis_fields = _fields(axis_text)
+            labels = re.split(r"[-/|_]", axis_fields[0], maxsplit=2) if axis_fields else []
+            if len(labels) != 2 or not all(labels):
+                _table_error(
+                    index, "BSAM-E320", f"table {name} axis header requires row-column labels",
+                    source, axis_line,
+                )
+                valid_grid = False
+            else:
+                row_label, column_label = (item.casefold() for item in labels)
+                parameters["row_label"] = [
+                    _table_parameter(row_label, labels[0], source, axis_line)
+                ]
+                parameters["column_label"] = [
+                    _table_parameter(column_label, labels[1], source, axis_line)
+                ]
+            for raw in axis_fields[1:]:
+                try:
+                    number = float(raw)
+                    if not math.isfinite(number):
+                        raise ValueError
+                    horizontal.append(number)
+                    parameters.setdefault("horizontal_lookup", []).append(
+                        _table_parameter(raw, "horizontal_lookup", source, axis_line)
+                    )
+                except ValueError:
+                    _table_error(
+                        index, "BSAM-E320", f"table {name} has a non-finite horizontal coordinate",
+                        source, axis_line,
+                    )
+                    valid_grid = False
+            if not horizontal:
+                _table_error(
+                    index, "BSAM-E320", f"table {name} requires a horizontal coordinate",
+                    source, axis_line,
+                )
+                valid_grid = False
+            elif any(right <= left for left, right in zip(horizontal, horizontal[1:])):
+                _table_error(
+                    index, "BSAM-E321", f"table {name} horizontal coordinates must increase",
+                    source, axis_line,
+                )
+                valid_grid = False
+
+            for data_line, data_text in entry[1:]:
+                fields = _fields(data_text)
+                if len(fields) != len(horizontal) + 1:
+                    _table_error(
+                        index, "BSAM-E320",
+                        f"table {name} row width must be {len(horizontal) + 1}",
+                        source, data_line,
+                    )
+                    valid_grid = False
+                    continue
+                try:
+                    numbers = [float(item) for item in fields]
+                    if any(not math.isfinite(item) for item in numbers):
+                        raise ValueError
+                except ValueError:
+                    _table_error(
+                        index, "BSAM-E320", f"table {name} data rows must contain finite reals",
+                        source, data_line,
+                    )
+                    valid_grid = False
+                    continue
+                vertical.append(numbers[0])
+                values.append(numbers[1:])
+                parameters.setdefault("vertical_lookup", []).append(
+                    _table_parameter(fields[0], "vertical_lookup", source, data_line)
+                )
+                for raw in fields[1:]:
+                    parameters.setdefault("value", []).append(
+                        _table_parameter(raw, "value", source, data_line)
+                    )
+            if not vertical:
+                _table_error(
+                    index, "BSAM-E320", f"table {name} requires at least one data row",
+                    source, axis_line,
+                )
+                valid_grid = False
+            elif any(right <= left for left, right in zip(vertical, vertical[1:])):
+                _table_error(
+                    index, "BSAM-E321", f"table {name} vertical coordinates must increase",
+                    source, entry[1][0],
+                )
+                valid_grid = False
+
+        table = _entity(index, "table", name or f"unnamed-{occurrence}", source, header, None, {
+            "row_label": row_label,
+            "column_label": column_label,
+            "horizontal_lookup": horizontal,
+            "vertical_lookup": vertical,
+            "values": values,
+            "shape": [len(vertical), len(horizontal)],
+            "valid_grid": valid_grid,
+        })
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.tables[{occurrence}]@{source}:{header.number}",
+            capability_id="block.tables",
+            canonical="TABLES",
+            occurrence=occurrence,
+            location=_location(source, header),
+            parameters={key: tuple(items) for key, items in parameters.items()},
+            operations=operational_support(table_record),
+            attributes={"entity_id": table.id, "shape": [len(vertical), len(horizontal)]},
+        ))
+
+    table_reference = re.compile(r"(?i)(?:^|[^a-z0-9])table_([^_,\s]+)")
+    for line in _top_block_body(all_lines, "MATERIALS"):
+        text = line.text.split("#", 1)[0]
+        if "=" not in text or line.text.lstrip().startswith("**"):
+            continue
+        right = text.split("=", 1)[1]
+        targets = [match.group(1).casefold() for match in table_reference.finditer(right)]
+        if not targets:
+            continue
+        parameter = _material_reference_owner(index, source, line, text)
+        for target in targets:
+            _reference(
+                index, parameter, "uses-table", _key("table", target, None), source, line,
+            )
+
+
+def augment_ufunction_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Parse named two-column UFUNCTIONS and structured material references."""
+    all_lines = tuple(lines)
+    function_record = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.ufunctions"
+    )
+    active = [
+        (line, line.text.split("#", 1)[0].strip())
+        for line in _top_block_body(all_lines, "UFUNCTIONS")
+        if line.text.split("#", 1)[0].strip()
+        and not line.text.lstrip().startswith("**")
+    ]
+    cursor = 0
+    occurrence = 0
+    while cursor < len(active):
+        header, header_text = active[cursor]
+        if header_text == "*end":
+            _table_error(
+                index, "BSAM-E330", "UFUNCTIONS contains an empty entry", source, header,
+            )
+            cursor += 1
+            continue
+        occurrence += 1
+        tokens = [item for item in re.split(r"[\s_-]+", header_text.casefold()) if item]
+        name = tokens[-1] if tokens else ""
+        end = next(
+            (position for position in range(cursor + 1, len(active)) if active[position][1] == "*end"),
+            None,
+        )
+        if end is None:
+            _table_error(
+                index, "BSAM-E330", f"user function {name or '<unnamed>'} is missing exact *end",
+                source, header,
+            )
+            entry = active[cursor + 1:]
+            cursor = len(active)
+        else:
+            entry = active[cursor + 1:end]
+            cursor = end + 1
+        while entry and entry[0][1].startswith("*"):
+            entry = entry[1:]
+
+        parameters: dict[str, list[dict[str, Any]]] = {
+            "name": [_table_parameter(name, header_text, source, header)],
+        }
+        points: list[list[float]] = []
+        valid_data = True
+        if not name:
+            _table_error(index, "BSAM-E330", "user function name is empty", source, header)
+            valid_data = False
+        for data_line, data_text in entry:
+            fields = _fields(data_text)
+            if len(fields) != 2:
+                _table_error(
+                    index, "BSAM-E330", f"user function {name} data must have two columns",
+                    source, data_line,
+                )
+                valid_data = False
+                continue
+            try:
+                point = [float(item) for item in fields]
+                if any(not math.isfinite(item) for item in point):
+                    raise ValueError
+            except ValueError:
+                _table_error(
+                    index, "BSAM-E330", f"user function {name} data must contain finite reals",
+                    source, data_line,
+                )
+                valid_data = False
+                continue
+            points.append(point)
+            parameters.setdefault("x", []).append(
+                _table_parameter(fields[0], "x", source, data_line)
+            )
+            parameters.setdefault("y", []).append(
+                _table_parameter(fields[1], "y", source, data_line)
+            )
+        if len(points) < 2:
+            _table_error(
+                index, "BSAM-E330", f"user function {name} requires at least two points",
+                source, header,
+            )
+            valid_data = False
+        elif not (
+            all(right[0] > left[0] for left, right in zip(points, points[1:]))
+            or all(right[0] < left[0] for left, right in zip(points, points[1:]))
+        ):
+            _table_error(
+                index, "BSAM-E331", f"user function {name} x coordinates must be strictly monotonic",
+                source, entry[0][0],
+            )
+            valid_data = False
+
+        function = _entity(
+            index, "user-function", name or f"unnamed-{occurrence}", source, header, None,
+            {"points": points, "point_count": len(points), "valid_data": valid_data},
+        )
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.ufunctions[{occurrence}]@{source}:{header.number}",
+            capability_id="block.ufunctions",
+            canonical="UFUNCTIONS",
+            occurrence=occurrence,
+            location=_location(source, header),
+            parameters={key: tuple(items) for key, items in parameters.items()},
+            operations=operational_support(function_record),
+            attributes={"entity_id": function.id, "point_count": len(points)},
+        ))
+
+    function_reference = re.compile(r"(?i)(?:^|[^a-z0-9])ufunc_([^_,\s]+)")
+    for line in _top_block_body(all_lines, "MATERIALS"):
+        text = line.text.split("#", 1)[0]
+        if "=" not in text or line.text.lstrip().startswith("**"):
+            continue
+        right = text.split("=", 1)[1]
+        targets = [match.group(1).casefold() for match in function_reference.finditer(right)]
+        if not targets:
+            continue
+        parameter = _material_reference_owner(index, source, line, text)
+        for target in targets:
+            _reference(
+                index, parameter, "uses-user-function",
+                _key("user-function", target, None), source, line,
+            )
+
+
+def augment_statistical_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Parse canonical type-3 statistical distributions and their references."""
+    all_lines = tuple(lines)
+    stat_record = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.statistical-distributions"
+    )
+    active = [
+        (line, line.text.split("#", 1)[0].strip())
+        for line in _top_block_body(all_lines, "STATISTICAL")
+        if line.text.split("#", 1)[0].strip()
+        and not line.text.lstrip().startswith("**")
+    ]
+    clusters = [item for item in index.entities if item.kind == "cluster"]
+    cursor = 0
+    occurrence = 0
+    while cursor < len(active):
+        header, header_text = active[cursor]
+        folded_header = header_text.casefold()
+        if not folded_header.startswith(("stat-", "dist-")):
+            _table_error(
+                index, "BSAM-E340", "statistical entry must start with stat-<name>",
+                source, header,
+            )
+            cursor += 1
+            continue
+        occurrence += 1
+        name = folded_header.split("-", 1)[1].strip()
+        end = next(
+            (position for position in range(cursor + 1, len(active)) if active[position][1] == "*end"),
+            None,
+        )
+        if end is None:
+            _table_error(
+                index, "BSAM-E340", f"statistical distribution {name} is missing exact *end",
+                source, header,
+            )
+            entry = active[cursor + 1:]
+            cursor = len(active)
+        else:
+            entry = active[cursor + 1:end]
+            cursor = end + 1
+
+        parameters: dict[str, list[dict[str, Any]]] = {
+            "name": [_table_parameter(name, header_text, source, header)],
+        }
+        parsed: dict[str, tuple[str, SourceLine]] = {}
+        positions: dict[str, int] = {}
+        aliases = {
+            "approximation": "approx", "seed": "seeding", "gen": "generation",
+        }
+        for position, (data_line, data_text) in enumerate(entry):
+            if "=" not in data_text:
+                _table_error(
+                    index, "BSAM-E340", f"statistical distribution {name} requires key=value rows",
+                    source, data_line,
+                )
+                continue
+            left, right = data_text.split("=", 1)
+            keys = _fields(left)
+            if len(keys) != 1:
+                _table_error(
+                    index, "BSAM-E340",
+                    f"statistical distribution {name} canonical rows require one key",
+                    source, data_line,
+                )
+                continue
+            key = aliases.get(keys[0].casefold(), keys[0].casefold())
+            if key in parsed:
+                _table_error(
+                    index, "BSAM-E340", f"statistical distribution {name} repeats {key}",
+                    source, data_line,
+                )
+                continue
+            parsed[key] = (right.strip(), data_line)
+            positions[key] = position
+
+        required = {"type", "approx", "seeding", "alpha", "v0", "generation"}
+        missing = sorted(required - parsed.keys())
+        if missing:
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} is missing: {', '.join(missing)}",
+                source, header,
+            )
+        seeding = parsed.get("seeding", ("", header))[0].casefold()
+        if seeding:
+            required.add(seeding)
+        allowed_keys = {
+            "type", "approx", "seeding", "alpha", "v0", "generation",
+            "seed_window_section", seeding,
+        }
+        unknown = sorted(set(parsed) - allowed_keys)
+        if unknown:
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} has unknown keys: {', '.join(unknown)}",
+                source, parsed[unknown[0]][1],
+            )
+        if seeding not in {"coordinates", "fiber", "fibers"}:
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} seeding must be coordinates, fiber, or fibers",
+                source, parsed.get("seeding", ("", header))[1],
+            )
+        seed_value = parsed.get(seeding)
+        if seed_value is None:
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} requires dynamic {seeding or '<seeding>'} dimensions",
+                source, header,
+            )
+        elif positions[seeding] <= positions.get("seeding", -1):
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} seed dimensions must follow seeding",
+                source, seed_value[1],
+            )
+
+        numeric: dict[str, int | float | list[float]] = {}
+        for key in ("type", "approx", "generation", "seed_window_section"):
+            if key not in parsed:
+                continue
+            raw, data_line = parsed[key]
+            try:
+                numeric[key] = int(raw)
+            except ValueError:
+                _table_error(
+                    index, "BSAM-E340", f"statistical distribution {name} {key} must be an integer",
+                    source, data_line,
+                )
+        for key in ("alpha", "v0"):
+            if key not in parsed:
+                continue
+            raw, data_line = parsed[key]
+            try:
+                value = float(raw)
+                if not math.isfinite(value) or value <= 0:
+                    raise ValueError
+                numeric[key] = value
+            except ValueError:
+                _table_error(
+                    index, "BSAM-E340", f"statistical distribution {name} {key} must be positive",
+                    source, data_line,
+                )
+        if seed_value is not None:
+            raw, data_line = seed_value
+            try:
+                dimensions = [float(item) for item in _fields(raw)]
+                if len(dimensions) != 3 or any(
+                    not math.isfinite(item) or item <= 0 for item in dimensions
+                ):
+                    raise ValueError
+                numeric["seed_dimensions"] = dimensions
+            except ValueError:
+                _table_error(
+                    index, "BSAM-E340",
+                    f"statistical distribution {name} seed dimensions must be three positive reals",
+                    source, data_line,
+                )
+        if numeric.get("type") != 3:
+            _table_error(
+                index, "BSAM-E340", f"statistical distribution {name} generated type must be 3",
+                source, parsed.get("type", ("", header))[1],
+            )
+        if not isinstance(numeric.get("approx"), int) or numeric["approx"] <= 0:
+            _table_error(
+                index, "BSAM-E340", f"statistical distribution {name} approx must be positive",
+                source, parsed.get("approx", ("", header))[1],
+            )
+        if not isinstance(numeric.get("generation"), int) or numeric["generation"] <= 0:
+            _table_error(
+                index, "BSAM-E340", f"statistical distribution {name} generation must be positive",
+                source, parsed.get("generation", ("", header))[1],
+            )
+        if seeding in {"fiber", "fibers"} and "seed_window_section" not in numeric:
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} fiber seeding requires seed_window_section",
+                source, header,
+            )
+        if isinstance(numeric.get("seed_window_section"), int) and numeric["seed_window_section"] <= 0:
+            _table_error(
+                index, "BSAM-E340",
+                f"statistical distribution {name} seed_window_section must be positive",
+                source, parsed["seed_window_section"][1],
+            )
+
+        for key, (raw, data_line) in parsed.items():
+            canonical = "seed_dimensions" if key == seeding else key
+            parameters.setdefault(canonical, []).append(
+                _table_parameter(raw, key, source, data_line)
+            )
+        distribution = _entity(
+            index, "statistical-distribution", name or f"unnamed-{occurrence}",
+            source, header, None,
+            {"seeding": seeding, **numeric},
+        )
+        approximation = numeric.get("approx")
+        target_cluster: SemanticEntity | None = None
+        if isinstance(approximation, int):
+            if 1 <= approximation <= len(clusters):
+                target_cluster = clusters[approximation - 1]
+                target_key = target_cluster.key
+            else:
+                target_key = _key("cluster", f"approximation-{approximation}", None)
+            _reference(
+                index, distribution, "uses-seed-cluster", target_key, source,
+                parsed["approx"][1], {"approximation": approximation},
+            )
+        section_id = numeric.get("seed_window_section")
+        if isinstance(section_id, int) and target_cluster is not None:
+            sections = [
+                item for item in index.entities
+                if item.kind == "section"
+                and item.attributes.get("cluster", "").casefold() == target_cluster.name.casefold()
+            ]
+            section_key = (
+                sections[section_id - 1].key
+                if 1 <= section_id <= len(sections)
+                else f"{target_cluster.key}/section:ordinal-{section_id}"
+            )
+            _reference(
+                index, distribution, "uses-seed-section", section_key, source,
+                parsed["seed_window_section"][1], {"section": section_id},
+            )
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.statistical-distributions[{occurrence}]@{source}:{header.number}",
+            capability_id="block.statistical-distributions",
+            canonical="STATISTICAL",
+            occurrence=occurrence,
+            location=_location(source, header),
+            parameters={key: tuple(items) for key, items in parameters.items()},
+            operations=operational_support(stat_record),
+            attributes={"entity_id": distribution.id},
+        ))
+
+    stat_reference = re.compile(r"(?i)(?:^|[^a-z0-9])stat_([^_,\s]+)")
+    for line in _top_block_body(all_lines, "MATERIALS"):
+        text = line.text.split("#", 1)[0]
+        if "=" not in text or line.text.lstrip().startswith("**"):
+            continue
+        right = text.split("=", 1)[1]
+        targets = [match.group(1).casefold() for match in stat_reference.finditer(right)]
+        if not targets:
+            continue
+        parameter = _material_reference_owner(index, source, line, text)
+        for target in targets:
+            _reference(
+                index, parameter, "uses-statistical-distribution",
+                _key("statistical-distribution", target, None), source, line,
+            )
+
+
+_CONSTITUTIVE_DIRECT_WIDTHS = {
+    1: 3, 2: 5, 3: 8, 4: 10, 5: 3, 6: 4, 7: 2, 8: 2, 10: 3,
+}
+_CONSTITUTIVE_WRAPPER_TYPES = {11, 12, 13, 21, 110, 120, 130}
+
+
+def _semantic_record_lines(lines: Iterable[SourceLine]) -> list[SourceLine]:
+    """Return records visible to list-directed readers while retaining source locations."""
+    return [
+        line for line in lines
+        if line.text.split("#", 1)[0].strip()
+        and not line.text.lstrip().startswith("#")
+    ]
+
+
+def _record_fields(line: SourceLine) -> list[str]:
+    return _fields(line.text.split("#", 1)[0])
+
+
+def _fortran_real(value: str) -> float:
+    return float(value.replace("d", "e").replace("D", "E"))
+
+
+def _not_fortran_number(value: str) -> bool:
+    try:
+        _fortran_real(value)
+    except ValueError:
+        return True
+    return False
+
+
+def _constitutive_modifier(line: SourceLine) -> tuple[str, list[int]] | None:
+    """Mirror CON_INI's five-character modifier dispatch without consuming data rows."""
+    text = line.text.split("#", 1)[0].strip()
+    fields = _fields(text)
+    if not fields:
+        return None
+    dispatch = fields[0][:5]
+    if dispatch == "*xyzl":
+        return "xyzload", []
+    if dispatch == "*fati":
+        values = _fields(text[len(fields[0]):])
+        try:
+            return "fatigue", [int(values[0])] if values else []
+        except ValueError:
+            return "fatigue", []
+    if dispatch == "*mic=":
+        values = re.findall(r"(?<![A-Za-z0-9_.+-])[+-]?\d+(?![A-Za-z0-9_.])", text[4:])
+        return "mic", [int(value) for value in values[:3]]
+    return None
+
+
+def augment_constitutive_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Consume every CON_INI declaration variant in declaration order without rewriting it."""
+    records = _semantic_record_lines(_top_block_body(tuple(lines), "CONSTITUTIVE"))
+    construct = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.constitutive"
+    )
+    cursor = 0
+    ordinal = 0
+    while cursor < len(records):
+        type_line = records[cursor]
+        type_fields = _record_fields(type_line)
+        try:
+            material_type = int(type_fields[0])
+        except (IndexError, ValueError):
+            _table_error(
+                index, "BSAM-E360", "CONSTITUTIVE declaration requires an integer type",
+                source, type_line,
+            )
+            break
+        cursor += 1
+        if material_type <= 0:
+            break
+        if material_type not in set(_CONSTITUTIVE_DIRECT_WIDTHS) | _CONSTITUTIVE_WRAPPER_TYPES:
+            _table_error(
+                index, "BSAM-E360",
+                f"unsupported CONSTITUTIVE type {material_type}", source, type_line,
+            )
+            break
+
+        modifiers: dict[str, Any] = {"xyzload": False, "mic": [], "fatigue": 0}
+        modifier_lines: dict[str, SourceLine] = {}
+        # CON_INI probes exactly three slots, backspacing an unrecognized record.
+        for _slot in range(3):
+            if cursor >= len(records):
+                break
+            parsed_modifier = _constitutive_modifier(records[cursor])
+            if parsed_modifier is None:
+                continue
+            name, values = parsed_modifier
+            modifier_lines[name] = records[cursor]
+            if name == "xyzload":
+                modifiers[name] = True
+            elif name == "mic":
+                modifiers[name] = values
+            elif values:
+                modifiers[name] = values[0]
+            cursor += 1
+
+        if cursor >= len(records):
+            _table_error(
+                index, "BSAM-E360",
+                f"CONSTITUTIVE type {material_type} is missing its data record",
+                source, type_line,
+            )
+            break
+        data_line = records[cursor]
+        data_fields = _record_fields(data_line)
+        attributes: dict[str, Any] = {
+            "type": material_type,
+            "declaration_ordinal": ordinal + 1,
+            "body_start_line": type_line.number,
+            "modifiers": modifiers,
+        }
+        referenced_constitutives: list[tuple[int, SourceLine, str]] = []
+        if material_type in _CONSTITUTIVE_DIRECT_WIDTHS:
+            required = _CONSTITUTIVE_DIRECT_WIDTHS[material_type]
+            if len(data_fields) < required:
+                _table_error(
+                    index, "BSAM-E360",
+                    f"CONSTITUTIVE type {material_type} requires {required} data values",
+                    source, data_line,
+                )
+                break
+            try:
+                attributes["material_id"] = int(data_fields[0])
+                attributes["failure_id"] = int(data_fields[1])
+                for value in data_fields[2:required]:
+                    _fortran_real(value)
+                if attributes["material_id"] <= 0 or attributes["failure_id"] <= 0:
+                    raise ValueError
+            except ValueError:
+                _table_error(
+                    index, "BSAM-E360",
+                    f"CONSTITUTIVE type {material_type} requires positive material/failure IDs and numeric data",
+                    source, data_line,
+                )
+                break
+            cursor += 1
+        else:
+            header_width = 2 if material_type >= 110 else 1
+            if len(data_fields) < header_width:
+                _table_error(
+                    index, "BSAM-E360",
+                    f"CONSTITUTIVE wrapper type {material_type} has an incomplete header",
+                    source, data_line,
+                )
+                break
+            try:
+                count = int(data_fields[0])
+            except ValueError:
+                count = -1
+            if count <= 0:
+                _table_error(
+                    index, "BSAM-E360",
+                    f"CONSTITUTIVE wrapper type {material_type} requires a positive count",
+                    source, data_line,
+                )
+                break
+            attributes["referenced_count"] = count
+            if material_type >= 110:
+                try:
+                    attributes["property_subdivision_id"] = int(data_fields[1])
+                except ValueError:
+                    _table_error(
+                        index, "BSAM-E360",
+                        f"CONSTITUTIVE wrapper type {material_type} requires an integer subdivision ID",
+                        source, data_line,
+                    )
+                    break
+            cursor += 1
+            if cursor + count > len(records):
+                _table_error(
+                    index, "BSAM-E360",
+                    f"CONSTITUTIVE wrapper type {material_type} requires {count} mapping rows",
+                    source, data_line,
+                )
+                break
+            mapping_ids: list[int] = []
+            malformed = False
+            for mapping_line in records[cursor:cursor + count]:
+                mapping = _record_fields(mapping_line)
+                try:
+                    int(mapping[0])
+                    target = int(mapping[1])
+                    if target <= 0:
+                        raise ValueError
+                except (IndexError, ValueError):
+                    _table_error(
+                        index, "BSAM-E360",
+                        f"CONSTITUTIVE wrapper type {material_type} requires label/ID mappings",
+                        source, mapping_line,
+                    )
+                    malformed = True
+                    break
+                mapping_ids.append(target)
+                referenced_constitutives.append((target, mapping_line, "wrapper"))
+            if malformed:
+                break
+            attributes["constitutive_ids"] = mapping_ids
+            data_line = records[cursor + count - 1]
+            cursor += count
+
+        ordinal += 1
+        attributes["body_end_line"] = data_line.number
+        entity = _entity(
+            index, "constitutive", str(ordinal), source, type_line, None, attributes,
+        )
+        for target in modifiers["mic"]:
+            referenced_constitutives.append((target, modifier_lines["mic"], "mic"))
+        for target, reference_line, reference_kind in referenced_constitutives:
+            _reference(
+                index, entity, "uses-constitutive", _key("constitutive", str(target), None),
+                source, reference_line, {"source": reference_kind},
+            )
+        parameters = {
+            "type": (_table_parameter(material_type, "type", source, type_line),),
+        }
+        for name, value in (
+            ("material_id", attributes.get("material_id")),
+            ("failure_id", attributes.get("failure_id")),
+            ("mic", modifiers["mic"] or None),
+            ("xyzload", True if modifiers["xyzload"] else None),
+            ("fatigue", modifiers["fatigue"] or None),
+        ):
+            if value is None:
+                continue
+            value_line = modifier_lines.get(name, data_line)
+            parameters[name] = (_table_parameter(value, name, source, value_line),)
+        operations = {
+            **operational_support(construct),
+            "parse": "verified", "semantic": "verified", "inspect": "verified",
+            "static_validation": "verified",
+        }
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.constitutive[{ordinal}]@{source}:{type_line.number}",
+            capability_id="block.constitutive",
+            canonical="CONSTITUTIVE",
+            occurrence=ordinal,
+            location=_location(source, type_line),
+            parameters=parameters,
+            operations=operations,
+            attributes={"entity_id": entity.id, "variant_type": material_type},
+        ))
+
+
+_FAILURE_NO_DATA_TYPES = {
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21,
+    24, 27, 28, 31, 32, 33, 34, 35, 36, 45,
+}
+_FAILURE_SINGLE_REFERENCE_TYPES = {22, 23, 25, 29, 30}
+
+
+def augment_failure_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Consume every FAI_INI variant and retain one-based declaration identities."""
+    records = _semantic_record_lines(_top_block_body(tuple(lines), "FAILURE"))
+    construct = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.failure"
+    )
+    cursor = 0
+    ordinal = 0
+    while cursor < len(records):
+        type_line = records[cursor]
+        fields = _record_fields(type_line)
+        try:
+            failure_type = int(fields[0])
+        except (IndexError, ValueError):
+            _table_error(
+                index, "BSAM-E370", "FAILURE declaration requires an integer type",
+                source, type_line,
+            )
+            break
+        cursor += 1
+        if failure_type <= 0:
+            break
+        if failure_type not in (
+            _FAILURE_NO_DATA_TYPES | _FAILURE_SINGLE_REFERENCE_TYPES | {1, 2, 18, 26}
+        ):
+            _table_error(
+                index, "BSAM-E370", f"unsupported FAILURE type {failure_type}",
+                source, type_line,
+            )
+            break
+
+        body_end = type_line
+        attributes: dict[str, Any] = {
+            "type": failure_type,
+            "declaration_ordinal": ordinal + 1,
+            "body_start_line": type_line.number,
+        }
+        referenced_failure: tuple[int, SourceLine] | None = None
+        required_rows = {1: 10, 2: 11}.get(failure_type, 0)
+        if required_rows:
+            if cursor + required_rows > len(records):
+                _table_error(
+                    index, "BSAM-E370",
+                    f"FAILURE type {failure_type} requires {required_rows} degradation rows",
+                    source, type_line,
+                )
+                break
+            malformed = next((
+                line for line in records[cursor:cursor + required_rows]
+                if len(_record_fields(line)) < 8 or any(
+                    _not_fortran_number(value) for value in _record_fields(line)[:8]
+                )
+            ), None)
+            if malformed is not None:
+                _table_error(
+                    index, "BSAM-E370",
+                    f"FAILURE type {failure_type} degradation rows require eight values",
+                    source, malformed,
+                )
+                break
+            body_end = records[cursor + required_rows - 1]
+            attributes["degradation_row_count"] = required_rows
+            cursor += required_rows
+        elif failure_type == 18:
+            if cursor >= len(records):
+                _table_error(
+                    index, "BSAM-E370", "FAILURE type 18 is missing its control row",
+                    source, type_line,
+                )
+                break
+            control_line = records[cursor]
+            control = _record_fields(control_line)
+            try:
+                target, mode_count = int(control[0]), int(control[1])
+                int(control[2])
+                if target <= 0:
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E370",
+                    "FAILURE type 18 requires criterion, mode-count, and level values",
+                    source, control_line,
+                )
+                break
+            if mode_count <= 0 or cursor + 1 + mode_count > len(records):
+                _table_error(
+                    index, "BSAM-E370",
+                    f"FAILURE type 18 requires {max(mode_count, 0)} mode rows",
+                    source, control_line,
+                )
+                break
+            malformed = next((
+                line for line in records[cursor + 1:cursor + 1 + mode_count]
+                if len(_record_fields(line)) < 5 or any(
+                    _not_fortran_number(value) for value in _record_fields(line)[:5]
+                )
+            ), None)
+            if malformed is not None:
+                _table_error(
+                    index, "BSAM-E370", "FAILURE type 18 mode rows require five values",
+                    source, malformed,
+                )
+                break
+            referenced_failure = (target, control_line)
+            attributes["base_failure_id"] = target
+            attributes["mode_count"] = mode_count
+            body_end = records[cursor + mode_count]
+            cursor += mode_count + 1
+        elif failure_type in _FAILURE_SINGLE_REFERENCE_TYPES:
+            if cursor >= len(records):
+                _table_error(
+                    index, "BSAM-E370",
+                    f"FAILURE type {failure_type} requires a referenced criterion row",
+                    source, type_line,
+                )
+                break
+            reference_line = records[cursor]
+            try:
+                target = int(_record_fields(reference_line)[0])
+                if target <= 0:
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E370",
+                    f"FAILURE type {failure_type} requires an integer criterion ID",
+                    source, reference_line,
+                )
+                break
+            referenced_failure = (target, reference_line)
+            attributes["base_failure_id"] = target
+            body_end = reference_line
+            cursor += 1
+        # Type 26 rereads its own declaration line to extract optional CFACTOR.
+        if failure_type == 26:
+            match = re.search(
+                r"(?i)\bCFACTOR\s*[=, ]\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][+-]?\d+)?)",
+                type_line.text.split("#", 1)[0],
+            )
+            attributes["cfactor"] = float(match.group(1).replace("d", "e").replace("D", "E")) if match else 10.0
+
+        ordinal += 1
+        attributes["body_end_line"] = body_end.number
+        entity = _entity(
+            index, "failure", str(ordinal), source, type_line, None, attributes,
+        )
+        if referenced_failure is not None:
+            target, reference_line = referenced_failure
+            _reference(
+                index, entity, "uses-failure", _key("failure", str(target), None),
+                source, reference_line,
+            )
+        operations = {
+            **operational_support(construct),
+            "parse": "verified", "semantic": "verified", "inspect": "verified",
+            "static_validation": "verified",
+        }
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.failure[{ordinal}]@{source}:{type_line.number}",
+            capability_id="block.failure",
+            canonical="FAILURE",
+            occurrence=ordinal,
+            location=_location(source, type_line),
+            parameters={
+                "type": (_table_parameter(failure_type, "type", source, type_line),),
+            },
+            operations=operations,
+            attributes={"entity_id": entity.id, "variant_type": failure_type},
+        ))
+
+
+_MATERIAL_ORTHOTROPIC_TYPES = {1, 5, 6, 7, 100, 101, 102, 103, 104, 105, 106}
+_MATERIAL_TYPES = (
+    _MATERIAL_ORTHOTROPIC_TYPES
+    | {2, 3, 4, 10, 11, 12, 15, 40, 41, 50, 200, 210, 300, 500, 800, 998, 999}
+)
+
+
+def _material_record_lines(lines: Iterable[SourceLine]) -> list[SourceLine]:
+    records: list[SourceLine] = []
+    for line in lines:
+        text = line.text.strip()
+        if not text or text.startswith("**"):
+            continue
+        if text.startswith("#") and text[:3].casefold() not in {"#ge", "#ap", "#se"}:
+            continue
+        records.append(line)
+    return records
+
+
+def _material_header_type(line: SourceLine) -> int | None:
+    fields = _record_fields(line)
+    try:
+        return int(fields[0])
+    except (IndexError, ValueError):
+        text = line.text.split("#", 1)[0]
+        match = re.search(r"(?i)(?:^|[,\s])type\s*=\s*(mises|50)(?:[,\s]|$)", text)
+        return 50 if match else None
+
+
+def _material_dispatch(line: SourceLine) -> str:
+    raw = line.text.strip()
+    text = raw if raw.startswith("#") else line.text.split("#", 1)[0]
+    fields = _fields(text)
+    return fields[0][:5].casefold() if fields else ""
+
+
+def _consume_material_statistics(
+    records: list[SourceLine], cursor: int, *, type_three: bool,
+) -> int | None:
+    """Consume the legacy inline *statistics body beginning after its marker."""
+    for _entry in range(5):
+        if cursor >= len(records):
+            return None
+        if _material_dispatch(records[cursor]) == "*end":
+            return cursor + 1
+        fields = _record_fields(records[cursor])
+        try:
+            stat_type = int(fields[0])
+        except (IndexError, ValueError):
+            return None
+        cursor += 1
+        if stat_type == 1:
+            required = 2
+        elif stat_type == 2 and not type_three:
+            required = 2
+        elif stat_type == 3 and not type_three:
+            required = 4
+        else:
+            return None
+        if cursor + required > len(records):
+            return None
+        cursor += required
+        if cursor < len(records) and _material_dispatch(records[cursor]) == "#gene":
+            cursor += 1
+    return cursor if cursor <= len(records) else None
+
+
+def _material_spans(lines: Iterable[SourceLine]) -> list[tuple[int, SourceLine, SourceLine]] | None:
+    """Mirror MAT_INI record consumption; return nothing unless the whole block is proven."""
+    records = _material_record_lines(lines)
+    spans: list[tuple[int, SourceLine, SourceLine]] = []
+    cursor = 0
+    while cursor < len(records):
+        header = records[cursor]
+        material_type = _material_header_type(header)
+        if material_type is None:
+            return None
+        cursor += 1
+        if material_type <= 0:
+            return spans if cursor == len(records) else None
+        if material_type not in _MATERIAL_TYPES:
+            return None
+        end_line = header
+
+        if material_type in {50, 998, 999}:
+            end = next((
+                position for position in range(cursor, len(records))
+                if records[position].text.strip() == "*end"
+            ), None)
+            if end is None:
+                return None
+            end_line = records[end]
+            cursor = end + 1
+        elif material_type in _MATERIAL_ORTHOTROPIC_TYPES:
+            features = {"*fibe", "*cfv_", "*shea", "*tens", "*bimo"}
+            for _slot in range(5):
+                if cursor < len(records) and _material_dispatch(records[cursor]) in features:
+                    end_line = records[cursor]
+                    cursor += 1
+            if cursor >= len(records):
+                return None
+            if _material_dispatch(records[cursor]) == "*stre":
+                end_line = records[cursor]
+                cursor += 1
+                property_rows = 19 if material_type in {1, 5, 6, 7, 100} else 18
+            else:
+                property_rows = 12
+            if cursor + property_rows > len(records):
+                return None
+            end_line = records[cursor + property_rows - 1]
+            cursor += property_rows
+            if cursor < len(records) and _material_dispatch(records[cursor]) == "*s-n":
+                if cursor + 1 >= len(records):
+                    return None
+                end_line = records[cursor + 1]
+                cursor += 2
+            if cursor < len(records) and _material_dispatch(records[cursor]) == "*stat":
+                stat_start = cursor
+                cursor = _consume_material_statistics(records, cursor + 1, type_three=False)
+                if cursor is None:
+                    return None
+                end_line = records[cursor - 1] if cursor > stat_start + 1 else records[stat_start]
+        elif material_type == 10:
+            if cursor + 2 > len(records):
+                return None
+            end_line = records[cursor + 1]
+            cursor += 2
+        elif material_type == 12:
+            if cursor + 3 > len(records):
+                return None
+            end_line = records[cursor + 2]
+            cursor += 3
+            for _slot in range(5):
+                progressed = False
+                if cursor < len(records) and _material_dispatch(records[cursor]) == "*dama":
+                    end_line = records[cursor]
+                    cursor += 1
+                    continue
+                for marker, extra in (("*maxg", 0), ("*fric", 0), ("*pari", 2), ("*s-n", 1)):
+                    if cursor < len(records) and _material_dispatch(records[cursor]) == marker:
+                        if cursor + extra >= len(records):
+                            return None
+                        end_line = records[cursor + extra]
+                        cursor += extra + 1
+                        progressed = True
+                if not progressed:
+                    continue
+        elif material_type == 15:
+            if cursor + 5 > len(records):
+                return None
+            end_line = records[cursor + 4]
+            cursor += 5
+        elif material_type in {2, 3, 4}:
+            row_count = {2: 18, 3: 16, 4: 12}[material_type]
+            if cursor + row_count > len(records):
+                return None
+            end_line = records[cursor + row_count - 1]
+            cursor += row_count
+        elif material_type == 11:
+            if cursor >= len(records):
+                return None
+            end_line = records[cursor]
+            cursor += 1
+        elif material_type in {40, 41}:
+            if cursor + 2 > len(records):
+                return None
+            end_line = records[cursor + 1]
+            cursor += 2
+        elif material_type == 200:
+            if cursor + 2 > len(records):
+                return None
+            end_line = records[cursor + 1]
+            cursor += 2
+            if cursor < len(records) and _material_dispatch(records[cursor]) == "*delt":
+                if cursor + 1 >= len(records):
+                    return None
+                end_line = records[cursor + 1]
+                cursor += 2
+        elif material_type == 210:
+            if cursor >= len(records):
+                return None
+            if _material_dispatch(records[cursor]) == "*stre":
+                cursor += 1
+                property_rows = 14
+            else:
+                property_rows = 12
+            if cursor + property_rows > len(records):
+                return None
+            end_line = records[cursor + property_rows - 1]
+            cursor += property_rows
+            if cursor < len(records) and _material_dispatch(records[cursor]) == "*stat":
+                stat_start = cursor
+                cursor = _consume_material_statistics(records, cursor + 1, type_three=True)
+                if cursor is None:
+                    return None
+                end_line = records[cursor - 1] if cursor > stat_start + 1 else records[stat_start]
+            if cursor + 2 > len(records):
+                return None
+            end_line = records[cursor + 1]
+            cursor += 2
+            if cursor < len(records) and _material_dispatch(records[cursor]) == "*delt":
+                if cursor + 1 >= len(records):
+                    return None
+                end_line = records[cursor + 1]
+                cursor += 2
+        elif material_type == 300:
+            if cursor >= len(records):
+                return None
+            try:
+                count = int(_record_fields(records[cursor])[0])
+            except (IndexError, ValueError):
+                return None
+            if count <= 0 or cursor + count + 2 > len(records):
+                return None
+            end_line = records[cursor + count + 1]
+            cursor += count + 2
+        elif material_type == 500:
+            if cursor >= len(records):
+                return None
+            try:
+                count = int(_record_fields(records[cursor])[0])
+            except (IndexError, ValueError):
+                return None
+            if count <= 0 or cursor + count + 1 > len(records):
+                return None
+            end_line = records[cursor + count]
+            cursor += count + 1
+        elif material_type == 800:
+            if cursor + 3 > len(records):
+                return None
+            end_line = records[cursor + 2]
+            cursor += 3
+        spans.append((material_type, header, end_line))
+    return spans
+
+
+def augment_material_declaration_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> bool:
+    """Add ordinal material identities only after the complete block is cursor-proven."""
+    spans = _material_spans(_top_block_body(tuple(lines), "MATERIALS"))
+    if spans is None:
+        return False
+    structured_by_line = {
+        item.location.line: item for item in index.entities
+        if item.kind == "structured-material" and item.location.source == source
+    }
+    for ordinal, (material_type, header, end_line) in enumerate(spans, start=1):
+        structured = structured_by_line.get(header.number)
+        attributes: dict[str, Any] = {
+            "type": material_type,
+            "declaration_ordinal": ordinal,
+            "body_start_line": header.number,
+            "body_end_line": end_line.number,
+            "syntax": "structured" if material_type in {50, 998, 999} else "legacy",
+        }
+        if structured is not None:
+            attributes["structured_entity_id"] = structured.id
+        _entity(index, "material", str(ordinal), source, header, None, attributes)
+    return True
+
+
+def augment_direct_constitutive_references(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine], *,
+    material_declarations_complete: bool, failure_declarations_complete: bool,
+) -> None:
+    """Link direct declarations only when the target declaration order is fully known."""
+    by_number = {line.number: line for line in lines}
+    for entity in index.entities:
+        if entity.kind != "constitutive" or entity.location.source != source:
+            continue
+        material_id = entity.attributes.get("material_id")
+        failure_id = entity.attributes.get("failure_id")
+        line = by_number.get(int(entity.attributes.get("body_end_line", 0)))
+        if line is None:
+            continue
+        if material_declarations_complete and isinstance(material_id, int):
+            _reference(
+                index, entity, "uses-material", _key("material", str(material_id), None),
+                source, line,
+            )
+        if failure_declarations_complete and isinstance(failure_id, int):
+            _reference(
+                index, entity, "uses-failure", _key("failure", str(failure_id), None),
+                source, line,
+            )
+
+
 def augment_root_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine]
 ) -> None:
     """Add documented root control entities and their FE/cluster references."""
     all_lines = tuple(lines)
-
-    constitutive_body = _top_block_body(all_lines, "CONSTITUTIVE")
-    constitutive_ordinal = 0
-    for line in constitutive_body:
-        values = _fields(line.text)
-        if not values or not values[0].isdigit() or line.text[:1].isspace():
-            continue
-        constitutive_ordinal += 1
-        _entity(
-            index, "constitutive", str(constitutive_ordinal), source, line, None,
-            {"type": int(values[0])},
-        )
+    augment_registered_boundary_semantics(index, source, all_lines)
+    augment_solver_semantics(index, source, all_lines)
+    augment_structured_material_semantics(index, source, all_lines)
+    material_declarations_complete = augment_material_declaration_semantics(
+        index, source, all_lines,
+    )
+    augment_table_semantics(index, source, all_lines)
+    augment_ufunction_semantics(index, source, all_lines)
+    augment_statistical_semantics(index, source, all_lines)
+    augment_constitutive_semantics(index, source, all_lines)
+    failure_errors = sum(item.code == "BSAM-E370" for item in index.diagnostics)
+    augment_failure_semantics(index, source, all_lines)
+    failure_declarations_complete = failure_errors == sum(
+        item.code == "BSAM-E370" for item in index.diagnostics
+    )
+    augment_direct_constitutive_references(
+        index, source, all_lines,
+        material_declarations_complete=material_declarations_complete,
+        failure_declarations_complete=failure_declarations_complete,
+    )
 
     boundary_body = _top_block_body(all_lines, "BOUNDARY")
+    all_cluster_names = [item.name for item in index.entities if item.kind == "cluster"]
+    selected_cluster_names = list(all_cluster_names)
     for command_line, body in _command_spans(boundary_body):
         command = command_line.text.lstrip().split(",", 1)[0].casefold()
         records = [line for line in body if line.stripped and not line.stripped.startswith("**")]
-        if command.startswith("*boundary condition"):
+        if command.startswith("*type"):
+            selected_cluster_names = list(all_cluster_names)
+        elif command.startswith("*clusters"):
+            named_clusters = [
+                (name, line)
+                for line in records for name in _fields(line.text)
+            ]
+            select_all = (
+                len(named_clusters) == 1
+                and named_clusters[0][0].casefold() == "all"
+            )
+            if named_clusters and not select_all:
+                selected_cluster_names = [name for name, _line in named_clusters]
+            effective_clusters = (
+                [(name, command_line) for name in selected_cluster_names]
+                if select_all or not named_clusters else named_clusters
+            )
+            selection = _entity(
+                index, "cluster-selection", f"line-{command_line.number}",
+                source, command_line, None,
+                {
+                    "mode": "all" if select_all else (
+                        "unchanged-empty" if not named_clusters else "explicit"
+                    ),
+                    "clusters": [name for name, _line in named_clusters],
+                    "effective_clusters": [name for name, _line in effective_clusters],
+                },
+            )
+            for cluster_name, line in effective_clusters:
+                _reference(
+                    index, selection, "selects-cluster",
+                    _key("cluster", cluster_name, None), source, line,
+                )
+        elif command.startswith("*boundary condition"):
             for line in records:
                 options = _record_options(line)
                 name = options.get("name")
@@ -301,6 +2128,129 @@ def augment_root_semantics(
                         index, condition, "targets-node-set",
                         _key("node-set", set_name, cluster), source, line,
                     )
+                if str(options.get("type", "")).casefold().startswith("temp"):
+                    for cluster_name in selected_cluster_names:
+                        _reference(
+                            index, condition, "targets-cluster",
+                            _key("cluster", cluster_name, None), source, line,
+                        )
+        elif command.startswith("*output"):
+            headers = [
+                (position, line, _record_options(line))
+                for position, line in enumerate(records)
+                if "type" in _record_options(line)
+            ]
+            selected_keys = {name.casefold() for name in selected_cluster_names}
+            for ordinal, (position, line, options) in enumerate(headers, start=1):
+                next_position = (
+                    headers[ordinal][0] if ordinal < len(headers) else len(records)
+                )
+                continuation = [
+                    (value, body_line)
+                    for body_line in records[position + 1:next_position]
+                    for value in _fields(body_line.text)
+                ]
+                raw_type = str(options.get("type") or "")
+                prefix = raw_type.casefold()[:3]
+                output_type = {
+                    "dat": "data-file", "sum": "sum-force",
+                    "vol": "volume-average", "tra": "traction-average",
+                    "cfv": "cfv",
+                }.get(prefix)
+                if output_type is None:
+                    continue
+                output = _entity(
+                    index, "output-selection", f"line-{line.number}",
+                    source, line, None,
+                    {
+                        "output_type": output_type, "ordinal": ordinal,
+                        "coordinate_system": options.get("c_system", "global"),
+                        "intermediate": options.get("intermediate"),
+                    },
+                )
+
+                if output_type == "data-file":
+                    selector_name, target_kind = "clusters", "cluster"
+                elif output_type in {"sum-force", "traction-average"}:
+                    selector_name, target_kind = "nset", "node-set"
+                else:
+                    selector_name, target_kind = "elset", "element-set"
+                selector = str(options.get(selector_name) or "")
+                tokens = continuation if selector.casefold() == "list" else [(selector, line)]
+
+                if target_kind == "cluster":
+                    if selector.casefold() == "all" or (
+                        selector.casefold() == "list"
+                        and len(tokens) == 1 and tokens[0][0].casefold() == "all"
+                    ):
+                        tokens = [(name, line) for name in selected_cluster_names]
+                    for cluster_name, target_line in tokens:
+                        if not cluster_name:
+                            continue
+                        _reference(
+                            index, output, "selects-cluster",
+                            _key("cluster", cluster_name, None), source, target_line,
+                        )
+                    continue
+
+                if selector.casefold() == "all" or (
+                    selector.casefold() == "list"
+                    and len(tokens) == 1 and tokens[0][0].casefold() == "all"
+                ):
+                    seen_keys: set[str] = set()
+                    for candidate in index.entities:
+                        if candidate.kind != target_kind:
+                            continue
+                        candidate_cluster = str(candidate.attributes.get("cluster", "")).casefold()
+                        if candidate_cluster not in selected_keys or candidate.key in seen_keys:
+                            continue
+                        seen_keys.add(candidate.key)
+                        _reference(
+                            index, output, f"selects-{target_kind}",
+                            candidate.key, source, line,
+                        )
+                    continue
+
+                for qualified, target_line in tokens:
+                    if "." not in qualified:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E313", severity="error",
+                            message=(
+                                f"BOUNDARY output {selector_name} target must be "
+                                f"cluster-qualified: {qualified or '<missing>'}"
+                            ),
+                            line=target_line.number, source=source,
+                        ))
+                        continue
+                    cluster_name, set_name = qualified.split(".", 1)
+                    if cluster_name.casefold() not in selected_keys:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E313", severity="error",
+                            message=(
+                                f"BOUNDARY output target cluster is outside the active "
+                                f"cluster selection: {cluster_name}"
+                            ),
+                            line=target_line.number, source=source,
+                        ))
+                    if set_name.casefold() == "all":
+                        seen_keys: set[str] = set()
+                        for candidate in index.entities:
+                            if (
+                                candidate.kind == target_kind
+                                and str(candidate.attributes.get("cluster", "")).casefold()
+                                == cluster_name.casefold()
+                                and candidate.key not in seen_keys
+                            ):
+                                seen_keys.add(candidate.key)
+                                _reference(
+                                    index, output, f"selects-{target_kind}",
+                                    candidate.key, source, target_line,
+                                )
+                    else:
+                        _reference(
+                            index, output, f"selects-{target_kind}",
+                            _key(target_kind, set_name, cluster_name), source, target_line,
+                        )
         elif command.startswith("*connections"):
             connection: SemanticEntity | None = None
             ordinal = 0
@@ -351,6 +2301,39 @@ def augment_root_semantics(
                     index, change, "changes-boundary-condition",
                     _key("boundary-condition", changed, None), source, line,
                 )
+        elif command.startswith("*solver"):
+            if not records:
+                continue
+            values = _fields(records[0].text)
+            if not values or not values[0].lstrip("+-").isdigit():
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E312", severity="error",
+                    message="BOUNDARY solver schedule must be 1 or 2",
+                    line=records[0].number, source=source,
+                ))
+                continue
+            schedule = int(values[0])
+            if not any(item.kind == "solver" for item in index.entities):
+                _entity(
+                    index, "solver", "1", source, command_line, None,
+                    {"type": "pardiso", "syntax": "implicit-default"},
+                )
+            selector = _entity(
+                index, "solver-schedule", f"line-{records[0].number}", source, records[0], None,
+                {"schedule": schedule},
+            )
+            if schedule not in {1, 2}:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E312", severity="error",
+                    message="BOUNDARY solver schedule must be 1 or 2",
+                    line=records[0].number, source=source,
+                ))
+                continue
+            for solver_id in range(1, schedule + 1):
+                _reference(
+                    index, selector, "uses-solver", _key("solver", str(solver_id), None),
+                    source, records[0], {"iteration_policy": schedule},
+                )
 
     clusters = [item for item in index.entities if item.kind == "cluster"]
     active_crack: SemanticEntity | None = None
@@ -388,8 +2371,8 @@ def build_semantic_index(
 ) -> SemanticIndex:
     """Index only explicit FE records whose grammar is documented in the registry."""
     index = SemanticIndex()
+    cluster: str | None = None
     for _path, source, lines in sources:
-        cluster: str | None = None
         for command_line, body in _command_spans(lines):
             command = command_line.text.lstrip().split(",", 1)[0].upper()[:5]
             options = _options(command_line)
@@ -439,6 +2422,195 @@ def build_semantic_index(
                     if elset:
                         _reference(index, element, "member-of", _key("element-set", elset, cluster), source, line)
 
+            elif command in {"*NGEN", "*NCOP"} and cluster:
+                operation_name = "ngen" if command == "*NGEN" else "ncopy"
+                output_set = options.get("NSET")
+                if output_set:
+                    _entity(
+                        index, "node-set", output_set, source, command_line, cluster,
+                        {"definition": "generated-command-membership", "generator": operation_name},
+                    )
+                generation = _entity(
+                    index, "node-generation", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {"operation": operation_name, "output_set": output_set},
+                )
+                generation_records = records[1:] if command == "*NGEN" and "ARC" in options else records
+                for line in generation_records:
+                    values = _fields(line.text)
+                    if command == "*NCOP":
+                        if not values:
+                            continue
+                        source_set_key = _key("node-set", values[0], cluster)
+                        _reference(
+                            index, generation, "copies-node-set",
+                            source_set_key, source, line,
+                        )
+                        if len(values) >= 3:
+                            try:
+                                copy_count, label_offset = int(values[1]), int(values[2])
+                            except ValueError:
+                                continue
+                            if 0 < copy_count <= 100_000 and label_offset != 0:
+                                for member in _set_member_entities(index, source_set_key, "node"):
+                                    try:
+                                        source_label = int(member.name)
+                                    except ValueError:
+                                        continue
+                                    for copy_index in range(1, copy_count + 1):
+                                        label = source_label + copy_index * label_offset
+                                        if label <= 0:
+                                            continue
+                                        generated = _entity(
+                                            index, "node", str(label), source, line, cluster,
+                                            {"generated_by": "ncopy", "source_node": source_label},
+                                        )
+                                        if output_set:
+                                            _reference(
+                                                index, generated, "member-of",
+                                                _key("node-set", output_set, cluster), source, line,
+                                            )
+                        continue
+                    if len(values) < 2:
+                        continue
+                    if "ARC" in options:
+                        targets = ((values[0], "node"), (values[1], "node"))
+                    else:
+                        first_key, first_kind = _cluster_nodal_target_key(
+                            index, values[0], cluster,
+                        )
+                        first_target_kind = "node-set" if first_kind == "targets-node-set" else "node"
+                        targets = ((values[0], first_target_kind), (values[1], first_target_kind))
+                    for endpoint, target_kind in targets:
+                        _reference(
+                            index, generation, f"uses-{target_kind}-endpoint",
+                            _key(target_kind, endpoint, cluster), source, line,
+                        )
+                    try:
+                        increment = int(values[2])
+                    except (IndexError, ValueError):
+                        continue
+                    endpoint_pairs: list[tuple[int, int]] = []
+                    if targets[0][1] == "node":
+                        try:
+                            start_label, end_label = int(values[0]), int(values[1])
+                        except ValueError:
+                            continue
+                        known_keys = {item.key for item in index.entities}
+                        if (
+                            _key("node", str(start_label), cluster) not in known_keys
+                            or _key("node", str(end_label), cluster) not in known_keys
+                        ):
+                            continue
+                        endpoint_pairs.append((start_label, end_label))
+                    else:
+                        first_members = _set_member_entities(
+                            index, _key("node-set", values[0], cluster), "node",
+                        )
+                        second_members = _set_member_entities(
+                            index, _key("node-set", values[1], cluster), "node",
+                        )
+                        if len(first_members) != len(second_members):
+                            continue
+                        try:
+                            endpoint_pairs.extend(
+                                (int(first.name), int(second.name))
+                                for first, second in zip(first_members, second_members)
+                            )
+                        except ValueError:
+                            continue
+                    for start_label, end_label in endpoint_pairs:
+                        if output_set:
+                            output_set_key = _key("node-set", output_set, cluster)
+                            endpoint_keys = {
+                                _key("node", str(start_label), cluster),
+                                _key("node", str(end_label), cluster),
+                            }
+                            for endpoint_entity in index.entities:
+                                if endpoint_entity.key in endpoint_keys:
+                                    _reference_once(
+                                        index, endpoint_entity, "member-of",
+                                        output_set_key, source, line,
+                                    )
+                        for label in _bounded_generated_labels(
+                            start_label, end_label, increment,
+                        ):
+                            generated = _entity(
+                                index, "node", str(label), source, line, cluster,
+                                {
+                                    "generated_by": "ngen", "start_node": start_label,
+                                    "end_node": end_label,
+                                },
+                            )
+                            if output_set:
+                                _reference(
+                                    index, generated, "member-of",
+                                    _key("node-set", output_set, cluster), source, line,
+                                )
+
+            elif command == "*ELGE" and cluster:
+                requested_type = str(options.get("TYPE") or "").upper()
+                generation = _entity(
+                    index, "element-generation", f"{source}:{command_line.number}",
+                    source, command_line, cluster, {"element_type": requested_type},
+                )
+                for line in records:
+                    values = _fields(line.text)
+                    if len(values) < 7 or not values[0].isdigit():
+                        continue
+                    seed_key = _key("element", values[0], cluster)
+                    _reference(
+                        index, generation, "uses-seed-element", seed_key, source, line,
+                    )
+                    seeds = [item for item in index.entities if item.key == seed_key]
+                    if len(seeds) != 1:
+                        continue
+                    seed = seeds[0]
+                    if str(seed.attributes.get("element_type") or "").upper() != requested_type:
+                        continue
+                    try:
+                        seed_label = int(values[0])
+                        rows, columns, layers = (int(item) for item in values[1:4])
+                        row_offset, column_offset, layer_offset = (
+                            int(item) for item in values[4:7]
+                        )
+                        seed_connectivity = [
+                            int(item) for item in seed.attributes.get("connectivity", [])
+                        ]
+                    except (TypeError, ValueError):
+                        continue
+                    positions = rows * columns * layers
+                    if rows < 1 or columns < 1 or layers < 1 or positions > 100_001:
+                        continue
+                    generated_label = seed_label
+                    for layer in range(layers):
+                        for column in range(columns):
+                            for row in range(rows):
+                                offset = (
+                                    layer * layer_offset
+                                    + column * column_offset
+                                    + row * row_offset
+                                )
+                                if offset == 0:
+                                    continue
+                                generated_label += 1
+                                connectivity = [label + offset for label in seed_connectivity]
+                                element = _entity(
+                                    index, "element", str(generated_label), source, line,
+                                    cluster,
+                                    {
+                                        "element_type": requested_type,
+                                        "connectivity": [str(item) for item in connectivity],
+                                        "generated_by": "elgen", "seed_element": seed_label,
+                                    },
+                                )
+                                for position, node_label in enumerate(connectivity, start=1):
+                                    _reference(
+                                        index, element, "connectivity",
+                                        _key("node", str(node_label), cluster), source, line,
+                                        {"position": position},
+                                    )
+
             elif command in {"*NSET", "*ELSE"}:
                 entity_kind = "node-set" if command == "*NSET" else "element-set"
                 member_kind = "node" if command == "*NSET" else "element"
@@ -473,6 +2645,214 @@ def build_semantic_index(
                         index, assignment, "uses-constitutive",
                         _key("constitutive", value[0], None), source, records[0],
                     )
+            elif command == "*BOUN" and cluster:
+                format_name = str(options.get("FORMAT") or "ABAQUS").upper()[:4]
+                for line in records:
+                    values = _fields(line.text)
+                    if not values:
+                        continue
+                    target = values[0]
+                    boundary = _entity(
+                        index, "nodal-boundary", f"{source}:{line.number}", source,
+                        line, cluster, {"format": format_name, "target": target},
+                    )
+                    target_key, reference_kind = _cluster_nodal_target_key(
+                        index, target, cluster, node_only=format_name == "LIST",
+                    )
+                    _reference(
+                        index, boundary, reference_kind, target_key, source, line,
+                        {"format": format_name},
+                    )
+            elif command == "*LOAD" and cluster:
+                for line in records:
+                    values = _fields(line.text)
+                    if not values:
+                        continue
+                    target = values[0]
+                    load = _entity(
+                        index, "nodal-load", f"{source}:{line.number}", source,
+                        line, cluster, {"target": target},
+                    )
+                    target_key, reference_kind = _cluster_nodal_target_key(
+                        index, target, cluster,
+                    )
+                    _reference(index, load, reference_kind, target_key, source, line)
+            elif command == "*FIEL" and cluster:
+                variables = options.get("VARIABLES")
+                for line in records:
+                    values = _fields(line.text)
+                    if not values:
+                        continue
+                    target = values[0]
+                    field_value = _entity(
+                        index, "nodal-field", f"{source}:{line.number}", source,
+                        line, cluster, {"target": target, "variables": variables},
+                    )
+                    target_key, reference_kind = _cluster_nodal_target_key(
+                        index, target, cluster,
+                    )
+                    _reference(
+                        index, field_value, reference_kind, target_key, source, line,
+                        {"variables": variables},
+                    )
+            elif command == "*SELE" and cluster:
+                selection_id = options.get("ID")
+                if not selection_id:
+                    continue
+                selection_type = str(options.get("TYPE") or "NODE").upper()[:4]
+                member_kind = "element" if selection_type == "ELEM" else "node"
+                selection = _entity(
+                    index, "selection", selection_id, source, command_line, cluster,
+                    {"selection_type": member_kind},
+                )
+                set_kind = f"{member_kind}-set"
+                known_keys = {item.key for item in index.entities}
+                for line in records:
+                    for target in _fields(line.text):
+                        set_key = _key(set_kind, target, cluster)
+                        if set_key in known_keys:
+                            target_key, reference_kind = set_key, f"selects-{set_kind}"
+                        elif target.isdigit():
+                            target_key = _key(member_kind, target, cluster)
+                            reference_kind = f"selects-{member_kind}"
+                        else:
+                            target_key, reference_kind = set_key, f"selects-{set_kind}"
+                        _reference(
+                            index, selection, reference_kind, target_key, source, line,
+                        )
+            elif command == "*ORIE" and cluster:
+                orientation_name = str(options.get("NAME") or "").upper()
+                member_kind = "element" if orientation_name == "ORI-ELE" else "node"
+                set_kind = f"{member_kind}-set"
+                known_keys = {item.key for item in index.entities}
+                for line in records:
+                    values = _fields(line.text)
+                    if not values:
+                        continue
+                    target = values[0]
+                    orientation = _entity(
+                        index, "orientation-record", f"{source}:{line.number}",
+                        source, line, cluster,
+                        {"target": target, "target_kind": member_kind, "name": orientation_name},
+                    )
+                    set_key = _key(set_kind, target, cluster)
+                    if set_key in known_keys:
+                        target_key, reference_kind = set_key, f"targets-{set_kind}"
+                    elif target.isdigit():
+                        target_key = _key(member_kind, target, cluster)
+                        reference_kind = f"targets-{member_kind}"
+                    else:
+                        target_key, reference_kind = set_key, f"targets-{set_kind}"
+                    _reference(
+                        index, orientation, reference_kind, target_key, source, line,
+                    )
+            elif command in {"*SHIF", "*SCAL", "*FLIP", "*TRAN"} and cluster:
+                operation_name = {
+                    "*SHIF": "shift", "*SCAL": "scale",
+                    "*FLIP": "flip", "*TRAN": "transform",
+                }[command]
+                nset = options.get("NSET") if command in {"*SHIF", "*SCAL"} else None
+                attributes: dict[str, Any] = {
+                    "operation": operation_name, "target": nset or "ALL",
+                }
+                if command in {"*SHIF", "*SCAL"} and records:
+                    attributes["values"] = _fields(records[0].text)[:3]
+                elif command == "*FLIP":
+                    attributes["mapping"] = options.get("TYPE") or "XY"
+                else:
+                    attributes["inertia"] = "INERTIA" in options
+                    if options.get("FLATTEN") is not None:
+                        attributes["flatten"] = options["FLATTEN"]
+                operation = _entity(
+                    index, "coordinate-operation", f"{source}:{command_line.number}",
+                    source, command_line, cluster, attributes,
+                )
+                if nset:
+                    _reference(
+                        index, operation, "targets-node-set",
+                        _key("node-set", nset, cluster), source, command_line,
+                    )
+                else:
+                    _reference(
+                        index, operation, "targets-cluster",
+                        _key("cluster", cluster, None), source, command_line,
+                    )
+            elif command == "*INTE" and cluster:
+                if any(line.stripped.startswith("**") for line in body):
+                    continue
+                cursor = 0
+                while cursor < len(records):
+                    line = records[cursor]
+                    values = _fields(line.text)
+                    if len(values) < 2 or not values[0].isdigit():
+                        break
+                    try:
+                        point_count = int(values[1])
+                    except ValueError:
+                        break
+                    integration = _entity(
+                        index, "integration-scheme", f"{source}:{line.number}",
+                        source, line, cluster,
+                        {"element": values[0], "point_count": point_count},
+                    )
+                    _reference(
+                        index, integration, "targets-element",
+                        _key("element", values[0], cluster), source, line,
+                    )
+                    if point_count < 1 or cursor + point_count >= len(records):
+                        break
+                    cursor += point_count + 1
+            elif command == "*EXCL" and cluster:
+                shape = (
+                    "previous" if "PREVIOUS" in options else
+                    "plane" if "PLANE" in options else "box"
+                )
+                side = "outside" if "OUTSIDE" in options else "inside"
+                values = _fields(records[0].text) if records else []
+                exclusion = _entity(
+                    index, "exclusion-region", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {"shape": shape, "side": side, "values": values},
+                )
+                _reference(
+                    index, exclusion, "targets-cluster",
+                    _key("cluster", cluster, None), source, command_line,
+                )
+            elif command == "*CRAC" and cluster and command_line.text.lstrip().upper().startswith(
+                "*CRACK REGION"
+            ):
+                elset = options.get("ELSET")
+                action = (
+                    "ADD" if "ADD" in options else
+                    "REMOVE" if "REMOVE" in options else "REPLACE"
+                )
+                if elset:
+                    region = _entity(
+                        index, "crack-region", f"{source}:{command_line.number}",
+                        source, command_line, cluster,
+                        {"action": action, "selector": "element-set", "element_set": elset},
+                    )
+                    _reference(
+                        index, region, "targets-element-set",
+                        _key("element-set", elset, cluster), source, command_line,
+                    )
+                else:
+                    selector = (
+                        "sphere" if "SPHERE" in options else
+                        "cylinder" if "CYLINDER" in options else
+                        "box" if "BOX" in options or "COORDINATES" in options else None
+                    )
+                    if selector is not None:
+                        values = _fields(records[0].text) if records else []
+                        region = _entity(
+                            index, "crack-region", f"{source}:{command_line.number}",
+                            source, command_line, cluster,
+                            {"action": action, "selector": selector, "values": values},
+                        )
+                        _reference(
+                            index, region, "targets-cluster",
+                            _key("cluster", cluster, None), source, command_line,
+                        )
     if resolve:
         index.resolve()
     return index

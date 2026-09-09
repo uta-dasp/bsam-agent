@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bsam_agent.evals import load_chat_cases
+from bsam_agent.evals import load_chat_cases, load_trajectory_cases
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +33,24 @@ class ChatEvaluationTests(unittest.TestCase):
         ):
             self.assertGreaterEqual(value[key], 0)
             self.assertLessEqual(value[key], 1)
+
+    def test_trajectory_cases_cover_bounded_workflow_failures(self) -> None:
+        value = load_trajectory_cases(ROOT / "evals" / "trajectory_cases.json")
+        self.assertEqual(15, len(value["cases"]))
+        identifiers = {item["id"] for item in value["cases"]}
+        self.assertEqual({
+            "inspect-modify-validate", "ambiguous-parameter", "dependent-boundary-rename",
+            "unsupported-create", "stale-revision", "failed-execution",
+            "solver-control-change", "generic-node-create", "stale-plan-refresh",
+            "composite-reviewed-plan",
+            "table-reference-inspection",
+            "user-function-reference-inspection",
+            "statistical-reference-inspection",
+            "structured-material-reference-attribution",
+            "optional-parameter-removal",
+        }, identifiers)
+        self.assertIn("repeated_action_loops", value["metrics"])
+        self.assertIn("guarded_action_compliance", value["metrics"])
 
 
 if __name__ == "__main__":

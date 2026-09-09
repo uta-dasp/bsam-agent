@@ -76,6 +76,25 @@
         "runtime-verified"
       ]
     },
+    "operationStatus": {
+      "enum": ["unassessed", "unsupported", "implemented", "verified"]
+    },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parse": { "$ref": "#/$defs/operationStatus" },
+        "semantic": { "$ref": "#/$defs/operationStatus" },
+        "inspect": { "$ref": "#/$defs/operationStatus" },
+        "modify": { "$ref": "#/$defs/operationStatus" },
+        "create": { "$ref": "#/$defs/operationStatus" },
+        "delete": { "$ref": "#/$defs/operationStatus" },
+        "rename": { "$ref": "#/$defs/operationStatus" },
+        "generate": { "$ref": "#/$defs/operationStatus" },
+        "static_validation": { "$ref": "#/$defs/operationStatus" },
+        "execute": { "$ref": "#/$defs/operationStatus" }
+      }
+    },
     "target": {
       "type": "object",
       "additionalProperties": false,
@@ -146,6 +165,19 @@
           "items": { "type": ["string", "number", "integer", "boolean"] }
         },
         "default": {},
+        "routing_terms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        },
+        "edit_operations": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "insert": { "$ref": "#/$defs/operationStatus" },
+            "remove": { "$ref": "#/$defs/operationStatus" }
+          }
+        },
         "summary": { "type": "string", "minLength": 1 }
       }
     },
@@ -223,6 +255,12 @@
         "required": { "type": "boolean" },
         "parser": { "type": "string", "minLength": 1 },
         "summary": { "type": "string", "minLength": 1 },
+        "entity_kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "routing_terms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        },
         "termination": { "$ref": "#/$defs/termination" },
         "coverage": { "$ref": "#/$defs/coverage" },
         "parameters": {
@@ -238,6 +276,7 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "operations": { "$ref": "#/$defs/operations" },
         "body": { "$ref": "#/$defs/body" }
       }
     },
@@ -263,6 +302,12 @@
         "match_prefix": { "type": "string", "minLength": 1 },
         "kind": { "enum": ["problem-start", "keyword", "record-group"] },
         "summary": { "type": "string", "minLength": 1 },
+        "entity_kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "routing_terms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        },
         "coverage": { "$ref": "#/$defs/coverage" },
         "parameters": {
           "type": "array",
@@ -277,6 +322,7 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "operations": { "$ref": "#/$defs/operations" },
         "body": { "$ref": "#/$defs/body" }
       }
     },
@@ -300,6 +346,12 @@
         "canonical": { "type": "string", "pattern": "^\\*[A-Z][A-Z ]*$" },
         "dispatch_prefix": { "type": "string", "pattern": "^\\*[A-Z]{4}$" },
         "summary": { "type": "string", "minLength": 1 },
+        "entity_kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "routing_terms": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        },
         "coverage": { "$ref": "#/$defs/coverage" },
         "parameters": {
           "type": "array",
@@ -314,6 +366,7 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "operations": { "$ref": "#/$defs/operations" },
         "body": { "$ref": "#/$defs/body" }
       }
     },

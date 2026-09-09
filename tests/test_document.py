@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent import cli
-from bsam_agent.document import SourceDocument
+from bsam_agent.document import Diagnostic, SourceDocument
 
 
 CURRENT_DECK = (
@@ -45,6 +45,20 @@ class SourceDocumentTests(unittest.TestCase):
         codes = [item["code"] for item in inspection["diagnostics"]]
         self.assertIn("BSAM-E100", codes)
         self.assertIn("BSAM-W110", codes)
+        by_code = {item["code"]: item for item in inspection["diagnostics"]}
+        self.assertEqual("structure", by_code["BSAM-E100"]["level"])
+        self.assertEqual("syntax", by_code["BSAM-W110"]["level"])
+        self.assertEqual("source-defined", by_code["BSAM-W110"]["provenance"])
+        self.assertEqual({"structure": 1, "syntax": 1}, inspection["summary"]["by_level"])
+
+    def test_new_diagnostic_codes_require_explicit_level_and_provenance(self) -> None:
+        with self.assertRaisesRegex(ValueError, "requires explicit"):
+            Diagnostic("BSAM-W999", "warning", "new diagnostic")
+        diagnostic = Diagnostic(
+            "BSAM-W999", "warning", "review this estimate",
+            level="engineering-plausibility", provenance="engineering-heuristic",
+        )
+        self.assertEqual("engineering-plausibility", diagnostic.as_dict()["level"])
 
     def test_statistical_long_heading_matches_first_list_field(self) -> None:
         raw = CURRENT_DECK + b"STATISTICAL DISTRIBUTIONS\r\nEND STATISTICAL DISTRIBUTIONS\r\n"

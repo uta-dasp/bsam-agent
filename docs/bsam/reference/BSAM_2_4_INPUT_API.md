@@ -8,11 +8,11 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.21.0`
-- Registry SHA-256: `5C64E2069A4400958FDCA6775FDEE11A0F582D4C011A1B1560DACF263D98514C`
+- Registry version: `0.49.0`
+- Registry SHA-256: `DACA7C43D00D06663DA549F22227FE5F541DE44D8CB6650D9E4FE04DD3D07E07`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
-Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented.
+Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
 ## Top-level blocks
 
@@ -49,7 +49,7 @@ Known parameters:
 
 - `type` (integer record, required) (allowed: `3`): Activates the current single-thread non-sequential input format before internal conversion to block mode.
 
-### `INPUT` body
+#### `INPUT` body
 
 Termination: fixed-count. Dependencies: The first parsed type must equal 3; the parser then normalizes input_id 1 to internal non-sequential block mode.
 
@@ -68,6 +68,7 @@ Defines one or more linear solvers and solver-specific options; defaults to seri
 - Termination: `END SOLVER` (canonical)
 - Coverage: documented
 - Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.sheff-solver-dispatch](#evidencesheff-solver-dispatch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -77,12 +78,12 @@ Known parameters:
 - `backend` (enum, optional) (allowed: `mkl`, `petsc`; default: `"mkl"`): Selects the case-insensitive SHEFF backend; availability depends on how the executable was built.
 - `solver` (enum, optional) (allowed: `none`, `cg`, `gmes`, `fgmes`, `direct`; default: `"cg"`): Selects the case-insensitive SHEFF solver. The pinned dispatcher accepts the spellings gmes/fgmes, not gmres; none is PETSc-only.
 - `preconditioner` (enum, optional) (allowed: `none`, `jacobi`, `ilu`, `ilut`, `ilu0`; default: `"jacobi"`): Selects the case-insensitive SHEFF preconditioner using the active parser label; ilu and ilut select the same ILUT category.
-- `relative_tolerance` (real, optional) (default: `1e-08`): Sets the SHEFF relative tolerance.
+- `relative_tolerance` (real, optional) (default: `1e-08`; edit: insert=verified, remove=verified): Sets the SHEFF relative tolerance.
 - `maximum_iterations` (integer, optional) (default: `1000`): Sets the SHEFF maximum iteration count.
 - `petsc_opts` (string, optional) (default: `""`): Passes PETSc options to a SHEFF PETSc backend.
 - `debug_opts` (string, optional) (default: `""`): Passes SHEFF debug flags; recognized flags include -pause, -write_sparsity, and PETSc-only -reorder and -save_to_binary.
 
-### `SOLVER` body
+#### `SOLVER` body
 
 Termination: next-top-level-block. Dependencies: Solver IDs are one-based declaration order.; *SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs.; A boundary schedule 2 requires a second current-format solver definition.
 
@@ -119,6 +120,7 @@ Defines named user functions parsed as *end-delimited entries.
 - Termination: `END UFUNCTIONS` (canonical)
 - Coverage: documented
 - Evidence: [evidence.ufunction-parser](#evidenceufunction-parser), [evidence.ufunction-initializer](#evidenceufunction-initializer), [evidence.ufunction-material-reference](#evidenceufunction-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -126,7 +128,7 @@ Known parameters:
 - `x` (real, required): Supplies the consumer-defined independent coordinate; all x values must be strictly monotonic in one direction.
 - `y` (real, required): Supplies the consumer-defined function value paired with x.
 
-### `UFUNCTIONS` body
+#### `UFUNCTIONS` body
 
 Termination: next-top-level-block. Dependencies: Structured material parameters may reference a function as ufunc_<name>.; Function coordinate/value units are defined by the consuming material parameter rather than by UFUNCTIONS.
 
@@ -160,7 +162,7 @@ Known parameters:
 - `directory` (relative-directory, optional) (default: `"input directory"`): Selects the lowercased moisture workflow directory. Safe generation uses a relative child of the input or output directory because the full-path branch is prepended with the input directory.
 - `steps` (positive-integer-list, optional): Selects completed block-loading step numbers at which coupling runs; omission runs at every qualifying step.
 
-### `MOISTURE` body
+#### `MOISTURE` body
 
 Termination: next-top-level-block. Dependencies: Coupling is invoked only for hygro-thermomechanical output at a completed block-loading step.; A steps list filters those invocations; no list means every qualifying step.; Execution requires the external MDSIM installation and support files and is not part of the initial notch acceptance profile.
 
@@ -210,6 +212,7 @@ Defines constitutive law records that reference material and failure definitions
 - Termination: `END CONSTITUTIVE` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.constitutive-parser](#evidenceconstitutive-parser), [evidence.constitutive-storage](#evidenceconstitutive-storage), [evidence.constitutive-fe-consumer](#evidenceconstitutive-fe-consumer), [evidence.constitutive-wrapper-consumers](#evidenceconstitutive-wrapper-consumers), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -220,7 +223,7 @@ Known parameters:
 - `xyzload` (boolean-flag, optional) (default: `false`): Marks non-mechanical load vectors as global-coordinate data for material types 100 and 210.
 - `fatigue` (positive-failure-id, optional) (default: `0`): Stores a parsed fatigue criterion reference; Agent generation is blocked because no active consumer reads the stored field.
 
-### `CONSTITUTIVE` body
+#### `CONSTITUTIVE` body
 
 Termination: END CONSTITUTIVE after a complete declaration. Dependencies: Constitutive IDs are one-based declaration order and are referenced by cluster assignments, sections, connections, and MIC definitions.; Every direct material_id and failure_id must resolve to existing MATERIALS and FAILURE declarations.; Types 3 and 4 require numeric USER function IDs; type 7 requires external element orientation data; type 8 is coupled to COMPRO material type 800.; *MIC entries reference constitutive IDs and may be forward references because all declarations are read before element processing.; At most 1,500 entries are stored; canonical generation reserves END CONSTITUTIVE by emitting fewer than 1,500 declarations.
 
@@ -286,6 +289,7 @@ Defines named lookup tables used by material data.
 - Termination: `*end per table`, `END TABLES` (canonical)
 - Coverage: documented
 - Evidence: [evidence.table-parser](#evidencetable-parser), [evidence.table-initializer](#evidencetable-initializer), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -296,7 +300,7 @@ Known parameters:
 - `vertical_lookup` (strictly-increasing-real, required): Begins each data row with its vertical grid coordinate in consumer-defined units.
 - `value` (real, required): Supplies one table value for each horizontal coordinate in the row.
 
-### `TABLES` body
+#### `TABLES` body
 
 Termination: next-top-level-block. Dependencies: Structured bulk and interface material parameters may reference a table as table_<name>.; Statistical distributions may be combined with tables, and polynomial material parameters may reference multiple named tables.; Axis and value units are determined by the consuming material parameter and axis labels.
 
@@ -323,6 +327,7 @@ Defines named statistical distributions that modify material data.
 - Termination: `*end per distribution`, `END STATISTICAL DISTRIBUTIONS` (canonical)
 - Coverage: documented
 - Evidence: [evidence.stat-dist-parser](#evidencestat-dist-parser), [evidence.stat-dist-initializer](#evidencestat-dist-initializer), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -336,7 +341,7 @@ Known parameters:
 - `v0` (positive-real, required): Sets the reference volume used to scale element-seed strength.
 - `generation` (positive-integer, required): Seeds the deterministic MKL MT19937 stream; zero selects a diagnostic dummy distribution and is not generated.
 
-### `STATISTICAL` body
+#### `STATISTICAL` body
 
 Termination: next-top-level-block. Dependencies: approx references an existing one-based solid CLUSTERS declaration.; fiber/fibers mode requires a valid section and element orientations in that cluster.; Structured material parameters reference this entity as stat_<name>_<initial-value>; table and statistical references may be combined in one parameter value.; Distribution values are indexed by integration-point IDs and multiply the consuming material parameter.
 
@@ -368,6 +373,7 @@ Defines bulk and interface material records, including current structured materi
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
 - Coverage: partially-documented
 - Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -382,7 +388,7 @@ Remaining specification work:
 - Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.
 - Map material-type compatibility to each constitutive and element family.
 
-### `MATERIALS` body
+#### `MATERIALS` body
 
 Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.
 
@@ -485,6 +491,7 @@ Defines failure criterion records referenced by constitutive laws and damage beh
 - Termination: `END FAILURE` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.failure-parser](#evidencefailure-parser), [evidence.failure-storage](#evidencefailure-storage), [evidence.failure-evaluator](#evidencefailure-evaluator), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -492,7 +499,7 @@ Known parameters:
 - `base_failure_id` (positive-failure-id, optional): References the underlying static or surface criterion for wrapper types 22, 23, 25, 29, and 30.
 - `cfactor` (real, optional) (default: `10`): Sets the type-26 LARC04 compression cutoff and must appear on the type line.
 
-### `FAILURE` body
+#### `FAILURE` body
 
 Termination: END FAILURE after a complete declaration. Dependencies: Failure IDs are one-based declaration order and are referenced by direct CONSTITUTIVE records, connection-created constitutive records, and failure wrappers.; Wrapper base_failure_id references must resolve without cycles and retain compatible bulk, interface, fatigue, or contact domains.; Most no-data criteria obtain strengths and other coefficients from their referenced MATERIALS declaration rather than from FAILURE rows.; At most 50 entries are stored; canonical generation reserves END FAILURE by emitting fewer than 50 declarations.
 
@@ -550,7 +557,7 @@ Known parameters:
 - `coefficient` (real, optional): Supplies type-specific analytic coefficients in consumer-defined units.
 - `external_file` (input-relative-path-30, optional): For parsed type 100, selects a 30-character input-relative data file containing point count followed by x/y pairs.
 
-### `USER` body
+#### `USER` body
 
 Termination: next-top-level-block. Dependencies: USER function IDs are one-based declaration order and are referenced numerically by constitutive/material selection records.; At most 10,000 entries are stored.; END USER terminates the block after a complete function record; a nonpositive next type also returns.; Function and coefficient units are determined by each consumer.
 
@@ -622,7 +629,7 @@ Known parameters:
 - `minimum_length` (positive-real, optional) (default: `3`): Sets the minimum crack length through *min.
 - `maximum_length` (positive-real, optional) (default: `1000`): Sets the maximum crack length through *max and initializes predefined-crack physical radii.
 
-### `CRACK` body
+#### `CRACK` body
 
 Termination: END CRACK after a complete crack entry. Dependencies: Crack IDs are one-based declaration order and cluster *CRACK records reference them.; cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.; Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.; Growth and extension threshold pairs are indexed by failure mode.; END CRACK is recognized after a complete entry by reading the next record's first three characters as END.
 
@@ -681,9 +688,22 @@ The parser dispatches on the first five characters (the leading `*` plus four le
 | `*CRACK` | `*CRAC` | documented | `operation` | Dispatches cluster crack definition, region, spacing, initiation, and function variants. |
 | `*TRANSFORM` | `*TRAN` | documented | `INERTIA`, `FLATTEN` | Centers cluster geometry and rotates it into its computed principal inertial coordinate system. |
 
-## Documented command bodies
+## Cluster command details
 
-### `*TYPE` body
+### `*TYPE`
+
+Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters.
+
+- Registry ID: `command.type`
+- Dispatch prefix: `*TYPE`
+- Coverage: documented
+- Evidence: [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
+
+Known parameters:
+
+- `representation` (enum-prefix, required) (allowed: `solid`): The following data record is lowercased and accepted when its first four characters are soli.
+
+#### `*TYPE` body
 
 Termination: fixed-count. Dependencies: The accepted representation maps to internal cluster type 100.
 
@@ -692,7 +712,20 @@ Termination: fixed-count. Dependencies: The accepted representation maps to inte
   - Constraint: *TYPE must be the first non-comment record for each cluster.
   - Constraint: A second *TYPE encountered by the FE command reader stops the program.
 
-### `*DIMENSIONS` body
+### `*DIMENSIONS`
+
+Allocates cluster dimensions before mesh entities are read.
+
+- Registry ID: `command.dimensions`
+- Dispatch prefix: `*DIME`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records)
+
+Remaining specification work:
+
+- Confirm failure behavior for negative capacities and capacity overruns.
+
+#### `*DIMENSIONS` body
 
 Termination: fixed-count. Dependencies: Capacities must cover all entities produced by explicit and generation commands.
 
@@ -700,7 +733,20 @@ Termination: fixed-count. Dependencies: Capacities must cover all entities produ
   - `dimensions` [once]: `node_capacity`:integer, `element_capacity`:integer, `selection_count`:integer, `section_capacity`:integer
   - Constraint: Must precede commands that populate the allocated cluster arrays.
 
-### `*NAME` body
+### `*NAME`
+
+Assigns a name to the current cluster.
+
+- Registry ID: `command.name`
+- Dispatch prefix: `*NAME`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
+
+Known parameters:
+
+- `name` (string-record, required): Cluster name; it is normalized to lowercase by the enclosing cluster parser.
+
+#### `*NAME` body
 
 Termination: fixed-count. Dependencies: Every cluster-qualified set reference uses the normalized lowercase cluster name.; If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name.; Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference.
 
@@ -709,7 +755,20 @@ Termination: fixed-count. Dependencies: Every cluster-qualified set reference us
   - Constraint: The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.
   - Constraint: The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness because name-based consumers otherwise select or compare ambiguously.
 
-### `*CONSTITUTIVE` body
+### `*CONSTITUTIVE`
+
+Assigns the constitutive record used by the current cluster.
+
+- Registry ID: `command.constitutive`
+- Dispatch prefix: `*CONS`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
+
+Known parameters:
+
+- `constitutive_id` (positive-constitutive-id-record, required): The following data record selects one declaration-order CONSTITUTIVE definition.
+
+#### `*CONSTITUTIVE` body
 
 Termination: fixed-count. Dependencies: The ID must resolve to an existing CONSTITUTIVE declaration.; Deleting or reordering CONSTITUTIVE entries must update this reference atomically.
 
@@ -717,7 +776,25 @@ Termination: fixed-count. Dependencies: The ID must resolve to an existing CONST
   - `constitutive` [once]: `constitutive_id`:positive-integer
   - Constraint: The BSAM reader stores the integer without bounds checking; the Agent must reject zero, negative, and unresolved IDs.
 
-### `*NODE` body
+### `*NODE`
+
+Reads explicit node labels and coordinates, optionally adding them to a node set.
+
+- Registry ID: `command.node`
+- Dispatch prefix: `*NODE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=verified, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
+
+Known parameters:
+
+- `NSET` (node-set-name, optional): Creates or appends the listed nodes to the named node set.
+
+Remaining specification work:
+
+- Confirm duplicate-label and capacity-overrun diagnostics.
+
+#### `*NODE` body
 
 Termination: next-command-or-eof. Dependencies: DIMENSIONS node_capacity must be large enough.; NSET creates or appends membership when supplied on the command line.
 
@@ -725,7 +802,23 @@ Termination: next-command-or-eof. Dependencies: DIMENSIONS node_capacity must be
   - `node` [repeated]: `node_label`:positive-integer, `x`:real, `y`:real, `z`:real
   - Constraint: Comment and blank lines are ignored; the next non-comment line beginning with * ends the command.
 
-### `*NGEN` body
+### `*NGEN`
+
+Generates nodes from compact generation records.
+
+- Registry ID: `command.ngen`
+- Dispatch prefix: `*NGEN`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-node-generation](#evidencefe-node-generation)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `NSET` (node-set-name, optional): Adds generated nodes to a named node set.
+- `BIAS` (positive-real, optional) (default: `1`): Controls generation spacing bias.
+- `ARC` (flag, optional): Selects arc generation mode.
+
+#### `*NGEN` body
 
 Termination: next-command-or-eof. Dependencies: All endpoint nodes and sets must be defined before NGEN.; DIMENSIONS node_capacity and the node-label lookup allocation must cover all generated nodes and labels.; NSET creates or appends both endpoints and generated nodes when supplied.; BIAS must be positive to keep the interpolation finite and monotone.
 
@@ -743,7 +836,21 @@ Termination: next-command-or-eof. Dependencies: All endpoint nodes and sets must
   - Constraint: Endpoint radii must be nonzero and their radial vectors must not be collinear because the local arc frame normalizes their cross product.
   - Constraint: The implementation uses the start radius for all generated nodes and advances the end angle counterclockwise by at most one revolution.
 
-### `*NCOPY` body
+### `*NCOPY`
+
+Copies nodes using compact copy records.
+
+- Registry ID: `command.ncopy`
+- Dispatch prefix: `*NCOP`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-node-generation](#evidencefe-node-generation)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `NSET` (node-set-name, optional): Adds copied nodes to a named node set.
+
+#### `*NCOPY` body
 
 Termination: next-command-or-eof. Dependencies: source_set must already exist and contain at least one node.; DIMENSIONS node_capacity and the node-label lookup allocation must cover every copy.; NSET creates or appends generated copies when supplied; source nodes are not added.
 
@@ -752,7 +859,26 @@ Termination: next-command-or-eof. Dependencies: source_set must already exist an
   - Constraint: Generated copy j has label source_label+j*label_offset and coordinates source_coordinates+j*(dx,dy,dz).
   - Constraint: All generated labels must be positive and globally unique.
 
-### `*ELEMENT` body
+### `*ELEMENT`
+
+Reads explicit elements and connectivity into a named element set.
+
+- Registry ID: `command.element`
+- Dispatch prefix: `*ELEM`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records), [evidence.fe-element-generation](#evidencefe-element-generation), [evidence.fe-element-types](#evidencefe-element-types)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=verified, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
+
+Known parameters:
+
+- `TYPE` (enum, required) (allowed: `C3D8`, `Y3D8`, `X3D8`, `LC3D8`, `C3D4`, `C3D10`, `B3D10`): Selects the element topology; B3D10 is internally mapped to C3D10 with a Bernstein flag.
+- `ELSET` (element-set-name, optional): Creates or appends elements to the named element set.
+
+Remaining specification work:
+
+- Confirm duplicate-label and capacity-overrun diagnostics.
+
+#### `*ELEMENT` body
 
 Termination: next-command-or-eof. Dependencies: TYPE is required.; Referenced nodes must already exist.; DIMENSIONS element_capacity must be large enough.
 
@@ -762,7 +888,21 @@ Termination: next-command-or-eof. Dependencies: TYPE is required.; Referenced no
   - Constraint: Every connectivity node label must resolve to a node before BUILD or STOP.
   - Constraint: Element labels must be positive and unique; Agent validation rejects duplicates before the source lookup is overwritten.
 
-### `*ELGEN` body
+### `*ELGEN`
+
+Generates elements from compact connectivity-generation records.
+
+- Registry ID: `command.elgen`
+- Dispatch prefix: `*ELGE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-element-generation](#evidencefe-element-generation), [evidence.fe-element-types](#evidencefe-element-types)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `TYPE` (enum, required) (allowed: `C3D8`, `Y3D8`, `X3D8`, `LC3D8`, `C3D4`, `C3D10`): Selects the generated element topology.
+
+#### `*ELGEN` body
 
 Termination: next-command-or-eof. Dependencies: The seed element and every referenced/generated connectivity node must already exist.; DIMENSIONS element_capacity must cover row_count*column_count*layer_count minus the seed position.
 
@@ -773,7 +913,27 @@ Termination: next-command-or-eof. Dependencies: The seed element and every refer
   - Constraint: Every shifted node label must already exist and every generated element label must be unique.
   - Constraint: ELGEN has no ELSET option and does not add generated elements to a set.
 
-### `*NSET` body
+### `*NSET`
+
+Creates or extends a node set from explicit labels, a generated range, or a coordinate box.
+
+- Registry ID: `command.nset`
+- Dispatch prefix: `*NSET`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=verified, `delete`=verified, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
+
+Known parameters:
+
+- `NSET` (node-set-name, required): Names the target node set.
+- `GENERATE` (flag, optional): Selects generated-range mode and is mutually exclusive with BOX.
+- `BOX` (flag, optional): Selects coordinate-box mode and is mutually exclusive with GENERATE.
+
+Remaining specification work:
+
+- Confirm missing-label and duplicate-membership diagnostics.
+
+#### `*NSET` body
 
 Termination: next-command-or-eof. Dependencies: All selected node labels must already exist.
 
@@ -786,7 +946,26 @@ Termination: next-command-or-eof. Dependencies: All selected node labels must al
   - `bounds` [repeated]: `xmin`:real, `ymin`:real, `zmin`:real, `xmax`:real, `ymax`:real, `zmax`:real
   - Constraint: GENERATE and BOX are mutually exclusive.
 
-### `*ELSET` body
+### `*ELSET`
+
+Creates or extends an element set from explicit labels or a generated range.
+
+- Registry ID: `command.elset`
+- Dispatch prefix: `*ELSE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=verified, `delete`=verified, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
+
+Known parameters:
+
+- `ELSET` (element-set-name, required): Names the target element set.
+- `GENERATE` (flag, optional): Selects generated-range mode.
+
+Remaining specification work:
+
+- Confirm missing-label and duplicate-membership diagnostics.
+
+#### `*ELSET` body
 
 Termination: next-command-or-eof. Dependencies: All selected element labels must already exist.
 
@@ -795,7 +974,21 @@ Termination: next-command-or-eof. Dependencies: All selected element labels must
 - **generated-range** (GENERATE):
   - `range` [repeated]: `first_label`:positive-integer, `last_label`:positive-integer, `increment`:nonzero-integer
 
-### `*BOUNDARY` body
+### `*BOUNDARY`
+
+Applies cluster-local boundary data using supported row formats.
+
+- Registry ID: `command.boundary`
+- Dispatch prefix: `*BOUN`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-boundary-records](#evidencefe-boundary-records)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `FORMAT` (enum, optional) (allowed: `ABAQUS`, `LIST`, `POLYNOMIAL`; default: `"ABAQUS"`): Selects the boundary row parser; matching uses four-character prefixes.
+
+#### `*BOUNDARY` body
 
 Termination: next-command-or-eof. Dependencies: Every target must already exist in the current cluster.; Coordinate and degree-of-freedom indices are one-based X/Y/Z components.; These cluster-local values initialize node constraint state consumed by later BOUNDARY problems.
 
@@ -811,7 +1004,17 @@ Termination: next-command-or-eof. Dependencies: Every target must already exist 
   - Constraint: Rows are comma-delimited.
   - Constraint: The individual-node branch pauses and stores through the stale loop variable j rather than degree_of_freedom; Agent generation requires a node-set target until corrected.
 
-### `*LOAD` body
+### `*LOAD`
+
+Applies cluster-local nodal loading records.
+
+- Registry ID: `command.load`
+- Dispatch prefix: `*LOAD`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-load-records](#evidencefe-load-records)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+#### `*LOAD` body
 
 Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or node sets already created in the current cluster.; Node-set membership determines every node updated by that row.
 
@@ -821,7 +1024,21 @@ Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or n
   - Constraint: Later rows targeting the same node and degree of freedom replace earlier values rather than accumulate.
   - Constraint: A missing numeric node target stops the program; Agent validation also rejects missing node-set targets instead of relying on numeric fallback failure.
 
-### `*FIELD` body
+### `*FIELD`
+
+Applies field values with a configured variable count.
+
+- Registry ID: `command.field`
+- Dispatch prefix: `*FIEL`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `VARIABLES` (integer(1..10), required): Sets the number of field values following each target; it has no source default and must not exceed the ten allocated slots.
+
+#### `*FIELD` body
 
 Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or node sets already created in the current cluster.; Downstream material or analysis consumers determine the meaning and units of each field position.
 
@@ -831,7 +1048,22 @@ Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or n
   - Constraint: VARIABLES is mandatory because the source local has no visible default.
   - Constraint: The source does not update node%nfield for node-set targets and writes it through an incorrect index for individual targets; Agent generation is blocked until this consumer-state defect is resolved or proven harmless.
 
-### `*SELECTION` body
+### `*SELECTION`
+
+Defines an indexed node or element selection used by later operations.
+
+- Registry ID: `command.selection`
+- Dispatch prefix: `*SELE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `ID` (integer, required): Identifies a pre-dimensioned selection slot and must be at least one.
+- `TYPE` (enum, optional) (allowed: `NODE`, `ELEMENT`; default: `"NODE"`): Selects whether the selection contains nodes or elements.
+
+#### `*SELECTION` body
 
 Termination: next-command-or-eof. Dependencies: ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.; All named sets and individual entities must already exist in the current cluster.; Selection consumers reference the stored one-based ID.
 
@@ -844,7 +1076,20 @@ Termination: next-command-or-eof. Dependencies: ID is one-based, may not exceed 
   - Constraint: At most ten element-set labels may be recorded.
   - Constraint: The source checks an unrelated inode variable after individual-element lookup; Agent generation permits existing element sets but blocks individual element labels until that defect is fixed or runtime-qualified.
 
-### `*TOLERANCE` body
+### `*TOLERANCE`
+
+Overrides one of the model tolerances used by geometry and crack operations.
+
+- Registry ID: `command.tolerance`
+- Dispatch prefix: `*TOLE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
+
+Known parameters:
+
+- `TYPE` (enum, optional) (allowed: `PTOL`, `ITOL`, `FTOL`, `OTOL`; default: `"PTOL"`): Selects proximity, parametric-inversion, shape-function, or outside-parametric tolerance; source matching of the value is uppercase-sensitive.
+
+#### `*TOLERANCE` body
 
 Termination: fixed-count. Dependencies: PTOL affects proximity operations, ITOL affects parametric location, FTOL affects penalty-connection shape-function contributions, and OTOL extends accepted parametric element bounds.
 
@@ -854,7 +1099,21 @@ Termination: fixed-count. Dependencies: PTOL affects proximity operations, ITOL 
   - Constraint: Allocated defaults are PTOL=1e-6, ITOL=1e-8, FTOL=1e-10, and OTOL=0.
   - Constraint: PTOL has coordinate-length units; ITOL, FTOL, and OTOL are dimensionless parametric or shape-function tolerances.
 
-### `*INTEGRATION` body
+### `*INTEGRATION`
+
+Sets the integration scheme for supported X3D8 elements.
+
+- Registry ID: `command.integration`
+- Dispatch prefix: `*INTE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-integration-orientation](#evidencefe-integration-orientation)
+- Operational support: `parse`=implemented, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Remaining specification work:
+
+- Confirm behavior for non-X3D8 elements, repeated element headers, and nonpositive integration counts.
+
+#### `*INTEGRATION` body
 
 Termination: next-command-or-eof. Dependencies: The target element must already exist.
 
@@ -863,7 +1122,25 @@ Termination: next-command-or-eof. Dependencies: The target element must already 
   - `integration-point` [count-from-previous-field]: `p1`:real, `p2`:real, `p3`:real, `gauss_weight`:real
   - Constraint: Each element header is followed immediately by exactly integration_point_count point rows.
 
-### `*ORIENTATION` body
+### `*ORIENTATION`
+
+Defines nodal or elemental orientation data.
+
+- Registry ID: `command.orientation`
+- Dispatch prefix: `*ORIE`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-integration-orientation](#evidencefe-integration-orientation)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `NAME` (enum, required) (allowed: `ORI`, `ORI-NODE`, `ORI-ELE`): Selects nodal orientation (ORI or ORI-NODE) or elemental orientation (ORI-ELE).
+
+Remaining specification work:
+
+- Confirm zero-vector handling in nodal mode and the exact interpretation of fiber_volume.
+
+#### `*ORIENTATION` body
 
 Termination: next-command-or-eof. Dependencies: The selected node/element or set must already exist.
 
@@ -874,7 +1151,16 @@ Termination: next-command-or-eof. Dependencies: The selected node/element or set
   - `orientation` [repeated]: `target`:element-label-or-element-set-name, `v1_x`:real, `v1_y`:real, `v1_z`:real, `v3_x`:real, `v3_y`:real, `v3_z`:real, `fiber_volume`:real
   - Constraint: V1 and V3 must be nonzero and mutually normal; the parser normalizes them and derives V2.
 
-### `*BUILD` body
+### `*BUILD`
+
+Forces intermediate construction of element information before cluster input ends.
+
+- Registry ID: `command.build`
+- Dispatch prefix: `*BUIL`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-build-spacing](#evidencefe-build-spacing)
+
+#### `*BUILD` body
 
 Termination: fixed-count. Dependencies: All element connectivity must resolve to already-created nodes before topology construction.
 
@@ -884,7 +1170,16 @@ Termination: fixed-count. Dependencies: All element connectivity must resolve to
   - Constraint: Canonical generation places it only after required nodes and elements exist.
   - Constraint: Repeated execution is blocked from Agent generation because the source does not declare topology construction idempotent.
 
-### `*STOP` body
+### `*STOP`
+
+Finishes the current FE cluster reader after updating element data.
+
+- Registry ID: `command.stop`
+- Dispatch prefix: `*STOP`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+
+#### `*STOP` body
 
 Termination: fixed-count. Dependencies: Every element connectivity label must resolve before the implicit final update.; Commands after *STOP in the same cluster are unreachable.
 
@@ -893,7 +1188,20 @@ Termination: fixed-count. Dependencies: Every element connectivity label must re
   - Constraint: The command has no following data row and must be the final logical command of a cluster.
   - Constraint: A *STOP encountered inside an include exits the entire cluster rather than only the included stream; Agent generation therefore emits it only in the root cluster stream.
 
-### `*INCLUDE` body
+### `*INCLUDE`
+
+Reads additional FE cluster commands from a nested include stack; every FILE target is resolved from the original BSAM input directory and EOF resumes the parent stream.
+
+- Registry ID: `command.include`
+- Dispatch prefix: `*INCL`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-include-open](#evidencefe-include-open), [evidence.fe-include-unwind](#evidencefe-include-unwind)
+
+Known parameters:
+
+- `FILE` (path, required): Names an unquoted relative include file resolved against the original BSAM input directory, not the including file; the Agent additionally requires the resolved target to remain inside its configured workspace.
+
+#### `*INCLUDE` body
 
 Termination: fixed-count. Dependencies: The target must be a readable FE-command fragment reachable inside the configured workspace.; Included definitions share the current cluster and must obey the same ordering, capacity, identity, and reference rules.
 
@@ -905,7 +1213,22 @@ Termination: fixed-count. Dependencies: The target must be a readable FE-command
   - Constraint: The Agent rejects absolute paths, workspace escapes, missing files, and include cycles before execution.
   - Constraint: Source-preserving edits inside included files remain blocked until multi-file patch planning is implemented.
 
-### `*SHIFT` body
+### `*SHIFT`
+
+Translates all nodes or nodes in a named node set.
+
+- Registry ID: `command.shift`
+- Dispatch prefix: `*SHIF`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `ALL` (flag, optional): Selects all nodes and is mutually exclusive with NSET; it is the default.
+- `NSET` (node-set-name, optional): Selects one existing node set and is mutually exclusive with ALL.
+
+#### `*SHIFT` body
 
 Termination: fixed-count. Dependencies: NSET must resolve in the current cluster and selects its existing member nodes.; Only nodes created before the command are translated.; The operation marks cached element coordinates stale for the next BUILD or STOP update.
 
@@ -914,7 +1237,22 @@ Termination: fixed-count. Dependencies: NSET must resolve in the current cluster
   - Constraint: Exactly one non-comment vector row is consumed.
   - Constraint: ALL and NSET are mutually exclusive and omission selects ALL.
 
-### `*SCALE` body
+### `*SCALE`
+
+Scales all nodes or nodes in a named node set.
+
+- Registry ID: `command.scale`
+- Dispatch prefix: `*SCAL`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `ALL` (flag, optional): Selects all nodes and is mutually exclusive with NSET; it is the default.
+- `NSET` (node-set-name, optional): Selects one existing node set and is mutually exclusive with ALL.
+
+#### `*SCALE` body
 
 Termination: fixed-count. Dependencies: NSET must resolve in the current cluster and selects its existing member nodes.; At least one previously created node must be selected or BSAM stops.; The operation marks cached element coordinates stale for the next BUILD or STOP update.
 
@@ -924,7 +1262,22 @@ Termination: fixed-count. Dependencies: NSET must resolve in the current cluster
   - Constraint: ALL and NSET are mutually exclusive and omission selects ALL.
   - Constraint: The source accepts zero factors, but Agent generation rejects them because they collapse the mesh; negative factors intentionally reflect an axis.
 
-### `*EXCLUSION` body
+### `*EXCLUSION`
+
+Defines an exclusion by box, plane, or previous crack with inside/outside selection where applicable.
+
+- Registry ID: `command.exclusion`
+- Dispatch prefix: `*EXCL`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-exclusion-records](#evidencefe-exclusion-records), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `shape` (mutually-exclusive flags, optional) (allowed: `BOX`, `PLANE`, `PREVIOUS`; default: `"BOX"`): Selects the exclusion geometry/source; omission selects BOX.
+- `side` (mutually-exclusive flags, optional) (allowed: `INSIDE`, `OUTSIDE`; default: `"INSIDE"`): Selects which side of BOX or PLANE is excluded; invalid with PREVIOUS.
+
+#### `*EXCLUSION` body
 
 Termination: fixed-count. Dependencies: BOX and PLANE exclusions act on elements after their coordinate caches are updated.; PREVIOUS supplies crack-related maximum-diameter state rather than directly marking elements.
 
@@ -940,7 +1293,21 @@ Termination: fixed-count. Dependencies: BOX and PLANE exclusions act on elements
   - `diameter` [once]: `maximum_diameter`:positive-real
   - Constraint: INSIDE and OUTSIDE are invalid with PREVIOUS.
 
-### `*FLIP` body
+### `*FLIP`
+
+Swaps two coordinate axes for subsequent/read cluster geometry.
+
+- Registry ID: `command.flip`
+- Dispatch prefix: `*FLIP`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `TYPE` (enum, optional) (allowed: `XY`, `YX`, `XZ`, `ZX`, `YZ`, `ZY`; default: `"XY"`): Selects the directed axis exchange.
+
+#### `*FLIP` body
 
 Termination: fixed-count. Dependencies: Only nodes already created in the cluster are rotated.; The operation does not rotate separately stored orientation vectors and marks cached element coordinates stale; ordering relative to ORIENTATION is therefore engineering-significant.
 
@@ -950,7 +1317,21 @@ Termination: fixed-count. Dependencies: Only nodes already created in the cluste
   - Constraint: Mappings are XY=(-Y,X,Z), YX=(Y,-X,Z), XZ=(-Z,Y,X), ZX=(Z,Y,-X), YZ=(X,-Z,Y), and ZY=(X,Z,-Y).
   - Constraint: The command consumes no following data row.
 
-### `*SPACING` body
+### `*SPACING`
+
+Defines crack spacing behavior for the cluster.
+
+- Registry ID: `command.spacing`
+- Dispatch prefix: `*SPAC`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-build-spacing](#evidencefe-build-spacing)
+
+Known parameters:
+
+- `mode` (mutually-exclusive-command-line-option, optional) (allowed: `STRICT`, `VALUE`, `RELAXED`; default: `"STRICT"`): STRICT stores zero, VALUE requires a positive spacing, and RELAXED stores the negative sentinel used to disable strict spacing.
+- `value` (positive-real, optional): Required only for VALUE and stored as the cluster minimum crack spacing.
+
+#### `*SPACING` body
 
 Termination: fixed-count. Dependencies: The stored value controls later crack insertion spacing checks for this cluster.
 
@@ -960,7 +1341,27 @@ Termination: fixed-count. Dependencies: The stored value controls later crack in
   - Constraint: VALUE must be greater than zero or BSAM stops.
   - Constraint: The allocated cluster default is strict spacing with a stored value of zero.
 
-### `*SECTION` body
+### `*SECTION`
+
+Assigns layered section information to an existing element set.
+
+- Registry ID: `command.section`
+- Dispatch prefix: `*SECT`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-section-reader](#evidencefe-section-reader)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `ELSET` (element-set-name, required): Selects the existing element set receiving the section.
+- `LAYERS` (integer, required): Sets a positive number of layers.
+- `CONNECTION` (flag, optional): Enables the connection form handled by the section reader.
+
+Remaining specification work:
+
+- Confirm CONNECTION semantics and material-ID resolution diagnostics.
+
+#### `*SECTION` body
 
 Termination: next-command-or-eof. Dependencies: ELSET must name an existing element set.; DIMENSIONS section_capacity must include this section.; Every material_id must resolve in MATERIALS.; A ply-count edit must update LAYERS and the layer-row sequence atomically.
 
@@ -969,7 +1370,21 @@ Termination: next-command-or-eof. Dependencies: ELSET must name an existing elem
   - Constraint: The number of non-comment layer rows must equal LAYERS; fewer rows are fatal.
   - Constraint: Layer thicknesses are divided by their total before assignment.
 
-### `*CRACK` body
+### `*CRACK`
+
+Dispatches cluster crack definition, region, spacing, initiation, and function variants.
+
+- Registry ID: `command.crack`
+- Dispatch prefix: `*CRAC`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-crack-controls](#evidencefe-crack-controls)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `operation` (command-name-suffix, required) (allowed: `DEFINITION`, `REGION`, `SPACING`, `INITIATION`, `FUNCTION`): Selects the command family through the uppercased characters 6 through 10 of the full command token.
+
+#### `*CRACK` body
 
 Termination: next-command-or-eof. Dependencies: REGION set and geometry targets act only on elements already created in the current cluster.; Crack region and initiation state is consumed by subsequent crack insertion and analysis operations.; DEFINITION is preservation-only until its active record-advance defect is corrected.
 
@@ -999,7 +1414,22 @@ Termination: next-command-or-eof. Dependencies: REGION set and geometry targets 
   - `command` [once]: `TYPE`:enum-prefix(SIMPLE,WEIGHTED)
   - Constraint: The final TYPE option must supply the residual parsed value used by this branch; canonical generation places it last.
 
-### `*TRANSFORM` body
+### `*TRANSFORM`
+
+Centers cluster geometry and rotates it into its computed principal inertial coordinate system.
+
+- Registry ID: `command.transform`
+- Dispatch prefix: `*TRAN`
+- Coverage: documented
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-inertial-transform](#evidencefe-inertial-transform)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+
+Known parameters:
+
+- `INERTIA` (flag, required): Requests transformation to the computed inertial system.
+- `FLATTEN` (real, optional): Parsed but not passed to the transformation routine; blocked from Agent generation because it has no active effect.
+
+#### `*TRANSFORM` body
 
 Termination: fixed-count. Dependencies: Elements must already be built with valid nonzero total volume and current coordinate caches.; The transformation changes every existing node but preserves label and set membership.; A later BUILD or STOP must refresh element coordinate caches.
 
@@ -1042,7 +1472,7 @@ Known parameters:
 
 - `problem_type` (enum-record, required) (allowed: `mechanical`, `thermal`, `contact`): The following cleaned record is matched by its first four characters.
 
-### `*TYPE` body
+#### `*TYPE` body
 
 Termination: fixed-count. Dependencies: A new problem begins at each *TYPE and the preceding problem terminates when the dispatcher encounters it.; Only mechanical and thermal problems may contain the registered nested BOUNDARY constructs.
 
@@ -1071,14 +1501,14 @@ Configures damage-increment control, update, damping, iteration, and exit thresh
 Known parameters:
 
 - `UPDATE` (flag, optional) (default: `false`): Enables damage update control.
-- `DAMP` (flag, optional) (default: `false`): Enables damage damping.
+- `DAMP` (flag, optional) (default: `false`; edit: insert=verified, remove=verified): Enables damage damping.
 - `G_ITER` (positive-integer, optional) (default: `1000`): Sets the damage-control iteration limit.
 - `GMIN` (nonnegative-real, optional) (default: `0`): Minimum damage increment for exit; G_TH is an accepted alias.
 - `GMAX` (nonnegative-real, optional) (default: `1000000000`): Maximum damage increment for exit.
 - `GTHR` (nonnegative-real, optional) (default: `0`): Active-control damage increment threshold.
 - `NO_DAMAGE_LOCK` (flag, optional) (default: `false`): NO_D disables the default damage lock.
 
-### `*G-CONTROL` body
+#### `*G-CONTROL` body
 
 Termination: fixed-count. Dependencies: The command enables G-control for the current mechanical or thermal boundary problem.
 
@@ -1123,7 +1553,7 @@ Known parameters:
 
 - `name` (string-record, optional): Boundary problem name; defaults to boundname plus the problem index when absent.
 
-### `*NAME` body
+#### `*NAME` body
 
 Termination: fixed-count. Dependencies: Names identify boundary problems in diagnostics, run artifacts, and future query/edit selection.
 
@@ -1145,7 +1575,7 @@ Known parameters:
 
 - `status` (string-record, optional) (allowed: `restart`, `no restart`, `new`; default: `"restart"`): restart maps to run option 1, no restart maps to -1, and new maps to the generic new-run option 0.
 
-### `*STATUS` body
+#### `*STATUS` body
 
 Termination: fixed-count. Dependencies: The first boundary problem's run option is also passed to CRACK initialization.
 
@@ -1162,8 +1592,9 @@ Restricts the boundary problem to a list of existing cluster names.
 - Match prefix: `*clus`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.boundary-selectors](#evidenceboundary-selectors)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
-### `*CLUSTERS` body
+#### `*CLUSTERS` body
 
 Termination: next-command. Dependencies: Every later boundary condition, connection, crack, and output selector is restricted to this selected cluster list.
 
@@ -1182,6 +1613,7 @@ Defines named boundary conditions as key/value pairs referencing cluster-qualifi
 - Match prefix: `*boun`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.boundary-components](#evidenceboundary-components), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=verified, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1192,7 +1624,7 @@ Known parameters:
 - `nset` (cluster-name.node-set-name, optional): Existing node set qualified by its cluster name.
 - `global` (input-relative-path, optional): Loads global/local nodal coordinates, displacements, and forces from a local auxiliary file.
 
-### `*BOUNDARY CONDITION` body
+#### `*BOUNDARY CONDITION` body
 
 Termination: next-command. Dependencies: Loading-sequence change records reference name and may replace type or value.; nset targets must belong to clusters selected by *CLUSTERS.; Deleting or renaming a cluster, node set, or boundary condition must update all reverse references atomically.
 
@@ -1231,7 +1663,7 @@ Known parameters:
 - `search` (enum, optional) (allowed: `vtms`, `sheff`; default: `"vtms"`): Penalty search implementation.
 - `component` (component, optional) (default: `123`): Nodal-connection component selection.
 
-### `*CONNECTIONS` body
+#### `*CONNECTIONS` body
 
 Termination: next-command. Dependencies: Referenced clusters must be selected by the boundary problem.; All node sets and material/constitutive/failure IDs must already exist.; Ply or mesh changes must revalidate both sides of every connection.
 
@@ -1274,7 +1706,7 @@ Known parameters:
 - `incr` (real, required): Load increment for static or fatigue segments; omission leaves active storage without a source-defined value.
 - `block` (positive-integer, optional): Marks the start/end of a repeated load block and its repetition count.
 
-### `*LOADING SEQUENCE` body
+#### `*LOADING SEQUENCE` body
 
 Termination: next-command. Dependencies: Change records reference names created in BOUNDARY CONDITION.; Step ranges are accumulated in declaration order.; Boundary-condition deletion or renaming must update every load change reference.
 
@@ -1301,13 +1733,14 @@ Configures nonlinear convergence, time-step, iteration, and reattempt controls.
 - Match prefix: `*conv`
 - Coverage: documented
 - Evidence: [evidence.boundary-convergence](#evidenceboundary-convergence), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
 - `relative` (positive-real, optional) (default: `0.001`): Relative convergence tolerance; may share a row with absolute and divergence.
 - `absolute` (positive-real, optional) (default: `100000000`): Absolute convergence tolerance.
 - `divergence` (positive-real, optional) (default: `1000000`): Residual divergence multiplier parsed from a relative/absolute row.
-- `maxiterations` (positive-integer, optional) (default: `20`): Maximum nonlinear iterations; recognized by the maxi prefix.
+- `maxiterations` (positive-integer, optional) (default: `20`; edit: insert=verified, remove=verified): Maximum nonlinear iterations; recognized by the maxi prefix.
 - `mintime` (integer, optional) (default: `1`): Minimum time control; recognized by the mint prefix.
 - `invert` (integer, optional) (default: `-1`): Full stiffness-inversion interval; recognized by the inve prefix.
 - `D_AA` (enum, optional) (allowed: `0`, `1`, `2`; default: `0`): Anderson acceleration: 0 inactive, 1 prediction, 2 correction.
@@ -1319,7 +1752,7 @@ Known parameters:
 - `d_max` (real, optional) (default: `1`): Maximum time increment recognized by d_ma.
 - `fatigue` (real, optional): 2D/3D fatigue convergence control recognized by fati.
 
-### `*CONVERGENCE` body
+#### `*CONVERGENCE` body
 
 Termination: next-command. Dependencies: Convergence controls apply to the current boundary problem and its ordered loading sequence.; Automatic increment controls must be validated as a coherent group before rendering changes.
 
@@ -1348,6 +1781,7 @@ Defines output types and their target, coordinate-system, and intermediate-outpu
 - Match prefix: `*outp`
 - Coverage: documented
 - Evidence: [evidence.boundary-output](#evidenceboundary-output), [evidence.boundary-output-execution](#evidenceboundary-output-execution), [evidence.boundary-data-formats](#evidenceboundary-data-formats), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1355,7 +1789,7 @@ Known parameters:
 - `c_system` (enum, optional) (allowed: `global`, `material`; default: `"global"`): Selects the coordinate system; only the mate prefix changes the default.
 - `intermediate` (integer, optional): Controls intermediate output frequency/selection.
 
-### `*OUTPUT` body
+#### `*OUTPUT` body
 
 Termination: next-command. Dependencies: All selected clusters and sets must belong to the current boundary problem.; Mesh, set, or cluster edits must revalidate every output selector.
 

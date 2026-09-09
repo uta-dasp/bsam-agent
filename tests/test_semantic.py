@@ -28,7 +28,7 @@ class SemanticIndexTests(unittest.TestCase):
         semantic = inspection["semantic_model"]
 
         self.assertEqual(0, inspection["summary"]["errors"])
-        self.assertEqual(19, semantic["summary"]["entities"])
+        self.assertEqual(18, semantic["summary"]["entities"])
         self.assertEqual(20, semantic["summary"]["references"])
         self.assertEqual(20, semantic["summary"]["resolved_references"])
         keys = {item["key"] for item in semantic["entities"]}
@@ -50,10 +50,10 @@ class SemanticIndexTests(unittest.TestCase):
 
             semantic = SourceSet.read(root).inspection()["semantic_model"]
 
-            self.assertEqual("0.2.0", semantic["schema_version"])
+            self.assertEqual("0.4.0", semantic["schema_version"])
             self.assertEqual(
                 {
-                    "constitutive": 1, "element": 1, "element-set": 2,
+                    "element": 1, "element-set": 2,
                     "node": 2, "node-set": 2, "section": 1,
                 },
                 semantic["summary"]["entities_by_kind"],
@@ -103,6 +103,434 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertIn("BSAM-E302", codes)
             self.assertIn("BSAM-E303", codes)
 
+    def test_cluster_boundary_and_load_targets_follow_source_lookup_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n"
+                b"*NSET,NSET=edge\n1\n"
+                b"*BOUNDARY\nedge,1,2,0\n2,3,3,0\n"
+                b"*BOUNDARY,FORMAT=LIST\n1,0,0,0\n"
+                b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,1,2,1,0,1\n"
+                b"*LOAD\nedge,1,5\n2,2,6\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            kinds = semantic["summary"]["entities_by_kind"]
+            references = [
+                item for item in semantic["references"]
+                if item["kind"] in {"targets-node", "targets-node-set"}
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(4, kinds["nodal-boundary"])
+            self.assertEqual(2, kinds["nodal-load"])
+            self.assertEqual(6, len(references))
+            self.assertEqual(3, sum(item["kind"] == "targets-node" for item in references))
+            self.assertEqual(3, sum(item["kind"] == "targets-node-set" for item in references))
+            self.assertTrue(all(item["status"] == "resolved" for item in references))
+
+    def test_missing_cluster_boundary_and_load_targets_are_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*BOUNDARY\n99,1,1,0\nmissing,1,1,0\n"
+                b"*BOUNDARY,FORMAT=LIST\n98,0,0,0\n"
+                b"*LOAD\nabsent,1,5\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            unresolved = [
+                item for item in inspection["semantic_model"]["references"]
+                if item["status"] == "unresolved"
+            ]
+
+            self.assertEqual(4, len(unresolved))
+            self.assertTrue(all(item["kind"] in {"targets-node", "targets-node-set"} for item in unresolved))
+            self.assertEqual(4, [
+                item["code"] for item in inspection["diagnostics"]
+            ].count("BSAM-E301"))
+
+    def test_cluster_field_targets_are_source_located_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n"
+                b"*NSET,NSET=edge\n1\n"
+                b"*FIELD,VARIABLES=2\nedge,10,20\n2,30,40\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            fields = [
+                item for item in semantic["entities"] if item["kind"] == "nodal-field"
+            ]
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in {field["id"] for field in fields}
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(2, len(fields))
+            self.assertEqual({"2"}, {item["attributes"]["variables"] for item in fields})
+            self.assertEqual(
+                {"targets-node", "targets-node-set"},
+                {item["kind"] for item in references},
+            )
+            self.assertTrue(all(item["status"] == "resolved" for item in references))
+
+    def test_missing_cluster_field_target_is_an_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*FIELD,VARIABLES=1\nmissing,10\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            fields = [
+                item for item in inspection["semantic_model"]["entities"]
+                if item["kind"] == "nodal-field"
+            ]
+
+            self.assertEqual(1, len(fields))
+            self.assertEqual(1, [
+                item["code"] for item in inspection["diagnostics"]
+            ].count("BSAM-E301"))
+
+    def test_cluster_selections_reference_nodes_elements_and_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n"
+                b"*ELEMENT,TYPE=C3D4\n10,1,2,1,2\n"
+                b"*NSET,NSET=edge\n1\n*ELSET,ELSET=solid\n10\n"
+                b"*SELECTION,ID=1\nedge,2\n"
+                b"*SELECTION,ID=2,TYPE=ELEMENT\nsolid\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            selections = [
+                item for item in semantic["entities"] if item["kind"] == "selection"
+            ]
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in {selection["id"] for selection in selections}
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(2, len(selections))
+            self.assertEqual(
+                {"selects-node", "selects-node-set", "selects-element-set"},
+                {item["kind"] for item in references},
+            )
+            self.assertTrue(all(item["status"] == "resolved" for item in references))
+
+    def test_missing_and_duplicate_cluster_selections_are_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*SELECTION,ID=1\n99\n*SELECTION,ID=1\n1\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            codes = [item["code"] for item in inspection["diagnostics"]]
+
+            self.assertEqual(1, codes.count("BSAM-E300"))
+            self.assertEqual(1, codes.count("BSAM-E301"))
+
+    def test_crack_region_element_set_dependency_is_source_located(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n*ELSET,ELSET=region\n1\n"
+                b"*CRACK REGION,ADD,ELSET=region\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            region = next(
+                item for item in semantic["entities"] if item["kind"] == "crack-region"
+            )
+            reference = next(
+                item for item in semantic["references"]
+                if item["source_entity_id"] == region["id"]
+            )
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual("targets-element-set", reference["kind"])
+            self.assertEqual("cluster:ply1/element-set:region", reference["target_key"])
+
+    def test_spatial_exclusion_and_crack_region_selectors_target_the_cluster(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*EXCLUSION,PLANE,OUTSIDE\n0,0,0,0,0,1,.1\n"
+                b"*CRACK REGION,ADD,SPHERE\n0,0,0,2\n"
+                b"*CRACK REGION,REMOVE,CYLINDER\n0,0,0,0,0,1,2\n"
+                b"*CRACK REGION,BOX\n-1,-1,-1,1,1,1\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            exclusions = [
+                item for item in semantic["entities"]
+                if item["kind"] == "exclusion-region"
+            ]
+            regions = [
+                item for item in semantic["entities"]
+                if item["kind"] == "crack-region"
+            ]
+            owner_ids = {item["id"] for item in [*exclusions, *regions]}
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in owner_ids
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual("plane", exclusions[0]["attributes"]["shape"])
+            self.assertEqual("outside", exclusions[0]["attributes"]["side"])
+            self.assertEqual(
+                {"sphere", "cylinder", "box"},
+                {item["attributes"]["selector"] for item in regions},
+            )
+            self.assertEqual(4, len(references))
+            self.assertTrue(all(
+                item["kind"] == "targets-cluster"
+                and item["target_key"] == "cluster:ply1"
+                and item["status"] == "resolved"
+                for item in references
+            ))
+
+    def test_orientation_records_resolve_node_element_and_set_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n2,1,2,3,4\n"
+                b"*NSET,NSET=edge\n1\n*ELSET,ELSET=solid\n1\n"
+                b"*ORIENTATION,NAME=ORI-NODE\nedge,1,0,0,0,0,1,.5\n2,1,0,0,0,0,1,.5\n"
+                b"*ORIENTATION,NAME=ORI-ELE\nsolid,1,0,0,0,0,1,.5\n2,1,0,0,0,0,1,.5\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            orientations = [
+                item for item in semantic["entities"]
+                if item["kind"] == "orientation-record"
+            ]
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in {entry["id"] for entry in orientations}
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(4, len(orientations))
+            self.assertEqual(
+                {"targets-node", "targets-node-set", "targets-element", "targets-element-set"},
+                {item["kind"] for item in references},
+            )
+            self.assertTrue(all(item["status"] == "resolved" for item in references))
+
+    def test_coordinate_operations_and_integration_dependencies_resolve(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"*ELEMENT,TYPE=X3D8\n1,1,2,3,4,1,2,3,4\n"
+                b"*NSET,NSET=edge\n1,2\n*SHIFT,NSET=edge\n1,0,0\n"
+                b"*SCALE,NSET=edge\n2,2,2\n*INTEGRATION\n1,2\n"
+                b"-.5,0,0,1\n.5,0,0,1\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(2, semantic["summary"]["entities_by_kind"]["coordinate-operation"])
+            self.assertEqual(1, semantic["summary"]["entities_by_kind"]["integration-scheme"])
+            reference_kinds = {item["kind"] for item in semantic["references"]}
+            self.assertTrue({"targets-node-set", "targets-element"} <= reference_kinds)
+
+    def test_missing_coordinate_and_integration_targets_are_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*SHIFT,NSET=missing\n1,0,0\n*INTEGRATION\n99,1\n0,0,0,1\n"
+            ))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(2, [
+                item["code"] for item in inspection["diagnostics"]
+            ].count("BSAM-E301"))
+
+    def test_all_node_coordinate_operations_target_the_current_cluster(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*SHIFT,ALL\n1,2,3\n*SCALE\n2,3,4\n"
+                b"*FLIP,TYPE=YZ\n*TRANSFORM,INERTIA\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            operations = {
+                item["attributes"]["operation"]: item
+                for item in semantic["entities"]
+                if item["kind"] == "coordinate-operation"
+            }
+            operation_ids = {item["id"] for item in operations.values()}
+            targets = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in operation_ids
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual({"shift", "scale", "flip", "transform"}, set(operations))
+            self.assertEqual(["1", "2", "3"], operations["shift"]["attributes"]["values"])
+            self.assertEqual("YZ", operations["flip"]["attributes"]["mapping"])
+            self.assertTrue(operations["transform"]["attributes"]["inertia"])
+            self.assertEqual(4, sum(
+                item["kind"] == "targets-cluster"
+                and item["target_key"] == "cluster:ply1"
+                and item["status"] == "resolved"
+                for item in targets
+            ))
+
+    def test_ngen_and_ncopy_dependencies_and_output_sets_resolve(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n5,4,0,0\n21,0,1,0\n"
+                b"25,4,1,0\n31,0,2,0\n35,4,2,0\n41,0,3,0\n45,4,3,0\n"
+                b"*NSET,NSET=starts\n21,31\n*NSET,NSET=ends\n25,35\n"
+                b"*NGEN,NSET=line\n1,5,1\nstarts,ends,1\n"
+                b"*NGEN,ARC\n0,0,0\n41,45,1\n"
+                b"*NCOPY,NSET=copies\nstarts,2,100,0,0,1\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            generations = [
+                item for item in semantic["entities"] if item["kind"] == "node-generation"
+            ]
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in {entry["id"] for entry in generations}
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(3, len(generations))
+            self.assertTrue({
+                "uses-node-endpoint", "uses-node-set-endpoint", "copies-node-set",
+            } <= {item["kind"] for item in references})
+            keys = {item["key"] for item in semantic["entities"]}
+            self.assertTrue({
+                "cluster:ply1/node-set:line", "cluster:ply1/node-set:copies",
+            } <= keys)
+            entity_by_id = {item["id"]: item for item in semantic["entities"]}
+            line_members = {
+                entity_by_id[item["source_entity_id"]]["name"]
+                for item in semantic["references"]
+                if item["kind"] == "member-of"
+                and item["target_key"] == "cluster:ply1/node-set:line"
+            }
+            copy_members = {
+                entity_by_id[item["source_entity_id"]]["name"]
+                for item in semantic["references"]
+                if item["kind"] == "member-of"
+                and item["target_key"] == "cluster:ply1/node-set:copies"
+            }
+            self.assertEqual(
+                {str(label) for label in range(1, 6)}
+                | {str(label) for label in range(21, 26)}
+                | {str(label) for label in range(31, 36)},
+                line_members,
+            )
+            self.assertEqual({"121", "131", "221", "231"}, copy_members)
+
+    def test_generated_node_identities_resolve_downstream_connectivity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n5,4,0,0\n"
+                b"*NSET,NSET=source\n1\n*NGEN,NSET=line\n1,5,1\n"
+                b"*NCOPY,NSET=copies\nsource,1,100,0,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,2,3,4,5\n2,101,2,3,4\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            nodes = {
+                item["key"]: item for item in semantic["entities"] if item["kind"] == "node"
+            }
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual("ngen", nodes["cluster:ply1/node:2"]["attributes"]["generated_by"])
+            self.assertEqual("ncopy", nodes["cluster:ply1/node:101"]["attributes"]["generated_by"])
+            self.assertEqual(8, sum(
+                item["kind"] == "connectivity" and item["status"] == "resolved"
+                for item in semantic["references"]
+            ))
+
+    def test_elgen_identities_and_shifted_connectivity_resolve(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"11,2,0,0\n12,3,0,0\n13,2,1,0\n14,2,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n"
+                b"*ELGEN,TYPE=C3D4\n1,2,1,1,10,0,0\n"
+                b"*ELSET,ELSET=generated\n2\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            generated = next(
+                item for item in semantic["entities"]
+                if item["key"] == "cluster:ply1/element:2"
+            )
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual("elgen", generated["attributes"]["generated_by"])
+            self.assertEqual(["11", "12", "13", "14"], generated["attributes"]["connectivity"])
+            self.assertEqual(4, sum(
+                item["source_entity_id"] == generated["id"]
+                and item["status"] == "resolved"
+                for item in semantic["references"]
+            ))
+
+    def test_elgen_missing_shifted_connectivity_is_an_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n"
+                b"*ELGEN,TYPE=C3D4\n1,2,1,1,10,0,0\n"
+            ))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(4, [
+                item["code"] for item in inspection["diagnostics"]
+            ].count("BSAM-E301"))
+
+    def test_missing_ngen_and_ncopy_sources_are_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*NGEN\n1,99,1\n*NCOPY\nmissing,1,10,0,0,1\n"
+            ))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(2, [
+                item["code"] for item in inspection["diagnostics"]
+            ].count("BSAM-E301"))
+
     def test_boundary_connection_loading_and_crack_references_resolve(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
@@ -111,8 +539,10 @@ class SemanticIndexTests(unittest.TestCase):
             ).replace(
                 b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
                 b"BOUNDARY\n*type\nmechanical\n"
+                b"*clusters\nPLY1\n"
                 b"*boundary condition\n"
                 b"type=disp, comp=x, name=bc1, value=0, nset=PLY1.edge\n"
+                b"type=temp, name=heat, value=10\n"
                 b"*connections\n"
                 b"type=-2, name=penalty\n"
                 b"mset=PLY1.edge, Constitutive=1\n"
@@ -124,7 +554,11 @@ class SemanticIndexTests(unittest.TestCase):
             ).replace(
                 b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
                 b"CONSTITUTIVE\n1\n\t1 1 0\nEND CONSTITUTIVE\n"
+                b"FAILURE\n4\nEND FAILURE\n"
                 b"CRACK\n301\n\t0 1 0 0\n\t1 -approximation\nEND CRACK\n",
+            ).replace(
+                b"MATERIALS\n0\nEND MATERIALS\n",
+                b"MATERIALS\n999\nE11=1\n*end\nEND MATERIALS\n",
             )
             root.write_bytes(raw)
 
@@ -133,15 +567,28 @@ class SemanticIndexTests(unittest.TestCase):
             kinds = semantic["summary"]["entities_by_kind"]
 
             self.assertEqual(0, inspection["summary"]["errors"])
-            self.assertEqual(1, kinds["boundary-condition"])
+            self.assertEqual(2, kinds["boundary-condition"])
             self.assertEqual(1, kinds["connection"])
             self.assertEqual(1, kinds["load-change"])
             self.assertEqual(1, kinds["crack"])
+            self.assertEqual(1, kinds["cluster-selection"])
             reference_kinds = {item["kind"] for item in semantic["references"]}
             self.assertTrue({
                 "targets-node-set", "mset", "uses-constitutive", "terminal-cluster",
-                "changes-boundary-condition", "targets-cluster",
+                "changes-boundary-condition", "targets-cluster", "selects-cluster",
             } <= reference_kinds)
+            heat = next(
+                item for item in semantic["entities"]
+                if item["kind"] == "boundary-condition" and item["name"] == "heat"
+            )
+            self.assertEqual(
+                ["cluster:ply1"],
+                [
+                    item["target_key"] for item in semantic["references"]
+                    if item["source_entity_id"] == heat["id"]
+                    and item["kind"] == "targets-cluster"
+                ],
+            )
 
     def test_missing_boundary_and_loading_targets_are_errors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -161,6 +608,93 @@ class SemanticIndexTests(unittest.TestCase):
 
             self.assertEqual(2, len(errors))
             self.assertTrue(all(item["code"] == "BSAM-E301" for item in errors))
+
+    def test_boundary_cluster_selection_resolves_all_and_reports_missing_names(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            raw = deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*NAME\nply2\n*NODE\n1,0,0,0\n"
+            ).replace(
+                b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
+                b"BOUNDARY\n*type\nmechanical\n"
+                b"*clusters\nall\n*clusters\nply1,missing\nEND BOUNDARY\n",
+            )
+            root.write_bytes(raw)
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            cluster_refs = [
+                item for item in semantic["references"]
+                if item["kind"] == "selects-cluster"
+            ]
+
+            self.assertEqual(2, semantic["summary"]["entities_by_kind"]["cluster-selection"])
+            self.assertEqual(4, len(cluster_refs))
+            self.assertEqual(3, sum(item["status"] == "resolved" for item in cluster_refs))
+            self.assertEqual(1, [
+                item["code"] for item in inspection["diagnostics"]
+            ].count("BSAM-E301"))
+
+    def test_boundary_outputs_resolve_cluster_node_set_and_element_set_selectors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            raw = deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n*ELSET,ELSET=solid\n1\n"
+                b"*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n*ELSET,ELSET=solid\n1\n"
+            ).replace(
+                b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
+                b"BOUNDARY\n*type\nmechanical\n*clusters\nall\n*output\n"
+                b"type=data_file, clusters=list\nply1,ply2\n"
+                b"type=sum_force, nset=list\nply1.edge,ply2.edge\n"
+                b"type=volume_average, elset=list\nply1.solid,ply2.solid\n"
+                b"type=traction_average, nset=all\n"
+                b"type=cfv, elset=ply1.solid\nEND BOUNDARY\n",
+            )
+            root.write_bytes(raw)
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            outputs = [
+                item for item in semantic["entities"]
+                if item["kind"] == "output-selection"
+            ]
+            output_ids = {item["id"] for item in outputs}
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in output_ids
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(5, len(outputs))
+            self.assertEqual(9, len(references))
+            self.assertEqual(
+                {"selects-cluster", "selects-node-set", "selects-element-set"},
+                {item["kind"] for item in references},
+            )
+            self.assertTrue(all(item["status"] == "resolved" for item in references))
+
+    def test_boundary_output_rejects_missing_and_out_of_scope_set_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            raw = deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+            ).replace(
+                b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
+                b"BOUNDARY\n*type\nmechanical\n*clusters\nply1\n*output\n"
+                b"type=sum_force, nset=list\nply1.missing,ply2.edge,bare\n"
+                b"END BOUNDARY\n",
+            )
+            root.write_bytes(raw)
+
+            inspection = SourceSet.read(root).inspection()
+            codes = [item["code"] for item in inspection["diagnostics"]]
+
+            self.assertEqual(1, codes.count("BSAM-E301"))
+            self.assertEqual(2, codes.count("BSAM-E313"))
 
 
 if __name__ == "__main__":
