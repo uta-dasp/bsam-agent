@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.57.0",
+  "registry_version": "0.58.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -861,6 +861,8 @@
       "required": false,
       "parser": "MOI_INI",
       "summary": "Configures optional coupling to the external moisture simulation workflow.",
+      "entity_kind": "moisture-workflow",
+      "routing_terms": ["moisture workflow", "moisture workflows", "moisture coupling"],
       "termination": {
         "style": "end-line",
         "tokens": ["END MOISTURE"],
@@ -905,6 +907,12 @@
       ],
       "evidence_ids": ["evidence.moisture-parser", "evidence.moisture-step-dispatch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unsupported"
+      },
       "body": {
         "style": "records",
         "termination": "next-top-level-block",

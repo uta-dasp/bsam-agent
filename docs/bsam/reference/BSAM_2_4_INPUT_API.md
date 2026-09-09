@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.57.0`
-- Registry SHA-256: `B963C1079E9D881FDE482EFBD5F2D59CFF12D73B2328623E1253255138CC0E12`
+- Registry version: `0.58.0`
+- Registry SHA-256: `6E91BB6EE1096681C552F21D52DBB48C52713A45F05272C3B5C8F032B6A932A9`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -154,6 +154,7 @@ Configures optional coupling to the external moisture simulation workflow.
 - Termination: `END MOISTURE` (canonical)
 - Coverage: documented
 - Evidence: [evidence.moisture-parser](#evidencemoisture-parser), [evidence.moisture-step-dispatch](#evidencemoisture-step-dispatch)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unsupported
 
 Known parameters:
 

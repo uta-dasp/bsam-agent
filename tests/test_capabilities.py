@@ -51,6 +51,36 @@ def provider_config() -> ProviderConfig:
 
 
 class CapabilitySliceTests(unittest.TestCase):
+    def test_canonical_moisture_settings_are_typed_but_execution_is_blocked(self) -> None:
+        raw = boundary_deck(b"d_reduction=0.5\n").replace(
+            b"CLUSTERS\n",
+            b"MOISTURE\nprogram=MDSIM\nconverter_utils=dup, orient\n"
+            b"steps=1 3\nEND MOISTURE\nCLUSTERS\n",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            semantic = SourceSet.read(path).inspection()["semantic_model"]
+
+        record = next(
+            item for item in semantic["capability_records"]
+            if item["capability_id"] == "block.moisture"
+        )
+        workflow = next(
+            item for item in semantic["entities"]
+            if item["kind"] == "moisture-workflow"
+        )
+        self.assertEqual("mdsim", record["parameters"]["program"][0]["value"])
+        self.assertEqual(["dup", "orient"], [
+            item["value"] for item in record["parameters"]["converter_utils"]
+        ])
+        self.assertEqual([1, 3], [
+            item["value"] for item in record["parameters"]["steps"]
+        ])
+        self.assertEqual("unsupported", record["operations"]["execute"])
+        self.assertEqual("blocked", workflow["attributes"]["execution"])
+
     def test_input_format_is_a_registered_source_located_record(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "model.in"

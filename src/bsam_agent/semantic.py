@@ -526,6 +526,73 @@ def augment_input_semantics(
     _validate_registered_values(index, definition, parameters)
 
 
+def augment_moisture_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Index canonical MOISTURE key/value settings without authorizing execution."""
+    all_lines = tuple(lines)
+    header = next((line for line in all_lines if line.stripped == "MOISTURE"), None)
+    if header is None:
+        return
+    definition = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.moisture"
+    )
+    definitions = {
+        str(item["name"]).casefold(): item for item in definition["parameters"]
+    }
+    found: dict[str, list[dict[str, Any]]] = {}
+    list_parameters = {"converter_utils", "steps"}
+    for line in _top_block_body(all_lines, "MOISTURE"):
+        text = line.text.split("#", 1)[0].strip()
+        if "=" not in text or text.startswith("**"):
+            continue
+        raw_name, raw_value = text.split("=", 1)
+        parameter = definitions.get(raw_name.strip().casefold())
+        if parameter is None:
+            continue
+        name = str(parameter["name"])
+        raw_values = (
+            [item for item in re.split(r"[\s,]+", raw_value.strip()) if item]
+            if name in list_parameters else [raw_value.strip()]
+        )
+        for raw in raw_values:
+            value: Any = raw.casefold()
+            if name == "steps" and raw.lstrip("+").isdigit():
+                value = int(raw)
+            found.setdefault(name, []).append({
+                "value": value,
+                "spelling": raw_name.strip(),
+                "location": _location(source, line).as_dict(),
+            })
+    parameters = {name: tuple(values) for name, values in found.items()}
+    defaults = {
+        str(item["name"]): item["default"]
+        for item in definition["parameters"] if "default" in item
+    }
+    effective = dict(defaults)
+    for name, values in parameters.items():
+        effective[name] = (
+            [item["value"] for item in values]
+            if name in list_parameters else values[-1]["value"]
+        )
+    workflow = _entity(
+        index, "moisture-workflow", "1", source, header, None,
+        {"effective_settings": effective, "execution": "blocked"},
+    )
+    index.capability_records.append(RegisteredConstruct(
+        id=f"block.moisture[1]@{source}:{header.number}",
+        capability_id="block.moisture",
+        canonical="MOISTURE",
+        occurrence=1,
+        location=_location(source, header),
+        parameters=parameters,
+        defaults=defaults,
+        operations=operational_support(definition),
+        attributes={"entity_id": workflow.id, "syntax": "canonical-key-value"},
+    ))
+
+
 def _solver_parameter(
     definition: dict[str, Any], value: Any, spelling: str, source: str, line: SourceLine,
 ) -> dict[str, Any]:
@@ -2087,6 +2154,7 @@ def augment_root_semantics(
     """Add documented root control entities and their FE/cluster references."""
     all_lines = tuple(lines)
     augment_input_semantics(index, source, all_lines)
+    augment_moisture_semantics(index, source, all_lines)
     augment_registered_boundary_semantics(index, source, all_lines)
     augment_solver_semantics(index, source, all_lines)
     augment_structured_material_semantics(index, source, all_lines)
