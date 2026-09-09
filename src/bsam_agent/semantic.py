@@ -2372,15 +2372,58 @@ def build_semantic_index(
     """Index only explicit FE records whose grammar is documented in the registry."""
     index = SemanticIndex()
     cluster: str | None = None
+    cluster_declaration_ordinal = 0
+    pending_cluster_records: list[SemanticEntity] = []
     for _path, source, lines in sources:
         for command_line, body in _command_spans(lines):
             command = command_line.text.lstrip().split(",", 1)[0].upper()[:5]
             options = _options(command_line)
             records = [line for line in body if line.stripped and not line.stripped.startswith("**")]
 
+            if command == "*TYPE":
+                cluster_declaration_ordinal += 1
+                cluster = None
+                representation = records[0].stripped.casefold() if records else ""
+                declaration = _entity(
+                    index, "cluster-declaration", str(cluster_declaration_ordinal),
+                    source, command_line, None,
+                    {"representation": representation},
+                )
+                pending_cluster_records = [declaration]
+                continue
+
+            if command == "*DIME":
+                values = _fields(records[0].text) if records else []
+                names = (
+                    "node_capacity", "element_capacity",
+                    "selection_count", "section_capacity",
+                )
+                dimensions = _entity(
+                    index, "cluster-dimensions", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {name: values[position] if position < len(values) else None
+                     for position, name in enumerate(names)},
+                )
+                if cluster:
+                    _reference(
+                        index, dimensions, "configures-cluster",
+                        _key("cluster", cluster, None), source, command_line,
+                    )
+                else:
+                    pending_cluster_records.append(dimensions)
+                continue
+
             if command == "*NAME" and records:
                 cluster = records[0].stripped.casefold()
                 _entity(index, "cluster", cluster, source, records[0], None)
+                for pending in pending_cluster_records:
+                    _reference(
+                        index, pending,
+                        "declares-cluster" if pending.kind == "cluster-declaration"
+                        else "configures-cluster",
+                        _key("cluster", cluster, None), source, records[0],
+                    )
+                pending_cluster_records = []
                 continue
 
             if command == "*NODE":

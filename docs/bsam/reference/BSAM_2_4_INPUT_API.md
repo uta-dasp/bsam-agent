@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.51.0`
-- Registry SHA-256: `6639C9399A68A0BE13D3A79A98A8BFAD3AE04F1CF28DE2D70DC1CC74F74AA172`
+- Registry version: `0.52.0`
+- Registry SHA-256: `21A7AD8778F2A6F6325FD397C8DCBE241DA5D12D9496B53D486A3B22D185E2CA`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -698,6 +698,7 @@ Starts a cluster and selects its representation; the active cluster reader accep
 - Dispatch prefix: `*TYPE`
 - Coverage: documented
 - Evidence: [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -720,6 +721,7 @@ Allocates cluster dimensions before mesh entities are read.
 - Dispatch prefix: `*DIME`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Remaining specification work:
 
@@ -741,6 +743,7 @@ Assigns a name to the current cluster.
 - Dispatch prefix: `*NAME`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 

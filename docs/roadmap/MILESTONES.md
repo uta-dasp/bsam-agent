@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.51.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.52.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -99,6 +99,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Index EXCLUSION and geometric CRACK REGION box/plane/sphere/cylinder selectors as source-located, inspection-only cluster operations.
 - [x] Index BUILD and STOP as source-located, inspection-only topology barriers targeting the active cluster.
 - [x] Index TOLERANCE plus standalone and CRACK SPACING forms as source-located, inspection-only cluster settings.
+- [x] Bind source-located TYPE declarations and DIMENSIONS capacities to the following normalized cluster NAME without changing unnamed legacy entity scope.
 - [x] Parse nodal and elemental ORIENTATION rows into source-located node, element, and set dependencies so structural deletion remains fail-closed.
 - [x] Parse SHIFT/SCALE NSET and INTEGRATION element dependencies, and retarget exact SHIFT/SCALE NSET values through the generic modify surface.
 - [x] Index ALL/default SHIFT/SCALE plus FLIP and inertial TRANSFORM as source-located cluster coordinate operations; keep coordinate mutation unavailable.

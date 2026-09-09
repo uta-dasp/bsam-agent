@@ -28,9 +28,9 @@ class SemanticIndexTests(unittest.TestCase):
         semantic = inspection["semantic_model"]
 
         self.assertEqual(0, inspection["summary"]["errors"])
-        self.assertEqual(19, semantic["summary"]["entities"])
-        self.assertEqual(21, semantic["summary"]["references"])
-        self.assertEqual(21, semantic["summary"]["resolved_references"])
+        self.assertEqual(21, semantic["summary"]["entities"])
+        self.assertEqual(23, semantic["summary"]["references"])
+        self.assertEqual(23, semantic["summary"]["resolved_references"])
         keys = {item["key"] for item in semantic["entities"]}
         self.assertIn("cluster:lower_ply/node:1", keys)
         self.assertIn("cluster:upper_ply/node:1", keys)
@@ -53,6 +53,7 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual("0.4.0", semantic["schema_version"])
             self.assertEqual(
                 {
+                    "cluster-declaration": 1,
                     "element": 1, "element-set": 2,
                     "node": 2, "node-set": 2, "section": 1,
                 },
@@ -66,6 +67,42 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertIn("node-set:all_nodes", targets)
             self.assertIn("element-set:solid", targets)
             self.assertEqual(11, semantic["summary"]["resolved_references"])
+
+    def test_cluster_type_and_dimensions_bind_to_the_following_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*DIMENSIONS\n100,50,4,2\n*NAME\nply1\n*NODE\n1,0,0,0\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            declaration = next(
+                item for item in semantic["entities"]
+                if item["kind"] == "cluster-declaration"
+            )
+            dimensions = next(
+                item for item in semantic["entities"]
+                if item["kind"] == "cluster-dimensions"
+            )
+            owner_ids = {declaration["id"], dimensions["id"]}
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in owner_ids
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual("solid", declaration["attributes"]["representation"])
+            self.assertEqual("100", dimensions["attributes"]["node_capacity"])
+            self.assertEqual("2", dimensions["attributes"]["section_capacity"])
+            self.assertEqual(
+                {"declares-cluster", "configures-cluster"},
+                {item["kind"] for item in references},
+            )
+            self.assertTrue(all(
+                item["target_key"] == "cluster:ply1" and item["status"] == "resolved"
+                for item in references
+            ))
 
     def test_include_entities_use_workspace_independent_source_labels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
