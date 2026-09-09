@@ -113,6 +113,13 @@ class SemanticIndex:
     references: list[SemanticReference] = field(default_factory=list)
     capability_records: list[RegisteredConstruct] = field(default_factory=list)
     diagnostics: list[Diagnostic] = field(default_factory=list)
+    _entity_identity_counts: dict[str, int] = field(default_factory=dict, repr=False)
+
+    def entity_id(self, base: str) -> str:
+        """Allocate a stable occurrence ID without changing the semantic key."""
+        occurrence = self._entity_identity_counts.get(base, 0) + 1
+        self._entity_identity_counts[base] = occurrence
+        return base if occurrence == 1 else f"{base}#{occurrence}"
 
     def as_dict(self) -> dict[str, Any]:
         counts: dict[str, int] = {}
@@ -245,7 +252,7 @@ def _entity(index: SemanticIndex, kind: str, name: str, source: str, line: Sourc
     if cluster:
         values["cluster"] = cluster
     entity = SemanticEntity(
-        id=f"{key}@{source}:{line.number}",
+        id=index.entity_id(f"{key}@{source}:{line.number}"),
         key=key,
         kind=kind,
         name=name,
@@ -296,8 +303,9 @@ def augment_include_graph_semantics(
     for label, first_line in files:
         key = _key("source-file", label, None)
         if first_line is None:
+            base_id = f"{key}@{label}:1"
             entity = SemanticEntity(
-                id=f"{key}@{label}:1",
+                id=index.entity_id(base_id),
                 key=key,
                 kind="source-file",
                 name=label,

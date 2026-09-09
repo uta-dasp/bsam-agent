@@ -27,6 +27,30 @@ def root_deck(cluster_lines: bytes) -> bytes:
 
 
 class SourceSetTests(unittest.TestCase):
+    def test_repeated_include_occurrences_have_unique_entity_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deck = root / "model.in"
+            include = root / "mesh.inc"
+            deck.write_bytes(root_deck(
+                b"*NAME\nply1\n*INCLUDE,FILE=mesh.inc\n"
+                b"*INCLUDE,FILE=mesh.inc\n",
+            ))
+            include.write_bytes(b"*NODE\n1,0,0,0\n")
+
+            inspection = SourceSet.read(deck).inspection()
+
+        nodes = [
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "node"
+        ]
+        self.assertEqual(2, len(nodes))
+        self.assertEqual(2, len({item["id"] for item in nodes}))
+        self.assertEqual({"cluster:ply1/node:1"}, {item["key"] for item in nodes})
+        self.assertEqual(1, [
+            item["code"] for item in inspection["diagnostics"]
+        ].count("BSAM-E300"))
+
     def test_resolved_include_graph_has_stable_source_file_references(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
