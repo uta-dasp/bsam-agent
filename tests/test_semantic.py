@@ -108,7 +108,7 @@ class SemanticIndexTests(unittest.TestCase):
 
             semantic = SourceSet.read(root).inspection()["semantic_model"]
 
-            self.assertEqual("0.4.0", semantic["schema_version"])
+            self.assertEqual("0.5.0", semantic["schema_version"])
             self.assertEqual(
                 {
                     "cluster-declaration": 1,

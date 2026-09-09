@@ -27,6 +27,39 @@ def root_deck(cluster_lines: bytes) -> bytes:
 
 
 class SourceSetTests(unittest.TestCase):
+    def test_cross_file_reference_ids_ignore_unrelated_edges(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deck = root / "model.in"
+            include = root / "mesh.inc"
+            deck.write_bytes(root_deck(
+                b"*NAME\nply1\n*INCLUDE,FILE=mesh.inc\n",
+            ))
+            include.write_bytes(b"*NODE\n1,0,0,0\n")
+            source_set = SourceSet.read(deck)
+            baseline = source_set.semantic_index().as_dict()
+            expanded = source_set.semantic_index({
+                include.resolve(): (
+                    b"*NODE\n1,0,0,0\n"
+                    b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n"
+                ),
+            }).as_dict()
+
+        def include_link(semantic: dict) -> dict:
+            return next(
+                item for item in semantic["references"]
+                if item["kind"] == "includes-file"
+            )
+
+        self.assertEqual(include_link(baseline)["id"], include_link(expanded)["id"])
+        self.assertEqual("0.5.0", expanded["schema_version"])
+        connectivity = [
+            item for item in expanded["references"]
+            if item["kind"] == "connectivity"
+        ]
+        self.assertEqual(4, len(connectivity))
+        self.assertEqual(4, len({item["id"] for item in connectivity}))
+
     def test_repeated_include_occurrences_have_unique_entity_ids(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

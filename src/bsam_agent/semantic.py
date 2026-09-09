@@ -114,6 +114,7 @@ class SemanticIndex:
     capability_records: list[RegisteredConstruct] = field(default_factory=list)
     diagnostics: list[Diagnostic] = field(default_factory=list)
     _entity_identity_counts: dict[str, int] = field(default_factory=dict, repr=False)
+    _reference_identity_counts: dict[str, int] = field(default_factory=dict, repr=False)
 
     def entity_id(self, base: str) -> str:
         """Allocate a stable occurrence ID without changing the semantic key."""
@@ -121,12 +122,25 @@ class SemanticIndex:
         self._entity_identity_counts[base] = occurrence
         return base if occurrence == 1 else f"{base}#{occurrence}"
 
+    def reference_id(
+        self, source_entity_id: str, kind: str, target_key: str,
+        source: str, line: int,
+    ) -> str:
+        """Allocate an ID stable against unrelated references elsewhere in the model."""
+        base = (
+            f"reference:{kind}:{source_entity_id}->{target_key}"
+            f"@{source}:{line}"
+        )
+        occurrence = self._reference_identity_counts.get(base, 0) + 1
+        self._reference_identity_counts[base] = occurrence
+        return base if occurrence == 1 else f"{base}#{occurrence}"
+
     def as_dict(self) -> dict[str, Any]:
         counts: dict[str, int] = {}
         for entity in self.entities:
             counts[entity.kind] = counts.get(entity.kind, 0) + 1
         return {
-            "schema_version": "0.4.0",
+            "schema_version": "0.5.0",
             "coverage": "documented-fe-control-named-data-and-declaration-references",
             "entities": [item.as_dict() for item in self.entities],
             "references": [item.as_dict() for item in self.references],
@@ -266,9 +280,10 @@ def _entity(index: SemanticIndex, kind: str, name: str, source: str, line: Sourc
 def _reference(index: SemanticIndex, source_entity: SemanticEntity, kind: str,
                target_key: str, source: str, line: SourceLine,
                attributes: dict[str, Any] | None = None) -> None:
-    ordinal = len(index.references) + 1
     index.references.append(SemanticReference(
-        id=f"reference:{ordinal}",
+        id=index.reference_id(
+            source_entity.id, kind, target_key, source, line.number,
+        ),
         kind=kind,
         source_entity_id=source_entity.id,
         target_key=target_key,
@@ -349,7 +364,10 @@ def augment_include_graph_semantics(
             ):
                 continue
             index.references.append(SemanticReference(
-                id=f"reference:{len(index.references) + 1}",
+                id=index.reference_id(
+                    operation.id, "includes-file", target_key,
+                    operation.location.source, operation.location.line,
+                ),
                 kind="includes-file",
                 source_entity_id=operation.id,
                 target_key=target_key,
