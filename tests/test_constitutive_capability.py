@@ -25,6 +25,44 @@ def constitutive_deck(body: str) -> bytes:
 
 
 class ConstitutiveCapabilityTests(unittest.TestCase):
+    def test_cluster_assignment_is_typed_resolved_and_registry_queryable(self) -> None:
+        class NoCallProvider:
+            def complete(self, _request):  # pragma: no cover - a call fails the test
+                raise AssertionError("registry entity query should not call the provider")
+
+        raw = constitutive_deck("1\n1 1 0\n").replace(
+            b"*STOP", b"*CONSTITUTIVE\n1\n*STOP",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+            result = ChatOrchestrator(
+                NoCallProvider(),
+                ProviderConfig(
+                    "fake", "fake", "http://127.0.0.1", None,
+                    1, 10000, 128, "local-only",
+                ),
+                LocalAgentApi(root),
+            ).turn("List cluster assignments in model.in.")
+
+        assignment = next(
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "cluster-constitutive"
+        )
+        reference = next(
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] == assignment["id"]
+        )
+        self.assertEqual("cluster:ply1/cluster-constitutive:assignment", assignment["key"])
+        self.assertEqual(1, assignment["attributes"]["constitutive"])
+        self.assertEqual("constitutive:1", reference["target_key"])
+        self.assertEqual("resolved", reference["status"])
+        self.assertEqual("query_model", result.tool)
+        self.assertEqual(1, result.tool_result["summary"]["matches"])
+        self.assertEqual("cluster-constitutive", result.tool_result["matches"][0]["kind"])
+
     def test_registry_entity_terms_route_declaration_queries_without_provider(self) -> None:
         class NoCallProvider:
             def complete(self, _request):  # pragma: no cover - a call fails the test

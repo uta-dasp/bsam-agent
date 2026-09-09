@@ -1362,18 +1362,29 @@ def _deterministic_query_request(text: str) -> dict[str, Any] | None:
     if re.search(r"\bstructured materials?\b", text, re.IGNORECASE):
         named_entity_kind = "structured-material"
     else:
-        registered_kinds = {
-            str(item["entity_kind"])
-            for item in capability_applicability(text)
-            if item.get("entity_kind")
-            and item["intents"]["query"] in {"implemented", "verified"}
-        }
-        registered_kinds = {
-            kind for kind in registered_kinds
-            if not any(other.startswith(kind + "-") for other in registered_kinds)
-        }
-        if len(registered_kinds) == 1:
-            named_entity_kind = next(iter(registered_kinds))
+        normalized_text = f" {_normalized_routing_text(text)} "
+        registered_matches: list[tuple[int, str]] = []
+        for item in capability_applicability(text):
+            if not item.get("entity_kind") or item["intents"]["query"] not in {
+                "implemented", "verified",
+            }:
+                continue
+            terms = [*item.get("routing_terms", []), str(item["canonical"]).lstrip("*")]
+            scores = [
+                len(normalized)
+                for term in terms
+                if (normalized := _normalized_routing_text(term))
+                and f" {normalized} " in normalized_text
+            ]
+            if scores:
+                registered_matches.append((max(scores), str(item["entity_kind"])))
+        if registered_matches:
+            best_score = max(score for score, _kind in registered_matches)
+            registered_kinds = {
+                kind for score, kind in registered_matches if score == best_score
+            }
+            if len(registered_kinds) == 1:
+                named_entity_kind = next(iter(registered_kinds))
     if named_entity_kind and re.search(
         r"\b(?:show|query|list)\b", text, re.IGNORECASE,
     ):
