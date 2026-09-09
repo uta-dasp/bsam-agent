@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.72.0",
+  "registry_version": "0.73.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -505,7 +505,7 @@
       "kind": "source",
       "locator": "source/libbsam/mat_stiffness.f90",
       "line_start": 150,
-      "line_end": 330,
+      "line_end": 850,
       "claim": "Uses declaration-order USER function IDs from material selections to evaluate stiffness and related properties."
     },
     {
@@ -1458,7 +1458,7 @@
               {"name": "fatigue", "repetition": "optional-once", "fields": [{"name": "header", "value_type": "*S-N with optional RRATIO=<real>", "required": true, "summary": "Introduces one following row containing S1, S2, and eta."}, {"name": "values", "value_type": "three-reals", "required": true, "summary": "Bulk S-N parameters."}]},
               {"name": "inline-statistics", "repetition": "optional-up-to-five", "fields": [{"name": "header", "value_type": "const(*stat)", "required": true, "summary": "Starts material-local variation."}, {"name": "definition", "value_type": "type 1: [ELE] then count-alpha-control-volume, count property indices, optional #generator integer; type 2: count-file, then count property indices; type 3: #approximation and #seed(COORD XYZ x y z|ELEM|FILE NAME value MAXSEED n MAXELEM n), then the type-1 coefficient/index rows", "required": true, "summary": "Exact positional legacy statistical records."}, {"name": "end", "value_type": "prefix(*en)", "required": true, "summary": "Terminates the inline statistical list."}]}
             ],
-            "constraints": ["The alternate *strength form consumes the same properties as individual scalar rows and is preservation-only.", "*shear and type 105 replace the G13 and G12 records with uf= user-function IDs; their creation requires resolved UFUNCTIONS references.", "Type 100 consumes six values after alpha1 instead of one alpha2 value.", "Types 103, 104, and 106 require the compression fracture row on nu23.", "The five-pass option scanner and inline statistical grammar are order-sensitive; the Agent preserves them but blocks creation until a runtime-verified profile exists."]
+            "constraints": ["The alternate *strength form consumes the same properties as individual scalar rows and is preservation-only.", "*shear and type 105 replace the G13 and G12 records with uf= declaration-order USER function IDs; both references must resolve.", "Type 100 consumes six values after alpha1 instead of one alpha2 value.", "Types 103, 104, and 106 require the compression fracture row on nu23.", "The five-pass option scanner and inline statistical grammar are order-sensitive; the Agent preserves them but blocks creation until a runtime-verified profile exists."]
           },
           {
             "name": "legacy-isotropic-type-10",
@@ -1566,7 +1566,7 @@
             "constraints": ["The cluster must already exist and contain finite elements.", "The external file must contain exactly eight rows per element in current element order.", "Type 800 mutates element orientations, swaps integration points 3/4 and 7/8, and validates nonzero orientation vectors; generation and editing remain blocked until an atomic multi-file plan and an executable-verified COMPRO fixture exist."]
           }
         ],
-        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
+        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
       },
       "remaining_work": [
         "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.",

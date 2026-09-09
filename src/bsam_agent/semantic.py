@@ -2673,6 +2673,50 @@ def augment_material_declaration_semantics(
             else:
                 attributes["cluster_id"] = cluster_id
                 cluster_dependency = (cluster_id, body[0])
+        elif material_type in _MATERIAL_ORTHOTROPIC_TYPES:
+            feature_count = 0
+            while (
+                feature_count < len(body)
+                and _material_dispatch(body[feature_count])
+                in {"*fibe", "*cfv_", "*shea", "*tens", "*bimo"}
+            ):
+                feature_count += 1
+            feature_lines = body[:feature_count]
+            ordinary_rows = body[feature_count:feature_count + 12]
+            nonlinear_shear = material_type == 105 or any(
+                _material_dispatch(line) == "*shea" for line in feature_lines
+            )
+            alternate_strength = (
+                feature_count < len(body)
+                and _material_dispatch(body[feature_count]) == "*stre"
+            )
+            if nonlinear_shear and not alternate_strength:
+                selector_rows = (
+                    ("g13", ordinary_rows[6]), ("g12", ordinary_rows[8]),
+                )
+                try:
+                    selectors = {
+                        name: int(_record_fields(line)[1])
+                        for name, line in selector_rows
+                    }
+                    if any(
+                        _record_fields(line)[0].casefold() != "uf=" or target <= 0
+                        for (name, line), target in zip(
+                            selector_rows, selectors.values(),
+                        )
+                    ):
+                        raise ValueError
+                except (IndexError, ValueError):
+                    _table_error(
+                        index, "BSAM-E350",
+                        "nonlinear-shear MATERIALS require positive uf= USER IDs for G13 and G12",
+                        source, header,
+                    )
+                else:
+                    attributes["numeric_user_selectors"] = selectors
+                    user_selectors = [
+                        (name, selectors[name], line) for name, line in selector_rows
+                    ]
         material = _entity(
             index, "material", str(ordinal), source, header, None, attributes,
         )

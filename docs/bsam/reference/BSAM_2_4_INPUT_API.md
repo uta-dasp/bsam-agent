@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.72.0`
-- Registry SHA-256: `792DF0DC6C3C922F0027A10872DB9746D100FC6A2A964782B5493A135C61EC90`
+- Registry version: `0.73.0`
+- Registry SHA-256: `341198B8C00EE6A420E35358236ECD1CAF2F53F44D38C56733C516481A92CAC1`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -394,7 +394,7 @@ Remaining specification work:
 
 #### `MATERIALS` body
 
-Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
+Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
 
 - **structured-bulk-type-999** (the entry header is numeric type 999):
   - `parameter` [repeated]: `key=value`:one-or-more-structured-bulk-keys paired with one-or-more values
@@ -421,7 +421,7 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - `fatigue` [optional-once]: `header`:*S-N with optional RRATIO=<real>, `values`:three-reals
   - `inline-statistics` [optional-up-to-five]: `header`:const(*stat), `definition`:type 1: [ELE] then count-alpha-control-volume, count property indices, optional #generator integer; type 2: count-file, then count property indices; type 3: #approximation and #seed(COORD XYZ x y z|ELEM|FILE NAME value MAXSEED n MAXELEM n), then the type-1 coefficient/index rows, `end`:prefix(*en)
   - Constraint: The alternate *strength form consumes the same properties as individual scalar rows and is preservation-only.
-  - Constraint: *shear and type 105 replace the G13 and G12 records with uf= user-function IDs; their creation requires resolved UFUNCTIONS references.
+  - Constraint: *shear and type 105 replace the G13 and G12 records with uf= declaration-order USER function IDs; both references must resolve.
   - Constraint: Type 100 consumes six values after alpha1 instead of one alpha2 value.
   - Constraint: Types 103, 104, and 106 require the compression fracture row on nu23.
   - Constraint: The five-pass option scanner and inline statistical grammar are order-sensitive; the Agent preserves them but blocks creation until a runtime-verified profile exists.
@@ -2050,7 +2050,7 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 <a id="evidenceuser-sparse-matrix"></a>
 - `evidence.user-sparse-matrix` — source: `source/libbsam/sprmat.f90:1140-1200` — Defines the integer CSR-like record read by USER type 301 and assigns every stored matrix value to one.
 <a id="evidenceuser-active-consumer"></a>
-- `evidence.user-active-consumer` — source: `source/libbsam/mat_stiffness.f90:150-330` — Uses declaration-order USER function IDs from material selections to evaluate stiffness and related properties.
+- `evidence.user-active-consumer` — source: `source/libbsam/mat_stiffness.f90:150-850` — Uses declaration-order USER function IDs from material selections to evaluate stiffness and related properties.
 <a id="evidencecrack-parser"></a>
 - `evidence.crack-parser` — source: `source/libbsam/crk_ini.f90:11-990` — Locates optional CRACK, dispatches active FE crack types 101, 201, and 301, parses their shared counts, cluster, option, and predefined-crack records, and enforces count and mesh prerequisites.
 <a id="evidencecrack-storage"></a>

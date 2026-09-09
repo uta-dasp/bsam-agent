@@ -30,6 +30,48 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_orthotropic_nonlinear_shear_resolves_numeric_users(self) -> None:
+        properties = (
+            "1 2 3\n1 2 3\n1\n0.1 1 2 3\n0.1\n0.1\n"
+            "uf= {g13}\n1\nuf= {g12} 1 1\n1\n1\n1\n"
+        )
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            "MATERIALS\n105\n"
+            + properties.format(g13=1, g12=2)
+            + "1\n*shear\n"
+            + properties.format(g13=3, g12=4)
+            + "END MATERIALS\n"
+            + "USER\n" + "1\n0\n1\n" * 4 + "END USER\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        materials = [
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        ]
+        self.assertEqual(
+            [{"g13": 1, "g12": 2}, {"g13": 3, "g12": 4}],
+            [item["attributes"]["numeric_user_selectors"] for item in materials],
+        )
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] in {material["id"] for material in materials}
+            and item["kind"] == "uses-numeric-user-function"
+        ]
+        self.assertEqual([
+            "numeric-user-function:1", "numeric-user-function:2",
+            "numeric-user-function:3", "numeric-user-function:4",
+        ], [item["target_key"] for item in references])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_compro_material_resolves_cluster_identity(self) -> None:
         raw = (
             "INPUT\n3\nEND INPUT\n"
