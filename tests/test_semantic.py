@@ -21,6 +21,34 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_global_crack_leading_records_and_named_cluster_are_typed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            raw = deck(b"*NAME\nply1\n").replace(
+                b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+                b"CRACK\n301\n0,10\n3,-ngap\nply1,-approximation\n"
+                b"*normal\nEND CRACK\nCONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+            )
+            root.write_bytes(raw)
+            semantic = SourceSet.read(root).inspection()["semantic_model"]
+
+        record = next(
+            item for item in semantic["capability_records"]
+            if item["capability_id"] == "block.crack"
+        )
+        crack = next(item for item in semantic["entities"] if item["kind"] == "crack")
+        reference = next(
+            item for item in semantic["references"]
+            if item["source_entity_id"] == crack["id"]
+        )
+        self.assertEqual(301, record["parameters"]["type"][0]["value"])
+        self.assertEqual(0, record["parameters"]["predefined_count"][0]["value"])
+        self.assertEqual(10, record["parameters"]["maximum_count"][0]["value"])
+        self.assertEqual(3, record["parameters"]["n_gap"][0]["value"])
+        self.assertEqual("ply1", record["parameters"]["cluster"][0]["value"])
+        self.assertEqual("cluster:ply1", reference["target_key"])
+        self.assertEqual("resolved", reference["status"])
+
     def test_cluster_commands_emit_uniform_registered_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

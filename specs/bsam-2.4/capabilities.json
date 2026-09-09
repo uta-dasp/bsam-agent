@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.59.0",
+  "registry_version": "0.60.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1834,6 +1834,8 @@
       "required": false,
       "parser": "CRK_INI",
       "summary": "Defines global finite-element crack insertion controls for crack types 101, 201, and 301.",
+      "entity_kind": "crack",
+      "routing_terms": ["crack", "cracks", "global crack", "global cracks"],
       "termination": {
         "style": "end-line",
         "tokens": ["END CRACK"],
@@ -1897,6 +1899,12 @@
       ],
       "evidence_ids": ["evidence.crack-parser", "evidence.crack-storage", "evidence.crack-active-consumer", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "verified",
+        "modify": "unassessed", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "END CRACK after a complete crack entry",

@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.59.0`
-- Registry SHA-256: `AECA97FCE9D449F973315940FE65098B6723B64766DDD81A7235A6BB670CEFE5`
+- Registry version: `0.60.0`
+- Registry SHA-256: `07F36D3DFEDC33C294ED4CDA2E95DDCB74465AE9EFD9CC27324B7B486C313A6E`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -621,6 +621,7 @@ Defines global finite-element crack insertion controls for crack types 101, 201,
 - Termination: `END CRACK` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.crack-parser](#evidencecrack-parser), [evidence.crack-storage](#evidencecrack-storage), [evidence.crack-active-consumer](#evidencecrack-active-consumer), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unassessed, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 

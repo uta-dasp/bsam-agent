@@ -618,6 +618,93 @@ def augment_container_semantics(
         ))
 
 
+def augment_crack_capability_records(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Type the fixed leading records of global FE crack declarations."""
+    definition = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.crack"
+    )
+    body = [
+        line for line in _top_block_body(tuple(lines), "CRACK")
+        if line.stripped and not line.stripped.startswith(("#", "**"))
+    ]
+    header_positions = [
+        position for position, line in enumerate(body)
+        if not line.text[:1].isspace()
+        and _fields(line.text)[:1] in (["101"], ["201"], ["301"])
+    ]
+    entities_by_line = {
+        item.location.line: item for item in index.entities
+        if item.kind == "crack" and item.location.source == source
+    }
+
+    def parameter(value: Any, spelling: str, line: SourceLine) -> dict[str, Any]:
+        return {
+            "value": value, "spelling": spelling,
+            "location": _location(source, line).as_dict(),
+        }
+
+    defaults = {
+        str(item["name"]): item["default"]
+        for item in definition["parameters"] if "default" in item
+    }
+    for ordinal, position in enumerate(header_positions, start=1):
+        end = (
+            header_positions[ordinal]
+            if ordinal < len(header_positions) else len(body)
+        )
+        header = body[position]
+        entry = body[position + 1:end]
+        positional = [line for line in entry if not line.stripped.startswith("*")]
+        parameters: dict[str, tuple[dict[str, Any], ...]] = {
+            "type": (parameter(int(_fields(header.text)[0]), "type", header),),
+        }
+        if positional:
+            values = _fields(positional[0].text)
+            if values and values[0].lstrip("+").isdigit():
+                parameters["predefined_count"] = (
+                    parameter(int(values[0]), "predefined_count", positional[0]),
+                )
+            if len(values) > 1 and values[1].lstrip("+").isdigit():
+                parameters["maximum_count"] = (
+                    parameter(int(values[1]), "maximum_count", positional[0]),
+                )
+        if len(positional) > 1:
+            values = _fields(positional[1].text)
+            if values and values[0].lstrip("+-").isdigit():
+                parameters["n_gap"] = (
+                    parameter(int(values[0]), "n_gap", positional[1]),
+                )
+        if len(positional) > 2:
+            values = _fields(positional[2].text)
+            if values:
+                cluster_value: Any = (
+                    int(values[0]) if values[0].lstrip("+").isdigit()
+                    else values[0].casefold()
+                )
+                parameters["cluster"] = (
+                    parameter(cluster_value, "cluster", positional[2]),
+                )
+        entity = entities_by_line.get(header.number)
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.crack[{ordinal}]@{source}:{header.number}",
+            capability_id="block.crack",
+            canonical="CRACK",
+            occurrence=ordinal,
+            location=_location(source, header),
+            parameters=parameters,
+            defaults=defaults,
+            operations=operational_support(definition),
+            attributes={
+                "entity_id": entity.id if entity is not None else None,
+                "syntax": "fixed-leading-records",
+            },
+        ))
+        _validate_registered_values(index, definition, parameters)
+
+
 def _solver_parameter(
     definition: dict[str, Any], value: Any, spelling: str, source: str, line: SourceLine,
 ) -> dict[str, Any]:
@@ -2480,20 +2567,29 @@ def augment_root_semantics(
         if active_crack is None or "-approximation" not in line.text.casefold():
             continue
         values = _fields(line.text)
-        if not values or not values[0].isdigit():
+        if not values:
             continue
-        approximation = int(values[0])
-        if 1 <= approximation <= len(clusters):
+        selector = values[0]
+        if selector.isdigit() and 1 <= int(selector) <= len(clusters):
+            approximation = int(selector)
             _reference(
                 index, active_crack, "targets-cluster", clusters[approximation - 1].key,
                 source, line, {"approximation": approximation},
             )
+        elif not selector.isdigit():
+            _reference(
+                index, active_crack, "targets-cluster",
+                _key("cluster", selector, None), source, line,
+                {"cluster": selector.casefold()},
+            )
         else:
+            approximation = int(selector)
             _reference(
                 index, active_crack, "targets-cluster",
                 _key("cluster", f"approximation-{approximation}", None), source, line,
                 {"approximation": approximation},
             )
+    augment_crack_capability_records(index, source, all_lines)
 
 
 def build_semantic_index(
