@@ -30,6 +30,50 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_variable_isotropic_materials_resolve_numeric_user_selectors(self) -> None:
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            "MATERIALS\n"
+            "40\n1 2 3\n10 11 12\n"
+            "40\nE=4,G=5,U=6,ALF=7\n10 11 12\n"
+            "41\n8 9 10 11\n10 11 12\n"
+            "END MATERIALS\n"
+            "USER\n" + "1\n0\n1\n" * 11 + "END USER\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        materials = [
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        ]
+        self.assertEqual(
+            {"e": 1, "g": 2, "alf": 3},
+            materials[0]["attributes"]["numeric_user_selectors"],
+        )
+        self.assertEqual(
+            {"e": 4, "g": 5, "u": 6, "alf": 7},
+            materials[1]["attributes"]["numeric_user_selectors"],
+        )
+        self.assertEqual(
+            {"e_j1": 8, "e_j2": 9, "nu": 10, "alpha": 11},
+            materials[2]["attributes"]["numeric_user_selectors"],
+        )
+        material_ids = {item["id"] for item in materials}
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] in material_ids
+            and item["kind"] == "uses-numeric-user-function"
+        ]
+        self.assertEqual(11, len(references))
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_type_four_material_resolves_numeric_user_selectors(self) -> None:
         selector_rows = (
             "1 10 11\n2 12 13\n3\n4 1 2 3\n5\n6\n"
@@ -75,8 +119,8 @@ class StructuredMaterialCapabilityTests(unittest.TestCase):
             "3\n" + rows(16) +
             "4\n" + rows(12) +
             "11\n" + rows(1) +
-            "40\n" + rows(2) +
-            "41\n" + rows(2) +
+            "40\n1 1 1\n1 1 1\n"
+            "41\n1 1 1 1\n1 1 1\n"
             "200\n" + rows(2) + "*delta\n1\n" +
             "300\n2\n1 0\n2 1\n0.5\n"
             "500\n2 1\n1 1\n2 2\n"

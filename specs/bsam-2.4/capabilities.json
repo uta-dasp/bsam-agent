@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.67.0",
+  "registry_version": "0.68.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1524,7 +1524,7 @@
               {"name": "functions", "repetition": "once", "fields": [{"name": "selectors", "value_type": "type-40: legacy three IDs or keyed E/G/U/ALF IDs; type-41: four IDs for E(J1),E(J2),nu,alpha", "required": true, "summary": "User-function selectors controlling elastic response."}]},
               {"name": "strength", "repetition": "once", "fields": [{"name": "Xt-Xc-S", "value_type": "three-reals", "required": true, "summary": "Isotropic tensile, compressive, and shear strengths."}]}
             ],
-            "constraints": ["All nonzero selector IDs must resolve to UFUNCTIONS entries.", "The type-40 keyed reader does not enforce its documented pick-two relationship or required key set; Agent generation is blocked until a runtime-verified key combination is registered."]
+            "constraints": ["All nonzero selector IDs must resolve to declaration-order USER function entries.", "The type-40 keyed reader does not enforce its documented pick-two relationship or required key set; Agent generation is blocked until a runtime-verified key combination is registered."]
           },
           {
             "name": "heterogeneous-types-200-and-210",

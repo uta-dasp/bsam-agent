@@ -2503,7 +2503,7 @@ def augment_material_declaration_semantics(
         }
         if structured is not None:
             attributes["structured_entity_id"] = structured.id
-        selector_lines: tuple[SourceLine, ...] = ()
+        user_selectors: list[tuple[str, int, SourceLine]] = []
         if material_type == 4:
             selector_lines = body[:12]
             try:
@@ -2516,19 +2516,73 @@ def augment_material_declaration_semantics(
                     "MATERIALS type 4 requires twelve positive USER function IDs",
                     source, header,
                 )
-                selector_lines = ()
             else:
                 attributes["numeric_user_ids"] = user_ids
+                user_selectors = [
+                    (str(position), target, line)
+                    for position, (target, line) in enumerate(
+                        zip(user_ids, selector_lines), start=1,
+                    )
+                ]
+        elif material_type == 40:
+            fields = re.split(r"[\s,=]+", body[0].text.split("#", 1)[0].strip())
+            try:
+                if fields and fields[0][:1].isdigit():
+                    values = [int(value) for value in fields[:3]]
+                    if len(values) != 3 or any(value <= 0 for value in values):
+                        raise ValueError
+                    selectors = dict(zip(("e", "g", "alf"), values))
+                else:
+                    selectors: dict[str, int] = {}
+                    cursor = 0
+                    while cursor < len(fields):
+                        name = fields[cursor].casefold()
+                        if name not in {"e", "g", "u", "alf"} or cursor + 1 >= len(fields):
+                            raise ValueError
+                        value = int(fields[cursor + 1])
+                        if value < 0:
+                            raise ValueError
+                        selectors[name] = value
+                        cursor += 2
+                    if not selectors:
+                        raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 40 requires legacy E/G/ALF IDs or keyed E/G/U/ALF IDs",
+                    source, header,
+                )
+            else:
+                attributes["numeric_user_selectors"] = selectors
+                user_selectors = [
+                    (name, target, body[0]) for name, target in selectors.items()
+                    if target > 0
+                ]
+        elif material_type == 41:
+            try:
+                values = [int(value) for value in _record_fields(body[0])[:4]]
+                if len(values) != 4 or any(value <= 0 for value in values):
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 41 requires four positive USER function IDs",
+                    source, header,
+                )
+            else:
+                selectors = dict(zip(("e_j1", "e_j2", "nu", "alpha"), values))
+                attributes["numeric_user_selectors"] = selectors
+                user_selectors = [
+                    (name, target, body[0]) for name, target in selectors.items()
+                ]
         material = _entity(
             index, "material", str(ordinal), source, header, None, attributes,
         )
-        for position, (target, line) in enumerate(zip(
-            attributes.get("numeric_user_ids", []), selector_lines,
-        ), start=1):
+        for position, (selector, target, line) in enumerate(user_selectors, start=1):
             _reference(
                 index, material, "uses-numeric-user-function",
                 _key("numeric-user-function", str(target), None), source, line,
-                {"position": position},
+                {"position": position, "selector": selector},
             )
     return True
 

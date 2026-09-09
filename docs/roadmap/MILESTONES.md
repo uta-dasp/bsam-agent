@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.67.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.68.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -124,6 +124,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Give repeated cross-file semantic occurrences unique entity IDs while retaining shared keys for duplicate-definition validation.
 - [x] Derive reference IDs from their source, target, kind, and location so unrelated edges cannot renumber cross-file links.
 - [x] Resolve all twelve legacy MATERIAL type-4 selectors to declaration-order numeric USER identities.
+- [x] Resolve legacy and keyed MATERIAL type-40 plus type-41 selectors to declaration-order numeric USER identities.
 - [ ] Populate consistent entity identities and cross-file references.
 - [ ] Replace feature-specific semantic extraction where registry metadata is sufficient.
 
