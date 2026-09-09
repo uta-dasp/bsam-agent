@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.77.0",
+  "registry_version": "0.78.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1574,7 +1574,7 @@
             "constraints": ["The cluster must already exist and contain finite elements.", "The external file must contain exactly eight rows per element in current element order.", "Type 800 mutates element orientations, swaps integration points 3/4 and 7/8, and validates nonzero orientation vectors; generation and editing remain blocked until an atomic multi-file plan and an executable-verified COMPRO fixture exist."]
           }
         ],
-        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
+        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
       },
       "remaining_work": [
         "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.",
@@ -2015,7 +2015,7 @@
           }
         ],
         "dependencies": [
-          "Crack IDs are one-based declaration order and cluster *CRACK records reference them.",
+          "Crack IDs are one-based declaration order; each global CRACK declaration selects its cluster, and setup derives the cluster's reverse crack list.",
           "cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.",
           "Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.",
           "Growth and extension threshold pairs are indexed by failure mode.",

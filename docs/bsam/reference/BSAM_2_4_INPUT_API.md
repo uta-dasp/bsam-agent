@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.77.0`
-- Registry SHA-256: `F5718A6FFA88E15C7C3BCCCFBC0BE4DD7AAE82D2DF5E94756EBB7EB5C8D5CB42`
+- Registry version: `0.78.0`
+- Registry SHA-256: `1D75E7A7899FED61AD216368C2329D597147E9AC849FEC2BF88FA5A60DC35D27`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -394,7 +394,7 @@ Remaining specification work:
 
 #### `MATERIALS` body
 
-Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
+Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
 
 - **structured-bulk-type-999** (the entry header is numeric type 999):
   - `parameter` [repeated]: `key=value`:one-or-more-structured-bulk-keys paired with one-or-more values
@@ -637,7 +637,7 @@ Known parameters:
 
 #### `CRACK` body
 
-Termination: END CRACK after a complete crack entry. Dependencies: Crack IDs are one-based declaration order and cluster *CRACK records reference them.; cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.; Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.; Growth and extension threshold pairs are indexed by failure mode.; END CRACK is recognized after a complete entry by reading the next record's first three characters as END.
+Termination: END CRACK after a complete crack entry. Dependencies: Crack IDs are one-based declaration order; each global CRACK declaration selects its cluster, and setup derives the cluster's reverse crack list.; cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.; Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.; Growth and extension threshold pairs are indexed by failure mode.; END CRACK is recognized after a complete entry by reading the next record's first three characters as END.
 
 - **active-fe-crack-types** (type is 101, 201, or 301):
   - `type` [once]: `type`:enum(101,201,301)

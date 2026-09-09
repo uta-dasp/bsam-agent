@@ -40,6 +40,24 @@ def table_deck(material_value: str = "table_stiffness") -> bytes:
 
 
 class TableCapabilityTests(unittest.TestCase):
+    def test_polynomial_material_reference_resolves_every_table_identity(self) -> None:
+        raw = table_deck("poly_stiffness_strength_stiffness")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["kind"] == "uses-table"
+        ]
+        self.assertEqual([
+            "table:stiffness", "table:strength", "table:stiffness",
+            "table:strength",
+        ], [item["target_key"] for item in references])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_named_tables_and_structured_material_references_resolve(self) -> None:
         raw = table_deck()
         with tempfile.TemporaryDirectory() as directory:

@@ -1393,12 +1393,17 @@ def augment_table_semantics(
         ))
 
     table_reference = re.compile(r"(?i)(?:^|[^a-z0-9])table_([^_,\s]+)")
+    polynomial_reference = re.compile(r"(?i)(?:^|[^a-z0-9])poly_([^,\s]+)")
     for line in _top_block_body(all_lines, "MATERIALS"):
         text = line.text.split("#", 1)[0]
         if "=" not in text or line.text.lstrip().startswith("**"):
             continue
         right = text.split("=", 1)[1]
         targets = [match.group(1).casefold() for match in table_reference.finditer(right)]
+        for match in polynomial_reference.finditer(right):
+            targets.extend(
+                name.casefold() for name in match.group(1).split("_") if name
+            )
         if not targets:
             continue
         parameter = _material_reference_owner(index, source, line, text)
