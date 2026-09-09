@@ -741,7 +741,7 @@ class SemanticIndexTests(unittest.TestCase):
                 b"type=temp, name=heat, value=10\n"
                 b"*connections\n"
                 b"type=-2, name=penalty\n"
-                b"mset=PLY1.edge, Constitutive=1\n"
+                b"mset=PLY1.edge, Material=1, Constitutive=1, Failure=1\n"
                 b"last=PLY1\n"
                 b"*loading sequence\n"
                 b"type=Static, nstep=1, incr=1\n"
@@ -770,7 +770,8 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual(1, kinds["cluster-selection"])
             reference_kinds = {item["kind"] for item in semantic["references"]}
             self.assertTrue({
-                "targets-node-set", "mset", "uses-constitutive", "terminal-cluster",
+                "targets-node-set", "mset", "uses-material", "uses-constitutive",
+                "uses-failure", "terminal-cluster",
                 "changes-boundary-condition", "targets-cluster", "selects-cluster",
             } <= reference_kinds)
             heat = next(

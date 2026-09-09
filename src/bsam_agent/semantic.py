@@ -3003,12 +3003,17 @@ def augment_root_semantics(
                             index, connection, option,
                             _key("node-set", set_name, cluster), source, line,
                         )
-                constitutive = options.get("constitutive")
-                if constitutive and constitutive.isdigit():
-                    _reference(
-                        index, connection, "uses-constitutive",
-                        _key("constitutive", constitutive, None), source, line,
-                    )
+                for option, reference_kind, target_kind in (
+                    ("material", "uses-material", "material"),
+                    ("constitutive", "uses-constitutive", "constitutive"),
+                    ("failure", "uses-failure", "failure"),
+                ):
+                    target = options.get(option)
+                    if target and target.isdigit():
+                        _reference(
+                            index, connection, reference_kind,
+                            _key(target_kind, target, None), source, line,
+                        )
                 if "last" in options:
                     terminal_values = line.text.split("=", 1)[1].split(",")
                     for terminal in (value.strip() for value in terminal_values):

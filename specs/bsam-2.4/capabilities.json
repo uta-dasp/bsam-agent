@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.73.0",
+  "registry_version": "0.74.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3320,7 +3320,7 @@
             "constraints": ["At least one contact-pair row is required.", "The next row containing a type key starts the next connection; surface contact does not use a last sentinel."]
           }
         ],
-        "dependencies": ["Referenced clusters must be selected by the boundary problem.", "All node sets and material/constitutive/failure IDs must already exist.", "Ply or mesh changes must revalidate both sides of every connection."]
+        "dependencies": ["Referenced clusters must be selected by the boundary problem.", "All node sets and declaration-order material, constitutive, and failure IDs must already exist.", "Ply or mesh changes must revalidate both sides of every connection."]
       }
     },
     {
