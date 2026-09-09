@@ -3163,13 +3163,37 @@ def build_semantic_index(
     sources: Iterable[tuple[Path, str, Iterable[SourceLine]]], *, resolve: bool = True
 ) -> SemanticIndex:
     """Index only explicit FE records whose grammar is documented in the registry."""
+    source_entries = [
+        (path, source, tuple(lines)) for path, source, lines in sources
+    ]
+    declared_cluster_names: list[str | None] = []
+    active_declaration: int | None = None
+    for _path, _source, lines in source_entries:
+        for prescan_line, prescan_body in _command_spans(lines):
+            prescan_command = prescan_line.text.lstrip().split(",", 1)[0].upper()[:5]
+            prescan_records = [
+                line for line in prescan_body
+                if line.stripped and not line.stripped.startswith("**")
+            ]
+            if prescan_command == "*TYPE":
+                declared_cluster_names.append(None)
+                active_declaration = len(declared_cluster_names) - 1
+            elif (
+                prescan_command == "*NAME" and prescan_records
+                and active_declaration is not None
+            ):
+                declared_cluster_names[active_declaration] = (
+                    prescan_records[0].stripped.casefold()
+                )
+                active_declaration = None
+
     index = SemanticIndex()
     cluster: str | None = None
     cluster_declaration_ordinal = 0
     pending_cluster_records: list[SemanticEntity] = []
     registered_cluster_commands = load_registry()["cluster_commands"]
     registered_occurrences: dict[str, int] = {}
-    for _path, source, lines in sources:
+    for _path, source, lines in source_entries:
         for command_line, body in _command_spans(lines):
             command = command_line.text.lstrip().split(",", 1)[0].upper()[:5]
             options = _options(command_line)
@@ -3215,7 +3239,22 @@ def build_semantic_index(
                     source, command_line, None,
                     {"representation": representation},
                 )
-                pending_cluster_records = [declaration]
+                if declared_cluster_names[cluster_declaration_ordinal - 1] is None:
+                    cluster = f"noname{cluster_declaration_ordinal}"
+                    implicit_cluster = _entity(
+                        index, "cluster", cluster, source, command_line, None,
+                        {
+                            "declaration_ordinal": cluster_declaration_ordinal,
+                            "implicit_name": True,
+                        },
+                    )
+                    _reference(
+                        index, declaration, "declares-cluster",
+                        implicit_cluster.key, source, command_line,
+                    )
+                    pending_cluster_records = []
+                else:
+                    pending_cluster_records = [declaration]
                 continue
 
             if command == "*DIME":
@@ -3241,7 +3280,13 @@ def build_semantic_index(
 
             if command == "*NAME" and records:
                 cluster = records[0].stripped.casefold()
-                _entity(index, "cluster", cluster, source, records[0], None)
+                _entity(
+                    index, "cluster", cluster, source, records[0], None,
+                    {
+                        "declaration_ordinal": cluster_declaration_ordinal,
+                        "implicit_name": False,
+                    },
+                )
                 for pending in pending_cluster_records:
                     _reference(
                         index, pending,

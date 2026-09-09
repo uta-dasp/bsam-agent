@@ -21,6 +21,40 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_unnamed_cluster_uses_source_defined_fallback_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n",
+            ).replace(b"*type\nsolid\n*NAME\nply1\n", b"*type\nsolid\n"))
+            inspection = SourceSet.read(root).inspection()
+
+        semantic = inspection["semantic_model"]
+        cluster = next(
+            item for item in semantic["entities"] if item["kind"] == "cluster"
+        )
+        node = next(
+            item for item in semantic["entities"] if item["kind"] == "node"
+        )
+        node_set = next(
+            item for item in semantic["entities"] if item["kind"] == "node-set"
+        )
+        declaration = next(
+            item for item in semantic["entities"]
+            if item["kind"] == "cluster-declaration"
+        )
+        declaration_reference = next(
+            item for item in semantic["references"]
+            if item["source_entity_id"] == declaration["id"]
+        )
+        self.assertEqual("noname1", cluster["name"])
+        self.assertTrue(cluster["attributes"]["implicit_name"])
+        self.assertEqual("cluster:noname1/node:1", node["key"])
+        self.assertEqual("cluster:noname1/node-set:edge", node_set["key"])
+        self.assertEqual("cluster:noname1", declaration_reference["target_key"])
+        self.assertEqual("resolved", declaration_reference["status"])
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_connection_section_layers_resolve_constitutive_identities(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
@@ -223,20 +257,24 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual("0.5.0", semantic["schema_version"])
             self.assertEqual(
                 {
-                    "cluster-declaration": 1,
+                    "cluster": 1, "cluster-declaration": 1,
                     "element": 1, "element-set": 2,
                     "material": 2, "node": 2, "node-set": 2, "section": 1,
+                    "topology-operation": 1,
                 },
                 semantic["summary"]["entities_by_kind"],
             )
-            self.assertEqual(13, semantic["summary"]["references"])
-            node = next(item for item in semantic["entities"] if item["key"] == "node:1")
+            self.assertEqual(15, semantic["summary"]["references"])
+            node = next(
+                item for item in semantic["entities"]
+                if item["key"] == "cluster:noname1/node:1"
+            )
             self.assertEqual("<root>", node["location"]["source"])
             self.assertGreater(node["location"]["byte_end"], node["location"]["byte_start"])
             targets = {item["target_key"] for item in semantic["references"]}
-            self.assertIn("node-set:all_nodes", targets)
-            self.assertIn("element-set:solid", targets)
-            self.assertEqual(13, semantic["summary"]["resolved_references"])
+            self.assertIn("cluster:noname1/node-set:all_nodes", targets)
+            self.assertIn("cluster:noname1/element-set:solid", targets)
+            self.assertEqual(15, semantic["summary"]["resolved_references"])
 
     def test_cluster_type_and_dimensions_bind_to_the_following_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -284,7 +322,10 @@ class SemanticIndexTests(unittest.TestCase):
 
             semantic = SourceSet.read(root).semantic_index().as_dict()
 
-            node = next(item for item in semantic["entities"] if item["key"] == "node:7")
+            node = next(
+                item for item in semantic["entities"]
+                if item["key"] == "cluster:noname1/node:7"
+            )
             self.assertEqual("mesh.inc", node["location"]["source"])
             self.assertIn("@mesh.inc:2", node["id"])
 

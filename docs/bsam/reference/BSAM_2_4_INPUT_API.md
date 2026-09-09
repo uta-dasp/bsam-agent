@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.76.0`
-- Registry SHA-256: `73A4DE073221BD1364B59D60DA02463BE2367E58C606140613784F64ACEA16EC`
+- Registry version: `0.77.0`
+- Registry SHA-256: `F5718A6FFA88E15C7C3BCCCFBC0BE4DD7AAE82D2DF5E94756EBB7EB5C8D5CB42`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -757,7 +757,7 @@ Known parameters:
 
 #### `*NAME` body
 
-Termination: fixed-count. Dependencies: Every cluster-qualified set reference uses the normalized lowercase cluster name.; If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name.; Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference.
+Termination: fixed-count. Dependencies: Every cluster-qualified set reference uses the normalized lowercase cluster name.; If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name and all child entities remain scoped to that identity.; Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference.
 
 - **cluster-name** (*NAME is dispatched):
   - `name` [once]: `name`:one-list-directed-token-up-to-80-characters

@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.76.0",
+  "registry_version": "0.77.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2111,7 +2111,7 @@
         "style": "single-record",
         "termination": "fixed-count",
         "variants": [{"name": "cluster-name", "when": "*NAME is dispatched", "rows": [{"name": "name", "repetition": "once", "fields": [{"name": "name", "value_type": "one-list-directed-token-up-to-80-characters", "required": true, "summary": "Name assigned to the current cluster and later normalized to lowercase."}]}], "constraints": ["The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.", "The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness because name-based consumers otherwise select or compare ambiguously."]}],
-        "dependencies": ["Every cluster-qualified set reference uses the normalized lowercase cluster name.", "If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name.", "Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference."]
+        "dependencies": ["Every cluster-qualified set reference uses the normalized lowercase cluster name.", "If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name and all child entities remain scoped to that identity.", "Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference."]
       }
     },
     {
