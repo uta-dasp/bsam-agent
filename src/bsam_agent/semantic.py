@@ -283,6 +283,73 @@ def _reference_once(index: SemanticIndex, source_entity: SemanticEntity, kind: s
     _reference(index, source_entity, kind, target_key, source, line, attributes)
 
 
+def augment_include_graph_semantics(
+    index: SemanticIndex,
+    files: Iterable[tuple[str, SourceLine | None]],
+    references: Iterable[tuple[str, int, str | None, str | None, str]],
+) -> None:
+    """Link typed INCLUDE operations to stable workspace-relative source-file entities."""
+    reference_items = tuple(references)
+    if not reference_items:
+        return
+    file_entities: dict[str, SemanticEntity] = {}
+    for label, first_line in files:
+        key = _key("source-file", label, None)
+        if first_line is None:
+            entity = SemanticEntity(
+                id=f"{key}@{label}:1",
+                key=key,
+                kind="source-file",
+                name=label,
+                location=SourceLocation(label, 1, 0, 0),
+                attributes={"role": "root" if label == "<root>" else "include"},
+            )
+            index.entities.append(entity)
+        else:
+            entity = _entity(
+                index, "source-file", label, label, first_line, None,
+                {"role": "root" if label == "<root>" else "include"},
+            )
+        file_entities[label] = entity
+
+    for source, line_number, spelling, target, status in reference_items:
+        matching_positions = [
+            position for position, entity in enumerate(index.entities)
+            if entity.kind == "include-operation"
+            and entity.location.source == source
+            and entity.location.line == line_number
+        ]
+        for position in matching_positions:
+            operation = index.entities[position]
+            attributes = {
+                **operation.attributes,
+                "graph_status": status,
+                "target_source": target,
+            }
+            operation = replace(operation, attributes=attributes)
+            index.entities[position] = operation
+            if target is None or target not in file_entities or status not in {
+                "resolved", "already-loaded",
+            }:
+                continue
+            target_key = file_entities[target].key
+            if any(
+                item.source_entity_id == operation.id
+                and item.kind == "includes-file"
+                and item.target_key == target_key
+                for item in index.references
+            ):
+                continue
+            index.references.append(SemanticReference(
+                id=f"reference:{len(index.references) + 1}",
+                kind="includes-file",
+                source_entity_id=operation.id,
+                target_key=target_key,
+                location=operation.location,
+                attributes={"spelling": spelling, "graph_status": status},
+            ))
+
+
 def _cluster_nodal_target_key(
     index: SemanticIndex, target: str, cluster: str, *, node_only: bool = False,
 ) -> tuple[str, str]:

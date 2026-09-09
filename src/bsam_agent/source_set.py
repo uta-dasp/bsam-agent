@@ -9,7 +9,12 @@ from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from .document import Diagnostic, SourceDocument, SourceLine, diagnostic_summary
-from .semantic import SemanticIndex, augment_root_semantics, build_semantic_index
+from .semantic import (
+    SemanticIndex,
+    augment_include_graph_semantics,
+    augment_root_semantics,
+    build_semantic_index,
+)
 
 
 @dataclass(frozen=True)
@@ -298,6 +303,28 @@ class SourceSet:
         replacements = replacements or {}
         sources = self._semantic_sources(replacements)
         index = build_semantic_index(sources, resolve=False)
+        labels = {
+            path: (
+                "<root>" if path == self.root else
+                os.path.relpath(path, self.input_directory).replace("\\", "/")
+            )
+            for path in self.documents
+        }
+        augment_include_graph_semantics(
+            index,
+            (
+                (labels[path], document.lines[0] if document.lines else None)
+                for path, document in self.documents.items()
+            ),
+            (
+                (
+                    labels[reference.source], reference.line, reference.spelling,
+                    labels.get(reference.target) if reference.target is not None else None,
+                    reference.status,
+                )
+                for reference in self.references
+            ),
+        )
         root_document = self.documents[self.root]
         if self.root in replacements:
             root_document = SourceDocument.from_bytes(replacements[self.root], str(self.root))

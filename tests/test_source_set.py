@@ -27,6 +27,39 @@ def root_deck(cluster_lines: bytes) -> bytes:
 
 
 class SourceSetTests(unittest.TestCase):
+    def test_resolved_include_graph_has_stable_source_file_references(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deck = root / "model.in"
+            include = root / "mesh.inc"
+            deck.write_bytes(root_deck(
+                b"*NAME\nply1\n*INCLUDE,FILE=mesh.inc\n",
+            ))
+            include.write_bytes(b"*NODE\n1,0,0,0\n")
+
+            semantic = SourceSet.read(deck).inspection()["semantic_model"]
+
+        files = [
+            item for item in semantic["entities"] if item["kind"] == "source-file"
+        ]
+        operation = next(
+            item for item in semantic["entities"]
+            if item["kind"] == "include-operation"
+        )
+        references = [
+            item for item in semantic["references"]
+            if item["source_entity_id"] == operation["id"]
+        ]
+        self.assertEqual({"<root>", "mesh.inc"}, {item["name"] for item in files})
+        self.assertEqual("resolved", operation["attributes"]["graph_status"])
+        self.assertEqual("mesh.inc", operation["attributes"]["target_source"])
+        self.assertTrue(any(
+            item["kind"] == "includes-file"
+            and item["target_key"] == "source-file:mesh.inc"
+            and item["status"] == "resolved"
+            for item in references
+        ))
+
     def test_nested_includes_resolve_from_original_input_directory_and_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -173,6 +206,7 @@ class SourceSetTests(unittest.TestCase):
             include_targets = [
                 item for item in semantic["references"]
                 if item["source_entity_id"] in include_ids
+                and item["kind"] == "targets-cluster"
             ]
 
             self.assertEqual(0, inspection["summary"]["errors"])
