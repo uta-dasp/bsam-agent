@@ -13,6 +13,23 @@ class RegistryToolsTests(unittest.TestCase):
         cls.registry_path = registry_tools.DEFAULT_REGISTRY
         cls.registry = registry_tools.load_registry(cls.registry_path)
 
+    def test_every_active_construct_has_a_typed_read_contract(self) -> None:
+        active = [
+            *self.registry["top_level_blocks"],
+            *self.registry["cluster_commands"],
+            *self.registry["nested_constructs"],
+        ]
+
+        self.assertEqual(54, len(active))
+        self.assertEqual([], [
+            item["id"] for item in active
+            if any(
+                item.get("operations", {}).get(operation)
+                not in {"implemented", "verified"}
+                for operation in ("parse", "semantic", "inspect")
+            )
+        ])
+
     def test_registry_invariants(self) -> None:
         counts = registry_tools.validate_registry(self.registry)
         self.assertEqual(13, counts["blocks"])

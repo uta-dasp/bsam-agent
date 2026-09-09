@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.61.0",
+  "registry_version": "0.62.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
