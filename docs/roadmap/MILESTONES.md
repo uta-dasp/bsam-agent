@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.54.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.55.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -110,6 +110,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Derive bounded ELGEN element identities and shifted connectivity, while blocking generated entities from unsafe single-record deletion.
 - [x] Traverse FE includes inline for semantic indexing so nested fragments inherit active cluster state and included `*NAME` changes persist when the parent stream resumes.
 - [x] Index each reachable INCLUDE occurrence as a typed, source-located operation targeting the cluster active at that point in the inline stream.
+- [x] Emit uniform source-located capability records and registered parameter/default/operation views for every reachable cluster-command occurrence.
 - [ ] Parse completed registry constructs into typed records while preserving concrete syntax.
 - [x] Preserve unknown or not-yet-supported records losslessly.
 - [ ] Populate consistent entity identities and cross-file references.

@@ -2374,11 +2374,44 @@ def build_semantic_index(
     cluster: str | None = None
     cluster_declaration_ordinal = 0
     pending_cluster_records: list[SemanticEntity] = []
+    registered_cluster_commands = load_registry()["cluster_commands"]
+    registered_occurrences: dict[str, int] = {}
     for _path, source, lines in sources:
         for command_line, body in _command_spans(lines):
             command = command_line.text.lstrip().split(",", 1)[0].upper()[:5]
             options = _options(command_line)
             records = [line for line in body if line.stripped and not line.stripped.startswith("**")]
+            matched_commands = [
+                item for item in registered_cluster_commands
+                if command_line.text.lstrip().casefold().startswith(
+                    str(item["dispatch_prefix"]).casefold()
+                )
+            ]
+            if len(matched_commands) == 1:
+                registered = matched_commands[0]
+                capability_id = str(registered["id"])
+                registered_occurrences[capability_id] = (
+                    registered_occurrences.get(capability_id, 0) + 1
+                )
+                occurrence = registered_occurrences[capability_id]
+                parameters = _registered_parameter_values(
+                    registered, command_line, body, source,
+                )
+                defaults = {
+                    str(item["name"]): item["default"]
+                    for item in registered.get("parameters", []) if "default" in item
+                }
+                index.capability_records.append(RegisteredConstruct(
+                    id=f"{capability_id}[{occurrence}]@{source}:{command_line.number}",
+                    capability_id=capability_id,
+                    canonical=str(registered["canonical"]),
+                    occurrence=occurrence,
+                    location=_location(source, command_line),
+                    parameters=parameters,
+                    defaults=defaults,
+                    operations=operational_support(registered),
+                ))
+                _validate_registered_values(index, registered, parameters)
 
             if command == "*TYPE":
                 cluster_declaration_ordinal += 1

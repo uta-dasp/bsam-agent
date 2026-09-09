@@ -21,6 +21,36 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_cluster_commands_emit_uniform_registered_records(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*DIMENSIONS\n10,5,2,1\n*NAME\nply1\n"
+                b"*NODE,NSET=all_nodes\n1,0,0,0\n"
+            ))
+
+            semantic = SourceSet.read(root).inspection()["semantic_model"]
+            records = [
+                item for item in semantic["capability_records"]
+                if item["capability_id"].startswith("command.")
+            ]
+
+            self.assertEqual(
+                [
+                    "command.type", "command.dimensions", "command.name",
+                    "command.node", "command.stop",
+                ],
+                [item["capability_id"] for item in records],
+            )
+            self.assertEqual("solid", records[0]["parameters"]["representation"][0]["value"])
+            self.assertEqual("ply1", records[2]["parameters"]["name"][0]["value"])
+            self.assertEqual("all_nodes", records[3]["parameters"]["NSET"][0]["value"])
+            self.assertTrue(all(
+                item["operations"]["parse"] in {"implemented", "verified"}
+                and item["operations"]["semantic"] in {"implemented", "verified"}
+                for item in records
+            ))
+
     def test_representative_two_cluster_fixture_regression(self) -> None:
         fixture = Path(__file__).parent / "fixtures" / "semantic_two_cluster.in"
 
