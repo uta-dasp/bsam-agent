@@ -22,6 +22,50 @@ def numeric_user_deck(body: bytes) -> bytes:
 
 
 class NumericUserCapabilityTests(unittest.TestCase):
+    def test_constitutive_curve_ids_resolve_numeric_user_functions(self) -> None:
+        variants = (
+            (3, b"1,1,0,1,2,3,4,0", 4),
+            (4, b"1,1,0,1,2,3,4,5,6,0", 6),
+        )
+        for constitutive_type, data, count in variants:
+            with self.subTest(constitutive_type=constitutive_type):
+                raw = numeric_user_deck(
+                    b"1\n0\n1\n" * count,
+                ).replace(
+                    b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+                    b"CONSTITUTIVE\n" + str(constitutive_type).encode() + b"\n"
+                    + data + b"\nEND CONSTITUTIVE\n"
+                    b"FAILURE\n4\nEND FAILURE\n",
+                ).replace(
+                    b"MATERIALS\n0\nEND MATERIALS\n",
+                    b"MATERIALS\n999\nE11=1\n*end\nEND MATERIALS\n",
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "model.in"
+                    path.write_bytes(raw)
+                    inspection = SourceSet.read(path).inspection()
+
+                constitutive = next(
+                    item for item in inspection["semantic_model"]["entities"]
+                    if item["kind"] == "constitutive"
+                )
+                references = [
+                    item for item in inspection["semantic_model"]["references"]
+                    if item["source_entity_id"] == constitutive["id"]
+                    and item["kind"] == "uses-numeric-user-function"
+                ]
+                expected_ids = list(range(1, count + 1))
+                self.assertEqual(
+                    expected_ids, constitutive["attributes"]["numeric_user_ids"]
+                )
+                self.assertEqual([
+                    f"numeric-user-function:{item}" for item in expected_ids
+                ], [item["target_key"] for item in references])
+                self.assertTrue(all(
+                    item["status"] == "resolved" for item in references
+                ))
+                self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_safe_analytic_and_inline_variants_are_consumed_in_order(self) -> None:
         raw = numeric_user_deck(
             b"1\n2\n1\n2\n3\n"

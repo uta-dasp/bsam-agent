@@ -1908,6 +1908,20 @@ def augment_constitutive_semantics(
                     source, data_line,
                 )
                 break
+            if material_type in {3, 4}:
+                user_count = 4 if material_type == 3 else 6
+                try:
+                    user_ids = [int(value) for value in data_fields[3:3 + user_count]]
+                    if len(user_ids) != user_count or any(value <= 0 for value in user_ids):
+                        raise ValueError
+                except ValueError:
+                    _table_error(
+                        index, "BSAM-E360",
+                        f"CONSTITUTIVE type {material_type} requires positive USER function IDs",
+                        source, data_line,
+                    )
+                    break
+                attributes["numeric_user_ids"] = user_ids
             cursor += 1
         else:
             header_width = 2 if material_type >= 110 else 1
@@ -1984,6 +1998,12 @@ def augment_constitutive_semantics(
             _reference(
                 index, entity, "uses-constitutive", _key("constitutive", str(target), None),
                 source, reference_line, {"source": reference_kind},
+            )
+        for position, target in enumerate(attributes.get("numeric_user_ids", []), start=1):
+            _reference(
+                index, entity, "uses-numeric-user-function",
+                _key("numeric-user-function", str(target), None), source, data_line,
+                {"position": position},
             )
         parameters = {
             "type": (_table_parameter(material_type, "type", source, type_line),),
