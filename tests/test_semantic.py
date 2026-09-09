@@ -21,6 +21,42 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_nodal_connection_expands_all_and_qualified_set_lists(self) -> None:
+        raw = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*connections\n"
+            b"type=nodal, name=tie\nmset=all\nsset=ply1.edge, ply2.edge\n"
+            b"END BOUNDARY\nCONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            b"MATERIALS\n0\nEND MATERIALS\nCLUSTERS\n"
+            b"*type\nsolid\n*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n*STOP\n"
+            b"*type\nsolid\n*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n*STOP\n"
+            b"END CLUSTERS\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(raw)
+            inspection = SourceSet.read(root).inspection()
+
+        semantic = inspection["semantic_model"]
+        connection = next(
+            item for item in semantic["entities"]
+            if item["kind"] == "connection"
+        )
+        references = [
+            item for item in semantic["references"]
+            if item["source_entity_id"] == connection["id"]
+        ]
+        self.assertEqual(
+            ["mset", "mset", "sset", "sset"],
+            [item["kind"] for item in references],
+        )
+        self.assertEqual([
+            "cluster:ply1/node-set:edge", "cluster:ply2/node-set:edge",
+            "cluster:ply1/node-set:edge", "cluster:ply2/node-set:edge",
+        ], [item["target_key"] for item in references])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_section_layers_resolve_material_identities(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

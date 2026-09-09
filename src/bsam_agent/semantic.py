@@ -2983,12 +2983,14 @@ def augment_root_semantics(
                         )
         elif command.startswith("*connections"):
             connection: SemanticEntity | None = None
+            connection_type = ""
             ordinal = 0
             for line in records:
                 options = _record_options(line)
                 if "type" in options:
                     ordinal += 1
                     name = options.get("name", f"connection{ordinal}")
+                    connection_type = options["type"].casefold()
                     connection = _entity(
                         index, "connection", name, source, line, None,
                         {"type": options["type"], "ordinal": ordinal},
@@ -2997,11 +2999,58 @@ def augment_root_semantics(
                     continue
                 for option in ("mset", "sset"):
                     qualified = options.get(option)
-                    if qualified and "." in qualified:
-                        cluster, set_name = qualified.split(".", 1)
+                    if not qualified:
+                        continue
+                    if connection_type.startswith("noda"):
+                        fields = [value.strip() for value in line.text.split(",")]
+                        targets = [qualified, *(
+                            value for value in fields[1:] if value and "=" not in value
+                        )]
+                        if qualified.casefold() == "all":
+                            targets = [
+                                item.key for item in index.entities
+                                if item.kind == "node-set"
+                                and str(item.attributes.get("cluster", "")).casefold()
+                                in {name.casefold() for name in selected_cluster_names}
+                            ]
+                        for target in targets:
+                            if target.startswith("cluster:"):
+                                target_key = target
+                            elif "." in target:
+                                cluster_name, set_name = target.split(".", 1)
+                                if set_name.casefold() == "all":
+                                    for candidate in index.entities:
+                                        if (
+                                            candidate.kind == "node-set"
+                                            and str(candidate.attributes.get("cluster", "")).casefold()
+                                            == cluster_name.casefold()
+                                        ):
+                                            _reference(
+                                                index, connection, option,
+                                                candidate.key, source, line,
+                                            )
+                                    continue
+                                target_key = _key(
+                                    "node-set", set_name, cluster_name,
+                                )
+                            else:
+                                index.diagnostics.append(Diagnostic(
+                                    code="BSAM-E313", severity="error",
+                                    message=(
+                                        "nodal CONNECTION set target must be all or "
+                                        f"cluster-qualified: {target}"
+                                    ),
+                                    line=line.number, source=source,
+                                ))
+                                continue
+                            _reference(
+                                index, connection, option, target_key, source, line,
+                            )
+                    elif "." in qualified:
+                        cluster_name, set_name = qualified.split(".", 1)
                         _reference(
                             index, connection, option,
-                            _key("node-set", set_name, cluster), source, line,
+                            _key("node-set", set_name, cluster_name), source, line,
                         )
                 for option, reference_kind, target_kind in (
                     ("material", "uses-material", "material"),

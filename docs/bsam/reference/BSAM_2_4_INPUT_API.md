@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.74.0`
-- Registry SHA-256: `05757DEB06F955B36214DBD70ADA9ECEBBBF7AC6A36AD141AAFB803CF5F069BC`
+- Registry version: `0.75.0`
+- Registry SHA-256: `637AA35295DA8C7DAA7F47FDDA87947B6F5F420712C530202A271ED06C99FAD2`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1701,9 +1701,10 @@ Termination: next-command. Dependencies: Referenced clusters must be selected by
   - Constraint: Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but blocks their creation and conversion to them.
 - **nodal** (type is nodal):
   - `header` [once]: `type`:const(nodal), `name`:string, `component`:component
-  - `master-sets` [once]: `mset`:selector(all|list)
-  - `slave-sets` [once]: `sset`:selector(all|list)
+  - `master-sets` [once]: `mset`:all-or-comma-separated-cluster-qualified-node-sets
+  - `slave-sets` [once]: `sset`:all-or-comma-separated-cluster-qualified-node-sets
   - Constraint: Exactly two subordinate selector rows are consumed: master first and slave second.
+  - Constraint: The source forces internal list-selection mode; the first value is either all or the first qualified set, not a literal list token.
   - Constraint: Both selectors must resolve at least one node set.
 - **surface-contact** (type begins surf):
   - `header` [once]: `type`:const(surface), `name`:string, `tolerance`:positive-real, `search`:const(sheff)

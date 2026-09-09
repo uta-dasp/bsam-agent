@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.74.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.75.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -131,6 +131,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Resolve MATERIAL type-800 COMPRO ownership to its declaration-order cluster identity.
 - [x] Resolve MATERIAL type-105 and orthotropic `*shear` G13/G12 selectors to declaration-order numeric USER identities.
 - [x] Resolve BOUNDARY connection material, constitutive, and failure selectors to declaration-order identities.
+- [x] Expand BOUNDARY nodal-connection ALL and same-row qualified master/slave set selectors to typed dependencies.
 - [ ] Populate consistent entity identities and cross-file references.
 - [ ] Replace feature-specific semantic extraction where registry metadata is sufficient.
 

@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.74.0",
+  "registry_version": "0.75.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3305,10 +3305,10 @@
             "when": "type is nodal",
             "rows": [
               {"name": "header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(nodal)", "required": true, "summary": "Selects nodal connection."}, {"name": "name", "value_type": "string", "required": false, "summary": "Optional connection name."}, {"name": "component", "value_type": "component", "required": false, "summary": "Connected components; defaults to 123."}]},
-              {"name": "master-sets", "repetition": "once", "fields": [{"name": "mset", "value_type": "selector(all|list)", "required": true, "summary": "All or a list of cluster-qualified master node sets."}]},
-              {"name": "slave-sets", "repetition": "once", "fields": [{"name": "sset", "value_type": "selector(all|list)", "required": true, "summary": "All or a list of cluster-qualified slave node sets."}]}
+              {"name": "master-sets", "repetition": "once", "fields": [{"name": "mset", "value_type": "all-or-comma-separated-cluster-qualified-node-sets", "required": true, "summary": "All selected-cluster node sets or one or more cluster-qualified master node sets on the same row."}]},
+              {"name": "slave-sets", "repetition": "once", "fields": [{"name": "sset", "value_type": "all-or-comma-separated-cluster-qualified-node-sets", "required": true, "summary": "All selected-cluster node sets or one or more cluster-qualified slave node sets on the same row."}]}
             ],
-            "constraints": ["Exactly two subordinate selector rows are consumed: master first and slave second.", "Both selectors must resolve at least one node set."]
+            "constraints": ["Exactly two subordinate selector rows are consumed: master first and slave second.", "The source forces internal list-selection mode; the first value is either all or the first qualified set, not a literal list token.", "Both selectors must resolve at least one node set."]
           },
           {
             "name": "surface-contact",
