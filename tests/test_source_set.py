@@ -161,9 +161,19 @@ class SourceSetTests(unittest.TestCase):
             nodes.write_bytes(b"*NODE\r\n1,0,0,0\r\n2,1,0,0\r\n")
 
             inspection = SourceSet.read(deck).inspection()
+            semantic = inspection["semantic_model"]
             keys = {
-                item["key"] for item in inspection["semantic_model"]["entities"]
+                item["key"] for item in semantic["entities"]
             }
+            includes = [
+                item for item in semantic["entities"]
+                if item["kind"] == "include-operation"
+            ]
+            include_ids = {item["id"] for item in includes}
+            include_targets = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in include_ids
+            ]
 
             self.assertEqual(0, inspection["summary"]["errors"])
             self.assertTrue({
@@ -171,9 +181,22 @@ class SourceSetTests(unittest.TestCase):
                 "cluster:first/node-set:edge", "cluster:second/node:11",
                 "cluster:second/element:10",
             } <= keys)
+            self.assertEqual({"mesh.inc", "nodes.inc"}, {
+                item["attributes"]["file"] for item in includes
+            })
+            self.assertEqual({"<root>", "mesh.inc"}, {
+                item["location"]["source"] for item in includes
+            })
+            self.assertEqual(2, len(include_targets))
+            self.assertTrue(all(
+                item["kind"] == "targets-cluster"
+                and item["target_key"] == "cluster:first"
+                and item["status"] == "resolved"
+                for item in include_targets
+            ))
             self.assertEqual(
-                inspection["semantic_model"]["summary"]["references"],
-                inspection["semantic_model"]["summary"]["resolved_references"],
+                semantic["summary"]["references"],
+                semantic["summary"]["resolved_references"],
             )
 
 

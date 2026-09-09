@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.53.0`
-- Registry SHA-256: `105E19096F95522F1CE96D3CEE4C29068E062452A089E9A1A9BA07374FBED591`
+- Registry version: `0.54.0`
+- Registry SHA-256: `1EDB3F9CE4A052C60707C2035643E7DFA6879060EE156279632A11A1902B1ADD`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1203,6 +1203,7 @@ Reads additional FE cluster commands from a nested include stack; every FILE tar
 - Dispatch prefix: `*INCL`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-include-open](#evidencefe-include-open), [evidence.fe-include-unwind](#evidencefe-include-unwind)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 

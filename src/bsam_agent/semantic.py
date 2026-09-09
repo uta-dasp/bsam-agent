@@ -2426,6 +2426,18 @@ def build_semantic_index(
                 pending_cluster_records = []
                 continue
 
+            if command == "*INCL":
+                include = _entity(
+                    index, "include-operation", f"{source}:{command_line.number}",
+                    source, command_line, cluster, {"file": options.get("FILE")},
+                )
+                if cluster:
+                    _reference(
+                        index, include, "targets-cluster",
+                        _key("cluster", cluster, None), source, command_line,
+                    )
+                continue
+
             if command == "*NODE":
                 nset = options.get("NSET")
                 if nset:
