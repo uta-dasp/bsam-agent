@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.60.0",
+  "registry_version": "0.61.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1710,6 +1710,8 @@
       "required": false,
       "parser": "USF_INI",
       "summary": "Defines numeric user-function records, including polynomial and discrete forms.",
+      "entity_kind": "numeric-user-function",
+      "routing_terms": ["numeric user function", "numeric user functions", "numeric function", "numeric functions"],
       "termination": {
         "style": "end-line",
         "tokens": ["END USER"],
@@ -1745,6 +1747,12 @@
       ],
       "evidence_ids": ["evidence.user-parser", "evidence.user-evaluator", "evidence.user-spline", "evidence.user-sparse-matrix", "evidence.user-active-consumer"],
       "remaining_work": [],
+      "operations": {
+        "parse": "implemented", "semantic": "implemented", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",

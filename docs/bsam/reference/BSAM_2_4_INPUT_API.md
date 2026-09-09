@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.60.0`
-- Registry SHA-256: `07F36D3DFEDC33C294ED4CDA2E95DDCB74465AE9EFD9CC27324B7B486C313A6E`
+- Registry version: `0.61.0`
+- Registry SHA-256: `DD4AEF92964E2F036A1CA0DD1AFBBA087056A571909F2F0848860C8CD22591F2`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -553,6 +553,7 @@ Defines numeric user-function records, including polynomial and discrete forms.
 - Termination: `END USER` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.user-parser](#evidenceuser-parser), [evidence.user-evaluator](#evidenceuser-evaluator), [evidence.user-spline](#evidenceuser-spline), [evidence.user-sparse-matrix](#evidenceuser-sparse-matrix), [evidence.user-active-consumer](#evidenceuser-active-consumer)
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 

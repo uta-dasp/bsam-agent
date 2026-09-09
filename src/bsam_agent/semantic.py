@@ -705,6 +705,163 @@ def augment_crack_capability_records(
         _validate_registered_values(index, definition, parameters)
 
 
+def augment_numeric_user_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Cursor-parse deterministic numeric USER declarations and preserve blocked forms."""
+    definition = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.user"
+    )
+    body = [
+        line for line in _top_block_body(tuple(lines), "USER")
+        if line.stripped and not line.stripped.startswith(("#", "**"))
+    ]
+    cursor = 0
+    ordinal = 0
+
+    def parameter(value: Any, spelling: str, line: SourceLine) -> dict[str, Any]:
+        return {
+            "value": value, "spelling": spelling,
+            "location": _location(source, line).as_dict(),
+        }
+
+    while cursor < len(body):
+        header = body[cursor]
+        fields = _fields(header.text)
+        if not fields or not fields[0].lstrip("+-").isdigit():
+            break
+        function_type = int(fields[0])
+        if function_type <= 0:
+            break
+        ordinal += 1
+        cursor += 1
+        parameters: dict[str, tuple[dict[str, Any], ...]] = {
+            "type": (parameter(function_type, "type", header),),
+        }
+        attributes: dict[str, Any] = {
+            "type": function_type, "declaration_ordinal": ordinal,
+        }
+        complete = True
+
+        if function_type == 100:
+            if cursor >= len(body):
+                complete = False
+            else:
+                file_line = body[cursor]
+                cursor += 1
+                external_file = file_line.text[:30].strip()
+                parameters["external_file"] = (
+                    parameter(external_file, "external_file", file_line),
+                )
+                attributes.update({
+                    "external_file": external_file,
+                    "preservation": "external-file-not-in-source-set",
+                })
+        elif function_type == 301:
+            attributes["preservation"] = "blocked-sparse-matrix"
+        elif function_type in {1, 2, 3, 4, 5, 101, 201}:
+            if cursor >= len(body):
+                complete = False
+                count = -1
+                count_line = header
+            else:
+                count_line = body[cursor]
+                cursor += 1
+                count_fields = _fields(count_line.text)
+                try:
+                    count = int(count_fields[0])
+                except (IndexError, ValueError):
+                    count = -1
+                    complete = False
+            if count >= 0:
+                parameters["count"] = (parameter(count, "count", count_line),)
+                attributes["count"] = count
+            row_count = count + 1 if function_type == 1 else count
+            row_width = 1 if function_type == 1 else 2
+            if function_type == 201:
+                row_width = 4
+            data: list[list[float]] = []
+            if function_type == 5 and complete:
+                if cursor >= len(body):
+                    complete = False
+                else:
+                    range_line = body[cursor]
+                    cursor += 1
+                    try:
+                        range_values = [float(value) for value in _fields(range_line.text)[:2]]
+                    except ValueError:
+                        range_values = []
+                    if len(range_values) != 2 or not all(map(math.isfinite, range_values)):
+                        complete = False
+                    else:
+                        attributes["range"] = range_values
+            coefficient_values: list[dict[str, Any]] = []
+            if complete and row_count >= 0:
+                for _row in range(row_count):
+                    if cursor >= len(body):
+                        complete = False
+                        break
+                    row_line = body[cursor]
+                    cursor += 1
+                    try:
+                        row = [float(value) for value in _fields(row_line.text)[:row_width]]
+                    except ValueError:
+                        row = []
+                    if len(row) != row_width or not all(map(math.isfinite, row)):
+                        complete = False
+                        break
+                    data.append(row)
+                    if function_type in {1, 2, 3, 4, 5}:
+                        coefficient_values.extend(
+                            parameter(value, "coefficient", row_line) for value in row
+                        )
+            attributes["data"] = data
+            if coefficient_values:
+                parameters["coefficient"] = tuple(coefficient_values)
+            if function_type in {101, 201} and complete:
+                x_values = [row[0] for row in data]
+                monotonic = len(x_values) >= 2 and (
+                    all(right > left for left, right in zip(x_values, x_values[1:]))
+                    or all(right < left for left, right in zip(x_values, x_values[1:]))
+                )
+                if not monotonic:
+                    complete = False
+        else:
+            attributes["preservation"] = "unsupported-type"
+            complete = False
+
+        attributes["complete"] = complete
+        entity = _entity(
+            index, "numeric-user-function", str(ordinal), source, header, None,
+            attributes,
+        )
+        index.capability_records.append(RegisteredConstruct(
+            id=f"block.user[{ordinal}]@{source}:{header.number}",
+            capability_id="block.user",
+            canonical="USER",
+            occurrence=ordinal,
+            location=_location(source, header),
+            parameters=parameters,
+            operations=operational_support(definition),
+            attributes={
+                "entity_id": entity.id,
+                "syntax": "preservation-only" if function_type in {100, 301}
+                else "inline-numeric",
+                "complete": complete,
+            },
+        ))
+        if not complete and function_type not in {100, 301}:
+            _table_error(
+                index, "BSAM-E380",
+                f"numeric USER function {ordinal} has an incomplete or invalid type-{function_type} body",
+                source, header,
+            )
+            break
+        if function_type == 301:
+            break
+
+
 def _solver_parameter(
     definition: dict[str, Any], value: Any, spelling: str, source: str, line: SourceLine,
 ) -> dict[str, Any]:
@@ -2268,6 +2425,7 @@ def augment_root_semantics(
     augment_input_semantics(index, source, all_lines)
     augment_moisture_semantics(index, source, all_lines)
     augment_container_semantics(index, source, all_lines)
+    augment_numeric_user_semantics(index, source, all_lines)
     augment_registered_boundary_semantics(index, source, all_lines)
     augment_solver_semantics(index, source, all_lines)
     augment_structured_material_semantics(index, source, all_lines)
