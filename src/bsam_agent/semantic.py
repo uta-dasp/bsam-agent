@@ -2817,6 +2817,39 @@ def build_semantic_index(
                     index, topology, "targets-cluster",
                     _key("cluster", cluster, None), source, command_line,
                 )
+            elif command == "*TOLE" and cluster:
+                tolerance_type = str(options.get("TYPE") or "PTOL").upper()
+                value = _fields(records[0].text)[0] if records and _fields(records[0].text) else None
+                setting = _entity(
+                    index, "cluster-setting", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {"setting": tolerance_type.casefold(), "value": value},
+                )
+                _reference(
+                    index, setting, "targets-cluster",
+                    _key("cluster", cluster, None), source, command_line,
+                )
+            elif (
+                command == "*SPAC"
+                or command == "*CRAC" and command_line.text.lstrip().upper().startswith("*CRACK SPACING")
+            ) and cluster:
+                mode = (
+                    "relaxed" if "RELAXED" in options else
+                    "value" if "VALUE" in options else
+                    "strict" if "STRICT" in options else "unchanged"
+                )
+                setting = _entity(
+                    index, "cluster-setting", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {
+                        "setting": "crack-spacing", "mode": mode,
+                        "value": options.get("VALUE"),
+                    },
+                )
+                _reference(
+                    index, setting, "targets-cluster",
+                    _key("cluster", cluster, None), source, command_line,
+                )
             elif command == "*EXCL" and cluster:
                 shape = (
                     "previous" if "PREVIOUS" in options else

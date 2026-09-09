@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.50.0`
-- Registry SHA-256: `3E4333DC0E1837EEFDCDC74019174B3B23F6218F116A3839B78B77D1893E2578`
+- Registry version: `0.51.0`
+- Registry SHA-256: `6639C9399A68A0BE13D3A79A98A8BFAD3AE04F1CF28DE2D70DC1CC74F74AA172`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1084,6 +1084,7 @@ Overrides one of the model tolerances used by geometry and crack operations.
 - Dispatch prefix: `*TOLE`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -1327,6 +1328,7 @@ Defines crack spacing behavior for the cluster.
 - Dispatch prefix: `*SPAC`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-build-spacing](#evidencefe-build-spacing)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 

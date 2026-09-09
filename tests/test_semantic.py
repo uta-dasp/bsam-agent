@@ -340,6 +340,37 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_tolerance_and_spacing_are_source_located_cluster_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+                b"*TOLERANCE,TYPE=ITOL\n1e-9\n"
+                b"*SPACING,VALUE=0.25\n"
+                b"*CRACK SPACING,RELAXED\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            settings = [
+                item for item in semantic["entities"]
+                if item["kind"] == "cluster-setting"
+            ]
+            setting_ids = {item["id"] for item in settings}
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in setting_ids
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(3, len(settings))
+            self.assertEqual("1e-9", settings[0]["attributes"]["value"])
+            self.assertEqual("value", settings[1]["attributes"]["mode"])
+            self.assertEqual("0.25", settings[1]["attributes"]["value"])
+            self.assertEqual("relaxed", settings[2]["attributes"]["mode"])
+            self.assertEqual(3, len(references))
+            self.assertTrue(all(item["status"] == "resolved" for item in references))
+
     def test_orientation_records_resolve_node_element_and_set_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

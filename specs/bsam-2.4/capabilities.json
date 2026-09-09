@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.50.0",
+  "registry_version": "0.51.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2491,6 +2491,8 @@
       "id": "command.tolerance",
       "parent_block_id": "block.clusters",
       "canonical": "*TOLERANCE",
+      "entity_kind": "cluster-setting",
+      "routing_terms": ["cluster tolerance", "cluster tolerances", "geometry tolerance"],
       "dispatch_prefix": "*TOLE",
       "summary": "Overrides one of the model tolerances used by geometry and crack operations.",
       "coverage": "documented",
@@ -2506,6 +2508,12 @@
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-coordinate-operations"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
@@ -2816,12 +2824,20 @@
       "id": "command.spacing",
       "parent_block_id": "block.clusters",
       "canonical": "*SPACING",
+      "entity_kind": "cluster-setting",
+      "routing_terms": ["crack spacing", "cluster crack spacing", "spacing mode"],
       "dispatch_prefix": "*SPAC",
       "summary": "Defines crack spacing behavior for the cluster.",
       "coverage": "documented",
       "parameters": [{"name": "mode", "value_type": "mutually-exclusive-command-line-option", "required": false, "allowed_values": ["STRICT", "VALUE", "RELAXED"], "default": "STRICT", "summary": "STRICT stores zero, VALUE requires a positive spacing, and RELAXED stores the negative sentinel used to disable strict spacing."}, {"name": "value", "value_type": "positive-real", "required": false, "summary": "Required only for VALUE and stored as the cluster minimum crack spacing."}],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-build-spacing"],
       "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
