@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.71.0`
-- Registry SHA-256: `BAF108DCAA131DD4917ACDFCE971925BB9DC175E1422F65F212AF26687D8464A`
+- Registry version: `0.72.0`
+- Registry SHA-256: `792DF0DC6C3C922F0027A10872DB9746D100FC6A2A964782B5493A135C61EC90`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -394,7 +394,7 @@ Remaining specification work:
 
 #### `MATERIALS` body
 
-Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.
+Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and poly_<table-name>... require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
 
 - **structured-bulk-type-999** (the entry header is numeric type 999):
   - `parameter` [repeated]: `key=value`:one-or-more-structured-bulk-keys paired with one-or-more values
@@ -439,9 +439,9 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
 - **user-function-interface-type-15** (type is 15):
   - `controls` [once]: `penalty-Xt-Gc`:three-reals
   - `gap-bounds` [once]: `U1-U2`:two-reals
-  - `mode-I-function` [once]: `ufunction_id`:positive-ufunction-id
-  - `mode-II-function` [once]: `ufunction_id`:positive-ufunction-id
-  - `phase-function` [once]: `ufunction_id`:positive-ufunction-id
+  - `mode-I-function` [once]: `ufunction_id`:positive-user-id
+  - `mode-II-function` [once]: `ufunction_id`:positive-user-id
+  - `phase-function` [once]: `ufunction_id`:positive-user-id
   - Constraint: All three function IDs must resolve to declaration-order USER function entries.
 - **legacy-anisotropic-types-2-and-3** (type is 2 or 3):
   - `engineering-properties` [twelve-ordered-records]: `records`:E1-Xt-Xc; E2-Yt-Yc; E3; nu13-GIc-GIIc-GIIIc; nu23; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2
@@ -472,7 +472,7 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - Constraint: Every material ID must refer to an earlier compatible heterogeneous material.
   - Constraint: The parser does not validate counts or fractions; the Agent requires N greater than zero and fractions in [0,1], and blocks creation until interpolation normalization is established from the consumer.
 - **viscoelastic-type-500** (type is 500):
-  - `header` [once]: `term_count`:positive-integer, `function_id`:positive-ufunction-id
+  - `header` [once]: `term_count`:positive-integer, `function_id`:positive-user-id
   - `term` [term_count-times]: `parameter`:integer, `coefficient`:real
   - Constraint: term_count controls allocation directly and must be positive and bounded by Agent policy.
   - Constraint: function_id must resolve to a declaration-order USER function entry; physical interpretation of term parameters remains consumer-specific, so model-generated engineering values are blocked without a verified profile.
@@ -1374,7 +1374,7 @@ Known parameters:
 
 Remaining specification work:
 
-- Confirm CONNECTION semantics and material-ID resolution diagnostics.
+- Confirm CONNECTION semantics.
 
 #### `*SECTION` body
 

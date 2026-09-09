@@ -2505,6 +2505,7 @@ def augment_material_declaration_semantics(
             attributes["structured_entity_id"] = structured.id
         user_selectors: list[tuple[str, int, SourceLine]] = []
         material_dependencies: list[tuple[int, SourceLine]] = []
+        cluster_dependency: tuple[int, SourceLine] | None = None
         if material_type == 4:
             selector_lines = body[:12]
             try:
@@ -2658,6 +2659,20 @@ def augment_material_declaration_semantics(
                 attributes["fractions"] = fractions
                 attributes["default_fraction"] = default_fraction
                 material_dependencies = list(zip(material_ids, source_rows))
+        elif material_type == 800:
+            try:
+                cluster_id = int(_record_fields(body[0])[0])
+                if cluster_id <= 0:
+                    raise ValueError
+            except (IndexError, ValueError):
+                _table_error(
+                    index, "BSAM-E350",
+                    "MATERIALS type 800 requires a positive cluster ID",
+                    source, header,
+                )
+            else:
+                attributes["cluster_id"] = cluster_id
+                cluster_dependency = (cluster_id, body[0])
         material = _entity(
             index, "material", str(ordinal), source, header, None, attributes,
         )
@@ -2672,6 +2687,17 @@ def augment_material_declaration_semantics(
                 index, material, "uses-material",
                 _key("material", str(target), None), source, line,
                 {"position": position},
+            )
+        if cluster_dependency is not None:
+            target, line = cluster_dependency
+            clusters = [item for item in index.entities if item.kind == "cluster"]
+            target_key = (
+                clusters[target - 1].key if target <= len(clusters)
+                else _key("cluster", f"approximation-{target}", None)
+            )
+            _reference(
+                index, material, "uses-cluster", target_key, source, line,
+                {"approximation": target},
             )
     return True
 

@@ -30,6 +30,33 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_compro_material_resolves_cluster_identity(self) -> None:
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            "MATERIALS\n800\n1\ncompro.out\n1 2 3 4 5 6\nEND MATERIALS\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        material = next(
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        )
+        reference = next(
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] == material["id"]
+            and item["kind"] == "uses-cluster"
+        )
+        self.assertEqual(1, material["attributes"]["cluster_id"])
+        self.assertEqual("cluster:ply1", reference["target_key"])
+        self.assertEqual("resolved", reference["status"])
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_interface_and_viscoelastic_materials_resolve_numeric_users(self) -> None:
         raw = (
             "INPUT\n3\nEND INPUT\n"
