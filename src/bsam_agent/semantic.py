@@ -593,6 +593,31 @@ def augment_moisture_semantics(
     ))
 
 
+def augment_container_semantics(
+    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
+) -> None:
+    """Expose parameterless CLUSTERS and BOUNDARY containers as typed records."""
+    all_lines = tuple(lines)
+    definitions = {
+        item["canonical"]: item for item in load_registry()["top_level_blocks"]
+        if item["id"] in {"block.clusters", "block.boundary"}
+    }
+    for canonical, definition in definitions.items():
+        header = next((line for line in all_lines if line.stripped == canonical), None)
+        if header is None:
+            continue
+        capability_id = str(definition["id"])
+        index.capability_records.append(RegisteredConstruct(
+            id=f"{capability_id}[1]@{source}:{header.number}",
+            capability_id=capability_id,
+            canonical=canonical,
+            occurrence=1,
+            location=_location(source, header),
+            operations=operational_support(definition),
+            attributes={"record_role": "container"},
+        ))
+
+
 def _solver_parameter(
     definition: dict[str, Any], value: Any, spelling: str, source: str, line: SourceLine,
 ) -> dict[str, Any]:
@@ -2155,6 +2180,7 @@ def augment_root_semantics(
     all_lines = tuple(lines)
     augment_input_semantics(index, source, all_lines)
     augment_moisture_semantics(index, source, all_lines)
+    augment_container_semantics(index, source, all_lines)
     augment_registered_boundary_semantics(index, source, all_lines)
     augment_solver_semantics(index, source, all_lines)
     augment_structured_material_semantics(index, source, all_lines)

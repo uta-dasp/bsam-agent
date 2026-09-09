@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.58.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.59.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -114,6 +114,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Declare verified typed read paths for all 12 registered BOUNDARY constructs and expose solver schedules and connections through entity queries.
 - [x] Expose the active INPUT format as a source-located registered block record with registry-driven value validation.
 - [x] Parse canonical MOISTURE settings into a typed workflow record while keeping external execution explicitly unsupported.
+- [x] Expose CLUSTERS and BOUNDARY as source-located container records backed by their typed command/construct children.
 - [ ] Parse completed registry constructs into typed records while preserving concrete syntax.
 - [x] Preserve unknown or not-yet-supported records losslessly.
 - [ ] Populate consistent entity identities and cross-file references.

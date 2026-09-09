@@ -51,6 +51,28 @@ def provider_config() -> ProviderConfig:
 
 
 class CapabilitySliceTests(unittest.TestCase):
+    def test_cluster_and_boundary_containers_are_registered_records(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(boundary_deck(b"d_reduction=0.5\n"))
+            records = SourceSet.read(path).inspection()["semantic_model"][
+                "capability_records"
+            ]
+
+        containers = {
+            item["capability_id"]: item for item in records
+            if item["capability_id"] in {"block.clusters", "block.boundary"}
+        }
+        self.assertEqual({"block.clusters", "block.boundary"}, set(containers))
+        self.assertTrue(all(
+            item["attributes"]["record_role"] == "container"
+            and item["operations"]["parse"] == "verified"
+            and item["operations"]["inspect"] == "verified"
+            for item in containers.values()
+        ))
+        self.assertEqual("implemented", containers["block.clusters"]["operations"]["semantic"])
+        self.assertEqual("verified", containers["block.boundary"]["operations"]["semantic"])
+
     def test_canonical_moisture_settings_are_typed_but_execution_is_blocked(self) -> None:
         raw = boundary_deck(b"d_reduction=0.5\n").replace(
             b"CLUSTERS\n",

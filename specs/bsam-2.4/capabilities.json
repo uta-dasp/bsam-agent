@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.2.0",
-  "registry_version": "0.58.0",
+  "registry_version": "0.59.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -952,7 +952,13 @@
       ],
       "remaining_work": [
         "Complete the node/element/set/orientation reverse-dependency model required for general structural edits."
-      ]
+      ],
+      "operations": {
+        "parse": "verified", "semantic": "implemented", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      }
     },
     {
       "id": "block.boundary",
@@ -975,7 +981,13 @@
         "evidence.current-vtms-deck-tric",
         "evidence.current-vtms-deck-notch"
       ],
-      "remaining_work": []
+      "remaining_work": [],
+      "operations": {
+        "parse": "verified", "semantic": "verified", "inspect": "verified",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
+      }
     },
     {
       "id": "block.constitutive",
