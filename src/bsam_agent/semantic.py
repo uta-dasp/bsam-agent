@@ -3387,10 +3387,46 @@ def build_semantic_index(
             elif command == "*SECT":
                 elset = options.get("ELSET")
                 if elset:
-                    section = _entity(index, "section", elset, source, command_line, cluster, {
-                        "layers": options.get("LAYERS"),
-                    })
+                    attributes: dict[str, Any] = {"layers": options.get("LAYERS")}
+                    layer_rows: list[tuple[int, float, SourceLine]] = []
+                    try:
+                        layer_count = int(str(options.get("LAYERS", "")))
+                        if layer_count <= 0 or len(records) != layer_count:
+                            raise ValueError
+                        for line in records:
+                            fields = _record_fields(line)
+                            thickness = _fortran_real(fields[0])
+                            material_id = int(fields[1])
+                            if (
+                                not math.isfinite(thickness) or thickness <= 0
+                                or material_id <= 0
+                            ):
+                                raise ValueError
+                            layer_rows.append((material_id, thickness, line))
+                    except (IndexError, ValueError):
+                        _table_error(
+                            index, "BSAM-E310",
+                            "SECTION requires exactly LAYERS positive thickness/material rows",
+                            source, command_line,
+                        )
+                    else:
+                        attributes.update({
+                            "layers": layer_count,
+                            "layer_material_ids": [item[0] for item in layer_rows],
+                            "layer_thicknesses": [item[1] for item in layer_rows],
+                        })
+                    section = _entity(
+                        index, "section", elset, source, command_line, cluster, attributes,
+                    )
                     _reference(index, section, "assigns-to", _key("element-set", elset, cluster), source, command_line)
+                    for position, (material_id, _thickness, line) in enumerate(
+                        layer_rows, start=1,
+                    ):
+                        _reference(
+                            index, section, "uses-material",
+                            _key("material", str(material_id), None), source, line,
+                            {"position": position},
+                        )
             elif command == "*CONS" and cluster and records:
                 value = _fields(records[0].text)
                 if value and value[0].isdigit():

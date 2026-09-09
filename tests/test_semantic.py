@@ -21,6 +21,40 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_section_layers_resolve_material_identities(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            raw = deck(
+                b"*NAME\nply1\n*ELEMENT,TYPE=C3D4,ELSET=solid\n"
+                b"1,1,1,1,1\n*SECTION,ELSET=solid,LAYERS=2\n.25,1\n.75,2\n"
+            ).replace(
+                b"MATERIALS\n0\nEND MATERIALS\n",
+                b"MATERIALS\n10\n1 0 0\n1 1 1\n"
+                b"10\n2 0 0\n2 2 2\nEND MATERIALS\n",
+            ).replace(
+                b"*NAME\nply1\n",
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n",
+            )
+            root.write_bytes(raw)
+            inspection = SourceSet.read(root).inspection()
+
+        section = next(
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "section"
+        )
+        references = [
+            item for item in inspection["semantic_model"]["references"]
+            if item["source_entity_id"] == section["id"]
+            and item["kind"] == "uses-material"
+        ]
+        self.assertEqual([1, 2], section["attributes"]["layer_material_ids"])
+        self.assertEqual([0.25, 0.75], section["attributes"]["layer_thicknesses"])
+        self.assertEqual(["material:1", "material:2"], [
+            item["target_key"] for item in references
+        ])
+        self.assertTrue(all(item["status"] == "resolved" for item in references))
+        self.assertEqual(0, inspection["summary"]["errors"])
+
     def test_global_crack_leading_records_and_named_cluster_are_typed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
@@ -86,9 +120,9 @@ class SemanticIndexTests(unittest.TestCase):
         semantic = inspection["semantic_model"]
 
         self.assertEqual(0, inspection["summary"]["errors"])
-        self.assertEqual(21, semantic["summary"]["entities"])
-        self.assertEqual(23, semantic["summary"]["references"])
-        self.assertEqual(23, semantic["summary"]["resolved_references"])
+        self.assertEqual(23, semantic["summary"]["entities"])
+        self.assertEqual(25, semantic["summary"]["references"])
+        self.assertEqual(25, semantic["summary"]["resolved_references"])
         keys = {item["key"] for item in semantic["entities"]}
         self.assertIn("cluster:lower_ply/node:1", keys)
         self.assertIn("cluster:upper_ply/node:1", keys)
@@ -104,6 +138,10 @@ class SemanticIndexTests(unittest.TestCase):
                 b"*NSET,NSET=edge\n1,2\n"
                 b"*ELSET,ELSET=solid\n10\n"
                 b"*SECTION,ELSET=solid,LAYERS=2\n.5,1\n.5,2\n"
+            ).replace(
+                b"MATERIALS\n0\nEND MATERIALS\n",
+                b"MATERIALS\n10\n1 0 0\n1 1 1\n"
+                b"10\n2 0 0\n2 2 2\nEND MATERIALS\n",
             ))
 
             semantic = SourceSet.read(root).inspection()["semantic_model"]
@@ -113,18 +151,18 @@ class SemanticIndexTests(unittest.TestCase):
                 {
                     "cluster-declaration": 1,
                     "element": 1, "element-set": 2,
-                    "node": 2, "node-set": 2, "section": 1,
+                    "material": 2, "node": 2, "node-set": 2, "section": 1,
                 },
                 semantic["summary"]["entities_by_kind"],
             )
-            self.assertEqual(11, semantic["summary"]["references"])
+            self.assertEqual(13, semantic["summary"]["references"])
             node = next(item for item in semantic["entities"] if item["key"] == "node:1")
             self.assertEqual("<root>", node["location"]["source"])
             self.assertGreater(node["location"]["byte_end"], node["location"]["byte_start"])
             targets = {item["target_key"] for item in semantic["references"]}
             self.assertIn("node-set:all_nodes", targets)
             self.assertIn("element-set:solid", targets)
-            self.assertEqual(11, semantic["summary"]["resolved_references"])
+            self.assertEqual(13, semantic["summary"]["resolved_references"])
 
     def test_cluster_type_and_dimensions_bind_to_the_following_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

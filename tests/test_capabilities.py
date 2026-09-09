@@ -377,6 +377,9 @@ class CapabilitySliceTests(unittest.TestCase):
                 b"*STOP",
                 b"*ELSET,ELSET=first\n1\n*ELSET,ELSET=second\n1\n"
                 b"*SECTION,ELSET=first,LAYERS=1\n1,1\n*STOP",
+            ).replace(
+                b"MATERIALS\n0\nEND MATERIALS\n",
+                b"MATERIALS\n10\n1 0 0\n1 1 1\nEND MATERIALS\n",
             )
             (root / "section.in").write_bytes(section_source)
             retarget_section = api.dispatch("preview_modify_entity", {

@@ -878,6 +878,9 @@ class ChangePlanTests(unittest.TestCase):
             destination.mkdir()
             source.write_bytes(DECK.replace(
                 b"*STOP\r\n", b"*INCLUDE,FILE=mesh.inc\r\n*STOP\r\n",
+            ).replace(
+                b"MATERIALS\r\n0\r\nEND MATERIALS\r\n",
+                b"MATERIALS\r\n10\r\n1 0 0\r\n1 1 1\r\nEND MATERIALS\r\n",
             ))
             include.write_bytes(
                 b"*NAME\r\nply1\r\n*NODE\r\n1,0,0,0\r\n2,1,0,0\r\n"
