@@ -2802,6 +2802,21 @@ def build_semantic_index(
                     if point_count < 1 or cursor + point_count >= len(records):
                         break
                     cursor += point_count + 1
+            elif command in {"*BUIL", "*STOP"} and cluster:
+                operation_name = "build" if command == "*BUIL" else "stop"
+                topology = _entity(
+                    index, "topology-operation", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {
+                        "operation": operation_name,
+                        "effect": "update-elements-and-create-topology"
+                        if command == "*BUIL" else "update-elements-and-finish-cluster",
+                    },
+                )
+                _reference(
+                    index, topology, "targets-cluster",
+                    _key("cluster", cluster, None), source, command_line,
+                )
             elif command == "*EXCL" and cluster:
                 shape = (
                     "previous" if "PREVIOUS" in options else

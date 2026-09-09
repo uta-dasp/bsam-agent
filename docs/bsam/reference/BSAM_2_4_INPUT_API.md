@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.49.0`
-- Registry SHA-256: `DACA7C43D00D06663DA549F22227FE5F541DE44D8CB6650D9E4FE04DD3D07E07`
+- Registry version: `0.50.0`
+- Registry SHA-256: `3E4333DC0E1837EEFDCDC74019174B3B23F6218F116A3839B78B77D1893E2578`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1159,6 +1159,7 @@ Forces intermediate construction of element information before cluster input end
 - Dispatch prefix: `*BUIL`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-build-spacing](#evidencefe-build-spacing)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 #### `*BUILD` body
 
@@ -1178,6 +1179,7 @@ Finishes the current FE cluster reader after updating element data.
 - Dispatch prefix: `*STOP`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 #### `*STOP` body
 

@@ -28,9 +28,9 @@ class SemanticIndexTests(unittest.TestCase):
         semantic = inspection["semantic_model"]
 
         self.assertEqual(0, inspection["summary"]["errors"])
-        self.assertEqual(18, semantic["summary"]["entities"])
-        self.assertEqual(20, semantic["summary"]["references"])
-        self.assertEqual(20, semantic["summary"]["resolved_references"])
+        self.assertEqual(19, semantic["summary"]["entities"])
+        self.assertEqual(21, semantic["summary"]["references"])
+        self.assertEqual(21, semantic["summary"]["resolved_references"])
         keys = {item["key"] for item in semantic["entities"]}
         self.assertIn("cluster:lower_ply/node:1", keys)
         self.assertIn("cluster:upper_ply/node:1", keys)
@@ -301,6 +301,38 @@ class SemanticIndexTests(unittest.TestCase):
                 {item["attributes"]["selector"] for item in regions},
             )
             self.assertEqual(4, len(references))
+            self.assertTrue(all(
+                item["kind"] == "targets-cluster"
+                and item["target_key"] == "cluster:ply1"
+                and item["status"] == "resolved"
+                for item in references
+            ))
+
+    def test_build_and_stop_are_source_located_topology_operations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n*BUILD\n"
+            ))
+
+            inspection = SourceSet.read(root).inspection()
+            semantic = inspection["semantic_model"]
+            operations = [
+                item for item in semantic["entities"]
+                if item["kind"] == "topology-operation"
+            ]
+            operation_ids = {item["id"] for item in operations}
+            references = [
+                item for item in semantic["references"]
+                if item["source_entity_id"] in operation_ids
+            ]
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertEqual(
+                {"build", "stop"},
+                {item["attributes"]["operation"] for item in operations},
+            )
+            self.assertEqual(2, len(references))
             self.assertTrue(all(
                 item["kind"] == "targets-cluster"
                 and item["target_key"] == "cluster:ply1"
