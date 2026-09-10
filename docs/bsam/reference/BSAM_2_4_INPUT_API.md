@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.86.0`
-- Registry SHA-256: `D7D5B30E8A49823E1AC6CFEC2E86556DF0634E92CC96334640DD897F094EE1D6`
+- Registry version: `0.87.0`
+- Registry SHA-256: `AD5D82E0C0318CADA49D43F5D412A535E8D2109FB6459E16AEE5B8AB9B757B57`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -44,7 +44,7 @@ Selects the current non-sequential block input mode; the pinned executable requi
 - Termination: `END INPUT` (canonical)
 - Coverage: documented
 - Evidence: [evidence.input-parser](#evidenceinput-parser), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 

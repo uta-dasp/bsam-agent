@@ -701,6 +701,49 @@ def augment_registered_top_level_semantics(
                 {"record_role": "container"} if is_container else attributes
             ),
         ))
+        if (
+            is_single_record
+            and operational_support(definition)["static_validation"] == "verified"
+        ):
+            headers = [line for line in all_lines if line.stripped == canonical]
+            terminators = {
+                str(token) for token in definition.get("termination", {}).get("tokens", [])
+            }
+            header_index = next(
+                (position for position, line in enumerate(all_lines) if line is header), None
+            )
+            end = None if header_index is None else next(
+                (
+                    line for line in all_lines[header_index + 1:]
+                    if line.stripped in terminators
+                ),
+                None,
+            )
+            active_records = [
+                line for line in block_body
+                if line.stripped and not line.stripped.startswith(("#", "**"))
+            ]
+            if len(headers) != 1:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E390", severity="error",
+                    message=f"{canonical} must occur exactly once; found {len(headers)}",
+                    line=header.number, source=source,
+                ))
+            if end is None:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E390", severity="error",
+                    message=f"{canonical} is missing an exact registered terminator",
+                    line=header.number, source=source,
+                ))
+            elif len(active_records) != 1:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E390", severity="error",
+                    message=(
+                        f"{canonical} requires exactly one active data record; "
+                        f"found {len(active_records)}"
+                    ),
+                    line=header.number, source=source,
+                ))
         _validate_registered_values(index, definition, parameters)
 
 
