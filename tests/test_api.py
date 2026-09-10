@@ -176,6 +176,22 @@ class LocalApiTests(unittest.TestCase):
             })
             self.assertEqual("compose-changes", composite["operation"])
             self.assertEqual(2, len(composite["patches"]))
+            set_source = root / "set-model.in"
+            set_source.write_bytes(DECK.replace(
+                b"*STOP\n",
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*SHIFT,NSET=edge\n1,0,0\n*STOP\n",
+            ))
+            set_rename = api.dispatch("preview_rename_entity", {
+                "source": "set-model.in",
+                "capability": "command.nset",
+                "entity_name": "edge",
+                "new_name": "rim",
+                "context": {"cluster": "ply1"},
+                "plan_path": "rename-set.json",
+            })
+            self.assertEqual("rename-set", set_rename["operation"])
+            self.assertEqual(2, len(set_rename["patches"]))
             solver_source = root / "legacy-solver.in"
             solver_source.write_bytes(DECK.replace(
                 b"BOUNDARY\n",

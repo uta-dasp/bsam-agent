@@ -18,10 +18,10 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.10.0"
+PLAN_SCHEMA_VERSION = "1.11.0"
 SUPPORTED_PLAN_SCHEMA_VERSIONS = {
     "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0",
-    "1.7.0", "1.8.0", "1.9.0", PLAN_SCHEMA_VERSION,
+    "1.7.0", "1.8.0", "1.9.0", "1.10.0", PLAN_SCHEMA_VERSION,
 }
 AUDIT_SCHEMA_VERSION = "1.1.0"
 
@@ -1482,12 +1482,178 @@ def plan_rename_boundary_condition(
     return plan
 
 
+def _set_rename_patches(
+    source_set: SourceSet,
+    cluster: str,
+    member_kind: str,
+    old_name: str,
+    new_name: str,
+) -> list[dict[str, Any]]:
+    """Select one explicit set name and every resolved dependent token."""
+    if member_kind not in {"node", "element"}:
+        raise ChangeError("set kind must be node or element")
+    _validate_raw_value(old_name)
+    _validate_raw_value(new_name)
+    if not re.fullmatch(r"[^\s,.=]+", old_name + new_name):
+        raise ChangeError("set names must be unqualified non-whitespace tokens")
+    if old_name.casefold() == new_name.casefold():
+        raise ChangeError("new set name must differ from the current name")
+
+    semantic = source_set.semantic_index()
+    set_kind = f"{member_kind}-set"
+    prefix = f"cluster:{cluster.casefold()}/"
+    old_key = f"{prefix}{set_kind}:{old_name.casefold()}"
+    new_key = f"{prefix}{set_kind}:{new_name.casefold()}"
+    definitions = [item for item in semantic.entities if item.key == old_key]
+    if len(definitions) != 1:
+        raise ChangeError(
+            f"{set_kind} {old_name} must resolve to one exact definition in cluster {cluster}"
+        )
+    definition = definitions[0]
+    if definition.attributes.get("mode") != "explicit":
+        raise ChangeError(f"only one explicit {set_kind} definition can be renamed")
+    if any(item.key == new_key for item in semantic.entities):
+        raise ChangeError(f"{set_kind} {new_name} already exists in cluster {cluster}")
+
+    source_path = _semantic_source_path(source_set, definition.location.source)
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("set source location is not in the bound source set")
+    line = document.lines[definition.location.line - 1]
+    parameter = "NSET" if member_kind == "node" else "ELSET"
+    spans = _value_spans(line, parameter)
+    if len(spans) != 1:
+        raise ChangeError(
+            f"{parameter} on line {line.number} no longer resolves to one exact value"
+        )
+    start, end = spans[0]
+    if document.raw[start:end].decode("latin-1").casefold() != old_name.casefold():
+        raise ChangeError(f"set definition on line {line.number} does not name {old_name}")
+    patches = [{
+        "source": str(source_path),
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": new_name,
+    }]
+
+    dependents = [
+        item for item in semantic.references
+        if item.target_key == old_key and item.kind != "member-of"
+    ]
+    by_location: dict[tuple[str, int], int] = {}
+    for reference in dependents:
+        key = (reference.location.source, reference.location.line)
+        by_location[key] = by_location.get(key, 0) + 1
+    token_pattern = re.compile(
+        rf"(?<![A-Za-z0-9_-]){re.escape(old_name)}(?![A-Za-z0-9_-])",
+        re.IGNORECASE,
+    )
+    for (semantic_source, line_number), expected_count in by_location.items():
+        dependent_source = _semantic_source_path(source_set, semantic_source)
+        dependent_document = source_set.documents.get(dependent_source)
+        if dependent_document is None:
+            raise ChangeError("set reference source is not in the bound source set")
+        dependent_line = dependent_document.lines[line_number - 1]
+        code = dependent_line.text.split("#", 1)[0]
+        matches = list(token_pattern.finditer(code))
+        if len(matches) != expected_count:
+            raise ChangeError(
+                f"set reference on line {line_number} resolves to {len(matches)} name "
+                f"tokens; expected {expected_count}"
+            )
+        for match in matches:
+            token_start = dependent_line.start + match.start()
+            token_end = dependent_line.start + match.end()
+            patches.append({
+                "source": str(dependent_source),
+                "start": token_start,
+                "end": token_end,
+                "line": line_number,
+                "old": dependent_document.raw[token_start:token_end].decode("latin-1"),
+                "new": new_name,
+            })
+    return patches
+
+
+def plan_rename_set(
+    source: Path,
+    cluster: str,
+    member_kind: str,
+    old_name: str,
+    new_name: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Rename one explicit set and every resolved dependent across its source set."""
+    source = source.resolve()
+    source_set = SourceSet.read(source, workspace_root)
+    patches = _set_rename_patches(
+        source_set, cluster, member_kind, old_name, new_name,
+    )
+    replacements = _patched_source_files(source_set, patches)
+    root_raw = replacements.get(source, source_set.documents[source].raw)
+    updated_document = SourceDocument.from_bytes(root_raw, str(source))
+    validation = _validation_result(source_set, replacements)
+    if validation["summary"]["errors"]:
+        messages = "; ".join(
+            item["message"] for item in validation["diagnostics"]
+            if item["severity"] == "error"
+        )
+        raise ChangeError(f"planned set rename failed validation: {messages}")
+    set_collection = f"{member_kind}-sets"
+    model_paths = [
+        f"CLUSTERS[{cluster.casefold()}].{set_collection}[{old_name.casefold()}]",
+        f"CLUSTERS[{cluster.casefold()}].references[{member_kind}-set:{old_name.casefold()}]",
+    ]
+    dependent_count = len(patches) - 1
+    preview = (
+        f"rename {member_kind} set {old_name} -> {new_name} in cluster {cluster} "
+        f"and update {dependent_count} dependent reference(s)"
+    )
+    changes = [
+        {"operation": "rename", "target": model_paths[0], "summary": f"{old_name} -> {new_name}"},
+        {"operation": "retarget", "target": model_paths[1], "summary": f"updated {dependent_count} dependent reference(s)"},
+    ]
+    plan: dict[str, Any] = {
+        "schema_version": PLAN_SCHEMA_VERSION,
+        "source": str(source),
+        "workspace_root": str(source_set.workspace_root),
+        "base_sha256": source_set.documents[source].sha256,
+        "base_source_set_sha256": source_set.sha256,
+        "proposed_sha256": updated_document.sha256,
+        "proposed_source_set_sha256": source_set.digest_with(replacements),
+        "operation": "rename-set",
+        "selector": {
+            "cluster": cluster,
+            "member_kind": member_kind,
+            "old_name": old_name,
+            "new_name": new_name,
+        },
+        "patches": patches,
+        "changed_model_paths": model_paths,
+        "affected_files": [str(path) for path in replacements],
+        "changes": changes,
+        "source_diff": "".join(
+            _source_diff(path, source_set.documents[path].raw, replacements[path])
+            for path in replacements
+        ),
+        "validation": validation,
+        "preview": preview,
+    }
+    digest = _plan_digest(plan)
+    plan["plan_digest"] = digest
+    plan["plan_id"] = digest[:16]
+    return plan
+
+
 def plan_rename_entity(
     source: Path,
     capability: str,
     entity_name: str,
     new_name: str,
     workspace_root: Path | None = None,
+    context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Dispatch a generic rename only through an explicitly verified capability adapter."""
     registry = load_registry()
@@ -1510,6 +1676,13 @@ def plan_rename_entity(
     adapters = {
         "construct.boundary-conditions": plan_rename_boundary_condition,
     }
+    if record["id"] in {"command.nset", "command.elset"}:
+        data = _structural_payload(context, {"cluster"})
+        member_kind = "node" if record["id"] == "command.nset" else "element"
+        return plan_rename_set(
+            source, str(data["cluster"]), member_kind, entity_name, new_name,
+            workspace_root,
+        )
     adapter = adapters.get(record["id"])
     if adapter is None:
         raise ChangeError(f"verified rename adapter is missing for {record['id']}")
@@ -2443,6 +2616,11 @@ def plan_refresh_change(
         return plan_rename_boundary_condition(
             source, str(selector["old_name"]), str(selector["new_name"]), workspace_root,
         )
+    if operation == "rename-set":
+        return plan_rename_set(
+            source, str(selector["cluster"]), str(selector["member_kind"]),
+            str(selector["old_name"]), str(selector["new_name"]), workspace_root,
+        )
     if operation == "add-node":
         coordinates = selector.get("coordinates")
         if not isinstance(coordinates, list) or len(coordinates) != 3:
@@ -2579,6 +2757,42 @@ def _validated_plan_proposal(
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         return (
             {source.resolve(): updated},
+            updated_document,
+            expected["changed_model_paths"],
+            expected["source_diff"],
+            expected["validation"],
+        )
+
+    if operation == "rename-set":
+        selector = plan.get("selector")
+        if not isinstance(selector, dict):
+            raise ChangeError("set rename plan is missing its selector")
+        try:
+            cluster = str(selector["cluster"])
+            member_kind = str(selector["member_kind"])
+            old_name = str(selector["old_name"])
+            new_name = str(selector["new_name"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ChangeError("set rename selector is malformed") from exc
+        expected = plan_rename_set(
+            source, cluster, member_kind, old_name, new_name,
+            source_set.workspace_root,
+        )
+        checked_fields = (
+            "selector", "patches", "changed_model_paths", "affected_files", "changes",
+            "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(
+                    f"set rename plan {field} does not match its typed selector"
+                )
+        replacements = _patched_source_files(source_set, expected["patches"])
+        root_raw = replacements.get(source.resolve(), document.raw)
+        updated_document = SourceDocument.from_bytes(root_raw, str(source.resolve()))
+        return (
+            replacements,
             updated_document,
             expected["changed_model_paths"],
             expected["source_diff"],

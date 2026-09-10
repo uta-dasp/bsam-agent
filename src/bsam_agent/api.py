@@ -224,10 +224,12 @@ class LocalAgentApi:
             args = self._args(
                 arguments,
                 {"source", "capability", "entity_name", "new_name", "plan_path"},
+                {"context"},
             )
             plan = plan_rename_entity(
                 self._path(args["source"], "source"), str(args["capability"]),
                 str(args["entity_name"]), str(args["new_name"]), self.workspace_root,
+                args.get("context"),
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))
             return plan

@@ -33,6 +33,7 @@ from bsam_agent.change import (
     plan_retarget_coordinate_operation,
     plan_retarget_section,
     plan_rename_boundary_condition,
+    plan_rename_entity,
     review_plan,
     write_plan,
 )
@@ -110,6 +111,58 @@ class ChangePlanTests(unittest.TestCase):
             self.assertIn(b"NSET,NSET=temporary", include.read_bytes())
             self.assertNotIn(b"NSET,NSET=temporary", (destination / "mesh.inc").read_bytes())
             self.assertEqual(0, result["validation"]["summary"]["errors"])
+
+    def test_generic_set_rename_updates_cross_file_dependents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            include = root / "mesh.inc"
+            plan_path = root / "rename-set.json"
+            destination = root / "revision"
+            destination.mkdir()
+            source.write_bytes(DECK.replace(
+                b"mechanical\r\n*convergence",
+                b"mechanical\r\n*boundary condition\r\n"
+                b"type=displacement,component=x,name=fix,value=0,nset=ply1.edge\r\n"
+                b"*convergence",
+            ).replace(
+                b"*STOP\r\n", b"*INCLUDE,FILE=mesh.inc\r\n*STOP\r\n",
+            ))
+            include.write_bytes(
+                b"*NAME\r\nply1\r\n*NODE\r\n1,0,0,0\r\n"
+                b"*NSET,NSET=edge\r\n1\r\n*SHIFT,NSET=edge\r\n1,0,0"
+            )
+
+            plan = plan_rename_entity(
+                source, "command.nset", "edge", "rim",
+                context={"cluster": "ply1"},
+            )
+            self.assertEqual("rename-set", plan["operation"])
+            self.assertEqual(3, len(plan["patches"]))
+            self.assertEqual(2, len(plan["affected_files"]))
+            write_plan(plan, plan_path)
+            review_plan(plan_path)
+            result = apply_plan(plan_path, destination / "model.in")
+
+            changed_root = (destination / "model.in").read_bytes()
+            changed_include = (destination / "mesh.inc").read_bytes()
+            self.assertIn(b"nset=ply1.rim", changed_root)
+            self.assertIn(b"*NSET,NSET=rim", changed_include)
+            self.assertIn(b"*SHIFT,NSET=rim", changed_include)
+            self.assertNotIn(b"edge", changed_root + changed_include)
+            self.assertEqual(0, result["validation"]["summary"]["errors"])
+
+            with self.assertRaisesRegex(ChangeError, "explicit node-set"):
+                generated = root / "generated.in"
+                generated.write_bytes(DECK.replace(
+                    b"*STOP\r\n",
+                    b"*NAME\r\nply1\r\n*NODE\r\n1,0,0,0\r\n"
+                    b"2,1,0,0\r\n*NSET,NSET=edge,GENERATE\r\n1,2,1\r\n*STOP\r\n",
+                ))
+                plan_rename_entity(
+                    generated, "command.nset", "edge", "rim",
+                    context={"cluster": "ply1"},
+                )
 
     def test_delete_set_blocks_dependents_and_nonisolated_definitions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

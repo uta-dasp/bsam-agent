@@ -110,6 +110,7 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "preview_rename_entity": ToolContract({
         "source": S, "capability": S, "entity_name": S, "new_name": S, "plan_path": S,
+        "context": Field("object", required=False),
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "preview_create_entity": ToolContract({
         "source": S, "capability": S, "attributes": O, "plan_path": S,
@@ -155,7 +156,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "preview_expand_notch_plies": "Create the approved notch_v1 review plan that expands two plies to eight plies.",
     "preview_migrate_legacy_solver": "Create a review plan that migrates a legacy type-9 solver body to current PARDISO syntax.",
     "preview_rename_boundary_condition": "Create a review plan that renames a boundary condition and updates its loading references.",
-    "preview_rename_entity": "Create a dependency-aware rename plan through a capability whose rename operation is verified.",
+    "preview_rename_entity": "Create a dependency-aware rename plan through a verified capability; scoped entities require explicit context.",
     "preview_create_entity": "Create a structural entity through a capability whose create operation is verified; attributes are capability-specific.",
     "preview_modify_entity": "Modify a structural entity through a capability whose modify operation is verified; changes are capability-specific.",
     "preview_delete_entity": "Delete a structural entity through a capability whose delete operation is verified and dependency checks permit it.",
