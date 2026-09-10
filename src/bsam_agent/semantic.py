@@ -3228,6 +3228,7 @@ def build_semantic_index(
 
     index = SemanticIndex()
     cluster: str | None = None
+    selection_capacity: int | None = None
     cluster_declaration_ordinal = 0
     pending_cluster_records: list[SemanticEntity] = []
     registered_cluster_commands = load_registry()["cluster_commands"]
@@ -3272,6 +3273,7 @@ def build_semantic_index(
             if command == "*TYPE":
                 cluster_declaration_ordinal += 1
                 cluster = None
+                selection_capacity = None
                 representation = records[0].stripped.casefold() if records else ""
                 declaration = _entity(
                     index, "cluster-declaration", str(cluster_declaration_ordinal),
@@ -3308,6 +3310,14 @@ def build_semantic_index(
                     {name: values[position] if position < len(values) else None
                      for position, name in enumerate(names)},
                 )
+                try:
+                    parsed_selection_capacity = int(values[2])
+                    selection_capacity = (
+                        parsed_selection_capacity
+                        if parsed_selection_capacity >= 0 else None
+                    )
+                except (IndexError, ValueError):
+                    selection_capacity = None
                 if cluster:
                     _reference(
                         index, dimensions, "configures-cluster",
@@ -3709,10 +3719,49 @@ def build_semantic_index(
                         {"variables": variables},
                     )
             elif command == "*SELE" and cluster:
-                selection_id = options.get("ID")
-                if not selection_id:
+                raw_selection_id = options.get("ID")
+                if not raw_selection_id:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="SELECTION requires an explicit positive ID",
+                        line=command_line.number, source=source,
+                    ))
                     continue
-                selection_type = str(options.get("TYPE") or "NODE").upper()[:4]
+                try:
+                    selection_number = int(raw_selection_id)
+                    if selection_number <= 0:
+                        raise ValueError
+                except ValueError:
+                    continue
+                if (
+                    selection_capacity is not None
+                    and selection_number > selection_capacity
+                ):
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message=(
+                            f"SELECTION ID {selection_number} exceeds DIMENSIONS "
+                            f"selection_count {selection_capacity}"
+                        ),
+                        line=command_line.number, source=source,
+                    ))
+                    continue
+                raw_selection_type = str(options.get("TYPE") or "NODE")
+                if raw_selection_type not in {"NODE", "ELEMENT"}:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="SELECTION TYPE must be uppercase NODE or ELEMENT",
+                        line=command_line.number, source=source,
+                    ))
+                    continue
+                if not records:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="SELECTION requires at least one member target",
+                        line=command_line.number, source=source,
+                    ))
+                selection_id = str(selection_number)
+                selection_type = raw_selection_type[:4]
                 member_kind = "element" if selection_type == "ELEM" else "node"
                 selection = _entity(
                     index, "selection", selection_id, source, command_line, cluster,
@@ -3720,10 +3769,12 @@ def build_semantic_index(
                 )
                 set_kind = f"{member_kind}-set"
                 known_keys = {item.key for item in index.entities}
+                named_set_count = 0
                 for line in records:
                     for target in _fields(line.text):
                         set_key = _key(set_kind, target, cluster)
                         if set_key in known_keys:
+                            named_set_count += 1
                             target_key, reference_kind = set_key, f"selects-{set_kind}"
                         elif target.isdigit():
                             target_key = _key(member_kind, target, cluster)
@@ -3733,6 +3784,12 @@ def build_semantic_index(
                         _reference(
                             index, selection, reference_kind, target_key, source, line,
                         )
+                if named_set_count > 10:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="SELECTION may contain at most ten named sets",
+                        line=command_line.number, source=source,
+                    ))
             elif command == "*ORIE" and cluster:
                 orientation_name = str(options.get("NAME") or "").upper()
                 member_kind = "element" if orientation_name == "ORI-ELE" else "node"

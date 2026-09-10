@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.89.0",
+  "registry_version": "0.90.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2551,7 +2551,7 @@
       "parameters": [
         {
           "name": "ID",
-          "value_type": "integer",
+          "value_type": "positive-integer",
           "required": true,
           "summary": "Identifies a pre-dimensioned selection slot and must be at least one."
         },
@@ -2570,7 +2570,7 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "verified", "delete": "unsupported",
         "rename": "unsupported", "generate": "verified",
-        "static_validation": "implemented", "execute": "verified"
+        "static_validation": "verified", "execute": "verified"
       },
       "body": {
         "style": "records",
@@ -2579,7 +2579,7 @@
           {"name": "node-selection", "when": "TYPE is NODE or omitted", "rows": [{"name": "members", "repetition": "repeated", "fields": [{"name": "targets", "value_type": "comma-separated-node-label-or-node-set-name-list", "required": true, "summary": "Adds resolved node indices; each token resolves as a node set before a numeric node label."}]}], "constraints": ["At most ten node-set labels may be recorded; individual node labels do not count toward that limit.", "Duplicate members are subject to the integer-list insertion behavior and should be normalized by Agent generation."]},
           {"name": "element-selection", "when": "TYPE is ELEMENT", "rows": [{"name": "members", "repetition": "repeated", "fields": [{"name": "targets", "value_type": "comma-separated-element-label-or-element-set-name-list", "required": true, "summary": "Adds resolved element indices; each token resolves as an element set before a numeric element label."}]}], "constraints": ["At most ten element-set labels may be recorded.", "The source checks an unrelated inode variable after individual-element lookup; Agent generation permits existing element sets but blocks individual element labels until that defect is fixed or runtime-qualified."]}
         ],
-        "dependencies": ["ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.", "All named sets and individual entities must already exist in the current cluster.", "Selection consumers reference the stored one-based ID."]
+        "dependencies": ["ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.", "TYPE values are uppercase-sensitive in the pinned parser; only NODE and ELEMENT are accepted by the Agent.", "At least one member target is required, and node or element selections may reference at most ten existing named sets.", "All named sets and individual entities must already exist in the current cluster.", "Selection consumers reference the stored one-based ID."]
       }
     },
     {

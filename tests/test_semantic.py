@@ -491,6 +491,46 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual(1, codes.count("BSAM-E300"))
             self.assertEqual(1, codes.count("BSAM-E301"))
 
+    def test_cluster_selection_id_type_body_and_capacity_are_validated(self) -> None:
+        cases = {
+            "missing-id": b"*SELECTION,TYPE=NODE\nedge\n",
+            "zero-id": b"*SELECTION,ID=0,TYPE=NODE\nedge\n",
+            "over-capacity": b"*SELECTION,ID=2,TYPE=NODE\nedge\n",
+            "case-sensitive-type": b"*SELECTION,ID=1,TYPE=element\n1\n",
+            "empty-body": b"*SELECTION,ID=1,TYPE=NODE\n",
+        }
+        for name, selection in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(deck(
+                    b"*NAME\nply1\n*DIMENSIONS\n1,0,1,0\n"
+                    b"*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n" + selection
+                ))
+                inspection = SourceSet.read(root).inspection()
+            self.assertIn(
+                "BSAM-E310", {item["code"] for item in inspection["diagnostics"]},
+            )
+
+    def test_cluster_selection_enforces_ten_named_set_limit(self) -> None:
+        set_names = [f"set{index}" for index in range(1, 12)]
+        definitions = b"".join(
+            f"*NSET,NSET={name}\n1\n".encode("ascii") for name in set_names
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*DIMENSIONS\n1,0,1,0\n"
+                b"*NODE\n1,0,0,0\n" + definitions
+                + b"*SELECTION,ID=1,TYPE=NODE\n"
+                + ",".join(set_names).encode("ascii") + b"\n"
+            ))
+            inspection = SourceSet.read(root).inspection()
+        messages = [
+            item["message"] for item in inspection["diagnostics"]
+            if item["code"] == "BSAM-E310"
+        ]
+        self.assertTrue(any("at most ten" in message for message in messages))
+
     def test_crack_region_element_set_dependency_is_source_located(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

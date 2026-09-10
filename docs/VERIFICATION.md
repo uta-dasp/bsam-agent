@@ -87,6 +87,8 @@ Registry 0.88.0 runtime-qualifies profile 1.2.0 on a synthetic eight-node C3D8 m
 
 Registry 0.89.0 corrects the runtime-evidence attribution: the successful profile run qualifies generated node `*SELECTION` records, while cluster `*FIELD` generation remains unsupported and its defective execution path remains unassessed.
 
+Registry 0.90.0 verifies cluster `*SELECTION` static validation for required positive IDs, exact uppercase NODE/ELEMENT types, nonempty bodies, DIMENSIONS selection capacity, the source ten-named-set limit, duplicate identities, and node/element/set references.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

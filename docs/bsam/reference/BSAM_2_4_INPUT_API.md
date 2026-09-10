@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.89.0`
-- Registry SHA-256: `6F51D9B6B9D8AD4F34E7A5335D9E123D1A67D89886CF7E632E6BB336B6EEA165`
+- Registry version: `0.90.0`
+- Registry SHA-256: `F3FCE803B2161F6DF896E87CBD83625D7392D429F8706549C1BCEE400E33E81C`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1067,16 +1067,16 @@ Defines an indexed node or element selection used by later operations.
 - Dispatch prefix: `*SELE`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=implemented, `execute`=verified
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 Known parameters:
 
-- `ID` (integer, required): Identifies a pre-dimensioned selection slot and must be at least one.
+- `ID` (positive-integer, required): Identifies a pre-dimensioned selection slot and must be at least one.
 - `TYPE` (enum, optional) (allowed: `NODE`, `ELEMENT`; default: `"NODE"`): Selects whether the selection contains nodes or elements.
 
 #### `*SELECTION` body
 
-Termination: next-command-or-eof. Dependencies: ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.; All named sets and individual entities must already exist in the current cluster.; Selection consumers reference the stored one-based ID.
+Termination: next-command-or-eof. Dependencies: ID is one-based, may not exceed DIMENSIONS selection_count, and each ID may be defined only once.; TYPE values are uppercase-sensitive in the pinned parser; only NODE and ELEMENT are accepted by the Agent.; At least one member target is required, and node or element selections may reference at most ten existing named sets.; All named sets and individual entities must already exist in the current cluster.; Selection consumers reference the stored one-based ID.
 
 - **node-selection** (TYPE is NODE or omitted):
   - `members` [repeated]: `targets`:comma-separated-node-label-or-node-set-name-list

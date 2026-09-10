@@ -122,6 +122,10 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("blocks individual element labels", selection_text)
         self.assertEqual("verified", commands["*SELECTION"]["operations"]["generate"])
         self.assertEqual("verified", commands["*SELECTION"]["operations"]["execute"])
+        self.assertEqual("verified", commands["*SELECTION"]["operations"]["static_validation"])
+        self.assertEqual("positive-integer", {
+            item["name"]: item for item in commands["*SELECTION"]["parameters"]
+        }["ID"]["value_type"])
         self.assertEqual("unsupported", commands["*FIELD"]["operations"]["generate"])
         self.assertEqual("unassessed", commands["*FIELD"]["operations"]["execute"])
         tolerance = {item["name"]: item for item in commands["*TOLERANCE"]["parameters"]}
