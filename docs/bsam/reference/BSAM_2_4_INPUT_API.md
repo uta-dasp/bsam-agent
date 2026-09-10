@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.87.0`
-- Registry SHA-256: `AD5D82E0C0318CADA49D43F5D412A535E8D2109FB6459E16AEE5B8AB9B757B57`
+- Registry version: `0.88.0`
+- Registry SHA-256: `E16EAC2B6FF2DDDAA5F00DFAD20418E76954F513D2B66604F956EFF5772C6650`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -68,14 +68,14 @@ Defines one or more linear solvers and solver-specific options; defaults to seri
 - Required: no
 - Termination: `END SOLVER` (canonical)
 - Coverage: documented
-- Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.sheff-solver-dispatch](#evidencesheff-solver-dispatch)
+- Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.sheff-solver-dispatch](#evidencesheff-solver-dispatch), [evidence.runtime-current-pardiso-definite-rejection](#evidenceruntime-current-pardiso-definite-rejection)
 - Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
 - `*type` (enum, required) (allowed: `pardiso`, `cpardiso`, `sheff`): Selects the current-format solver family.
 - `n_threads` (integer, optional): Requests the OpenMP thread count for PARDISO/CPARDISO; values above the available maximum are capped. Current-format generation must emit this option because that path does not explicitly initialize a default.
-- `matrix_type` (enum, optional) (allowed: `definite`, `indefinite`, `unsymmetric`): Selects the matrix classification passed to PARDISO/CPARDISO. Numeric legacy input defaults to definite; current-format generation must emit the intended value because that path does not explicitly initialize a default.
+- `matrix_type` (enum, optional) (allowed: `indefinite`, `unsymmetric`): Selects the matrix classification passed to PARDISO/CPARDISO. Current syntax must use indefinite or unsymmetric: the parser advertises definite but has no assignment branch for it and leaves system type zero.
 - `backend` (enum, optional) (allowed: `mkl`, `petsc`; default: `"mkl"`): Selects the case-insensitive SHEFF backend; availability depends on how the executable was built.
 - `solver` (enum, optional) (allowed: `none`, `cg`, `gmes`, `fgmes`, `direct`; default: `"cg"`): Selects the case-insensitive SHEFF solver. The pinned dispatcher accepts the spellings gmes/fgmes, not gmres; none is PETSc-only.
 - `preconditioner` (enum, optional) (allowed: `none`, `jacobi`, `ilu`, `ilut`, `ilu0`; default: `"jacobi"`): Selects the case-insensitive SHEFF preconditioner using the active parser label; ilu and ilut select the same ILUT category.
@@ -91,11 +91,12 @@ Termination: next-top-level-block. Dependencies: Solver IDs are one-based declar
 - **current-pardiso** (record begins *type=pardiso or *type=cpardiso):
   - `solver-header` [once]: `*type`:enum(pardiso,cpardiso)
   - `thread-option` [once]: `n_threads`:integer
-  - `matrix-option` [once]: `matrix_type`:enum(definite,indefinite,unsymmetric)
+  - `matrix-option` [once]: `matrix_type`:enum(indefinite,unsymmetric)
   - `solver-end` [once]: `end solver`:sentinel
   - Constraint: Up to 50 current-format solver definitions are accepted.
   - Constraint: cpardiso is replaced by pardiso with a warning in a non-MPI build.
   - Constraint: Unknown option labels warn and are ignored.
+  - Constraint: matrix_type=definite is advertised in source comments but does not assign the required internal value 2; the resulting system type 0 fails before solve and is rejected by the Agent.
 - **current-sheff** (record begins *type=sheff):
   - `solver-header` [once]: `*type`:const(sheff)
   - `sheff-options` [repeated]: `option`:one-of(backend,solver,preconditioner,relative_tolerance,maximum_iterations,petsc_opts,debug_opts)
@@ -1041,8 +1042,8 @@ Applies field values with a configured variable count.
 - Registry ID: `command.field`
 - Dispatch prefix: `*FIEL`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=implemented, `execute`=verified
 
 Known parameters:
 
@@ -1838,7 +1839,7 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
 
 ## Registered generation profiles
 
-### `generation.mechanical-isotropic-solid-v1@1.0.0`
+### `generation.mechanical-isotropic-solid-v1@1.2.0`
 
 Builds one canonical current-syntax linear-mechanical deck from a validated Abaqus-style .ele mesh and a complete explicit isotropic solid analysis intent.
 
@@ -1846,13 +1847,22 @@ Builds one canonical current-syntax linear-mechanical deck from a validated Abaq
 - Tool: `generate_deck`
 - Analysis: linear mechanical solid finite element
 - Mesh format: `abaqus-style-ele`
-- Evidence: [evidence.main-input-sequence](#evidencemain-input-sequence), [evidence.input-parser](#evidenceinput-parser), [evidence.solver-parser](#evidencesolver-parser), [evidence.boundary-parser](#evidenceboundary-parser), [evidence.constitutive-parser](#evidenceconstitutive-parser), [evidence.failure-parser](#evidencefailure-parser), [evidence.material-parser](#evidencematerial-parser), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-core-records](#evidencefe-core-records)
+- Evidence: [evidence.main-input-sequence](#evidencemain-input-sequence), [evidence.input-parser](#evidenceinput-parser), [evidence.solver-parser](#evidencesolver-parser), [evidence.runtime-current-pardiso-definite-rejection](#evidenceruntime-current-pardiso-definite-rejection), [evidence.boundary-parser](#evidenceboundary-parser), [evidence.constitutive-parser](#evidenceconstitutive-parser), [evidence.failure-parser](#evidencefailure-parser), [evidence.material-parser](#evidencematerial-parser), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-core-records](#evidencefe-core-records), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
 - Required engineering choices:
   - `unit_system`
+  - `analysis.name`
+  - `analysis.status`
   - `cluster.name`
   - `solver.type`
   - `solver.n_threads`
   - `solver.matrix_type`
+  - `convergence.relative_tolerance`
+  - `convergence.absolute_tolerance`
+  - `convergence.divergence_tolerance`
+  - `convergence.max_iterations`
+  - `loading.name`
+  - `loading.step_count`
+  - `loading.increment`
   - `material.youngs_modulus`
   - `material.poisson_ratio`
   - `material.thermal_expansion`
@@ -1879,14 +1889,22 @@ Builds one canonical current-syntax linear-mechanical deck from a validated Abaq
   - `command.nset`
   - `command.elset`
   - `command.orientation`
+  - `command.selection`
   - `command.constitutive`
-  - `command.boundary`
-  - `command.load`
   - `command.stop`
+  - `construct.boundary-type`
+  - `construct.boundary-solver-schedule`
+  - `construct.boundary-status`
+  - `construct.boundary-name`
+  - `construct.boundary-clusters`
+  - `construct.boundary-conditions`
+  - `construct.boundary-loading-sequence`
+  - `construct.boundary-convergence`
 - Constraints:
   - The profile accepts only linear mechanical analysis, one solid cluster, current serial PARDISO syntax, legacy isotropic MATERIALS type 10, direct CONSTITUTIVE type 1, and an explicitly selected no-data bulk FAILURE criterion.
-  - Every engineering field is required; the generator supplies no material, strength, orientation, solver, boundary, load, or unit default.
-  - Boundary and load targets must resolve to explicit node labels or node sets in the validated mesh; version 1 rejects imported SURFACE records because BSAM has no active matching cluster dispatch.
+  - Every engineering field is required; the generator supplies no material, strength, orientation, solver, convergence, loading, boundary, load, restart, or unit default.
+  - Boundary and load targets must resolve to explicit node sets in the validated mesh; the generator deterministically promotes every imported node set to a one-based node SELECTION required by runtime boundary assembly; version 1 rejects imported SURFACE records because BSAM has no active matching cluster dispatch.
+  - Constraints and forces become named top-level BOUNDARY conditions selected for the generated cluster and are activated by one explicit static loading segment.
   - The deck and manifest are created together without overwrite; partial output is removed on failure.
   - Canonical deck comments and the manifest bind generator, registry, profile, mesh, normalized intent, and output SHA-256 values.
 
@@ -1927,26 +1945,27 @@ Expands the established notch_v1 two-ply source profile into the approved eight-
   - The plan must be rebound to the exact source-set digest during review and apply.
   - The output must be written separately from the source with an immutable audit sidecar.
 
-### `transformation.migrate-legacy-solver@1.0.0`
+### `transformation.migrate-legacy-solver@1.1.0`
 
 Migrates the established legacy numeric type-9 SOLVER body to explicit current PARDISO syntax for the pinned non-MPI baseline.
 
 - Coverage: runtime-verified
 - Tool/operation: `preview_migrate_legacy_solver` / `migrate-legacy-solver`
-- Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch), [evidence.runtime-notch-current-solver](#evidenceruntime-notch-current-solver)
+- Evidence: [evidence.solver-parser](#evidencesolver-parser), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch), [evidence.runtime-notch-current-solver](#evidenceruntime-notch-current-solver), [evidence.runtime-current-pardiso-definite-rejection](#evidenceruntime-current-pardiso-definite-rejection)
 - Applicability:
   - `SOLVER.count` equals `1`; otherwise: The source must contain exactly one terminated SOLVER block.
   - `SOLVER.format` equals `"legacy-numeric"`; otherwise: The SOLVER body must use the supported legacy numeric record format.
   - `SOLVER.type` equals `9`; otherwise: This transformation is restricted to legacy solver type 9.
-  - `SOLVER.records.valid` equals `true`; otherwise: The body must contain a positive thread count and at most one supported matrix marker.
+  - `SOLVER.records.valid` equals `true`; otherwise: The body must contain a positive thread count and exactly one supported matrix marker.
+  - `SOLVER.matrix_type` in `["indefinite", "unsymmetric"]`; otherwise: Current PARDISO syntax cannot select definite because the pinned parser leaves its system type uninitialized.
   - `BASELINE.execution_mode` equals `"serial"`; otherwise: Mapping legacy type 9 to PARDISO is established only for the pinned serial non-MPI baseline.
 - Approved/source-derived decisions:
   - `target_solver` = `"pardiso"` (user-approved)
   - `thread_policy` = `"preserve positive legacy thread count"` (source-derived)
-  - `matrix_policy` = `"preserve definite, indefinite, or unsymmetric classification"` (source-derived)
+  - `matrix_policy` = `"preserve explicit indefinite or unsymmetric classification; reject implicit definite"` (source-derived)
 - Impacts:
   - Replace only the SOLVER body while retaining the surrounding SOLVER and END SOLVER records.
-  - Emit explicit *type, n_threads, optional matrix_type, and end solver records.
+  - Emit explicit *type, n_threads, matrix_type, and end solver records.
   - Leave every non-SOLVER byte and all analysis semantics unchanged.
 - Dependencies:
   - The plan must be rebound to the exact source-set digest during review and apply.
@@ -2120,6 +2139,10 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.runtime-notch-eight-ply` — runtime: `local-probe/2026-09-01/notch-v1-eight-ply-controlled-acceptance` — The transformed eight-ply notch deck completed input and connection setup, produced step and TP artifacts, and ran for 120 seconds before a controlled timeout stop with exit code zero and no fatal marker.
 <a id="evidenceruntime-notch-current-solver"></a>
 - `evidence.runtime-notch-current-solver` — runtime: `local-probe/2026-09-02/notch-v1-eight-ply-current-solver` — The legacy type-9 SOLVER body was migrated to current PARDISO syntax with 14 threads and an indefinite matrix; the pinned serial executable reported PARDISO, advanced through seven loading steps, and stopped cleanly after a 120-second controlled probe with no fatal marker.
+<a id="evidenceruntime-current-pardiso-definite-rejection"></a>
+- `evidence.runtime-current-pardiso-definite-rejection` — runtime: `local-probe/2026-09-10/generated-isotropic-solid-current-pardiso-definite` — A digest-bound generated deck using matrix_type=definite reached complete input parsing, then the pinned executable reported internal system type 0 as unimplemented and terminated with exit code 157; source inspection confirms the current parser assigns only indefinite and unsymmetric values.
+<a id="evidenceruntime-generated-isotropic-solid-success"></a>
+- `evidence.runtime-generated-isotropic-solid-success` — runtime: `local-probe/2026-09-10/generated-isotropic-solid-current-pardiso-indefinite` — A digest-bound profile 1.2.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>

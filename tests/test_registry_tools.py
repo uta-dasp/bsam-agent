@@ -38,7 +38,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(1, counts["generation_profiles"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(75, counts["evidence"])
+        self.assertEqual(77, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -59,6 +59,8 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("material.youngs_modulus", profile["required_choices"])
         self.assertIn("constraints", profile["required_choices"])
         self.assertIn("loads", profile["required_choices"])
+        self.assertEqual("1.2.0", profile["profile_version"])
+        self.assertIn("command.selection", profile["capabilities"])
 
     def test_required_current_block_names(self) -> None:
         blocks = {item["canonical"]: item for item in self.registry["top_level_blocks"]}
@@ -397,6 +399,7 @@ class RegistryToolsTests(unittest.TestCase):
             item for item in self.registry["transformations"]
             if item["id"] == "transformation.migrate-legacy-solver"
         )
+        self.assertEqual("1.1.0", transformation["algorithm_version"])
         self.assertEqual("runtime-verified", transformation["coverage"])
         self.assertEqual("preview_migrate_legacy_solver", transformation["tool"])
         paths = {item["path"] for item in transformation["applicability"]}

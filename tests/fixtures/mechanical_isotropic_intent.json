@@ -1,0 +1,56 @@
+{
+  "analysis": {
+    "kinematics": "linear",
+    "name": "coupon_analysis",
+    "status": "no restart",
+    "type": "mechanical"
+  },
+  "cluster": {
+    "name": "coupon"
+  },
+  "constitutive": {
+    "failure_type": 4,
+    "z_rotation_degrees": 0.0
+  },
+  "constraints": [
+    {
+      "first_dof": 1,
+      "last_dof": 3,
+      "target": "bottom",
+      "value": 0.0
+    }
+  ],
+  "convergence": {
+    "absolute_tolerance": 1e-08,
+    "divergence_tolerance": 1000000.0,
+    "max_iterations": 20,
+    "relative_tolerance": 1e-06
+  },
+  "loading": {
+    "increment": 1.0,
+    "name": "static_load",
+    "step_count": 1
+  },
+  "loads": [
+    {
+      "dof": 3,
+      "target": "top",
+      "value": 100.0
+    }
+  ],
+  "material": {
+    "compressive_strength": 250.0,
+    "poisson_ratio": 0.3,
+    "shear_strength": 150.0,
+    "tensile_strength": 300.0,
+    "thermal_expansion": 2.3e-05,
+    "youngs_modulus": 70000.0
+  },
+  "profile": "generation.mechanical-isotropic-solid-v1",
+  "solver": {
+    "matrix_type": "indefinite",
+    "n_threads": 2,
+    "type": "pardiso"
+  },
+  "unit_system": "N-mm-MPa"
+}

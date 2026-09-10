@@ -83,6 +83,8 @@ Registry 0.86.0 adds the verified `generation.mechanical-isotropic-solid-v1` pro
 
 Registry 0.87.0 promotes INPUT static validation after exact positive and negative tests for required presence, current type 3, one active data record, one block occurrence, exact termination, comment tolerance, typed inspection, and byte-identical no-op rendering.
 
+Registry 0.88.0 runtime-qualifies profile 1.2.0 on a synthetic eight-node C3D8 mesh with every engineering value explicit. Controlled probes exposed and corrected three pinned-source requirements: current PARDISO accepts only explicit indefinite or unsymmetric matrices, convergence tolerances must share one record, and boundary-target node sets must be promoted to one-based node SELECTION records. The final digest-bound deck completed with exit code zero, the end-of-program sentinel, and no fatal marker. This qualifies the bounded profile and fixture, not arbitrary meshes or engineering choices.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

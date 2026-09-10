@@ -470,6 +470,14 @@ class ChangePlanTests(unittest.TestCase):
             with self.assertRaisesRegex(ChangeError, "already uses current syntax"):
                 plan_migrate_legacy_solver(output)
 
+            source.write_bytes(DECK.replace(
+                b"BOUNDARY\r\n",
+                b"SOLVER\r\n9\r\n14\r\nEND SOLVER\r\nBOUNDARY\r\n",
+                1,
+            ))
+            with self.assertRaisesRegex(ChangeError, "cannot select definite"):
+                plan_migrate_legacy_solver(source)
+
     def test_boundary_condition_rename_updates_loading_dependents(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

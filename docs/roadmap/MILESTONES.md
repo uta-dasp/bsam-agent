@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.87.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
+Status: in progress. Registry `0.88.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -197,7 +197,8 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [ ] Add invalid, ambiguous, and dependency-breaking test cases.
 - [ ] Add small representative fixtures across capability families; keep notch as one regression fixture.
 - [ ] Add controlled executable probes where static source evidence is insufficient.
-- [ ] Round-trip and executable-test a representative imported `.ele` model after an appropriate analysis template is available.
+- [x] Executable-test the bounded mechanical-isotropic generation profile against its pinned solver and boundary-assembly paths.
+- [x] Round-trip and executable-test a representative imported `.ele` model after an appropriate analysis template is available.
 
 Exit: capability support is measurable, reproducible, and protected against regression.
 

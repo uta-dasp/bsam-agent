@@ -14,7 +14,7 @@ from .source_set import SourceSet
 
 
 GENERATION_SCHEMA_VERSION = "0.1.0"
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.2.0"
 PROFILE_ID = "generation.mechanical-isotropic-solid-v1"
 
 
@@ -84,15 +84,10 @@ def _registered_profile() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def _target(value: Any, name: str, mesh: MeshModel) -> str:
-    node_labels = {item.label for item in mesh.nodes}
     node_sets = {item.name.casefold(): item.name for item in mesh.sets if item.kind == "node"}
-    if isinstance(value, int) and not isinstance(value, bool):
-        if value not in node_labels:
-            raise GenerationError("invalid_intent", f"{name} node {value} does not exist in the mesh")
-        return str(value)
     if isinstance(value, str) and value.casefold() in node_sets:
         return node_sets[value.casefold()]
-    raise GenerationError("invalid_intent", f"{name} must name an existing mesh node or node set")
+    raise GenerationError("invalid_intent", f"{name} must name an existing mesh node set")
 
 
 def _validate_intent(intent: Any, mesh: MeshModel) -> dict[str, Any]:
@@ -102,17 +97,20 @@ def _validate_intent(intent: Any, mesh: MeshModel) -> dict[str, Any]:
             "this profile does not accept mesh SURFACE records because BSAM has no active cluster dispatch",
         )
     root = _object(intent, "intent", {
-        "profile", "unit_system", "analysis", "cluster", "solver", "material",
-        "constitutive", "constraints", "loads",
+        "profile", "unit_system", "analysis", "cluster", "solver", "convergence",
+        "loading", "material", "constitutive", "constraints", "loads",
     })
     if root["profile"] != PROFILE_ID:
         raise GenerationError("unsupported_generation", f"profile must be {PROFILE_ID}")
     if not isinstance(root["unit_system"], str) or not root["unit_system"].strip():
         raise GenerationError("missing_engineering_choice", "unit_system must be stated explicitly")
 
-    analysis = _object(root["analysis"], "analysis", {"type", "kinematics"})
+    analysis = _object(root["analysis"], "analysis", {"type", "kinematics", "name", "status"})
     if analysis["type"] != "mechanical" or analysis["kinematics"] != "linear":
         raise GenerationError("unsupported_generation", "this profile supports only linear mechanical analysis")
+    analysis_name = _token(analysis["name"], "analysis.name")
+    if analysis["status"] not in {"new", "no restart"}:
+        raise GenerationError("invalid_intent", "analysis.status must be new or no restart")
 
     cluster = _object(root["cluster"], "cluster", {"name"})
     cluster_name = _token(cluster["name"], "cluster.name")
@@ -127,8 +125,30 @@ def _validate_intent(intent: Any, mesh: MeshModel) -> dict[str, Any]:
     if solver["type"] != "pardiso":
         raise GenerationError("unsupported_generation", "this profile supports only the serial PARDISO solver")
     n_threads = _positive_integer(solver["n_threads"], "solver.n_threads")
-    if solver["matrix_type"] not in {"definite", "indefinite", "unsymmetric"}:
+    if solver["matrix_type"] not in {"indefinite", "unsymmetric"}:
         raise GenerationError("invalid_intent", "solver.matrix_type is not registered")
+
+    convergence = _object(
+        root["convergence"], "convergence",
+        {"relative_tolerance", "absolute_tolerance", "divergence_tolerance", "max_iterations"},
+    )
+    relative_tolerance = _real(
+        convergence["relative_tolerance"], "convergence.relative_tolerance", positive=True,
+    )
+    absolute_tolerance = _real(
+        convergence["absolute_tolerance"], "convergence.absolute_tolerance", positive=True,
+    )
+    divergence_tolerance = _real(
+        convergence["divergence_tolerance"], "convergence.divergence_tolerance", positive=True,
+    )
+    max_iterations = _positive_integer(
+        convergence["max_iterations"], "convergence.max_iterations",
+    )
+
+    loading = _object(root["loading"], "loading", {"name", "step_count", "increment"})
+    loading_name = _token(loading["name"], "loading.name")
+    step_count = _positive_integer(loading["step_count"], "loading.step_count")
+    load_increment = _real(loading["increment"], "loading.increment")
 
     material = _object(root["material"], "material", {
         "youngs_modulus", "poisson_ratio", "thermal_expansion", "tensile_strength",
@@ -181,9 +201,19 @@ def _validate_intent(intent: Any, mesh: MeshModel) -> dict[str, Any]:
     return {
         "profile": PROFILE_ID,
         "unit_system": root["unit_system"].strip(),
-        "analysis": {"type": "mechanical", "kinematics": "linear"},
+        "analysis": {
+            "type": "mechanical", "kinematics": "linear",
+            "name": analysis_name, "status": analysis["status"],
+        },
         "cluster": {"name": cluster_name},
         "solver": {"type": "pardiso", "n_threads": n_threads, "matrix_type": solver["matrix_type"]},
+        "convergence": {
+            "relative_tolerance": relative_tolerance,
+            "absolute_tolerance": absolute_tolerance,
+            "divergence_tolerance": divergence_tolerance,
+            "max_iterations": max_iterations,
+        },
+        "loading": {"name": loading_name, "step_count": step_count, "increment": load_increment},
         "material": {
             "youngs_modulus": youngs_modulus, "poisson_ratio": poisson_ratio,
             "thermal_expansion": thermal_expansion, "tensile_strength": tensile_strength,
@@ -207,6 +237,8 @@ def render_generated_deck(mesh_path: Path, intent: Any) -> tuple[bytes, dict[str
     material = normalized["material"]
     solver = normalized["solver"]
     constitutive = normalized["constitutive"]
+    convergence = normalized["convergence"]
+    loading = normalized["loading"]
     cluster = normalized["cluster"]
     lines = [
         f"** BSAM-AGENT GENERATION-ID {generation_id}",
@@ -216,7 +248,38 @@ def render_generated_deck(mesh_path: Path, intent: Any) -> tuple[bytes, dict[str
         "INPUT", "3", "END INPUT",
         "SOLVER", "*type=pardiso", f"n_threads={solver['n_threads']}",
         f"matrix_type={solver['matrix_type']}", "end solver", "END SOLVER",
-        "BOUNDARY", "*type", "mechanical", "*solver", "1", "END BOUNDARY",
+        "BOUNDARY", "*type", "mechanical", "*solver", "1",
+        "*status", normalized["analysis"]["status"],
+        "*name", normalized["analysis"]["name"],
+        "*clusters", cluster["name"],
+        "*boundary condition",
+    ]
+    components = {
+        (1, 1): "x", (2, 2): "y", (3, 3): "z",
+        (1, 2): "xy", (2, 3): "yz", (1, 3): "xyz",
+    }
+    for index, item in enumerate(normalized["constraints"], start=1):
+        component = components[(item["first_dof"], item["last_dof"])]
+        lines.append(
+            f"type=disp,comp={component},name=constraint{index},"
+            f"value={_number(item['value'])},nset={cluster['name']}.{item['target']}"
+        )
+    for index, item in enumerate(normalized["loads"], start=1):
+        component = components[(item["dof"], item["dof"])]
+        lines.append(
+            f"type=force,comp={component},name=load{index},"
+            f"value={_number(item['value'])},nset={cluster['name']}.{item['target']}"
+        )
+    lines.extend([
+        "*loading sequence",
+        f"type=Static,name={loading['name']},nstep={loading['step_count']},"
+        f"incr={_number(loading['increment'])}",
+        "*convergence",
+        f"relative={_number(convergence['relative_tolerance'])},"
+        f"absolute={_number(convergence['absolute_tolerance'])},"
+        f"divergence={_number(convergence['divergence_tolerance'])}",
+        f"maxiterations={convergence['max_iterations']}",
+        "END BOUNDARY",
         "CONSTITUTIVE", "1", f"1 1 {_number(constitutive['z_rotation_degrees'])}",
         "END CONSTITUTIVE",
         "FAILURE", str(constitutive["failure_type"]), "END FAILURE",
@@ -228,20 +291,16 @@ def render_generated_deck(mesh_path: Path, intent: Any) -> tuple[bytes, dict[str
             "tensile_strength", "compressive_strength", "shear_strength",
         )),
         "END MATERIALS", "CLUSTERS", "*TYPE", "solid", "*NAME", cluster["name"],
-    ]
+    ])
     deck = "\n".join(lines).encode("latin-1") + b"\n"
     deck += render_bsam_commands(mesh)
-    deck += b"*CONSTITUTIVE\n1\n*BOUNDARY\n"
-    deck += b"".join(
-        f"{item['target']},{item['first_dof']},{item['last_dof']},{_number(item['value'])}\n".encode("latin-1")
-        for item in normalized["constraints"]
-    )
-    deck += b"*LOAD\n"
-    deck += b"".join(
-        f"{item['target']},{item['dof']},{_number(item['value'])}\n".encode("latin-1")
-        for item in normalized["loads"]
-    )
-    deck += b"*STOP\nEND CLUSTERS\n"
+    for selection_id, mesh_set in enumerate(
+        (item for item in mesh.sets if item.kind == "node"), start=1,
+    ):
+        deck += (
+            f"*SELECTION,ID={selection_id},TYPE=NODE\n{mesh_set.name}\n"
+        ).encode("latin-1")
+    deck += b"*CONSTITUTIVE\n1\n*STOP\nEND CLUSTERS\n"
     provenance = {
         "schema_version": GENERATION_SCHEMA_VERSION,
         "generator_version": GENERATOR_VERSION,

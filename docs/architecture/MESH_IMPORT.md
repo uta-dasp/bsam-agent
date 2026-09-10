@@ -46,9 +46,9 @@ Direct conversion from a full Abaqus input deck or Gmsh file is deferred; those 
 
 ## Net-new deck generation
 
-Registry profile `generation.mechanical-isotropic-solid-v1` builds one canonical linear-mechanical solid deck without a template. Its typed intent requires the unit system, cluster name, PARDISO thread and matrix controls, every isotropic material and strength value, failure criterion, fiber rotation, and at least one explicit constraint and load. Targets must resolve to imported nodes or node sets. Version 1 rejects imported `*SURFACE` records because the pinned BSAM cluster dispatcher has no matching active command.
+Registry profile `generation.mechanical-isotropic-solid-v1` builds one canonical linear-mechanical solid deck without a template. Its typed intent requires the unit system, analysis name/status, cluster name, PARDISO thread and matrix controls, convergence controls, static loading controls, every isotropic material and strength value, failure criterion, fiber rotation, and at least one explicit constraint and load. Targets must resolve to imported node sets. The generator promotes each node set to a deterministic one-based node `*SELECTION`, which the pinned executable requires during boundary assembly. Version 1 rejects imported `*SURFACE` records because the pinned BSAM cluster dispatcher has no matching active command.
 
-`generate-deck` creates a new deck and JSON provenance manifest without overwrite. Stable comments and manifest fields bind the generator, registry profile, mesh digest, normalized-intent digest, and output digest. Static validation failure rolls back both outputs.
+`generate-deck` creates a new deck and JSON provenance manifest without overwrite. Stable comments and manifest fields bind the generator, registry profile, mesh digest, normalized-intent digest, and output digest. Static validation failure rolls back both outputs. Profile 1.2.0 completed a controlled pinned-executable run with an indefinite PARDISO matrix, exit code zero, the success sentinel, and no fatal marker.
 
 ```powershell
 python -m bsam_agent generate-deck mesh.ele intent.json `

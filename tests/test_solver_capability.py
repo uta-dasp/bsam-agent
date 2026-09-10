@@ -72,7 +72,7 @@ class SolverCapabilityTests(unittest.TestCase):
 
     def test_schedule_two_requires_two_solver_definitions(self) -> None:
         one = (
-            b"SOLVER\n*type=pardiso\nn_threads=1\nmatrix_type=definite\n"
+            b"SOLVER\n*type=pardiso\nn_threads=1\nmatrix_type=indefinite\n"
             b"end solver\nEND SOLVER\n"
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -97,6 +97,18 @@ class SolverCapabilityTests(unittest.TestCase):
         self.assertEqual(2, len(errors))
         self.assertIn("n_threads", errors[0]["message"] + errors[1]["message"])
         self.assertIn("matrix_type", errors[0]["message"] + errors[1]["message"])
+
+        definite = (
+            b"SOLVER\n*type=pardiso\nn_threads=1\nmatrix_type=definite\n"
+            b"end solver\nEND SOLVER\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(deck(definite, b"1"))
+            definite_inspection = SourceSet.read(path).inspection()
+        self.assertIn(
+            "BSAM-E310", {item["code"] for item in definite_inspection["diagnostics"]}
+        )
 
     def test_legacy_solver_is_inspectable_but_generic_edit_is_blocked(self) -> None:
         legacy = b"SOLVER\n9\n14\n*indefinite\nEND SOLVER\n"

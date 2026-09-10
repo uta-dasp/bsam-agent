@@ -2232,8 +2232,11 @@ def _legacy_solver_patch(source_set: SourceSet) -> tuple[dict[str, Any], dict[st
     ]
     if records and records[0].first_field.casefold().startswith("*type"):
         raise ChangeError("SOLVER block already uses current syntax")
-    if len(records) not in {2, 3}:
-        raise ChangeError("legacy solver migration requires two records and one optional matrix marker")
+    if len(records) != 3:
+        raise ChangeError(
+            "legacy solver migration requires an explicit *indefinite or *unsymmetric marker; "
+            "current PARDISO syntax cannot select definite"
+        )
     try:
         solver_type = int(records[0].first_field)
         threads = int(records[1].first_field)
@@ -2244,20 +2247,17 @@ def _legacy_solver_patch(source_set: SourceSet) -> tuple[dict[str, Any], dict[st
     if threads <= 0:
         raise ChangeError("legacy solver thread count must be positive")
 
-    matrix_type = "definite"
-    if len(records) == 3:
-        marker = records[2].first_field.casefold()
-        if marker.startswith("*in"):
-            matrix_type = "indefinite"
-        elif marker.startswith("*un"):
-            matrix_type = "unsymmetric"
-        else:
-            raise ChangeError("legacy solver matrix marker must be *indefinite or *unsymmetric")
+    marker = records[2].first_field.casefold()
+    if marker.startswith("*in"):
+        matrix_type = "indefinite"
+    elif marker.startswith("*un"):
+        matrix_type = "unsymmetric"
+    else:
+        raise ChangeError("legacy solver matrix marker must be *indefinite or *unsymmetric")
 
     newline = next((line.newline for line in body_lines if line.newline), b"\n")
     rendered = ["*type=pardiso", f"n_threads={threads}"]
-    if matrix_type != "definite":
-        rendered.append(f"matrix_type={matrix_type}")
+    rendered.append(f"matrix_type={matrix_type}")
     rendered.append("end solver")
     new_body = newline.join(item.encode("latin-1") for item in rendered) + newline
     start = document.lines[block["start_line"] - 1].end

@@ -15,9 +15,17 @@ def intent() -> dict:
     return {
         "profile": "generation.mechanical-isotropic-solid-v1",
         "unit_system": "N-mm-MPa",
-        "analysis": {"type": "mechanical", "kinematics": "linear"},
+        "analysis": {
+            "type": "mechanical", "kinematics": "linear",
+            "name": "coupon_analysis", "status": "no restart",
+        },
         "cluster": {"name": "coupon"},
-        "solver": {"type": "pardiso", "n_threads": 2, "matrix_type": "definite"},
+        "solver": {"type": "pardiso", "n_threads": 2, "matrix_type": "indefinite"},
+        "convergence": {
+            "relative_tolerance": 1e-6, "absolute_tolerance": 1e-8,
+            "divergence_tolerance": 1e6, "max_iterations": 20,
+        },
+        "loading": {"name": "static_load", "step_count": 1, "increment": 1.0},
         "material": {
             "youngs_modulus": 70000.0,
             "poisson_ratio": 0.3,
@@ -36,13 +44,8 @@ class DeckGenerationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        # Retain the orientation block while removing the unsupported surface block.
-        original = (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_text()
-        before_surface, after_surface = original.split("*Surface", 1)
-        _surface_body, orientation_body = after_surface.split("*Orientation", 1)
-        (self.root / "mesh.ele").write_text(
-            before_surface + "*Orientation" + orientation_body, encoding="utf-8", newline="\n"
-        )
+        fixture = Path(__file__).parent / "fixtures" / "abaqus_style_mesh_no_surface.ele"
+        (self.root / "mesh.ele").write_bytes(fixture.read_bytes())
         self.api = LocalAgentApi(self.root)
 
     def tearDown(self) -> None:
@@ -63,8 +66,16 @@ class DeckGenerationTests(unittest.TestCase):
         self.assertEqual((self.root / "first.in").read_bytes(), (self.root / "second.in").read_bytes())
         deck = (self.root / "first.in").read_text(encoding="latin-1")
         self.assertIn("** INTENT-SHA256", deck)
-        self.assertIn("*type=pardiso\nn_threads=2\nmatrix_type=definite", deck)
-        self.assertIn("*BOUNDARY\nbottom,1,3,0\n*LOAD\ntop,3,100", deck)
+        self.assertIn("*type=pardiso\nn_threads=2\nmatrix_type=indefinite", deck)
+        self.assertIn(
+            "type=disp,comp=xyz,name=constraint1,value=0,nset=coupon.bottom", deck
+        )
+        self.assertIn("type=force,comp=z,name=load1,value=100,nset=coupon.top", deck)
+        self.assertIn("type=Static,name=static_load,nstep=1,incr=1", deck)
+        self.assertIn("relative=9.9999999999999995e-07,absolute=1e-08,divergence=1000000", deck)
+        self.assertIn("*SELECTION,ID=1,TYPE=NODE\nbottom", deck)
+        self.assertIn("*SELECTION,ID=2,TYPE=NODE\ntop", deck)
+        self.assertLess(deck.index("*NSET,NSET=top"), deck.index("*SELECTION,ID=2,TYPE=NODE"))
 
     def test_requires_every_engineering_choice_and_confirmation(self) -> None:
         incomplete = copy.deepcopy(intent())
@@ -82,6 +93,15 @@ class DeckGenerationTests(unittest.TestCase):
             })
         self.assertEqual("confirmation_required", confirmation.exception.code)
         self.assertFalse((self.root / "unconfirmed.in").exists())
+
+        unsafe_solver = copy.deepcopy(intent())
+        unsafe_solver["solver"]["matrix_type"] = "definite"
+        with self.assertRaisesRegex(ApiError, "matrix_type") as matrix:
+            self.api.dispatch("generate_deck", {
+                "mesh": "mesh.ele", "intent": unsafe_solver, "destination": "definite.in",
+                "manifest": "definite.json", "confirm": True,
+            })
+        self.assertEqual("invalid_intent", matrix.exception.code)
 
     def test_rejects_unsupported_surface_and_refuses_overwrite(self) -> None:
         full = Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele"
