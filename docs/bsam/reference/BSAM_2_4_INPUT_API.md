@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.88.0`
-- Registry SHA-256: `E16EAC2B6FF2DDDAA5F00DFAD20418E76954F513D2B66604F956EFF5772C6650`
+- Registry version: `0.89.0`
+- Registry SHA-256: `6F51D9B6B9D8AD4F34E7A5335D9E123D1A67D89886CF7E632E6BB336B6EEA165`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1042,8 +1042,8 @@ Applies field values with a configured variable count.
 - Registry ID: `command.field`
 - Dispatch prefix: `*FIEL`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=implemented, `execute`=verified
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
 
 Known parameters:
 
@@ -1066,8 +1066,8 @@ Defines an indexed node or element selection used by later operations.
 - Registry ID: `command.selection`
 - Dispatch prefix: `*SELE`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=implemented, `execute`=verified
 
 Known parameters:
 

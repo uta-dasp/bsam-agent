@@ -120,6 +120,10 @@ class RegistryToolsTests(unittest.TestCase):
         selection_text = json.dumps(commands["*SELECTION"]).lower()
         self.assertIn("at most ten", selection_text)
         self.assertIn("blocks individual element labels", selection_text)
+        self.assertEqual("verified", commands["*SELECTION"]["operations"]["generate"])
+        self.assertEqual("verified", commands["*SELECTION"]["operations"]["execute"])
+        self.assertEqual("unsupported", commands["*FIELD"]["operations"]["generate"])
+        self.assertEqual("unassessed", commands["*FIELD"]["operations"]["execute"])
         tolerance = {item["name"]: item for item in commands["*TOLERANCE"]["parameters"]}
         self.assertEqual("PTOL", tolerance["TYPE"]["default"])
         exclusion = {item["name"]: item for item in commands["*EXCLUSION"]["parameters"]}

@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.88.0",
+  "registry_version": "0.89.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2524,13 +2524,13 @@
           "summary": "Sets the number of field values following each target; it has no source default and must not exceed the ten allocated slots."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection", "evidence.runtime-generated-isotropic-solid-success"],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
-        "modify": "unsupported", "create": "verified", "delete": "unsupported",
-        "rename": "unsupported", "generate": "verified",
-        "static_validation": "implemented", "execute": "verified"
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "rename": "unsupported", "generate": "unsupported",
+        "static_validation": "implemented", "execute": "unassessed"
       },
       "body": {
         "style": "records",
@@ -2564,13 +2564,13 @@
           "summary": "Selects whether the selection contains nodes or elements."
         }
       ],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection"],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-field-selection", "evidence.runtime-generated-isotropic-solid-success"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
-        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
-        "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "modify": "unsupported", "create": "verified", "delete": "unsupported",
+        "rename": "unsupported", "generate": "verified",
+        "static_validation": "implemented", "execute": "verified"
       },
       "body": {
         "style": "records",
