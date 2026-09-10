@@ -18,10 +18,10 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.11.0"
+PLAN_SCHEMA_VERSION = "1.12.0"
 SUPPORTED_PLAN_SCHEMA_VERSIONS = {
     "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0",
-    "1.7.0", "1.8.0", "1.9.0", "1.10.0", PLAN_SCHEMA_VERSION,
+    "1.7.0", "1.8.0", "1.9.0", "1.10.0", "1.11.0", PLAN_SCHEMA_VERSION,
 }
 AUDIT_SCHEMA_VERSION = "1.1.0"
 
@@ -1771,6 +1771,111 @@ def plan_create_entity(
     raise ChangeError(f"verified create adapter is missing for {record['id']}")
 
 
+def _table_value_patch(
+    source_set: SourceSet,
+    table_name: str,
+    row: int,
+    column: int,
+    value: str,
+) -> dict[str, Any]:
+    """Select one existing finite table value by one-based grid coordinates."""
+    _validate_raw_value(value)
+    try:
+        new_value = float(value)
+    except ValueError as exc:
+        raise ChangeError("table value must be a finite real") from exc
+    if not math.isfinite(new_value):
+        raise ChangeError("table value must be a finite real")
+    semantic = source_set.semantic_index()
+    tables = [
+        item for item in semantic.entities
+        if item.kind == "table" and item.name.casefold() == table_name.casefold()
+    ]
+    if len(tables) != 1:
+        raise ChangeError(
+            f"table {table_name} must resolve to one exact definition; found {len(tables)}"
+        )
+    table = tables[0]
+    if not table.attributes.get("valid_grid"):
+        raise ChangeError(f"table {table_name} does not have a valid rectangular grid")
+    shape = table.attributes.get("shape")
+    if not isinstance(shape, list) or len(shape) != 2:
+        raise ChangeError(f"table {table_name} grid shape is unavailable")
+    row_count, column_count = (int(shape[0]), int(shape[1]))
+    if row < 1 or row > row_count or column < 1 or column > column_count:
+        raise ChangeError(
+            f"table cell ({row}, {column}) is outside the {row_count}x{column_count} grid"
+        )
+    records = [
+        item for item in semantic.capability_records
+        if item.capability_id == "block.tables"
+        and item.attributes.get("entity_id") == table.id
+    ]
+    if len(records) != 1:
+        raise ChangeError(f"table {table_name} does not resolve to one capability record")
+    values = records[0].parameters.get("value", ())
+    value_index = (row - 1) * column_count + column - 1
+    if value_index >= len(values):
+        raise ChangeError(f"table {table_name} cell location is unavailable")
+    location = values[value_index].get("location")
+    if not isinstance(location, dict):
+        raise ChangeError(f"table {table_name} cell location is malformed")
+    source_path = _semantic_source_path(source_set, str(location["source"]))
+    document = source_set.documents.get(source_path)
+    if document is None:
+        raise ChangeError("table value source is not in the bound source set")
+    line = document.lines[int(location["line"]) - 1]
+    tokens = list(re.finditer(r"[^,\s#]+", line.text.split("#", 1)[0]))
+    if len(tokens) != column_count + 1:
+        raise ChangeError(
+            f"table row {row} no longer resolves to {column_count + 1} exact numeric fields"
+        )
+    token = tokens[column]
+    old = token.group(0)
+    try:
+        old_value = float(old)
+    except ValueError as exc:
+        raise ChangeError("existing table cell is not a finite real") from exc
+    expected = table.attributes["values"][row - 1][column - 1]
+    if not math.isfinite(old_value) or old_value != expected:
+        raise ChangeError("existing table cell no longer matches its semantic value")
+    if new_value == old_value:
+        raise ChangeError("requested table value is identical to the existing value")
+    start = line.start + token.start()
+    end = line.start + token.end()
+    return {
+        "source": str(source_path),
+        "start": start,
+        "end": end,
+        "line": line.number,
+        "old": document.raw[start:end].decode("latin-1"),
+        "new": value,
+    }
+
+
+def plan_set_table_value(
+    source: Path,
+    table_name: str,
+    row: int,
+    column: int,
+    value: str,
+    workspace_root: Path | None = None,
+) -> dict[str, Any]:
+    """Plan one exact existing TABLES grid-value replacement."""
+    source_set = SourceSet.read(source.resolve(), workspace_root)
+    patch = _table_value_patch(source_set, table_name, row, column, value)
+    model_path = f"TABLES[{table_name.casefold()}].values[{row},{column}]"
+    preview = (
+        f"line {patch['line']}: table {table_name} cell ({row}, {column}) "
+        f"= {patch['old']} -> {value}"
+    )
+    return _typed_plan(
+        source_set, patch, "set-table-value",
+        {"table": table_name, "row": row, "column": column, "value": value},
+        model_path, preview, "modify",
+    )
+
+
 def plan_modify_entity(
     source: Path,
     capability: str,
@@ -1780,6 +1885,17 @@ def plan_modify_entity(
 ) -> dict[str, Any]:
     """Modify an entity through an explicitly verified capability adapter."""
     record = _verified_operation_record(capability, "modify")
+    if record["id"] == "block.tables":
+        data = _structural_payload(changes, {"row", "column", "value"})
+        if any(
+            not isinstance(data[name], int) or isinstance(data[name], bool)
+            for name in ("row", "column")
+        ):
+            raise ChangeError("table row and column must be integers")
+        return plan_set_table_value(
+            source, entity_name, data["row"], data["column"], str(data["value"]),
+            workspace_root,
+        )
     if record["id"] in {"command.nset", "command.elset"}:
         if not isinstance(changes, dict):
             raise ChangeError("structural operation payload must be an object")
@@ -2621,6 +2737,11 @@ def plan_refresh_change(
             source, str(selector["cluster"]), str(selector["member_kind"]),
             str(selector["old_name"]), str(selector["new_name"]), workspace_root,
         )
+    if operation == "set-table-value":
+        return plan_set_table_value(
+            source, str(selector["table"]), int(selector["row"]),
+            int(selector["column"]), str(selector["value"]), workspace_root,
+        )
     if operation == "add-node":
         coordinates = selector.get("coordinates")
         if not isinstance(coordinates, list) or len(coordinates) != 3:
@@ -2834,6 +2955,44 @@ def _validated_plan_proposal(
         updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
         return (
             {source.resolve(): updated},
+            updated_document,
+            expected["changed_model_paths"],
+            expected["source_diff"],
+            expected["validation"],
+        )
+
+    if operation == "set-table-value":
+        selector = plan.get("selector")
+        if not isinstance(selector, dict):
+            raise ChangeError("table value plan is missing its selector")
+        try:
+            table_name = str(selector["table"])
+            row = int(selector["row"])
+            column = int(selector["column"])
+            value = str(selector["value"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ChangeError("table value selector is malformed") from exc
+        expected = plan_set_table_value(
+            source, table_name, row, column, value, source_set.workspace_root,
+        )
+        checked_fields = (
+            "selector", "patch", "changed_model_paths", "affected_files", "changes",
+            "source_diff", "validation", "preview", "proposed_sha256",
+            "proposed_source_set_sha256",
+        )
+        for field in checked_fields:
+            if plan.get(field) != expected.get(field):
+                raise ChangeError(
+                    f"table value plan {field} does not match its typed selector"
+                )
+        patch_source = Path(str(expected["patch"].get("source", source))).resolve()
+        patch_document = source_set.documents[patch_source]
+        updated = _patched_bytes(patch_document, expected["patch"])
+        replacements = {patch_source: updated}
+        root_raw = replacements.get(source.resolve(), document.raw)
+        updated_document = SourceDocument.from_bytes(root_raw, str(source.resolve()))
+        return (
+            replacements,
             updated_document,
             expected["changed_model_paths"],
             expected["source_diff"],

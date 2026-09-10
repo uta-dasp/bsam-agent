@@ -96,6 +96,53 @@ class TableCapabilityTests(unittest.TestCase):
         self.assertEqual([2, 2], result["matches"][0]["attributes"]["shape"])
         self.assertEqual("verified", result["matches"][0]["operations"]["inspect"])
 
+    def test_reviewed_table_cell_edit_patches_one_exact_value(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "model.in"
+            source.write_bytes(table_deck())
+            api = LocalAgentApi(root)
+
+            plan = api.dispatch("preview_modify_entity", {
+                "source": "model.in",
+                "capability": "block.tables",
+                "entity_name": "stiffness",
+                "changes": {"row": 2, "column": 2, "value": "275"},
+                "plan_path": "table-change.json",
+            })
+            self.assertEqual("set-table-value", plan["operation"])
+            self.assertEqual("250", plan["patch"]["old"])
+            self.assertEqual("275", plan["patch"]["new"])
+            self.assertEqual(
+                ["TABLES[stiffness].values[2,2]"], plan["changed_model_paths"],
+            )
+            api.dispatch("review_change", {"plan_path": "table-change.json"})
+            result = api.dispatch("apply_change", {
+                "plan_path": "table-change.json",
+                "destination": "changed.in",
+                "confirm": True,
+            })
+            changed = (root / "changed.in").read_bytes()
+            self.assertIn(b"20 150 275", changed)
+            self.assertEqual(1, plan["source_diff"].count("-20 150 250"))
+            self.assertEqual(1, plan["source_diff"].count("+20 150 275"))
+            self.assertEqual(0, result["validation"]["summary"]["errors"])
+
+            invalid_changes = (
+                {"row": 3, "column": 1, "value": "1"},
+                {"row": 1, "column": 1, "value": "nan"},
+                {"row": 1, "column": 1, "value": "100.0"},
+            )
+            for ordinal, changes in enumerate(invalid_changes, start=1):
+                with self.assertRaises(ValueError):
+                    api.dispatch("preview_modify_entity", {
+                        "source": "model.in",
+                        "capability": "block.tables",
+                        "entity_name": "stiffness",
+                        "changes": changes,
+                        "plan_path": f"invalid-{ordinal}.json",
+                    })
+
     def test_reference_queries_accept_stable_kind_and_name_selectors(self) -> None:
         duplicate = table_deck().replace(
             b"END TABLES", b"table-stiffness\ntemp-moisture 0\n10 1\n*end\nEND TABLES",
@@ -161,7 +208,7 @@ class TableCapabilityTests(unittest.TestCase):
         )
         self.assertEqual("verified", table["operations"]["parse"])
         self.assertEqual("verified", table["operations"]["static_validation"])
-        self.assertEqual("unsupported", table["operations"]["modify"])
+        self.assertEqual("verified", table["operations"]["modify"])
 
     def test_natural_table_listing_is_deterministic(self) -> None:
         class NoCallProvider:

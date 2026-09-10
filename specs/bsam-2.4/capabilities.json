@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.3.0",
-  "registry_version": "0.83.0",
+  "registry_version": "0.84.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1240,7 +1240,7 @@
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
-        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
+        "modify": "verified", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
         "static_validation": "verified", "execute": "unassessed"
       },

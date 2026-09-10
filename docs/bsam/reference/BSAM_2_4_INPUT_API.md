@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.83.0`
-- Registry SHA-256: `32031C7AD30B65E1199201A60DE0F0E99242927C291E1BD65D2ED15780B96DF8`
+- Registry version: `0.84.0`
+- Registry SHA-256: `855722A2A075E481DE7F754557A95564B1E89276413F0E9EBB555115259E698A`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -293,7 +293,7 @@ Defines named lookup tables used by material data.
 - Termination: `*end per table`, `END TABLES` (canonical)
 - Coverage: documented
 - Evidence: [evidence.table-parser](#evidencetable-parser), [evidence.table-initializer](#evidencetable-initializer), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 

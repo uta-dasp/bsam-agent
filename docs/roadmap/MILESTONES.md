@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.83.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.84.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -166,7 +166,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Create, delete, rename, and list entities and records whose corresponding registry operation is verified, including dependency-aware explicit node/element-set rename across source files.
 - [ ] Reorder entities or records only after their registry contracts define safe ordering semantics.
 - [x] Edit registered repeated parameter values, explicit set member lists, and referenced set names.
-- [ ] Edit TABLES grids through reviewed minimal patches.
+- [x] Edit one existing TABLES grid value through a one-based, finite-real, reviewed minimal patch without changing axes, names, or shape.
 - [x] Generalize path-bound reviewed include-file edits across verified node, element, set, and empty-cluster mesh insertion operations.
 - [x] Copy a reviewed root edit plus unchanged relative include files to a separate source-set directory with preflight conflict checks, digest verification, and partial-write rollback.
 - [x] Delete an unreferenced node from an included FE fragment through a path-bound patch, and compose root/include changes into one reviewed source-set plan without touching originals.
