@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .change import (
+    ChangeError,
     apply_plan,
     plan_add_element,
     plan_add_node,
@@ -46,7 +47,7 @@ from .tool_contracts import (
 )
 
 
-API_VERSION = "0.1.0"
+API_VERSION = "0.2.0"
 MAX_REQUEST_BYTES = 1_048_576
 
 
@@ -112,6 +113,8 @@ class LocalAgentApi:
             return validate_response(tool, result)
         except ApiError:
             raise
+        except ChangeError as exc:
+            raise ApiError(exc.code or "invalid_arguments", str(exc)) from exc
         except (TypeError, ValueError) as exc:
             raise ApiError("invalid_arguments", str(exc)) from exc
 

@@ -29,6 +29,10 @@ AUDIT_SCHEMA_VERSION = "1.1.0"
 class ChangeError(ValueError):
     """Raised when a requested change cannot be planned or safely applied."""
 
+    def __init__(self, message: str, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+
 
 def _canonical_json(value: dict[str, Any]) -> bytes:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
@@ -109,9 +113,14 @@ def _validation_result(source_set: SourceSet, replacements: dict[Path, bytes]) -
 
 def _validate_raw_value(value: str) -> None:
     if any(character in value for character in "\r\n\x00,"):
-        raise ChangeError("replacement value must be a single non-comma record value")
+        raise ChangeError(
+            "replacement value must be a single non-comma record value",
+            "invalid_parameter_value",
+        )
     if not value.strip():
-        raise ChangeError("replacement value must not be empty")
+        raise ChangeError(
+            "replacement value must not be empty", "invalid_parameter_value",
+        )
 
 
 def _semantic_source_path(source_set: SourceSet, source: str) -> Path:
@@ -1068,7 +1077,9 @@ def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
     block_by_name = {name: item["id"] for name, item in block_records.items()}
     block_id = block_by_name.get(block_name.upper())
     if block_id is None:
-        raise ChangeError(f"unknown registered block: {block_name}")
+        raise ChangeError(
+            f"unknown registered block: {block_name}", "unknown_parameter_context",
+        )
     requested = construct_name.upper()
     if not requested.startswith("*"):
         requested = "*" + requested
@@ -1088,7 +1099,10 @@ def _construct_record(block_name: str, construct_name: str) -> dict[str, Any]:
         )
     ]
     if not matches:
-        raise ChangeError(f"unknown registered construct {construct_name} in {block_name}")
+        raise ChangeError(
+            f"unknown registered construct {construct_name} in {block_name}",
+            "unknown_parameter_context",
+        )
     return matches[0]
 
 
@@ -1099,7 +1113,8 @@ def _parameter_definition(
     definition = parameters.get(parameter.lower())
     if definition is None:
         raise ChangeError(
-            f"parameter {parameter} is not registered for {construct['canonical']}; untyped edits are blocked"
+            f"parameter {parameter} is not registered for {construct['canonical']}; untyped edits are blocked",
+            "unknown_parameter",
         )
     return definition
 
@@ -1121,14 +1136,24 @@ def _validate_replacement(construct: dict[str, Any], parameter: str, value: str)
         else:
             parsed = 0
     except ValueError as exc:
-        raise ChangeError(f"value {value!r} is not a valid {definition['value_type']}") from exc
+        raise ChangeError(
+            f"value {value!r} is not a valid {definition['value_type']}",
+            "invalid_parameter_value",
+        ) from exc
     if value_type.startswith("positive-") and parsed <= 0:
-        raise ChangeError(f"value for {parameter} must be positive")
+        raise ChangeError(
+            f"value for {parameter} must be positive", "invalid_parameter_value",
+        )
     if value_type.startswith("nonnegative-") and parsed < 0:
-        raise ChangeError(f"value for {parameter} must be nonnegative")
+        raise ChangeError(
+            f"value for {parameter} must be nonnegative", "invalid_parameter_value",
+        )
     allowed = definition.get("allowed_values")
     if allowed is not None and value.lower() not in {str(item).lower() for item in allowed}:
-        raise ChangeError(f"value for {parameter} must be one of: {', '.join(map(str, allowed))}")
+        raise ChangeError(
+            f"value for {parameter} must be one of: {', '.join(map(str, allowed))}",
+            "invalid_parameter_value",
+        )
 
 
 def _find_construct_lines(
@@ -1138,10 +1163,14 @@ def _find_construct_lines(
     occurrence: int,
 ) -> tuple[int, int]:
     if occurrence < 1:
-        raise ChangeError("occurrence must be at least 1")
+        raise ChangeError(
+            "occurrence must be at least 1", "invalid_parameter_occurrence",
+        )
     blocks = [item for item in document.blocks() if item["name"].upper() == block_name.upper()]
     if not blocks:
-        raise ChangeError(f"block {block_name} was not found")
+        raise ChangeError(
+            f"block {block_name} was not found", "missing_parameter_context",
+        )
     prefix = construct["match_prefix"].lower()
     matches: list[tuple[int, int]] = []
     for block in blocks:
@@ -1162,7 +1191,8 @@ def _find_construct_lines(
             line_number += 1
     if occurrence > len(matches):
         raise ChangeError(
-            f"construct {construct['canonical']} occurrence {occurrence} was not found; found {len(matches)}"
+            f"construct {construct['canonical']} occurrence {occurrence} was not found; found {len(matches)}",
+            "missing_parameter_context",
         )
     return matches[occurrence - 1]
 
@@ -1194,7 +1224,10 @@ def _value_spans(line: SourceLine, parameter: str) -> list[tuple[int, int]]:
             while value_end > value_start and searchable[value_end - 1].isspace():
                 value_end -= 1
             if value_end == value_start:
-                raise ChangeError(f"parameter {parameter} has an empty value on line {line.number}")
+                raise ChangeError(
+                    f"parameter {parameter} has an empty value on line {line.number}",
+                    "invalid_parameter_value",
+                )
             spans.append((line.start + value_start, line.start + value_end))
             cursor = value_end
             continue
@@ -1213,17 +1246,24 @@ def _select_parameter_candidate(
             lines = ", ".join(str(item[0].number) for item in candidates)
             raise ChangeError(
                 f"parameter {parameter} is ambiguous in the selected construct "
-                f"(lines {lines}); provide parameter_occurrence"
+                f"(lines {lines}); provide parameter_occurrence",
+                "ambiguous_parameter",
             )
         return candidates[0], 1
     if parameter_occurrence < 1:
-        raise ChangeError("parameter_occurrence must be at least 1")
+        raise ChangeError(
+            "parameter_occurrence must be at least 1", "invalid_parameter_occurrence",
+        )
     if definition.get("cardinality", "single") != "repeated-last-wins":
-        raise ChangeError(f"parameter {parameter} is not registered as repeated")
+        raise ChangeError(
+            f"parameter {parameter} is not registered as repeated",
+            "parameter_edit_unsupported",
+        )
     if parameter_occurrence > len(candidates):
         raise ChangeError(
             f"parameter {parameter} occurrence {parameter_occurrence} was not found; "
-            f"found {len(candidates)}"
+            f"found {len(candidates)}",
+            "missing_parameter",
         )
     return candidates[parameter_occurrence - 1], parameter_occurrence
 
@@ -1265,7 +1305,8 @@ def _flag_parameter_plan(
     spans = _flag_spans(line, construct, parameter)
     if len(spans) > 1:
         raise ChangeError(
-            f"flag {parameter} is ambiguous on line {line.number}"
+            f"flag {parameter} is ambiguous on line {line.number}",
+            "ambiguous_parameter",
         )
     enabled = value.casefold() == "true"
     if enabled == bool(spans):
@@ -1273,7 +1314,8 @@ def _flag_parameter_plan(
     edit_operation = "insert" if enabled else "remove"
     if definition.get("edit_operations", {}).get(edit_operation) != "verified":
         raise ChangeError(
-            f"{edit_operation} of flag parameter {parameter} is not verified"
+            f"{edit_operation} of flag parameter {parameter} is not verified",
+            "parameter_edit_unsupported",
         )
     if enabled:
         code = line.text.split("#", 1)[0]
@@ -1293,7 +1335,8 @@ def _flag_parameter_plan(
             local_start -= 1
         elif local_start == start - line.start:
             raise ChangeError(
-                f"flag {parameter} is not separately delimited; removal is blocked"
+                f"flag {parameter} is not separately delimited; removal is blocked",
+                "parameter_edit_unsupported",
             )
         start = line.start + local_start
         old = document.raw[start:end].decode("latin-1")
@@ -2066,13 +2109,18 @@ def plan_parameter_change(
     if insert_repeated:
         if parameter_occurrence is not None:
             raise ChangeError(
-                "parameter_occurrence cannot be combined with insert_repeated"
+                "parameter_occurrence cannot be combined with insert_repeated",
+                "invalid_parameter_occurrence",
             )
         if definition.get("cardinality", "single") != "repeated-last-wins":
-            raise ChangeError(f"parameter {parameter} is not registered as repeated")
+            raise ChangeError(
+                f"parameter {parameter} is not registered as repeated",
+                "parameter_edit_unsupported",
+            )
         if definition.get("edit_operations", {}).get("insert") != "verified":
             raise ChangeError(
-                f"insertion of repeated parameter {parameter} is not verified"
+                f"insertion of repeated parameter {parameter} is not verified",
+                "parameter_edit_unsupported",
             )
         selected_parameter_occurrence = len(candidates) + 1
     if candidates and not insert_repeated:
@@ -2096,12 +2144,14 @@ def plan_parameter_change(
     else:
         if parameter_occurrence is not None:
             raise ChangeError(
-                f"parameter {parameter} occurrence {parameter_occurrence} was not found; found 0"
+                f"parameter {parameter} occurrence {parameter_occurrence} was not found; found 0",
+                "missing_parameter",
             )
         if definition.get("edit_operations", {}).get("insert") != "verified":
             raise ChangeError(
                 f"parameter {parameter} was not found in {construct['canonical']} occurrence "
-                f"{occurrence}; insertion is not verified"
+                f"{occurrence}; insertion is not verified",
+                "missing_parameter",
             )
         insertion = document.lines[end_line].start if end_line < len(document.lines) else len(document.raw)
         line_number = (
@@ -2209,16 +2259,23 @@ def plan_parameter_removal(
     construct = _construct_record(block, construct_name)
     definition = _parameter_definition(construct, parameter)
     if definition.get("edit_operations", {}).get("remove") != "verified":
-        raise ChangeError(f"removal of parameter {parameter} is not verified")
+        raise ChangeError(
+            f"removal of parameter {parameter} is not verified",
+            "parameter_edit_unsupported",
+        )
     if definition.get("required") or "default" not in definition:
-        raise ChangeError(f"parameter {parameter} cannot be safely reset by omission")
+        raise ChangeError(
+            f"parameter {parameter} cannot be safely reset by omission",
+            "parameter_edit_unsupported",
+        )
     start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
     candidates: list[tuple[SourceLine, int, int]] = []
     for line in document.lines[start_line:end_line]:
         candidates.extend((line, *span) for span in _value_spans(line, parameter))
     if not candidates:
         raise ChangeError(
-            f"parameter {parameter} was not found in {construct['canonical']} occurrence {occurrence}"
+            f"parameter {parameter} was not found in {construct['canonical']} occurrence {occurrence}",
+            "missing_parameter",
         )
     selected, selected_parameter_occurrence = _select_parameter_candidate(
         candidates, definition, parameter, parameter_occurrence,
@@ -2226,7 +2283,8 @@ def plan_parameter_removal(
     line, value_start, value_end = selected
     if "#" in line.text or "," in line.text:
         raise ChangeError(
-            f"parameter {parameter} shares line {line.number}; minimal removal is not verified"
+            f"parameter {parameter} shares line {line.number}; minimal removal is not verified",
+            "parameter_edit_unsupported",
         )
     local_start = value_start - line.start
     local_end = value_end - line.start
@@ -2237,7 +2295,8 @@ def plan_parameter_removal(
     )
     if expected_prefix is None or after.strip():
         raise ChangeError(
-            f"parameter {parameter} is not an isolated record; minimal removal is not verified"
+            f"parameter {parameter} is not an isolated record; minimal removal is not verified",
+            "parameter_edit_unsupported",
         )
     old_record = document.raw[line.start:line.end]
     patch = {

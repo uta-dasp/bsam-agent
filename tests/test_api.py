@@ -123,6 +123,44 @@ class LocalApiTests(unittest.TestCase):
             })
             self.assertEqual("insert-repeated-parameter", repeated["operation"])
             self.assertEqual(2, repeated["selector"]["parameter_occurrence"])
+            failures = (
+                ({
+                    "source": "model.in", "block": "BOUNDARY",
+                    "construct": "CONVERGENCE", "parameter": "mystery",
+                    "value": "1", "plan_path": "unknown.json",
+                }, "unknown_parameter"),
+                ({
+                    "source": "model.in", "block": "BOUNDARY",
+                    "construct": "CONVERGENCE", "parameter": "absolute",
+                    "value": "nan", "plan_path": "invalid.json",
+                }, "invalid_parameter_value"),
+            )
+            for arguments, expected_code in failures:
+                with self.assertRaises(ApiError) as raised:
+                    api.dispatch("preview_parameter_change", arguments)
+                self.assertEqual(expected_code, raised.exception.code)
+
+            (root / "missing.in").write_bytes(DECK.replace(b"maxiterations=20\n", b""))
+            with self.assertRaises(ApiError) as missing:
+                api.dispatch("preview_parameter_removal", {
+                    "source": "missing.in", "block": "BOUNDARY",
+                    "construct": "CONVERGENCE", "parameter": "maxiterations",
+                    "plan_path": "missing.json",
+                })
+            self.assertEqual("missing_parameter", missing.exception.code)
+
+            (root / "ambiguous.in").write_bytes(DECK.replace(
+                b"maxiterations=20\n",
+                b"maxiterations=20\nmaxiterations=30\n",
+            ))
+            with self.assertRaises(ApiError) as ambiguous:
+                api.dispatch("preview_parameter_change", {
+                    "source": "ambiguous.in", "block": "BOUNDARY",
+                    "construct": "CONVERGENCE", "parameter": "maxiterations",
+                    "value": "40", "plan_path": "ambiguous.json",
+                })
+            self.assertEqual("ambiguous_parameter", ambiguous.exception.code)
+            self.assertIn("provide parameter_occurrence", str(ambiguous.exception))
             api.dispatch("preview_parameter_change", {
                 "source": "model.in",
                 "block": "BOUNDARY",
