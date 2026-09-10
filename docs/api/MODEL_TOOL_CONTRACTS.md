@@ -9,6 +9,7 @@ These are the only operations an optional language model should be allowed to re
 | `query_model` | Run focused registered-construct, parameter, entity, and reference queries | No |
 | `validate_model` | Run deterministic validation | No |
 | `import_mesh` | Inspect and validate a manually prepared Abaqus-style `.ele` mesh | No |
+| `generate_deck` | Create a canonical deck and provenance manifest from a registered profile and complete typed intent | Yes, confirmation required |
 | `preview_parameter_change` | Plan one registered parameter edit | Writes plan only |
 | `preview_parameter_removal` | Plan removal of an isolated optional parameter with verified omission/default semantics | Writes plan only |
 | `preview_compose_changes` | Compose 2–8 independent same-revision typed plans into one reviewed plan | Writes plan only |
@@ -32,6 +33,7 @@ These are the only operations an optional language model should be allowed to re
 - Tool arguments are validated against strict schemas; unknown properties are rejected.
 - The provider receives summaries and enumerations by default, never full source files or unrestricted decks.
 - Model changes use stable capability/entity identifiers, never raw unrestricted text replacement.
+- `generate_deck` requires `confirm: true`, refuses existing outputs, validates every engineering field and mesh target, and rolls back both deck and provenance manifest if generated static validation fails.
 - Registry specification `coverage` and per-capability operational support are separate; `get_capabilities` exposes complete operation maturity plus derived inspect/query/create/modify/validate/run intent maturity, and omitted registry operations are reported as `unassessed`.
 - Optional parameter insertion/removal occurs only when its parameter-level registry operation is `verified`. Current cases are absent or isolated-record `BOUNDARY/*CONVERGENCE/maxiterations`, Boolean `BOUNDARY/*G-CONTROL/DAMP` enable/disable, and the repeated SHEFF option row `SOLVER/relative_tolerance`; shared-record removal is blocked.
 - `query_model` reports explicit versus registered-default parameter values, supports stable entity kind/name selectors for listings and references, and returns ambiguity instead of choosing among multiple contexts.

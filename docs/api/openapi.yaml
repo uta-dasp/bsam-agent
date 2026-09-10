@@ -327,7 +327,7 @@ components:
     CapabilityManifest:
       type: object
       additionalProperties: false
-      required: [api_version, specification_version, bsam, categories, transformations]
+      required: [api_version, specification_version, bsam, categories, generation_profiles, transformations]
       properties:
         api_version:
           type: string
@@ -339,6 +339,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CapabilityCategory"
+        generation_profiles:
+          type: array
+          items:
+            type: object
         transformations:
           type: array
           items:

@@ -88,6 +88,9 @@ class LocalApiTests(unittest.TestCase):
             )
             self.assertEqual("verified", convergence["operations"]["inspect"])
             self.assertEqual("unsupported", convergence["operations"]["create"])
+            profiles = capabilities["capabilities"]["generation_profiles"]
+            self.assertEqual("generation.mechanical-isotropic-solid-v1", profiles[0]["id"])
+            self.assertEqual("verified", profiles[0]["status"])
             transformations = capabilities["capabilities"]["transformations"]
             self.assertEqual("transformation.notch-expand-plies", transformations[0]["id"])
             self.assertTrue(transformations[0]["applicability"])

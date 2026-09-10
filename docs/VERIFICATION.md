@@ -79,6 +79,8 @@ The generated reference is a view of the same registry; it is not independent ev
 
 No single successful BSAM run proves general correctness. Each supported capability needs positive, negative, round-trip, and dependency tests appropriate to its risk.
 
+Registry 0.86.0 adds the verified `generation.mechanical-isotropic-solid-v1` profile. Its tests prove canonical repeatability, stable mesh/intent/output digests, explicit-choice rejection, mesh-target resolution, unsupported-surface refusal, confirmation enforcement, no-overwrite behavior, rollback safety, and zero-error static validation of the generated deck. This is a bounded static-generation qualification, not executable evidence for arbitrary user-selected engineering values.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

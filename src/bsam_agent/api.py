@@ -34,6 +34,7 @@ from .change import (
     write_plan,
 )
 from .capabilities import capability_manifest
+from .generation import GenerationError, generate_deck
 from .mesh import import_ele
 from .query import query_model
 from .registry import load_registry
@@ -47,7 +48,7 @@ from .tool_contracts import (
 )
 
 
-API_VERSION = "0.2.0"
+API_VERSION = "0.3.0"
 MAX_REQUEST_BYTES = 1_048_576
 
 
@@ -115,6 +116,8 @@ class LocalAgentApi:
             raise
         except ChangeError as exc:
             raise ApiError(exc.code or "invalid_arguments", str(exc)) from exc
+        except GenerationError as exc:
+            raise ApiError(exc.code, str(exc)) from exc
         except (TypeError, ValueError) as exc:
             raise ApiError("invalid_arguments", str(exc)) from exc
 
@@ -139,6 +142,7 @@ class LocalAgentApi:
                         {key: item[key] for key in ("id", "canonical", "coverage")}
                         for item in registry["nested_constructs"]
                     ],
+                    "generation_profiles": registry["generation_profiles"],
                     "transformations": registry["transformations"],
                     "obsolete_tokens": registry["obsolete_tokens"],
                     "operational_manifest": capability_manifest(registry),
@@ -176,6 +180,16 @@ class LocalAgentApi:
         if tool == "import_mesh":
             args = self._args(arguments, {"source"})
             return import_ele(self._path(args["source"], "source")).as_dict()
+        if tool == "generate_deck":
+            args = self._args(
+                arguments, {"mesh", "intent", "destination", "manifest", "confirm"}
+            )
+            return generate_deck(
+                self._path(args["mesh"], "mesh"), args["intent"],
+                self._path(args["destination"], "destination"),
+                self._path(args["manifest"], "manifest"), self.workspace_root,
+                confirm=bool(args["confirm"]),
+            )
         if tool == "preview_parameter_change":
             args = self._args(
                 arguments,

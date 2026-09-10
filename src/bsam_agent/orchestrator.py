@@ -19,7 +19,7 @@ from .registry import load_registry
 from .tool_contracts import TOOL_CONTRACTS, TOOL_DESCRIPTIONS, validate_arguments
 
 
-GUARDED_TOOLS = frozenset({"apply_change", "run_bsam", "stop_run"})
+GUARDED_TOOLS = frozenset({"generate_deck", "apply_change", "run_bsam", "stop_run"})
 PREVIEW_TOOLS = frozenset(name for name in TOOL_CONTRACTS if name.startswith("preview_"))
 POLICY_ERROR_CODES = (
     "confirmation_required", "invalid_arguments", "path_not_allowed",
@@ -335,6 +335,10 @@ def relevant_tools(user_text: str) -> tuple[str, ...]:
         return ("stop_run", "get_run_status")
     if "run" in text or "launch" in text:
         return ("run_bsam", "validate_model", "get_run_status")
+    if re.search(r"\b(?:generate|build|create)\b", text) and (
+        "deck" in text or "model" in text
+    ):
+        return ("generate_deck", "import_mesh", "get_capabilities")
     if "unknown" in text or "undocumented" in text or "sounds plausible" in text:
         return ("get_capabilities", "preview_parameter_change", "validate_model")
     if re.search(r"\b(?:compose|combine|merge)\b", text) and (
@@ -1657,6 +1661,11 @@ def _summarize_result(tool: str, result: dict[str, Any]) -> str:
         )
     if tool == "apply_change":
         return f"Applied the reviewed plan to {result.get('destination', 'the destination deck')}."
+    if tool == "generate_deck":
+        return (
+            f"Generated the registered deck profile with output digest "
+            f"{result.get('output_sha256', '')}."
+        )
     if tool == "run_bsam":
         return (
             f"BSAM run {result.get('state', 'accepted')}: "

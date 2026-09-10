@@ -66,6 +66,9 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
     }, ("source_set_sha256", "query", "matches", "summary")),
     "validate_model": ToolContract({"source": S}, ("source_set_sha256", "diagnostics", "summary")),
     "import_mesh": ToolContract({"source": S}, ("format", "provenance", "summary")),
+    "generate_deck": ToolContract({
+        "mesh": S, "intent": O, "destination": S, "manifest": S, "confirm": B,
+    }, ("generation_id", "registry_version", "profile", "output_sha256", "validation")),
     "preview_parameter_change": ToolContract({
         "source": S, "block": S, "construct": S, "parameter": S, "value": S,
         "plan_path": S, "occurrence": Field("integer", required=False),
@@ -144,6 +147,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "query_model": "Run a focused semantic query for registered constructs, parameters, entities, or references.",
     "validate_model": "Validate an existing BSAM deck without changing or running it.",
     "import_mesh": "Inspect and validate a manually prepared Abaqus-style .ele mesh without modifying a deck.",
+    "generate_deck": "Generate a new canonical BSAM deck and provenance manifest from a registered profile, validated mesh, and complete explicit engineering intent; confirm must be true.",
     "preview_parameter_change": "Create a review plan to replace or insert one registered parameter value, with explicit occurrence selection for repeated-last-wins values.",
     "preview_parameter_removal": "Create a review plan to remove one isolated optional parameter value, with explicit occurrence selection for repeated-last-wins values.",
     "preview_compose_changes": "Compose 2 to 8 independent same-revision typed plans into one validated review and confirmation boundary.",

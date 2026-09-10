@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.85.0`
-- Registry SHA-256: `EACFB132F3CB2EA21530FC0A18018BC4825F7CAE685002D134BC52145901869E`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
+- Registry version: `0.86.0`
+- Registry SHA-256: `D7D5B30E8A49823E1AC6CFEC2E86556DF0634E92CC96334640DD897F094EE1D6`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -1834,6 +1834,61 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
   - Constraint: The active implementation reduces multiple selected sets to one entry per distinct cluster, so selecting two sets from the same cluster does not preserve both set identities.
   - Constraint: The execution path stores c_system but volume-average and CFV calculations do not consume it; the Agent preserves material-coordinate requests but blocks generating them as an effective transformation claim.
   - Constraint: CFV requires every retained cluster to use compatible constitutive/failure data and the same mode/level dimensions.
+
+
+## Registered generation profiles
+
+### `generation.mechanical-isotropic-solid-v1@1.0.0`
+
+Builds one canonical current-syntax linear-mechanical deck from a validated Abaqus-style .ele mesh and a complete explicit isotropic solid analysis intent.
+
+- Status: verified
+- Tool: `generate_deck`
+- Analysis: linear mechanical solid finite element
+- Mesh format: `abaqus-style-ele`
+- Evidence: [evidence.main-input-sequence](#evidencemain-input-sequence), [evidence.input-parser](#evidenceinput-parser), [evidence.solver-parser](#evidencesolver-parser), [evidence.boundary-parser](#evidenceboundary-parser), [evidence.constitutive-parser](#evidenceconstitutive-parser), [evidence.failure-parser](#evidencefailure-parser), [evidence.material-parser](#evidencematerial-parser), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-core-records](#evidencefe-core-records)
+- Required engineering choices:
+  - `unit_system`
+  - `cluster.name`
+  - `solver.type`
+  - `solver.n_threads`
+  - `solver.matrix_type`
+  - `material.youngs_modulus`
+  - `material.poisson_ratio`
+  - `material.thermal_expansion`
+  - `material.tensile_strength`
+  - `material.compressive_strength`
+  - `material.shear_strength`
+  - `constitutive.failure_type`
+  - `constitutive.z_rotation_degrees`
+  - `constraints`
+  - `loads`
+- Capability dependencies:
+  - `block.input`
+  - `block.solver`
+  - `block.boundary`
+  - `block.constitutive`
+  - `block.failure`
+  - `block.materials`
+  - `block.clusters`
+  - `command.type`
+  - `command.name`
+  - `command.dimensions`
+  - `command.node`
+  - `command.element`
+  - `command.nset`
+  - `command.elset`
+  - `command.orientation`
+  - `command.constitutive`
+  - `command.boundary`
+  - `command.load`
+  - `command.stop`
+- Constraints:
+  - The profile accepts only linear mechanical analysis, one solid cluster, current serial PARDISO syntax, legacy isotropic MATERIALS type 10, direct CONSTITUTIVE type 1, and an explicitly selected no-data bulk FAILURE criterion.
+  - Every engineering field is required; the generator supplies no material, strength, orientation, solver, boundary, load, or unit default.
+  - Boundary and load targets must resolve to explicit node labels or node sets in the validated mesh; version 1 rejects imported SURFACE records because BSAM has no active matching cluster dispatch.
+  - The deck and manifest are created together without overwrite; partial output is removed on failure.
+  - Canonical deck comments and the manifest bind generator, registry, profile, mesh, normalized intent, and output SHA-256 values.
 
 
 ## Registered transformations

@@ -81,6 +81,10 @@ def candidate_tools(user: str) -> dict[str, dict[str, Any]]:
         names = ("stop_run", "get_run_status", "run_bsam")
     elif "run" in text or "launch" in text:
         names = ("run_bsam", "validate_model", "get_run_status", "stop_run")
+    elif ("generate" in text or "build" in text or "create" in text) and (
+        "deck" in text or "model" in text
+    ):
+        names = ("generate_deck", "import_mesh", "get_capabilities")
     elif "unknown" in text or "undocumented" in text or "sounds plausible" in text:
         names = ("get_capabilities", "preview_parameter_change", "validate_model")
     elif "rename" in text:
@@ -150,7 +154,7 @@ def _policy_error(tool: str, arguments: dict[str, Any]) -> str | None:
             path = Path(value)
             if path.is_absolute() or ".." in path.parts:
                 return "path_not_allowed"
-    if tool in {"apply_change", "run_bsam", "stop_run"} and arguments.get("confirm") is not True:
+    if tool in {"generate_deck", "apply_change", "run_bsam", "stop_run"} and arguments.get("confirm") is not True:
         return "confirmation_required"
     return None
 

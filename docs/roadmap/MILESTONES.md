@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.85.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.86.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -79,7 +79,7 @@ Exit: every reachable active input path is fully specified or explicitly blocked
 
 ## M2 — Registry-driven deterministic engine
 
-Status: partially implemented. Loss-preserving parsing, selected semantic entities/references, registered parameter edits, node/element/set edits, boundary-condition rename, solver migration, notch laminate transformation, and mesh-template assembly exist. M2 generalizes these mechanisms where registry metadata is sufficient; it does not restart them.
+Status: complete. Loss-preserving parsing, semantic identities/references, registered parameter edits, structural edits, bounded transformations, mesh-template assembly, and one deterministic net-new deck profile are implemented behind registry contracts.
 
 ### M2.1 Generic parsing and semantic model
 
@@ -175,9 +175,9 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 
 ### M2.4 Deterministic generation
 
-- [ ] Build new current-syntax decks from typed analysis and mesh intent.
-- [ ] Require all essential engineering choices rather than inventing them.
-- [ ] Render canonical current syntax with provenance and stable digests.
+- [x] Build new current-syntax decks from typed analysis and mesh intent.
+- [x] Require all essential engineering choices rather than inventing them.
+- [x] Render canonical current syntax with provenance and stable digests.
 
 Exit: ordinary supported BSAM operations are driven by registry metadata, not prompt-specific or fixture-specific code.
 
@@ -251,7 +251,7 @@ Input gate: user selection of the first geometry families and trusted acceptance
 
 ## Next execution sessions
 
-1. Continue dependency indexing for source-backed cluster transformations and selection consumers; keep engineering-significant coordinate mutations non-editable.
+1. Continue M3 cross-feature validation coverage for the registered generation profile and remaining capability families.
 2. Continue non-notch live acceptance when another trusted representative project is available; do not fabricate engineering fixtures.
 
 No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

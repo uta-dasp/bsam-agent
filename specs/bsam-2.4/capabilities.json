@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.4.0",
-  "registry_version": "0.85.0",
+  "schema_version": "1.5.0",
+  "registry_version": "0.86.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3487,6 +3487,73 @@
         ],
         "dependencies": ["All selected clusters and sets must belong to the current boundary problem.", "Mesh, set, or cluster edits must revalidate every output selector."]
       }
+    }
+  ],
+  "generation_profiles": [
+    {
+      "id": "generation.mechanical-isotropic-solid-v1",
+      "profile_version": "1.0.0",
+      "status": "verified",
+      "summary": "Builds one canonical current-syntax linear-mechanical deck from a validated Abaqus-style .ele mesh and a complete explicit isotropic solid analysis intent.",
+      "tool": "generate_deck",
+      "analysis": "linear mechanical solid finite element",
+      "mesh_format": "abaqus-style-ele",
+      "required_choices": [
+        "unit_system",
+        "cluster.name",
+        "solver.type",
+        "solver.n_threads",
+        "solver.matrix_type",
+        "material.youngs_modulus",
+        "material.poisson_ratio",
+        "material.thermal_expansion",
+        "material.tensile_strength",
+        "material.compressive_strength",
+        "material.shear_strength",
+        "constitutive.failure_type",
+        "constitutive.z_rotation_degrees",
+        "constraints",
+        "loads"
+      ],
+      "capabilities": [
+        "block.input",
+        "block.solver",
+        "block.boundary",
+        "block.constitutive",
+        "block.failure",
+        "block.materials",
+        "block.clusters",
+        "command.type",
+        "command.name",
+        "command.dimensions",
+        "command.node",
+        "command.element",
+        "command.nset",
+        "command.elset",
+        "command.orientation",
+        "command.constitutive",
+        "command.boundary",
+        "command.load",
+        "command.stop"
+      ],
+      "constraints": [
+        "The profile accepts only linear mechanical analysis, one solid cluster, current serial PARDISO syntax, legacy isotropic MATERIALS type 10, direct CONSTITUTIVE type 1, and an explicitly selected no-data bulk FAILURE criterion.",
+        "Every engineering field is required; the generator supplies no material, strength, orientation, solver, boundary, load, or unit default.",
+        "Boundary and load targets must resolve to explicit node labels or node sets in the validated mesh; version 1 rejects imported SURFACE records because BSAM has no active matching cluster dispatch.",
+        "The deck and manifest are created together without overwrite; partial output is removed on failure.",
+        "Canonical deck comments and the manifest bind generator, registry, profile, mesh, normalized intent, and output SHA-256 values."
+      ],
+      "evidence_ids": [
+        "evidence.main-input-sequence",
+        "evidence.input-parser",
+        "evidence.solver-parser",
+        "evidence.boundary-parser",
+        "evidence.constitutive-parser",
+        "evidence.failure-parser",
+        "evidence.material-parser",
+        "evidence.cluster-parser",
+        "evidence.fe-core-records"
+      ]
     }
   ],
   "transformations": [

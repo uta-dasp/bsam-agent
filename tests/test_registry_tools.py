@@ -35,6 +35,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(13, counts["blocks"])
         self.assertEqual(29, counts["commands"])
         self.assertEqual(12, counts["constructs"])
+        self.assertEqual(1, counts["generation_profiles"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
         self.assertEqual(75, counts["evidence"])
@@ -50,6 +51,14 @@ class RegistryToolsTests(unittest.TestCase):
             "7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A",
             target["executable_sha256"],
         )
+
+    def test_generation_profile_requires_explicit_engineering_choices(self) -> None:
+        profile = self.registry["generation_profiles"][0]
+        self.assertEqual("generation.mechanical-isotropic-solid-v1", profile["id"])
+        self.assertEqual("verified", profile["status"])
+        self.assertIn("material.youngs_modulus", profile["required_choices"])
+        self.assertIn("constraints", profile["required_choices"])
+        self.assertIn("loads", profile["required_choices"])
 
     def test_required_current_block_names(self) -> None:
         blocks = {item["canonical"]: item for item in self.registry["top_level_blocks"]}

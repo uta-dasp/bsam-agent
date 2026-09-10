@@ -29,6 +29,7 @@ from .change import (
     write_plan,
 )
 from .registry import load_registry
+from .generation import GenerationError, generate_deck
 from .mesh import MeshImportError, import_ele
 from .run import RunError, request_run_stop, run_bsam, run_status
 from .source_set import SourceSet
@@ -186,6 +187,15 @@ def build_parser() -> argparse.ArgumentParser:
     import_parser.add_argument("mesh")
     import_parser.add_argument("--compact", action="store_true", help="emit compact JSON")
 
+    generate_parser = subparsers.add_parser(
+        "generate-deck", help="generate a registered current-syntax deck from mesh and intent"
+    )
+    generate_parser.add_argument("mesh")
+    generate_parser.add_argument("intent", help="JSON file containing all required engineering choices")
+    generate_parser.add_argument("--workspace-root", required=True, help="contain every input and output")
+    generate_parser.add_argument("--out", required=True, help="new deck path")
+    generate_parser.add_argument("--manifest-out", required=True, help="new provenance JSON path")
+
     import_plan_parser = subparsers.add_parser(
         "plan-import-mesh", help="plan import of a .ele mesh into an empty template cluster"
     )
@@ -253,6 +263,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         if args.command == "import-mesh":
             _print_json(import_ele(Path(args.mesh)).as_dict(), args.compact)
+            return 0
+        if args.command == "generate-deck":
+            workspace = Path(args.workspace_root).resolve()
+            intent_path = Path(args.intent).resolve()
+            if not intent_path.is_relative_to(workspace):
+                raise ValueError("intent path escapes the workspace")
+            with intent_path.open("r", encoding="utf-8") as stream:
+                intent = json.load(stream)
+            result = generate_deck(
+                Path(args.mesh), intent, Path(args.out), Path(args.manifest_out), workspace,
+                confirm=True,
+            )
+            _print_json(result)
             return 0
         if args.command == "plan-import-mesh":
             plan = plan_import_mesh(
@@ -389,7 +412,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             }
             _print_json(result, args.compact)
             return 2 if inspection["summary"]["errors"] else 0
-    except (OSError, ValueError, ChangeError, MeshImportError, RunError) as exc:
+    except (OSError, ValueError, ChangeError, GenerationError, MeshImportError, RunError) as exc:
         _print_json({"error": str(exc)})
         return 2
     return 2

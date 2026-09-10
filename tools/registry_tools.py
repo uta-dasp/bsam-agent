@@ -76,13 +76,14 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "top_level_blocks",
             "cluster_commands",
             "nested_constructs",
+            "generation_profiles",
             "transformations",
             "obsolete_tokens",
             "execution_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "1.4.0":
+    if data["schema_version"] != "1.5.0":
         raise RegistryError("unsupported schema_version")
 
     target = data["target"]
@@ -248,6 +249,40 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
                             f"body field in {item['id']}/{variant['name']}/{row['name']}",
                         )
 
+    capability_ids = set(block_ids) | set(command_ids) | {
+        item["id"] for item in constructs
+    }
+    generation_profiles = data["generation_profiles"]
+    _unique([item["id"] for item in generation_profiles], "generation profile id")
+    _unique(
+        [f"{item['id']}@{item['profile_version']}" for item in generation_profiles],
+        "generation profile version",
+    )
+    for item in generation_profiles:
+        _require_keys(
+            item,
+            {
+                "id", "profile_version", "status", "summary", "tool", "analysis",
+                "mesh_format", "required_choices", "capabilities", "constraints",
+                "evidence_ids",
+            },
+            item["id"],
+        )
+        if item["status"] not in {"implemented", "verified"}:
+            raise RegistryError(f"{item['id']} has invalid generation status {item['status']}")
+        _unique(item["required_choices"], f"required choice in {item['id']}")
+        _unique(item["capabilities"], f"capability in {item['id']}")
+        missing_capabilities = sorted(set(item["capabilities"]) - capability_ids)
+        if missing_capabilities:
+            raise RegistryError(
+                f"{item['id']} references missing capabilities: {', '.join(missing_capabilities)}"
+            )
+        missing_evidence = sorted(set(item["evidence_ids"]) - set(evidence_by_id))
+        if missing_evidence:
+            raise RegistryError(
+                f"{item['id']} references missing evidence: {', '.join(missing_evidence)}"
+            )
+
     transformations = data["transformations"]
     _unique([item["id"] for item in transformations], "transformation id")
     _unique(
@@ -324,6 +359,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "blocks": len(blocks),
         "commands": len(commands),
         "constructs": len(constructs),
+        "generation_profiles": len(generation_profiles),
         "transformations": len(transformations),
         "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
@@ -412,7 +448,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, and {counts['transformations']} registered transformations",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, and {counts['transformations']} registered transformations",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -554,6 +590,28 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         if construct.get("body"):
             _render_body(lines, construct["canonical"], construct["body"])
 
+    lines.extend(["", "## Registered generation profiles", ""])
+    for item in data["generation_profiles"]:
+        evidence = ", ".join(evidence_links[value] for value in item["evidence_ids"])
+        lines.extend([
+            f"### `{item['id']}@{item['profile_version']}`",
+            "",
+            item["summary"],
+            "",
+            f"- Status: {item['status']}",
+            f"- Tool: `{item['tool']}`",
+            f"- Analysis: {item['analysis']}",
+            f"- Mesh format: `{item['mesh_format']}`",
+            f"- Evidence: {evidence}",
+            "- Required engineering choices:",
+        ])
+        lines.extend(f"  - `{value}`" for value in item["required_choices"])
+        lines.append("- Capability dependencies:")
+        lines.extend(f"  - `{value}`" for value in item["capabilities"])
+        lines.append("- Constraints:")
+        lines.extend(f"  - {value}" for value in item["constraints"])
+        lines.append("")
+
     lines.extend(["", "## Registered transformations", ""])
     for item in data["transformations"]:
         evidence = ", ".join(evidence_links[value] for value in item["evidence_ids"])
@@ -659,6 +717,7 @@ def main(argv: list[str] | None = None) -> int:
             "valid registry: "
             f"{counts['blocks']} blocks, {counts['commands']} cluster commands, "
             f"{counts['constructs']} nested constructs, "
+            f"{counts['generation_profiles']} generation profiles, "
             f"{counts['transformations']} transformations, "
             f"{counts['obsolete_tokens']} obsolete/compatibility tokens, "
             f"{counts['evidence']} evidence records"

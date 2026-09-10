@@ -13,13 +13,14 @@
     "top_level_blocks",
     "cluster_commands",
     "nested_constructs",
+    "generation_profiles",
     "transformations",
     "obsolete_tokens",
     "execution_contract"
   ],
   "properties": {
     "schema_version": {
-      "const": "1.4.0"
+      "const": "1.5.0"
     },
     "registry_version": {
       "type": "string",
@@ -55,6 +56,10 @@
         "$ref": "#/$defs/nestedConstruct"
       }
     },
+    "generation_profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/generationProfile" }
+    },
     "transformations": {
       "type": "array",
       "items": { "$ref": "#/$defs/transformation" }
@@ -78,6 +83,38 @@
     },
     "operationStatus": {
       "enum": ["unassessed", "unsupported", "implemented", "verified"]
+    },
+    "generationProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "profile_version", "status", "summary", "tool", "analysis",
+        "mesh_format", "required_choices", "capabilities", "constraints", "evidence_ids"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^generation\\.[a-z0-9.-]+$" },
+        "profile_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "status": { "enum": ["implemented", "verified"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string", "minLength": 1 },
+        "analysis": { "type": "string", "minLength": 1 },
+        "mesh_format": { "type": "string", "minLength": 1 },
+        "required_choices": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "capabilities": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "constraints": {
+          "type": "array", "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence_ids": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^evidence\\.[a-z0-9.-]+$" }
+        }
+      }
     },
     "operations": {
       "type": "object",
