@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.79.0`
-- Registry SHA-256: `EEC88D81BEAE32FC8E6FDF41A84B58A7F78705892671560119A833A7527A0B6D`
+- Registry version: `0.80.0`
+- Registry SHA-256: `DF2D14F95D0145DFFD47718AEC61CA355A6F719E9318361EE63C586DABEF85CE`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.

@@ -504,6 +504,37 @@ def _registered_parameter_values(
     return {name: tuple(values) for name, values in found.items()}
 
 
+def _registered_record_parameter_values(
+    construct: dict[str, Any], body: list[SourceLine], source: str,
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    """Read a registry-declared repeated key/value record body."""
+    found: dict[str, list[dict[str, Any]]] = {}
+    for line in body:
+        text = line.text.split("#", 1)[0].strip()
+        if "=" not in text or text.startswith("**"):
+            continue
+        raw_name, raw_value = text.split("=", 1)
+        definition = canonical_parameter(construct, raw_name.strip())
+        if definition is None:
+            continue
+        name = str(definition["name"])
+        value_type = str(definition["value_type"]).casefold()
+        raw_values = (
+            [item for item in re.split(r"[\s,]+", raw_value.strip()) if item]
+            if value_type.endswith("-list") else [raw_value.strip()]
+        )
+        for raw in raw_values:
+            value: Any = raw.casefold()
+            if "integer" in value_type and raw.lstrip("+").isdigit():
+                value = int(raw)
+            found.setdefault(name, []).append({
+                "value": value,
+                "spelling": raw_name.strip(),
+                "location": _location(source, line).as_dict(),
+            })
+    return {name: tuple(values) for name, values in found.items()}
+
+
 def _validate_registered_values(
     index: SemanticIndex, construct: dict[str, Any],
     values: dict[str, tuple[dict[str, Any], ...]],
@@ -598,7 +629,17 @@ def augment_registered_top_level_semantics(
             and body.get("style") == "single-record"
             and len(parameters_defined) == 1
         )
-        if not (is_container or is_single_record):
+        variants = body.get("variants", []) if isinstance(body, dict) else []
+        rows = variants[0].get("rows", []) if len(variants) == 1 else []
+        fields = rows[0].get("fields", []) if len(rows) == 1 else []
+        is_key_value_records = (
+            isinstance(body, dict)
+            and body.get("style") == "records"
+            and len(rows) == 1
+            and rows[0].get("repetition") == "repeated"
+            and [item.get("name") for item in fields] == ["key", "value"]
+        )
+        if not (is_container or is_single_record or is_key_value_records):
             continue
 
         canonical = str(definition["canonical"])
@@ -608,16 +649,45 @@ def augment_registered_top_level_semantics(
         if header is None:
             continue
         capability_id = str(definition["id"])
-        parameters = (
-            _registered_parameter_values(
-                definition, header, _top_block_body(all_lines, canonical), source,
+        block_body = _top_block_body(all_lines, canonical)
+        if is_single_record:
+            parameters = _registered_parameter_values(
+                definition, header, block_body, source,
             )
-            if is_single_record else {}
-        )
+        elif is_key_value_records:
+            parameters = _registered_record_parameter_values(
+                definition, block_body, source,
+            )
+        else:
+            parameters = {}
         defaults = {
             str(item["name"]): item["default"]
             for item in parameters_defined if "default" in item
         }
+        attributes: dict[str, Any] = {}
+        entity_kind = definition.get("entity_kind")
+        if is_key_value_records and entity_kind:
+            effective = dict(defaults)
+            definitions = {
+                str(item["name"]): item for item in parameters_defined
+            }
+            for name, values in parameters.items():
+                value_type = str(definitions[name]["value_type"]).casefold()
+                effective[name] = (
+                    [item["value"] for item in values]
+                    if value_type.endswith("-list") else values[-1]["value"]
+                )
+            entity_attributes: dict[str, Any] = {"effective_settings": effective}
+            if operational_support(definition)["execute"] == "unsupported":
+                entity_attributes["execution"] = "blocked"
+            entity = _entity(
+                index, str(entity_kind), "1", source, header, None,
+                entity_attributes,
+            )
+            attributes = {
+                "entity_id": entity.id,
+                "syntax": "canonical-key-value",
+            }
         index.capability_records.append(RegisteredConstruct(
             id=f"{capability_id}[1]@{source}:{header.number}",
             capability_id=capability_id,
@@ -627,76 +697,11 @@ def augment_registered_top_level_semantics(
             parameters=parameters,
             defaults=defaults,
             operations=operational_support(definition),
-            attributes={"record_role": "container"} if is_container else {},
+            attributes=(
+                {"record_role": "container"} if is_container else attributes
+            ),
         ))
         _validate_registered_values(index, definition, parameters)
-
-
-def augment_moisture_semantics(
-    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
-) -> None:
-    """Index canonical MOISTURE key/value settings without authorizing execution."""
-    all_lines = tuple(lines)
-    header = next((line for line in all_lines if line.stripped == "MOISTURE"), None)
-    if header is None:
-        return
-    definition = next(
-        item for item in load_registry()["top_level_blocks"]
-        if item["id"] == "block.moisture"
-    )
-    definitions = {
-        str(item["name"]).casefold(): item for item in definition["parameters"]
-    }
-    found: dict[str, list[dict[str, Any]]] = {}
-    list_parameters = {"converter_utils", "steps"}
-    for line in _top_block_body(all_lines, "MOISTURE"):
-        text = line.text.split("#", 1)[0].strip()
-        if "=" not in text or text.startswith("**"):
-            continue
-        raw_name, raw_value = text.split("=", 1)
-        parameter = definitions.get(raw_name.strip().casefold())
-        if parameter is None:
-            continue
-        name = str(parameter["name"])
-        raw_values = (
-            [item for item in re.split(r"[\s,]+", raw_value.strip()) if item]
-            if name in list_parameters else [raw_value.strip()]
-        )
-        for raw in raw_values:
-            value: Any = raw.casefold()
-            if name == "steps" and raw.lstrip("+").isdigit():
-                value = int(raw)
-            found.setdefault(name, []).append({
-                "value": value,
-                "spelling": raw_name.strip(),
-                "location": _location(source, line).as_dict(),
-            })
-    parameters = {name: tuple(values) for name, values in found.items()}
-    defaults = {
-        str(item["name"]): item["default"]
-        for item in definition["parameters"] if "default" in item
-    }
-    effective = dict(defaults)
-    for name, values in parameters.items():
-        effective[name] = (
-            [item["value"] for item in values]
-            if name in list_parameters else values[-1]["value"]
-        )
-    workflow = _entity(
-        index, "moisture-workflow", "1", source, header, None,
-        {"effective_settings": effective, "execution": "blocked"},
-    )
-    index.capability_records.append(RegisteredConstruct(
-        id=f"block.moisture[1]@{source}:{header.number}",
-        capability_id="block.moisture",
-        canonical="MOISTURE",
-        occurrence=1,
-        location=_location(source, header),
-        parameters=parameters,
-        defaults=defaults,
-        operations=operational_support(definition),
-        attributes={"entity_id": workflow.id, "syntax": "canonical-key-value"},
-    ))
 
 
 def augment_crack_capability_records(
@@ -2771,7 +2776,6 @@ def augment_root_semantics(
     """Add documented root control entities and their FE/cluster references."""
     all_lines = tuple(lines)
     augment_registered_top_level_semantics(index, source, all_lines)
-    augment_moisture_semantics(index, source, all_lines)
     augment_numeric_user_semantics(index, source, all_lines)
     augment_registered_boundary_semantics(index, source, all_lines)
     augment_solver_semantics(index, source, all_lines)
