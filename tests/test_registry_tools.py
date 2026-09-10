@@ -395,6 +395,26 @@ class RegistryToolsTests(unittest.TestCase):
         decisions = {item["name"]: item for item in transformation["decisions"]}
         self.assertEqual("pardiso", decisions["target_solver"]["value"])
 
+    def test_last_record_wins_parameter_cardinality_is_explicit(self) -> None:
+        solver = next(
+            item for item in self.registry["top_level_blocks"]
+            if item["id"] == "block.solver"
+        )
+        convergence = next(
+            item for item in self.registry["nested_constructs"]
+            if item["id"] == "construct.boundary-convergence"
+        )
+        repeated = {
+            (record["id"], parameter["name"])
+            for record in (solver, convergence)
+            for parameter in record["parameters"]
+            if parameter.get("cardinality") == "repeated-last-wins"
+        }
+        self.assertEqual({
+            ("block.solver", "relative_tolerance"),
+            ("construct.boundary-convergence", "maxiterations"),
+        }, repeated)
+
     def test_obsolete_tokens_have_current_replacements(self) -> None:
         obsolete = {item["token"]: item for item in self.registry["obsolete_tokens"]}
         self.assertEqual("SOLVER", obsolete["SOLVE"]["replacement"])

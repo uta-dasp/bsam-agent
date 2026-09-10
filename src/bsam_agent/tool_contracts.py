@@ -69,10 +69,13 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
     "preview_parameter_change": ToolContract({
         "source": S, "block": S, "construct": S, "parameter": S, "value": S,
         "plan_path": S, "occurrence": Field("integer", required=False),
+        "parameter_occurrence": Field("integer", required=False),
+        "insert_repeated": Field("boolean", required=False),
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "preview_parameter_removal": ToolContract({
         "source": S, "block": S, "construct": S, "parameter": S,
         "plan_path": S, "occurrence": Field("integer", required=False),
+        "parameter_occurrence": Field("integer", required=False),
     }, ("plan_id", "plan_digest", "source_diff", "validation")),
     "preview_compose_changes": ToolContract({
         "source": S, "plan_paths": AS, "plan_path": S,
@@ -140,8 +143,8 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "query_model": "Run a focused semantic query for registered constructs, parameters, entities, or references.",
     "validate_model": "Validate an existing BSAM deck without changing or running it.",
     "import_mesh": "Inspect and validate a manually prepared Abaqus-style .ele mesh without modifying a deck.",
-    "preview_parameter_change": "Create a review plan for one registered parameter in a named BSAM block and construct.",
-    "preview_parameter_removal": "Create a review plan to remove one isolated optional parameter whose registered omission semantics are verified.",
+    "preview_parameter_change": "Create a review plan to replace or insert one registered parameter value, with explicit occurrence selection for repeated-last-wins values.",
+    "preview_parameter_removal": "Create a review plan to remove one isolated optional parameter value, with explicit occurrence selection for repeated-last-wins values.",
     "preview_compose_changes": "Compose 2 to 8 independent same-revision typed plans into one validated review and confirmation boundary.",
     "preview_add_node": "Create a review plan to add one finite-element node.",
     "preview_add_element": "Create a review plan to add one finite element with existing node labels.",

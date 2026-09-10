@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.80.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.81.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -150,7 +150,7 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Remove an isolated explicit `*CONVERGENCE` `maxiterations` record to restore its registered default only when parameter-level policy marks removal verified.
 - [x] Enable or disable the optional Boolean `*G-CONTROL` `DAMP` flag through exact command-line tokens and parameter-level registry policy.
 - [x] Insert or remove the optional SHEFF `relative_tolerance` row within a repeated solver option group, restoring the source-defined default on removal.
-- [ ] Support insertion/removal of repeated values where source evidence and edit policy permit them.
+- [x] Support append-only insertion and occurrence-selected replacement/removal for explicitly registered repeated-last-wins values where source evidence and edit policy permit them.
 - [ ] Produce minimal source patches with deterministic defaults and validation.
 - [ ] Return actionable missing, unknown, ambiguous, and invalid-value diagnostics.
 

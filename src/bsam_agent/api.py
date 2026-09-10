@@ -177,12 +177,17 @@ class LocalAgentApi:
             args = self._args(
                 arguments,
                 {"source", "block", "construct", "parameter", "value", "plan_path"},
-                {"occurrence"},
+                {"occurrence", "parameter_occurrence", "insert_repeated"},
             )
             plan = plan_parameter_change(
                 self._path(args["source"], "source"), str(args["block"]),
                 str(args["construct"]), str(args["parameter"]), str(args["value"]),
                 int(args.get("occurrence", 1)), self.workspace_root,
+                parameter_occurrence=(
+                    int(args["parameter_occurrence"])
+                    if "parameter_occurrence" in args else None
+                ),
+                insert_repeated=bool(args.get("insert_repeated", False)),
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))
             return plan
@@ -190,12 +195,16 @@ class LocalAgentApi:
             args = self._args(
                 arguments,
                 {"source", "block", "construct", "parameter", "plan_path"},
-                {"occurrence"},
+                {"occurrence", "parameter_occurrence"},
             )
             plan = plan_parameter_removal(
                 self._path(args["source"], "source"), str(args["block"]),
                 str(args["construct"]), str(args["parameter"]),
                 int(args.get("occurrence", 1)), self.workspace_root,
+                parameter_occurrence=(
+                    int(args["parameter_occurrence"])
+                    if "parameter_occurrence" in args else None
+                ),
             )
             write_plan(plan, self._path(args["plan_path"], "plan_path"))
             return plan

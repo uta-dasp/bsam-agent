@@ -112,6 +112,17 @@ class LocalApiTests(unittest.TestCase):
                 "plan_path": "remove-parameter.json",
             })
             self.assertEqual("remove-optional-parameter", removal["operation"])
+            repeated = api.dispatch("preview_parameter_change", {
+                "source": "model.in",
+                "block": "BOUNDARY",
+                "construct": "CONVERGENCE",
+                "parameter": "maxiterations",
+                "value": "30",
+                "insert_repeated": True,
+                "plan_path": "append-parameter.json",
+            })
+            self.assertEqual("insert-repeated-parameter", repeated["operation"])
+            self.assertEqual(2, repeated["selector"]["parameter_occurrence"])
             api.dispatch("preview_parameter_change", {
                 "source": "model.in",
                 "block": "BOUNDARY",

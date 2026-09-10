@@ -18,10 +18,10 @@ from .registry import load_registry
 from .source_set import SourceSet
 
 
-PLAN_SCHEMA_VERSION = "1.9.0"
+PLAN_SCHEMA_VERSION = "1.10.0"
 SUPPORTED_PLAN_SCHEMA_VERSIONS = {
     "1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0",
-    "1.7.0", "1.8.0", PLAN_SCHEMA_VERSION,
+    "1.7.0", "1.8.0", "1.9.0", PLAN_SCHEMA_VERSION,
 }
 AUDIT_SCHEMA_VERSION = "1.1.0"
 
@@ -1201,6 +1201,33 @@ def _value_spans(line: SourceLine, parameter: str) -> list[tuple[int, int]]:
         cursor = found + 1
 
 
+def _select_parameter_candidate(
+    candidates: list[tuple[SourceLine, int, int]],
+    definition: dict[str, Any],
+    parameter: str,
+    parameter_occurrence: int | None,
+) -> tuple[tuple[SourceLine, int, int], int]:
+    """Select one registered repeated value without guessing among duplicates."""
+    if parameter_occurrence is None:
+        if len(candidates) > 1:
+            lines = ", ".join(str(item[0].number) for item in candidates)
+            raise ChangeError(
+                f"parameter {parameter} is ambiguous in the selected construct "
+                f"(lines {lines}); provide parameter_occurrence"
+            )
+        return candidates[0], 1
+    if parameter_occurrence < 1:
+        raise ChangeError("parameter_occurrence must be at least 1")
+    if definition.get("cardinality", "single") != "repeated-last-wins":
+        raise ChangeError(f"parameter {parameter} is not registered as repeated")
+    if parameter_occurrence > len(candidates):
+        raise ChangeError(
+            f"parameter {parameter} occurrence {parameter_occurrence} was not found; "
+            f"found {len(candidates)}"
+        )
+    return candidates[parameter_occurrence - 1], parameter_occurrence
+
+
 def _flag_spans(
     line: SourceLine, construct: dict[str, Any], parameter: str,
 ) -> list[tuple[int, int]]:
@@ -2018,6 +2045,8 @@ def plan_parameter_change(
     value: str,
     occurrence: int = 1,
     workspace_root: Path | None = None,
+    parameter_occurrence: int | None = None,
+    insert_repeated: bool = False,
 ) -> dict[str, Any]:
     _validate_raw_value(value)
     source = source.resolve()
@@ -2034,11 +2063,23 @@ def plan_parameter_change(
     candidates: list[tuple[SourceLine, int, int]] = []
     for line in document.lines[start_line:end_line]:
         candidates.extend((line, *span) for span in _value_spans(line, parameter))
-    if len(candidates) > 1:
-        lines = ", ".join(str(item[0].number) for item in candidates)
-        raise ChangeError(f"parameter {parameter} is ambiguous in the selected construct (lines {lines})")
-    if candidates:
-        line, start, end = candidates[0]
+    if insert_repeated:
+        if parameter_occurrence is not None:
+            raise ChangeError(
+                "parameter_occurrence cannot be combined with insert_repeated"
+            )
+        if definition.get("cardinality", "single") != "repeated-last-wins":
+            raise ChangeError(f"parameter {parameter} is not registered as repeated")
+        if definition.get("edit_operations", {}).get("insert") != "verified":
+            raise ChangeError(
+                f"insertion of repeated parameter {parameter} is not verified"
+            )
+        selected_parameter_occurrence = len(candidates) + 1
+    if candidates and not insert_repeated:
+        selected, selected_parameter_occurrence = _select_parameter_candidate(
+            candidates, definition, parameter, parameter_occurrence,
+        )
+        line, start, end = selected
         old_bytes = document.raw[start:end]
         new_bytes = value.encode("latin-1")
         if old_bytes == new_bytes:
@@ -2053,6 +2094,10 @@ def plan_parameter_change(
         operation = "set-existing-parameter"
         preview = f"line {line.number}: {parameter} = {old_bytes.decode('latin-1')} -> {value}"
     else:
+        if parameter_occurrence is not None:
+            raise ChangeError(
+                f"parameter {parameter} occurrence {parameter_occurrence} was not found; found 0"
+            )
         if definition.get("edit_operations", {}).get("insert") != "verified":
             raise ChangeError(
                 f"parameter {parameter} was not found in {construct['canonical']} occurrence "
@@ -2076,19 +2121,50 @@ def plan_parameter_change(
             "old": "",
             "new": record.decode("latin-1"),
         }
-        operation = "insert-optional-parameter"
-        default = (
-            f"registered default {definition['default']}"
-            if "default" in definition else "absent"
+        operation = (
+            "insert-repeated-parameter" if insert_repeated
+            else "insert-optional-parameter"
         )
-        preview = f"line {line_number}: add {definition['name']} = {value} (was {default})"
+        if insert_repeated:
+            previous = (
+                document.raw[candidates[-1][1]:candidates[-1][2]].decode("latin-1")
+                if candidates else str(definition.get("default", "absent"))
+            )
+            preview = (
+                f"line {line_number}: append {definition['name']} occurrence "
+                f"{selected_parameter_occurrence} = {value}; effective value was {previous}"
+            )
+        else:
+            default = (
+                f"registered default {definition['default']}"
+                if "default" in definition else "absent"
+            )
+            preview = f"line {line_number}: add {definition['name']} = {value} (was {default})"
     updated = _patched_bytes(document, patch)
     updated_document = SourceDocument.from_bytes(updated, str(source.resolve()))
     validation = _validation_result(source_set, {source: updated})
     if validation["summary"]["errors"]:
         messages = "; ".join(item["message"] for item in validation["diagnostics"] if item["severity"] == "error")
         raise ChangeError(f"planned source set failed dependency validation: {messages}")
-    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
+    parameter_path = (
+        f"{parameter}[{selected_parameter_occurrence}]"
+        if insert_repeated or parameter_occurrence is not None else parameter
+    )
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter_path}"
+    selector = {
+        "block": block.upper(),
+        "construct": construct["canonical"],
+        "construct_occurrence": occurrence,
+        "parameter": parameter,
+        "requested_value": value,
+    }
+    if insert_repeated:
+        selector.update({
+            "insert_repeated": True,
+            "parameter_occurrence": selected_parameter_occurrence,
+        })
+    elif parameter_occurrence is not None:
+        selector["parameter_occurrence"] = parameter_occurrence
     plan: dict[str, Any] = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "source": str(source.resolve()),
@@ -2098,18 +2174,12 @@ def plan_parameter_change(
         "proposed_sha256": updated_document.sha256,
         "proposed_source_set_sha256": source_set.digest_with({source: updated}),
         "operation": operation,
-        "selector": {
-            "block": block.upper(),
-            "construct": construct["canonical"],
-            "construct_occurrence": occurrence,
-            "parameter": parameter,
-            "requested_value": value,
-        },
+        "selector": selector,
         "patch": patch,
         "changed_model_paths": [model_path],
         "affected_files": [str(source.resolve())],
         "changes": [{
-            "operation": "modify",
+            "operation": "create" if insert_repeated else "modify",
             "target": model_path,
             "summary": preview,
         }],
@@ -2130,6 +2200,7 @@ def plan_parameter_removal(
     parameter: str,
     occurrence: int = 1,
     workspace_root: Path | None = None,
+    parameter_occurrence: int | None = None,
 ) -> dict[str, Any]:
     """Plan removal of one explicit optional parameter with verified reset semantics."""
     source = source.resolve()
@@ -2149,10 +2220,10 @@ def plan_parameter_removal(
         raise ChangeError(
             f"parameter {parameter} was not found in {construct['canonical']} occurrence {occurrence}"
         )
-    if len(candidates) > 1:
-        lines = ", ".join(str(item[0].number) for item in candidates)
-        raise ChangeError(f"parameter {parameter} is ambiguous in the selected construct (lines {lines})")
-    line, value_start, value_end = candidates[0]
+    selected, selected_parameter_occurrence = _select_parameter_candidate(
+        candidates, definition, parameter, parameter_occurrence,
+    )
+    line, value_start, value_end = selected
     if "#" in line.text or "," in line.text:
         raise ChangeError(
             f"parameter {parameter} shares line {line.number}; minimal removal is not verified"
@@ -2177,21 +2248,40 @@ def plan_parameter_removal(
         "old": old_record.decode("latin-1"),
         "new": "",
     }
-    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
-    preview = (
-        f"line {line.number}: remove explicit {parameter}; restore registered default "
-        f"{definition['default']}"
+    parameter_path = (
+        f"{parameter}[{selected_parameter_occurrence}]"
+        if parameter_occurrence is not None else parameter
     )
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter_path}"
+    repeated_removal = parameter_occurrence is not None
+    if repeated_removal:
+        remaining = [item for index, item in enumerate(candidates, start=1) if index != selected_parameter_occurrence]
+        effective = (
+            document.raw[remaining[-1][1]:remaining[-1][2]].decode("latin-1")
+            if remaining else str(definition["default"])
+        )
+        preview = (
+            f"line {line.number}: remove {parameter} occurrence "
+            f"{selected_parameter_occurrence}; effective value becomes {effective}"
+        )
+    else:
+        preview = (
+            f"line {line.number}: remove explicit {parameter}; restore registered default "
+            f"{definition['default']}"
+        )
+    selector = {
+        "block": block.upper(),
+        "construct": construct["canonical"],
+        "construct_occurrence": occurrence,
+        "parameter": parameter,
+    }
+    if repeated_removal:
+        selector["parameter_occurrence"] = selected_parameter_occurrence
     return _typed_plan(
         source_set,
         patch,
-        "remove-optional-parameter",
-        {
-            "block": block.upper(),
-            "construct": construct["canonical"],
-            "construct_occurrence": occurrence,
-            "parameter": parameter,
-        },
+        "remove-repeated-parameter" if repeated_removal else "remove-optional-parameter",
+        selector,
         model_path,
         preview,
         "delete",
@@ -2259,7 +2349,7 @@ def plan_refresh_change(
         raise ChangeError("stale plan selector is malformed")
     if operation in {
         "set-existing-parameter", "insert-optional-parameter",
-        "insert-optional-flag", "remove-optional-flag",
+        "insert-repeated-parameter", "insert-optional-flag", "remove-optional-flag",
     }:
         patch = plan.get("patch")
         if not isinstance(patch, dict) or not isinstance(patch.get("new"), str):
@@ -2273,12 +2363,22 @@ def plan_refresh_change(
             source, str(selector["block"]), str(selector["construct"]),
             str(selector["parameter"]), requested_value,
             int(selector["construct_occurrence"]), workspace_root,
+            parameter_occurrence=(
+                int(selector["parameter_occurrence"])
+                if operation == "set-existing-parameter"
+                and "parameter_occurrence" in selector else None
+            ),
+            insert_repeated=operation == "insert-repeated-parameter",
         )
-    if operation == "remove-optional-parameter":
+    if operation in {"remove-optional-parameter", "remove-repeated-parameter"}:
         return plan_parameter_removal(
             source, str(selector["block"]), str(selector["construct"]),
             str(selector["parameter"]), int(selector["construct_occurrence"]),
             workspace_root,
+            parameter_occurrence=(
+                int(selector["parameter_occurrence"])
+                if "parameter_occurrence" in selector else None
+            ),
         )
     if operation == "rename-boundary-condition":
         return plan_rename_boundary_condition(
@@ -2699,7 +2799,9 @@ def _validated_plan_proposal(
             raise ChangeError("change plan affected files do not match its source")
         return replacements, updated_document, [model_path], source_diff, validation
 
-    if plan.get("operation") == "remove-optional-parameter":
+    if plan.get("operation") in {
+        "remove-optional-parameter", "remove-repeated-parameter",
+    }:
         selector = plan.get("selector")
         if not isinstance(selector, dict):
             raise ChangeError("removed parameter plan is missing its selector")
@@ -2711,6 +2813,10 @@ def _validated_plan_proposal(
                 str(selector["parameter"]),
                 int(selector["construct_occurrence"]),
                 source_set.workspace_root,
+                parameter_occurrence=(
+                    int(selector["parameter_occurrence"])
+                    if "parameter_occurrence" in selector else None
+                ),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ChangeError("removed parameter selector is malformed") from exc
@@ -2732,7 +2838,8 @@ def _validated_plan_proposal(
         )
 
     if plan.get("operation") in {
-        "insert-optional-parameter", "insert-optional-flag", "remove-optional-flag",
+        "insert-optional-parameter", "insert-repeated-parameter",
+        "insert-optional-flag", "remove-optional-flag",
     }:
         selector = plan.get("selector")
         patch = plan.get("patch")
@@ -2749,6 +2856,7 @@ def _validated_plan_proposal(
                 str(selector["requested_value"]),
                 int(selector["construct_occurrence"]),
                 source_set.workspace_root,
+                insert_repeated=plan.get("operation") == "insert-repeated-parameter",
             )
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise ChangeError("inserted parameter selector or patch is malformed") from exc
@@ -2798,9 +2906,20 @@ def _validated_plan_proposal(
     candidates: list[tuple[SourceLine, int, int]] = []
     for line in document.lines[start_line:end_line]:
         candidates.extend((line, *span) for span in _value_spans(line, parameter))
-    if len(candidates) != 1:
-        raise ChangeError("planned parameter no longer resolves to one exact registered value")
-    line, start, end = candidates[0]
+    try:
+        parameter_occurrence = (
+            int(selector["parameter_occurrence"])
+            if "parameter_occurrence" in selector else None
+        )
+    except (TypeError, ValueError) as exc:
+        raise ChangeError("parameter occurrence selector is malformed") from exc
+    if not candidates:
+        raise ChangeError("planned parameter no longer resolves to a registered value")
+    selected, selected_parameter_occurrence = _select_parameter_candidate(
+        candidates, _parameter_definition(construct, parameter), parameter,
+        parameter_occurrence,
+    )
+    line, start, end = selected
     if (start, end, line.number) != (planned_start, planned_end, planned_line):
         raise ChangeError("planned patch does not match the registered parameter source span")
 
@@ -2823,7 +2942,11 @@ def _validated_plan_proposal(
             item["message"] for item in validation["diagnostics"] if item["severity"] == "error"
         )
         raise ChangeError(f"planned source set failed dependency validation: {messages}")
-    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter}"
+    parameter_path = (
+        f"{parameter}[{selected_parameter_occurrence}]"
+        if parameter_occurrence is not None else parameter
+    )
+    model_path = f"{block.upper()}.{construct['canonical']}[{occurrence}].{parameter_path}"
     if plan.get("changed_model_paths") is not None and plan["changed_model_paths"] != [model_path]:
         raise ChangeError("change plan model path does not match its registered selector")
     expected_preview = f"line {line.number}: {parameter} = {patch['old']} -> {new_value}"

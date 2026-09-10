@@ -82,7 +82,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         },
         "registry",
     )
-    if data["schema_version"] != "1.2.0":
+    if data["schema_version"] != "1.3.0":
         raise RegistryError("unsupported schema_version")
 
     target = data["target"]
@@ -209,6 +209,11 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
                 {"name", "value_type", "required", "summary"},
                 f"parameter in {item['id']}",
             )
+            cardinality = parameter.get("cardinality", "single")
+            if cardinality not in {"single", "repeated-last-wins"}:
+                raise RegistryError(
+                    f"parameter {parameter['name']} in {item['id']} has invalid cardinality"
+                )
         if kind in {"command", "construct"} and item["parent_block_id"] not in block_ids:
             raise RegistryError(f"{item['id']} references missing parent block")
         body = item.get("body")
@@ -345,6 +350,8 @@ def _render_parameter(parameter: dict[str, Any]) -> str:
         )
     if "default" in parameter:
         details.append(f"default: `{json.dumps(parameter['default'], ensure_ascii=False)}`")
+    if parameter.get("cardinality", "single") != "single":
+        details.append(f"cardinality: {parameter['cardinality']}")
     if parameter.get("edit_operations"):
         details.append(
             "edit: " + ", ".join(

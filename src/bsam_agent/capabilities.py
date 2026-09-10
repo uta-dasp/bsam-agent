@@ -80,6 +80,7 @@ def capability_manifest(registry: dict[str, Any] | None = None) -> list[dict[str
             parameter_edits = [
                 {
                     "name": str(parameter["name"]),
+                    "cardinality": str(parameter.get("cardinality", "single")),
                     "operations": dict(parameter["edit_operations"]),
                 }
                 for parameter in record.get("parameters", [])

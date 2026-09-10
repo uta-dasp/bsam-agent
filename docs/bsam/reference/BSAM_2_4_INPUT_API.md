@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.80.0`
-- Registry SHA-256: `DF2D14F95D0145DFFD47718AEC61CA355A6F719E9318361EE63C586DABEF85CE`
+- Registry version: `0.81.0`
+- Registry SHA-256: `EAF72CEC0FE09B1178C869C2B16D85F3A409B7302E1EBB8285367F632EBADB2E`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -79,7 +79,7 @@ Known parameters:
 - `backend` (enum, optional) (allowed: `mkl`, `petsc`; default: `"mkl"`): Selects the case-insensitive SHEFF backend; availability depends on how the executable was built.
 - `solver` (enum, optional) (allowed: `none`, `cg`, `gmes`, `fgmes`, `direct`; default: `"cg"`): Selects the case-insensitive SHEFF solver. The pinned dispatcher accepts the spellings gmes/fgmes, not gmres; none is PETSc-only.
 - `preconditioner` (enum, optional) (allowed: `none`, `jacobi`, `ilu`, `ilut`, `ilu0`; default: `"jacobi"`): Selects the case-insensitive SHEFF preconditioner using the active parser label; ilu and ilut select the same ILUT category.
-- `relative_tolerance` (real, optional) (default: `1e-08`; edit: insert=verified, remove=verified): Sets the SHEFF relative tolerance.
+- `relative_tolerance` (real, optional) (default: `1e-08`; cardinality: repeated-last-wins; edit: insert=verified, remove=verified): Sets the SHEFF relative tolerance.
 - `maximum_iterations` (integer, optional) (default: `1000`): Sets the SHEFF maximum iteration count.
 - `petsc_opts` (string, optional) (default: `""`): Passes PETSc options to a SHEFF PETSc backend.
 - `debug_opts` (string, optional) (default: `""`): Passes SHEFF debug flags; recognized flags include -pause, -write_sparsity, and PETSc-only -reorder and -save_to_binary.
@@ -1761,7 +1761,7 @@ Known parameters:
 - `relative` (positive-real, optional) (default: `0.001`): Relative convergence tolerance; may share a row with absolute and divergence.
 - `absolute` (positive-real, optional) (default: `100000000`): Absolute convergence tolerance.
 - `divergence` (positive-real, optional) (default: `1000000`): Residual divergence multiplier parsed from a relative/absolute row.
-- `maxiterations` (positive-integer, optional) (default: `20`; edit: insert=verified, remove=verified): Maximum nonlinear iterations; recognized by the maxi prefix.
+- `maxiterations` (positive-integer, optional) (default: `20`; cardinality: repeated-last-wins; edit: insert=verified, remove=verified): Maximum nonlinear iterations; recognized by the maxi prefix.
 - `mintime` (integer, optional) (default: `1`): Minimum time control; recognized by the mint prefix.
 - `invert` (integer, optional) (default: `-1`): Full stiffness-inversion interval; recognized by the inve prefix.
 - `D_AA` (enum, optional) (allowed: `0`, `1`, `2`; default: `0`): Anderson acceleration: 0 inactive, 1 prediction, 2 correction.

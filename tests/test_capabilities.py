@@ -147,6 +147,7 @@ class CapabilitySliceTests(unittest.TestCase):
         self.assertEqual(
             [{
                 "name": "maxiterations",
+                "cardinality": "repeated-last-wins",
                 "operations": {"insert": "verified", "remove": "verified"},
             }],
             convergence["parameter_edits"],

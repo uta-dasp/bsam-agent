@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.2.0",
-  "registry_version": "0.80.0",
+  "schema_version": "1.3.0",
+  "registry_version": "0.81.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -721,6 +721,7 @@
           "value_type": "real",
           "required": false,
           "default": 1e-8,
+          "cardinality": "repeated-last-wins",
           "edit_operations": {"insert": "verified", "remove": "verified"},
           "summary": "Sets the SHEFF relative tolerance."
         },
@@ -3392,7 +3393,7 @@
         {"name": "relative", "value_type": "positive-real", "required": false, "default": 0.001, "summary": "Relative convergence tolerance; may share a row with absolute and divergence."},
         {"name": "absolute", "value_type": "positive-real", "required": false, "default": 100000000, "summary": "Absolute convergence tolerance."},
         {"name": "divergence", "value_type": "positive-real", "required": false, "default": 1000000, "summary": "Residual divergence multiplier parsed from a relative/absolute row."},
-        {"name": "maxiterations", "value_type": "positive-integer", "required": false, "default": 20, "edit_operations": {"insert": "verified", "remove": "verified"}, "summary": "Maximum nonlinear iterations; recognized by the maxi prefix."},
+        {"name": "maxiterations", "value_type": "positive-integer", "required": false, "default": 20, "cardinality": "repeated-last-wins", "edit_operations": {"insert": "verified", "remove": "verified"}, "summary": "Maximum nonlinear iterations; recognized by the maxi prefix."},
         {"name": "mintime", "value_type": "integer", "required": false, "default": 1, "summary": "Minimum time control; recognized by the mint prefix."},
         {"name": "invert", "value_type": "integer", "required": false, "default": -1, "summary": "Full stiffness-inversion interval; recognized by the inve prefix."}
         ,{"name": "D_AA", "value_type": "enum", "required": false, "allowed_values": [0, 1, 2], "default": 0, "summary": "Anderson acceleration: 0 inactive, 1 prediction, 2 correction."}

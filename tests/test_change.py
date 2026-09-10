@@ -1059,6 +1059,67 @@ class ChangePlanTests(unittest.TestCase):
                     shared, "BOUNDARY", "CONVERGENCE", "maxiterations"
                 )
 
+    def test_repeated_last_wins_parameter_values_require_exact_occurrences(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "repeated.in"
+            source.write_bytes(DECK.replace(
+                b"maxiterations=20\r\n",
+                b"maxiterations=20\r\nmaxiterations=30\r\n",
+            ))
+
+            with self.assertRaisesRegex(ChangeError, "provide parameter_occurrence"):
+                plan_parameter_change(
+                    source, "BOUNDARY", "CONVERGENCE", "maxiterations", "25"
+                )
+            selected = plan_parameter_change(
+                source, "BOUNDARY", "CONVERGENCE", "maxiterations", "25",
+                parameter_occurrence=1,
+            )
+            self.assertEqual("20", selected["patch"]["old"])
+            self.assertEqual(
+                ["BOUNDARY.*CONVERGENCE[1].maxiterations[1]"],
+                selected["changed_model_paths"],
+            )
+
+            insertion_path = root / "append.json"
+            insertion_output = root / "appended.in"
+            insertion = plan_parameter_change(
+                source, "BOUNDARY", "CONVERGENCE", "maxiterations", "40",
+                insert_repeated=True,
+            )
+            self.assertEqual("insert-repeated-parameter", insertion["operation"])
+            self.assertEqual(3, insertion["selector"]["parameter_occurrence"])
+            self.assertEqual(
+                ["BOUNDARY.*CONVERGENCE[1].maxiterations[3]"],
+                insertion["changed_model_paths"],
+            )
+            write_plan(insertion, insertion_path)
+            review_plan(insertion_path)
+            apply_plan(insertion_path, insertion_output)
+            self.assertEqual(3, insertion_output.read_bytes().count(b"maxiterations="))
+            self.assertIn(b"maxiterations=40\r\nEND BOUNDARY", insertion_output.read_bytes())
+
+            removal_path = root / "remove-repeated.json"
+            removal_output = root / "removed-repeated.in"
+            removal = plan_parameter_removal(
+                source, "BOUNDARY", "CONVERGENCE", "maxiterations",
+                parameter_occurrence=2,
+            )
+            self.assertEqual("remove-repeated-parameter", removal["operation"])
+            self.assertIn("effective value becomes 20", removal["preview"])
+            write_plan(removal, removal_path)
+            review_plan(removal_path)
+            apply_plan(removal_path, removal_output)
+            self.assertEqual(1, removal_output.read_bytes().count(b"maxiterations="))
+            self.assertIn(b"maxiterations=20", removal_output.read_bytes())
+
+            with self.assertRaisesRegex(ChangeError, "not registered as repeated"):
+                plan_parameter_change(
+                    source, "BOUNDARY", "CONVERGENCE", "absolute", "2",
+                    parameter_occurrence=1,
+                )
+
     def test_plan_and_apply_verified_boolean_flag_parameter(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
