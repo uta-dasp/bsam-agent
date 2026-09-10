@@ -19,7 +19,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.3.0"
+      "const": "1.4.0"
     },
     "registry_version": {
       "type": "string",
@@ -90,6 +90,7 @@
         "create": { "$ref": "#/$defs/operationStatus" },
         "delete": { "$ref": "#/$defs/operationStatus" },
         "rename": { "$ref": "#/$defs/operationStatus" },
+        "reorder": { "$ref": "#/$defs/operationStatus" },
         "generate": { "$ref": "#/$defs/operationStatus" },
         "static_validation": { "$ref": "#/$defs/operationStatus" },
         "execute": { "$ref": "#/$defs/operationStatus" }

@@ -26,7 +26,7 @@ VALID_COVERAGE = {
 }
 VALID_OPERATIONS = {
     "parse", "semantic", "inspect", "modify", "create", "delete", "rename",
-    "generate", "static_validation", "execute",
+    "reorder", "generate", "static_validation", "execute",
 }
 VALID_OPERATION_STATUS = {"unassessed", "unsupported", "implemented", "verified"}
 
@@ -82,7 +82,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         },
         "registry",
     )
-    if data["schema_version"] != "1.3.0":
+    if data["schema_version"] != "1.4.0":
         raise RegistryError("unsupported schema_version")
 
     target = data["target"]

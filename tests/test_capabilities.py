@@ -169,6 +169,7 @@ class CapabilitySliceTests(unittest.TestCase):
             {"block.constitutive", "command.constitutive"},
             {item["id"] for item in matched},
         )
+
         self.assertEqual(("query_model", "inspect_model"), relevant_tools(
             "List the constitutive laws in model.in"
         ))
@@ -191,6 +192,15 @@ class CapabilitySliceTests(unittest.TestCase):
             ("preview_parameter_change", "preview_modify_entity"),
             relevant_tools("Change the nodal load target in model.in"),
         )
+
+    def test_reorder_is_explicitly_fail_closed_for_every_capability(self) -> None:
+        manifest = capability_manifest()
+        self.assertTrue(manifest)
+        self.assertTrue(all(
+            item["operations"]["reorder"] == "unassessed"
+            and item["intents"]["reorder"] == "unassessed"
+            for item in manifest
+        ))
 
     def test_registry_driven_boundary_semantics_preserve_values_and_locations(self) -> None:
         raw = boundary_deck(b"rela=0.01, absolute=2\nd_reduction=0.5\n")

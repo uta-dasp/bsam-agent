@@ -15,6 +15,7 @@ OPERATION_NAMES = (
     "create",
     "delete",
     "rename",
+    "reorder",
     "generate",
     "static_validation",
     "execute",
@@ -28,6 +29,7 @@ INTENT_OPERATIONS = {
     "modify": "modify",
     "delete": "delete",
     "rename": "rename",
+    "reorder": "reorder",
     "validate": "static_validation",
     "run": "execute",
 }

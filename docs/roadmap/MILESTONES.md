@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.84.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
+Status: in progress. Registry `0.85.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -164,14 +164,14 @@ Status: partially implemented. Loss-preserving parsing, selected semantic entiti
 - [x] Delete one unreferenced explicit element through the generic delete surface, including path-bound include edits, while blocking set, selection, and implicit-membership dependencies.
 - [x] Retarget one exact SECTION assignment to an existing element set through the generic modify surface, including path-bound include edits and ambiguity blocking.
 - [x] Create, delete, rename, and list entities and records whose corresponding registry operation is verified, including dependency-aware explicit node/element-set rename across source files.
-- [ ] Reorder entities or records only after their registry contracts define safe ordering semantics.
+- [x] Keep reorder explicitly fail-closed in operational manifests until a capability's registry contract defines safe ordering semantics; no current capability authorizes it.
 - [x] Edit registered repeated parameter values, explicit set member lists, and referenced set names.
 - [x] Edit one existing TABLES grid value through a one-based, finite-real, reviewed minimal patch without changing axes, names, or shape.
 - [x] Generalize path-bound reviewed include-file edits across verified node, element, set, and empty-cluster mesh insertion operations.
 - [x] Copy a reviewed root edit plus unchanged relative include files to a separate source-set directory with preflight conflict checks, digest verification, and partial-write rollback.
 - [x] Delete an unreferenced node from an included FE fragment through a path-bound patch, and compose root/include changes into one reviewed source-set plan without touching originals.
-- [ ] Compute dependent updates and block destructive changes with unresolved dependents.
-- [ ] Keep specialized transformations only for genuine engineering operations, not ordinary syntax edits.
+- [x] Compute dependent updates for verified renames and block verified destructive changes when semantic dependents are present or definitions are unresolved, ambiguous, implicit, or generated.
+- [x] Keep specialized transformations for the runtime-qualified notch expansion and legacy solver migration; route ordinary supported syntax edits through generic capability adapters.
 
 ### M2.4 Deterministic generation
 
