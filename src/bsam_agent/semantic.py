@@ -584,39 +584,52 @@ def augment_registered_boundary_semantics(
         _validate_registered_values(index, construct, parameters)
 
 
-def augment_input_semantics(
+def augment_registered_top_level_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
-    """Expose the current INPUT format as a registered, source-located record."""
+    """Expose simple top-level records selected entirely by registry shape."""
     all_lines = tuple(lines)
-    header = next((line for line in all_lines if line.stripped == "INPUT"), None)
-    if header is None:
-        return
-    definition = next(
-        item for item in load_registry()["top_level_blocks"]
-        if item["id"] == "block.input"
-    )
-    record = next((
-        line for line in _top_block_body(all_lines, "INPUT")
-        if line.stripped and not line.stripped.startswith(("#", "**"))
-    ), None)
-    parameters: dict[str, tuple[dict[str, Any], ...]] = {}
-    if record is not None:
-        parameters["type"] = ({
-            "value": record.stripped,
-            "spelling": "type",
-            "location": _location(source, record).as_dict(),
-        },)
-    index.capability_records.append(RegisteredConstruct(
-        id=f"block.input[1]@{source}:{header.number}",
-        capability_id="block.input",
-        canonical="INPUT",
-        occurrence=1,
-        location=_location(source, header),
-        parameters=parameters,
-        operations=operational_support(definition),
-    ))
-    _validate_registered_values(index, definition, parameters)
+    for definition in load_registry()["top_level_blocks"]:
+        parameters_defined = definition.get("parameters", [])
+        body = definition.get("body")
+        is_container = body is None and not parameters_defined
+        is_single_record = (
+            isinstance(body, dict)
+            and body.get("style") == "single-record"
+            and len(parameters_defined) == 1
+        )
+        if not (is_container or is_single_record):
+            continue
+
+        canonical = str(definition["canonical"])
+        header = next(
+            (line for line in all_lines if line.stripped == canonical), None
+        )
+        if header is None:
+            continue
+        capability_id = str(definition["id"])
+        parameters = (
+            _registered_parameter_values(
+                definition, header, _top_block_body(all_lines, canonical), source,
+            )
+            if is_single_record else {}
+        )
+        defaults = {
+            str(item["name"]): item["default"]
+            for item in parameters_defined if "default" in item
+        }
+        index.capability_records.append(RegisteredConstruct(
+            id=f"{capability_id}[1]@{source}:{header.number}",
+            capability_id=capability_id,
+            canonical=canonical,
+            occurrence=1,
+            location=_location(source, header),
+            parameters=parameters,
+            defaults=defaults,
+            operations=operational_support(definition),
+            attributes={"record_role": "container"} if is_container else {},
+        ))
+        _validate_registered_values(index, definition, parameters)
 
 
 def augment_moisture_semantics(
@@ -684,31 +697,6 @@ def augment_moisture_semantics(
         operations=operational_support(definition),
         attributes={"entity_id": workflow.id, "syntax": "canonical-key-value"},
     ))
-
-
-def augment_container_semantics(
-    index: SemanticIndex, source: str, lines: Iterable[SourceLine],
-) -> None:
-    """Expose parameterless CLUSTERS and BOUNDARY containers as typed records."""
-    all_lines = tuple(lines)
-    definitions = {
-        item["canonical"]: item for item in load_registry()["top_level_blocks"]
-        if item["id"] in {"block.clusters", "block.boundary"}
-    }
-    for canonical, definition in definitions.items():
-        header = next((line for line in all_lines if line.stripped == canonical), None)
-        if header is None:
-            continue
-        capability_id = str(definition["id"])
-        index.capability_records.append(RegisteredConstruct(
-            id=f"{capability_id}[1]@{source}:{header.number}",
-            capability_id=capability_id,
-            canonical=canonical,
-            occurrence=1,
-            location=_location(source, header),
-            operations=operational_support(definition),
-            attributes={"record_role": "container"},
-        ))
 
 
 def augment_crack_capability_records(
@@ -2782,9 +2770,8 @@ def augment_root_semantics(
 ) -> None:
     """Add documented root control entities and their FE/cluster references."""
     all_lines = tuple(lines)
-    augment_input_semantics(index, source, all_lines)
+    augment_registered_top_level_semantics(index, source, all_lines)
     augment_moisture_semantics(index, source, all_lines)
-    augment_container_semantics(index, source, all_lines)
     augment_numeric_user_semantics(index, source, all_lines)
     augment_registered_boundary_semantics(index, source, all_lines)
     augment_solver_semantics(index, source, all_lines)
