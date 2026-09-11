@@ -612,7 +612,8 @@ def augment_registered_boundary_semantics(
             defaults=defaults,
             operations=operational_support(construct),
         ))
-        _validate_registered_values(index, construct, parameters)
+        if construct.get("body", {}).get("style") != "nested-records":
+            _validate_registered_values(index, construct, parameters)
 
 
 def augment_registered_top_level_semantics(
@@ -1862,6 +1863,118 @@ def _not_fortran_number(value: str) -> bool:
     except ValueError:
         return True
     return False
+
+
+def _validate_boundary_loading_sequence(records: list[SourceLine]) -> str | None:
+    """Validate the bounded key/value rows consumed by IBN_INI's *LOAD branch."""
+    if not records:
+        return "BOUNDARY LOADING SEQUENCE requires at least one load header"
+    current_family: str | None = None
+    block_count: int | None = None
+    header_count = 0
+    for line in records:
+        tokens = [
+            token for token in re.split(
+                r"[\s,=]+", line.text.split("#", 1)[0].strip(),
+            ) if token
+        ]
+        if len(tokens) % 2:
+            return "BOUNDARY LOADING SEQUENCE rows require key/value pairs"
+        pairs = [(tokens[index].casefold()[:4], tokens[index + 1])
+                 for index in range(0, len(tokens), 2)]
+        if not pairs or len(pairs) > 9:
+            return "BOUNDARY LOADING SEQUENCE rows require one to nine key/value pairs"
+        values = {key: value for key, value in pairs}
+        is_header = "nste" in values
+        is_change = "chan" in values
+        if is_header == is_change:
+            return "each BOUNDARY LOADING SEQUENCE row requires exactly one of nstep or change"
+
+        if is_header:
+            header_count += 1
+            allowed = {"type", "name", "nste", "incr", "bloc"}
+            required = {"type", "name", "nste", "incr"}
+            raw_type = values.get("type", "").casefold()
+            if raw_type.startswith("stat"):
+                current_family = "static"
+            elif raw_type.startswith("fati"):
+                current_family = "fatigue"
+                allowed |= {"maxc", "minc", "r", "inic"}
+                required |= {"maxc", "minc", "r", "inic"}
+            elif raw_type.startswith("2dfa"):
+                current_family = "2dfatigue"
+                allowed |= {"maxc", "minc", "r", "inic"}
+                required |= {"maxc", "minc", "r", "inic"}
+            elif raw_type.startswith("redu"):
+                current_family = "reduced_fatigue"
+                allowed |= {"maxc", "minc", "r", "inic"}
+                required |= {"maxc", "minc", "r", "inic"}
+            else:
+                return "BOUNDARY LOADING SEQUENCE header has an unsupported type"
+            if not set(values) <= allowed:
+                return "BOUNDARY LOADING SEQUENCE header contains an unknown option"
+            if not required <= set(values):
+                return "BOUNDARY LOADING SEQUENCE header is missing a required option"
+            try:
+                if int(values["nste"]) <= 0:
+                    raise ValueError
+                if not math.isfinite(_fortran_real(values["incr"])):
+                    raise ValueError
+                if current_family != "static":
+                    int(values["maxc"])
+                    for key in ("minc", "r", "inic"):
+                        if not math.isfinite(_fortran_real(values[key])):
+                            raise ValueError
+            except ValueError:
+                return "BOUNDARY LOADING SEQUENCE header contains an invalid numeric value"
+            if "bloc" in values:
+                if current_family in {"2dfatigue", "reduced_fatigue"}:
+                    return f"{current_family} block repetition is blocked by incomplete source copying"
+                try:
+                    count = int(values["bloc"])
+                    if count <= 0:
+                        raise ValueError
+                except ValueError:
+                    return "BOUNDARY LOADING SEQUENCE block count must be a positive integer"
+                if block_count is None:
+                    block_count = count
+                elif count == block_count:
+                    block_count = None
+                else:
+                    return "BOUNDARY LOADING SEQUENCE block markers must have matching counts"
+            continue
+
+        if current_family is None:
+            return "BOUNDARY LOADING SEQUENCE change must follow a load header"
+        allowed = {"chan", "type", "valu"}
+        if current_family != "static":
+            allowed |= {"maxc", "minc", "r"}
+        if not set(values) <= allowed:
+            return "BOUNDARY LOADING SEQUENCE change contains an unknown option"
+        if current_family in {"2dfatigue", "reduced_fatigue"}:
+            return f"{current_family} change rows are blocked by incomplete source allocation"
+        raw_change_type = values.get("type")
+        if raw_change_type is not None and not (
+            raw_change_type.casefold().startswith(("disp", "stre", "forc"))
+            or raw_change_type.casefold().startswith("off")
+        ):
+            return "BOUNDARY LOADING SEQUENCE change has an unsupported type"
+        try:
+            if "valu" in values and not math.isfinite(_fortran_real(values["valu"])):
+                raise ValueError
+            if "maxc" in values:
+                int(values["maxc"])
+            if "minc" in values:
+                int(values["minc"])
+            if "r" in values and not math.isfinite(_fortran_real(values["r"])):
+                raise ValueError
+        except ValueError:
+            return "BOUNDARY LOADING SEQUENCE change contains an invalid numeric value"
+    if not header_count:
+        return "BOUNDARY LOADING SEQUENCE requires at least one load header"
+    if block_count is not None:
+        return "BOUNDARY LOADING SEQUENCE repeated blocks require an explicit closing marker"
+    return None
 
 
 def _constitutive_modifier(line: SourceLine) -> tuple[str, list[int]] | None:
@@ -3254,6 +3367,12 @@ def augment_root_semantics(
                                 _key("cluster", terminal, None), source, line,
                             )
         elif command.startswith("*loading sequence"):
+            loading_error = _validate_boundary_loading_sequence(records)
+            if loading_error is not None:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error", message=loading_error,
+                    line=command_line.number, source=source,
+                ))
             for ordinal, line in enumerate(records, start=1):
                 options = _record_options(line)
                 changed = options.get("change")

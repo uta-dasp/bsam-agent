@@ -19,7 +19,7 @@ def boundary_deck(convergence: bytes) -> bytes:
         b"INPUT\n3\nEND INPUT\n"
         b"BOUNDARY\n*type\nmechanical\n"
         b"*boundary condition\ntype=off, name=idle\n"
-        b"*loading sequence\ntype=Static, nstep=1, incr=1\n"
+        b"*loading sequence\ntype=Static, name=step1, nstep=1, incr=1\n"
         b"*convergence\n" + convergence +
         b"END BOUNDARY\n"
         b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"

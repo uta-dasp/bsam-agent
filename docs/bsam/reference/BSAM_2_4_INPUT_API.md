@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.97.0`
-- Registry SHA-256: `4FCFEED96B8D3F5FD106F2B6C98C822D048ABBDDC8AA83A726CC1645D3451723`
+- Registry version: `0.98.0`
+- Registry SHA-256: `4638FF5FBEF1BC6623C582CC1DBE94824298BF6303F4433944C30B514F622E35`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1722,7 +1722,7 @@ Defines load-step histories, cyclic controls, and optional repeated fatigue bloc
 - Match prefix: `*load`
 - Coverage: documented
 - Evidence: [evidence.boundary-loading](#evidenceboundary-loading), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1741,13 +1741,13 @@ Termination: next-command. Dependencies: Change records reference names created 
   - `change` [repeated]: `change`:boundary-condition-name, `type`:enum(displacement,stretch,force,off), `value`:real
   - Constraint: Change records continue until the next row containing nstep or the next command.
   - Constraint: Every change target must name an existing boundary condition.
-  - Constraint: The parser does not enforce positive nstep or initialize a missing incr; the Agent requires nstep greater than zero and an explicit finite incr.
+  - Constraint: Static validation requires a name, nstep greater than zero, and an explicit finite incr; it rejects unknown options and invalid change types or values.
 - **fatigue-segment** (type begins fati, 2dfa, or redu):
   - `load-header` [once]: `type`:enum(fatigue,2dfatigue,reduced_fatigue), `name`:string, `nstep`:positive-integer, `maxcycle`:integer, `mincycle`:real, `R`:real, `incr`:real, `inicycle`:real, `block`:positive-integer
   - `change` [repeated]: `change`:boundary-condition-name, `type`:enum(displacement,stretch,force,off), `value`:real, `maxcycle`:integer, `mincycle`:integer, `R`:real
   - Constraint: A load header supports at most nine key/value pairs.
-  - Constraint: Allocated fatigue fields have no source defaults, so canonical generation requires finite explicit maxcycle, mincycle, R, incr, and inicycle values and positive nstep.
-  - Constraint: Repeated blocks duplicate the enclosed segment sequence and derive suffixed names; every block count must be positive and a closing block marker should be explicit.
+  - Constraint: Allocated fatigue fields have no source defaults; static validation requires a name, positive nstep, integer maxcycle, and finite explicit mincycle, R, incr, and inicycle values.
+  - Constraint: Repeated blocks duplicate the enclosed segment sequence and derive suffixed names; every block count must be positive and static validation requires a matching explicit closing marker.
   - Constraint: The parser's change allocation and repeated-block copy branches omit internal types 21, 22, and 31; the Agent preserves existing 2dfatigue/reduced_fatigue content but blocks change rows and block repetition for those families.
   - Constraint: Fatigue-family creation remains source-documented but requires a separately runtime-verified profile before model-generated engineering values may be proposed.
 

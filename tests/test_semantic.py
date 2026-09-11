@@ -1002,7 +1002,7 @@ class SemanticIndexTests(unittest.TestCase):
                 b"mset=PLY1.edge, Material=1, Constitutive=1, Failure=1\n"
                 b"last=PLY1\n"
                 b"*loading sequence\n"
-                b"type=Static, nstep=1, incr=1\n"
+                b"type=Static, name=step1, nstep=1, incr=1\n"
                 b"change=bc1, type=disp, value=1\n"
                 b"END BOUNDARY\n",
             ).replace(
@@ -1053,7 +1053,8 @@ class SemanticIndexTests(unittest.TestCase):
                 b"BOUNDARY\n*type\nmechanical\n"
                 b"*boundary condition\n"
                 b"type=disp, comp=x, name=bc1, value=0, nset=PLY1.missing\n"
-                b"*loading sequence\nchange=unknown, type=disp, value=1\n"
+                b"*loading sequence\ntype=Static, name=step1, nstep=1, incr=1\n"
+                b"change=unknown, type=disp, value=1\n"
                 b"END BOUNDARY\n",
             )
             root.write_bytes(raw)
@@ -1193,6 +1194,73 @@ class SemanticIndexTests(unittest.TestCase):
                     path.write_bytes(deck(b"*NAME\nply1\n").replace(
                         b"mechanical\nEND BOUNDARY",
                         b"mechanical\n" + control + b"END BOUNDARY",
+                    ))
+                    diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
+    def test_boundary_loading_sequence_rows_are_validated(self) -> None:
+        valid_bodies = {
+            "static": (
+                b"type=Static,name=step1,nstep=2,incr=5D-1\n"
+                b"change=bc1,type=disp,value=1\n"
+            ),
+            "fatigue": (
+                b"type=fatigue,name=cyclic,nstep=2,maxcycle=10,mincycle=0,"
+                b"R=.1,incr=.5,inicycle=0\n"
+                b"change=bc1,maxcycle=-2,mincycle=1,R=.2\n"
+            ),
+            "closed-block": (
+                b"type=fatigue,name=a,nstep=1,maxcycle=10,mincycle=0,R=0,"
+                b"incr=1,inicycle=0,block=2\n"
+                b"type=fatigue,name=b,nstep=1,maxcycle=10,mincycle=0,R=0,"
+                b"incr=1,inicycle=0,block=2\n"
+            ),
+        }
+        invalid_bodies = {
+            "empty": b"",
+            "odd-pair": b"type=static,name\n",
+            "missing-required": b"type=static,name=step1,nstep=1\n",
+            "unknown-type": b"type=dynamic,name=step1,nstep=1,incr=1\n",
+            "unknown-option": b"type=static,name=step1,nstep=1,incr=1,bad=2\n",
+            "zero-steps": b"type=static,name=step1,nstep=0,incr=1\n",
+            "nonfinite-increment": b"type=static,name=step1,nstep=1,incr=NaN\n",
+            "change-first": b"change=bc1,value=1\n",
+            "bad-change-type": (
+                b"type=static,name=step1,nstep=1,incr=1\nchange=bc1,type=heat\n"
+            ),
+            "unclosed-block": (
+                b"type=fatigue,name=a,nstep=1,maxcycle=10,mincycle=0,R=0,"
+                b"incr=1,inicycle=0,block=2\n"
+            ),
+            "blocked-2d-change": (
+                b"type=2dfatigue,name=a,nstep=1,maxcycle=10,mincycle=0,R=0,"
+                b"incr=1,inicycle=0\nchange=bc1,value=1\n"
+            ),
+            "blocked-reduced-block": (
+                b"type=reduced_fatigue,name=a,nstep=1,maxcycle=10,mincycle=0,R=0,"
+                b"incr=1,inicycle=0,block=2\n"
+            ),
+        }
+        boundary_condition = b"*boundary condition\ntype=off,name=bc1\n"
+        with tempfile.TemporaryDirectory() as directory:
+            for name, loading_body in valid_bodies.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"valid-{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n" + boundary_condition
+                        + b"*loading sequence\n" + loading_body + b"END BOUNDARY",
+                    ))
+                    self.assertEqual(
+                        0, SourceSet.read(path).inspection()["summary"]["errors"],
+                    )
+            for name, loading_body in invalid_bodies.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"invalid-{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n" + boundary_condition
+                        + b"*loading sequence\n" + loading_body + b"END BOUNDARY",
                     ))
                     diagnostics = SourceSet.read(path).inspection()["diagnostics"]
                     self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})

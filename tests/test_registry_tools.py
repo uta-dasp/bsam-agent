@@ -226,6 +226,10 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("surface-contact", connection_text)
         self.assertIn("no -21 execution case", connection_text)
         loading_text = json.dumps(constructs["*LOADING SEQUENCE"]).lower()
+        self.assertEqual(
+            "verified",
+            constructs["*LOADING SEQUENCE"]["operations"]["static_validation"],
+        )
         self.assertIn("allocated fatigue fields have no source defaults", loading_text)
         self.assertIn("omit internal types 21, 22, and 31", loading_text)
         output_text = json.dumps(constructs["*OUTPUT"]).lower()

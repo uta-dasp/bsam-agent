@@ -491,7 +491,7 @@ class ChangePlanTests(unittest.TestCase):
                 b"*boundary condition\n"
                 b"type=disp, comp=x, name=pull, value=0, nset=lower_ply.all_nodes\n"
                 b"*loading sequence\n"
-                b"type=Static, nstep=1, incr=1\n"
+                b"type=Static, name=step1, nstep=1, incr=1\n"
                 b"change=pull, type=disp, value=1\n"
                 b"END BOUNDARY\n",
             ))

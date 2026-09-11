@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.97.0",
+  "registry_version": "0.98.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3365,7 +3365,7 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "nested-records",
@@ -3378,7 +3378,7 @@
               {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(static)", "required": true, "summary": "Static load segment."}, {"name": "name", "value_type": "string", "required": true, "summary": "Canonical segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "incr", "value_type": "real", "required": true, "summary": "Load increment; required because the parser's temporary value has no per-segment default."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
               {"name": "change", "repetition": "repeated", "fields": [{"name": "change", "value_type": "boundary-condition-name", "required": true, "summary": "Existing boundary condition to change."}, {"name": "type", "value_type": "enum(displacement,stretch,force,off)", "required": false, "summary": "Replacement action; inherited when absent."}, {"name": "value", "value_type": "real", "required": false, "summary": "Replacement value; inherited when absent."}]}
             ],
-            "constraints": ["Change records continue until the next row containing nstep or the next command.", "Every change target must name an existing boundary condition.", "The parser does not enforce positive nstep or initialize a missing incr; the Agent requires nstep greater than zero and an explicit finite incr."]
+            "constraints": ["Change records continue until the next row containing nstep or the next command.", "Every change target must name an existing boundary condition.", "Static validation requires a name, nstep greater than zero, and an explicit finite incr; it rejects unknown options and invalid change types or values."]
           },
           {
             "name": "fatigue-segment",
@@ -3387,7 +3387,7 @@
               {"name": "load-header", "repetition": "once", "fields": [{"name": "type", "value_type": "enum(fatigue,2dfatigue,reduced_fatigue)", "required": true, "summary": "Cyclic load family."}, {"name": "name", "value_type": "string", "required": true, "summary": "Canonical segment name."}, {"name": "nstep", "value_type": "positive-integer", "required": true, "summary": "Number of steps."}, {"name": "maxcycle", "value_type": "integer", "required": true, "summary": "Maximum cycle control; explicit generation is required because allocated storage has no source default."}, {"name": "mincycle", "value_type": "real", "required": true, "summary": "Minimum cycle control; explicit generation is required because allocated storage has no source default."}, {"name": "R", "value_type": "real", "required": true, "summary": "Cyclic load ratio; explicit generation is required because allocated storage has no source default."}, {"name": "incr", "value_type": "real", "required": true, "summary": "Load increment; explicit generation is required because allocated storage has no source default."}, {"name": "inicycle", "value_type": "real", "required": true, "summary": "Initial cycle; explicit generation is required because allocated storage has no source default."}, {"name": "block", "value_type": "positive-integer", "required": false, "summary": "Repeated-block marker/count."}]},
               {"name": "change", "repetition": "repeated", "fields": [{"name": "change", "value_type": "boundary-condition-name", "required": true, "summary": "Existing boundary condition to change."}, {"name": "type", "value_type": "enum(displacement,stretch,force,off)", "required": false, "summary": "Replacement action; inherited when absent."}, {"name": "value", "value_type": "real", "required": false, "summary": "Replacement value; inherited when absent."}, {"name": "maxcycle", "value_type": "integer", "required": false, "summary": "Change-specific maximum cycle; its sign selects an internal cycle-change type."}, {"name": "mincycle", "value_type": "integer", "required": false, "summary": "Change-specific minimum cycle."}, {"name": "R", "value_type": "real", "required": false, "summary": "Change-specific cyclic ratio."}]}
             ],
-            "constraints": ["A load header supports at most nine key/value pairs.", "Allocated fatigue fields have no source defaults, so canonical generation requires finite explicit maxcycle, mincycle, R, incr, and inicycle values and positive nstep.", "Repeated blocks duplicate the enclosed segment sequence and derive suffixed names; every block count must be positive and a closing block marker should be explicit.", "The parser's change allocation and repeated-block copy branches omit internal types 21, 22, and 31; the Agent preserves existing 2dfatigue/reduced_fatigue content but blocks change rows and block repetition for those families.", "Fatigue-family creation remains source-documented but requires a separately runtime-verified profile before model-generated engineering values may be proposed."]
+            "constraints": ["A load header supports at most nine key/value pairs.", "Allocated fatigue fields have no source defaults; static validation requires a name, positive nstep, integer maxcycle, and finite explicit mincycle, R, incr, and inicycle values.", "Repeated blocks duplicate the enclosed segment sequence and derive suffixed names; every block count must be positive and static validation requires a matching explicit closing marker.", "The parser's change allocation and repeated-block copy branches omit internal types 21, 22, and 31; the Agent preserves existing 2dfatigue/reduced_fatigue content but blocks change rows and block repetition for those families.", "Fatigue-family creation remains source-documented but requires a separately runtime-verified profile before model-generated engineering values may be proposed."]
           }
         ],
         "dependencies": ["Change records reference names created in BOUNDARY CONDITION.", "Step ranges are accumulated in declaration order.", "Boundary-condition deletion or renaming must update every load change reference."]

@@ -103,6 +103,8 @@ Registry 0.96.0 verifies BOUNDARY `*TYPE`: mechanical permits one optional regis
 
 Registry 0.97.0 verifies BOUNDARY `*G-CONTROL` as a command-line-only construct. Validation mirrors its four-character option dispatch, rejects unknown or valueless settings, enforces positive integer iterations and finite nonnegative thresholds, requires GMIN not to exceed GMAX, and blocks UPDATE unless GTHR is positive.
 
+Registry 0.98.0 verifies BOUNDARY `*LOADING SEQUENCE`: every row has one to nine key/value pairs and exactly one header/change discriminator; static and fatigue headers require their safe explicit fields and numeric domains; change types, values, and boundary-condition references are checked; repeated blocks require balanced positive markers. Change rows for 2D and reduced fatigue remain blocked because their source allocation branches are incomplete.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.
