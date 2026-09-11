@@ -4325,6 +4325,27 @@ def build_semantic_index(
                 attributes: dict[str, Any] = {
                     "operation": operation_name, "target": nset or "ALL",
                 }
+                if command == "*FLIP":
+                    flip_tokens = [token for token in re.split(
+                        r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                    ) if token]
+                    valid_flip = (
+                        len(flip_tokens) == 1
+                        or (
+                            len(flip_tokens) == 3
+                            and flip_tokens[1].casefold() == "type"
+                            and flip_tokens[2] in {"XY", "YX", "XZ", "ZX", "YZ", "ZY"}
+                        )
+                    )
+                    if records or not valid_flip:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=(
+                                "FLIP accepts only an optional command-line "
+                                "TYPE=XY|YX|XZ|ZX|YZ|ZY and no data records"
+                            ),
+                            line=command_line.number, source=source,
+                        ))
                 if command in {"*SHIF", "*SCAL"} and records:
                     attributes["values"] = _fields(records[0].text)[:3]
                 elif command == "*FLIP":

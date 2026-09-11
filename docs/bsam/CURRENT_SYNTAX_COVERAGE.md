@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.101.0` additionally verifies cluster `*FLIP` default and explicit command-line mappings, uppercase-sensitive TYPE values, rejection of unknown options, and its no-data-row contract.
+
 Registry `0.100.0` additionally verifies cluster `*BUILD` as a command-only topology operation and rejects attached data records before source execution can consume them as commands.
 
 Registry `0.99.0` additionally verifies all BOUNDARY `*CONNECTIONS` variants: typed headers, bounded key/value rows, positive tolerances and declaration IDs, selected-cluster-qualified sets, penalty sentinels, ordered nodal selectors, surface pairs, and blocked type -21 or duplicate-penalty execution paths.

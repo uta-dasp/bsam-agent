@@ -109,6 +109,8 @@ Registry 0.99.0 verifies BOUNDARY `*CONNECTIONS` across penalty, nodal, and surf
 
 Registry 0.100.0 verifies cluster `*BUILD` as command-only. Any attached data record now produces a structural validation error; valid instances retain their source-located topology operation and cluster dependency.
 
+Registry 0.101.0 verifies cluster `*FLIP`: omission retains the XY default, while an explicit command line accepts exactly one uppercase TYPE mapping from XY, YX, XZ, ZX, YZ, or ZY. Unknown options, lowercase mapping values, and attached data records are rejected.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

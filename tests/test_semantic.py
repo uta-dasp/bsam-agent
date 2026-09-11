@@ -731,6 +731,20 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_flip_command_line_mapping_and_body_are_validated(self) -> None:
+        cases = {
+            "lowercase-value": b"*FLIP,TYPE=xy\n",
+            "unknown-option": b"*FLIP,AXIS=XY\n",
+            "attached-record": b"*FLIP,TYPE=XY\nunexpected\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, flip in cases.items():
+                with self.subTest(name=name):
+                    root = Path(directory) / f"{name}.in"
+                    root.write_bytes(deck(b"*NAME\nply1\n*NODE\n1,0,0,0\n" + flip))
+                    diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_build_rejects_data_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

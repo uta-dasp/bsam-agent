@@ -147,6 +147,7 @@ class RegistryToolsTests(unittest.TestCase):
         exclusion = {item["name"]: item for item in commands["*EXCLUSION"]["parameters"]}
         self.assertEqual("BOX", exclusion["shape"]["default"])
         self.assertIn("xy=(-y,x,z)", json.dumps(commands["*FLIP"]).lower())
+        self.assertEqual("verified", commands["*FLIP"]["operations"]["static_validation"])
 
     def test_generation_element_and_cluster_boundary_grammars_are_registered(self) -> None:
         commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}
