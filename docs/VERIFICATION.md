@@ -101,6 +101,8 @@ Registry 0.95.0 verifies BOUNDARY `*NAME`: an empty body retains the indexed def
 
 Registry 0.96.0 verifies BOUNDARY `*TYPE`: mechanical permits one optional registered kinematic-options row, thermal requires one finite temperature row followed by at most one options row, and unknown or excess records are rejected. Contact remains recognized syntax but produces a blocking diagnostic because the active outer dispatch stops instead of executing it.
 
+Registry 0.97.0 verifies BOUNDARY `*G-CONTROL` as a command-line-only construct. Validation mirrors its four-character option dispatch, rejects unknown or valueless settings, enforces positive integer iterations and finite nonnegative thresholds, requires GMIN not to exceed GMAX, and blocks UPDATE unless GTHR is positive.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

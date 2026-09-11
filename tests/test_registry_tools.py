@@ -197,6 +197,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual("unassessed", constructs["*TYPE"]["operations"]["execute"])
         g_params = {item["name"]: item for item in constructs["*G-CONTROL"]["parameters"]}
         self.assertEqual(1000, g_params["G_ITER"]["default"])
+        self.assertEqual(
+            "verified", constructs["*G-CONTROL"]["operations"]["static_validation"],
+        )
         self.assertEqual("restart", constructs["*STATUS"]["parameters"][0]["default"])
         condition_text = json.dumps(constructs["*BOUNDARY CONDITION"]).lower()
         self.assertIn("global-local-file", condition_text)

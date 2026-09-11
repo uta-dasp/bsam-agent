@@ -1155,6 +1155,48 @@ class SemanticIndexTests(unittest.TestCase):
                     diagnostics = SourceSet.read(path).inspection()["diagnostics"]
                     self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
 
+    def test_boundary_g_control_options_and_safe_ranges_are_validated(self) -> None:
+        valid_commands = {
+            "empty": b"*g-control\n",
+            "full": (
+                b"*g-control,UPDATE,DAMP,G_ITER=20,GMIN=0,GMAX=2,"
+                b"GTHR=1D-3,NO_DAMAGE_LOCK\n"
+            ),
+            "source-prefixes": b"*g-control G_IT 3 G_TH 0 GMAX 1 GTHR .5 UPDA\n",
+        }
+        invalid_commands = {
+            "body-record": b"*g-control\nGMIN=0\n",
+            "unknown": b"*g-control,OTHER=1\n",
+            "missing-value": b"*g-control,GMAX\n",
+            "noninteger-iterations": b"*g-control,G_ITER=1.5\n",
+            "zero-iterations": b"*g-control,G_ITER=0\n",
+            "negative-threshold": b"*g-control,GMIN=-1\n",
+            "nonfinite-threshold": b"*g-control,GMAX=NaN\n",
+            "reversed-range": b"*g-control,GMIN=2,GMAX=1\n",
+            "update-without-threshold": b"*g-control,UPDATE\n",
+            "update-zero-threshold": b"*g-control,UPDATE,GTHR=0\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, control in valid_commands.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"valid-{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n" + control + b"END BOUNDARY",
+                    ))
+                    self.assertEqual(
+                        0, SourceSet.read(path).inspection()["summary"]["errors"],
+                    )
+            for name, control in invalid_commands.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"invalid-{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n" + control + b"END BOUNDARY",
+                    ))
+                    diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_boundary_problem_names_must_be_unique(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

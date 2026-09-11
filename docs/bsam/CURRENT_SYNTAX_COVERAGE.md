@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.97.0` additionally verifies BOUNDARY `*G-CONTROL` command-line-only shape, four-character option dispatch, value requirements, safe numeric domains, threshold ordering, and UPDATE compatibility.
+
 Registry `0.96.0` additionally verifies BOUNDARY `*TYPE` mechanical and thermal record shape, finite thermal temperature values, the bounded kinematic flag subset, and fail-closed contact dispatch.
 
 Registry `0.95.0` additionally verifies BOUNDARY `*NAME` default/explicit record shape, reserved-token rejection, cross-problem uniqueness, generation, and pinned-executable acceptance.

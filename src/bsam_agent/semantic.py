@@ -553,7 +553,7 @@ def _validate_registered_values(
                 if "integer" in value_type:
                     numeric = int(str(raw))
                 elif "real" in value_type:
-                    numeric = float(str(raw))
+                    numeric = _fortran_real(str(raw))
                 if isinstance(numeric, float) and not math.isfinite(numeric):
                     invalid = True
                 if value_type.startswith("positive-") and numeric is not None and numeric <= 0:
@@ -2902,6 +2902,59 @@ def augment_root_semantics(
             if type_error is not None:
                 index.diagnostics.append(Diagnostic(
                     code="BSAM-E310", severity="error", message=type_error,
+                    line=command_line.number, source=source,
+                ))
+        elif command.startswith("*g-co"):
+            control_error: str | None = None
+            if records:
+                control_error = "BOUNDARY G-CONTROL accepts command-line options only"
+            tokens = [
+                token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token
+            ][1:]
+            values: dict[str, float | int] = {
+                "g_it": 1000, "gmin": 0.0, "gmax": 1.0e9, "gthr": 0.0,
+            }
+            update = False
+            position = 0
+            while control_error is None and position < len(tokens):
+                spelling = tokens[position]
+                key = spelling.casefold()[:4]
+                if key in {"upda", "damp", "no_d"}:
+                    update = update or key == "upda"
+                    position += 1
+                    continue
+                canonical_key = "gmin" if key == "g_th" else key
+                if canonical_key not in {"g_it", "gmin", "gmax", "gthr"}:
+                    control_error = f"unknown BOUNDARY G-CONTROL option {spelling}"
+                    break
+                if position + 1 >= len(tokens):
+                    control_error = f"BOUNDARY G-CONTROL option {spelling} requires a value"
+                    break
+                raw_value = tokens[position + 1]
+                try:
+                    if canonical_key == "g_it":
+                        value: float | int = int(raw_value)
+                        if value <= 0:
+                            raise ValueError
+                    else:
+                        value = _fortran_real(raw_value)
+                        if not math.isfinite(value) or value < 0:
+                            raise ValueError
+                except ValueError:
+                    expected = "a positive integer" if canonical_key == "g_it" else "a nonnegative finite real"
+                    control_error = f"BOUNDARY G-CONTROL option {spelling} requires {expected}"
+                    break
+                values[canonical_key] = value
+                position += 2
+            if control_error is None and values["gmin"] > values["gmax"]:
+                control_error = "BOUNDARY G-CONTROL requires GMIN <= GMAX"
+            if control_error is None and update and values["gthr"] <= 0:
+                control_error = "BOUNDARY G-CONTROL UPDATE requires GTHR > 0"
+            if control_error is not None:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error", message=control_error,
                     line=command_line.number, source=source,
                 ))
         elif command.startswith("*name"):

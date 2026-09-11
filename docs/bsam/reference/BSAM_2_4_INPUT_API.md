@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.96.0`
-- Registry SHA-256: `570E86CCE6806354CF4199013AD58D8DC85A9F64A5B13FD4DEA23CBE3199A911`
+- Registry version: `0.97.0`
+- Registry SHA-256: `4FCFEED96B8D3F5FD106F2B6C98C822D048ABBDDC8AA83A726CC1645D3451723`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1513,7 +1513,7 @@ Configures damage-increment control, update, damping, iteration, and exit thresh
 - Match prefix: `*g-co`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=implemented, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=implemented, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1531,9 +1531,10 @@ Termination: fixed-count. Dependencies: The command enables G-control for the cu
 
 - **command-line-options** (always):
   - `control` [once]: `options`:comma-or-space-delimited-key/value-options-on-command-line
-  - Constraint: Keys are uppercased and matched as UPDA, DAMP, G_IT, G_TH or GMIN, GMAX, GTHR, and NO_D.
-  - Constraint: UPDATE requires GTHR greater than zero for safe generation; the source only warns when the threshold remains zero.
-  - Constraint: Agent generation requires GMIN <= GMAX and nonnegative thresholds.
+  - Constraint: Keys are uppercased and matched by their first four characters as UPDA, DAMP, G_IT, G_TH or GMIN, GMAX, GTHR, and NO_D.
+  - Constraint: Static validation requires UPDATE to have GTHR greater than zero; the source only warns when the threshold remains zero.
+  - Constraint: Static validation requires positive G_ITER, finite nonnegative thresholds, and GMIN <= GMAX.
+  - Constraint: Data rows and unregistered options are rejected.
 
 ### `*GEO_NL`
 

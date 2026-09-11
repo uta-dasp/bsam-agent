@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.96.0",
+  "registry_version": "0.97.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3117,12 +3117,12 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "implemented", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
-        "variants": [{"name": "command-line-options", "when": "always", "rows": [{"name": "control", "repetition": "once", "fields": [{"name": "options", "value_type": "comma-or-space-delimited-key/value-options-on-command-line", "required": false, "summary": "Configures G-control without consuming a following data row."}]}], "constraints": ["Keys are uppercased and matched as UPDA, DAMP, G_IT, G_TH or GMIN, GMAX, GTHR, and NO_D.", "UPDATE requires GTHR greater than zero for safe generation; the source only warns when the threshold remains zero.", "Agent generation requires GMIN <= GMAX and nonnegative thresholds."]}],
+        "variants": [{"name": "command-line-options", "when": "always", "rows": [{"name": "control", "repetition": "once", "fields": [{"name": "options", "value_type": "comma-or-space-delimited-key/value-options-on-command-line", "required": false, "summary": "Configures G-control without consuming a following data row."}]}], "constraints": ["Keys are uppercased and matched by their first four characters as UPDA, DAMP, G_IT, G_TH or GMIN, GMAX, GTHR, and NO_D.", "Static validation requires UPDATE to have GTHR greater than zero; the source only warns when the threshold remains zero.", "Static validation requires positive G_ITER, finite nonnegative thresholds, and GMIN <= GMAX.", "Data rows and unregistered options are rejected."]}],
         "dependencies": ["The command enables G-control for the current mechanical or thermal boundary problem."]
       }
     },
