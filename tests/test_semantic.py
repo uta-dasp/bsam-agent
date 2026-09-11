@@ -1116,6 +1116,45 @@ class SemanticIndexTests(unittest.TestCase):
                     diagnostics = SourceSet.read(path).inspection()["diagnostics"]
                     self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
 
+    def test_boundary_type_mechanical_and_thermal_records_are_validated(self) -> None:
+        valid_bodies = {
+            "mechanical": b"mechanical\n",
+            "mechanical-options": b"mechanical\nGEO_NL, FIBER_ROT\n",
+            "thermal": b"thermal\n-2.5D+1\n",
+            "thermal-options": b"thermo-mechanical\n0\nDLM_NORMAL_ROT MIC_NORMAL_ROT\n",
+        }
+        invalid_bodies = {
+            "missing-type": b"",
+            "short-type": b"mec\n",
+            "unknown-type": b"dynamic\n",
+            "mechanical-extra-row": b"mechanical\nGEO_NL\nFIBER_ROT\n",
+            "unknown-option": b"mechanical\nGEO_NL, UNKNOWN\n",
+            "thermal-missing-temperature": b"thermal\n",
+            "thermal-invalid-temperature": b"thermal\nNaN\n",
+            "thermal-extra-row": b"thermal\n0\nGEO_NL\nFIBER_ROT\n",
+            "blocked-contact": b"contact\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, type_body in valid_bodies.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"valid-{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"*type\nmechanical\nEND BOUNDARY",
+                        b"*type\n" + type_body + b"END BOUNDARY",
+                    ))
+                    self.assertEqual(
+                        0, SourceSet.read(path).inspection()["summary"]["errors"],
+                    )
+            for name, type_body in invalid_bodies.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"invalid-{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"*type\nmechanical\nEND BOUNDARY",
+                        b"*type\n" + type_body + b"END BOUNDARY",
+                    ))
+                    diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_boundary_problem_names_must_be_unique(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

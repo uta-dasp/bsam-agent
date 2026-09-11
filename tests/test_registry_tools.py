@@ -188,6 +188,13 @@ class RegistryToolsTests(unittest.TestCase):
             self.assertIn("body", constructs[token], token)
         type_variants = {item["name"] for item in constructs["*TYPE"]["body"]["variants"]}
         self.assertEqual({"mechanical", "thermal", "blocked-contact"}, type_variants)
+        self.assertEqual(
+            "case-normalized-prefix-record(mech,ther,cont)",
+            constructs["*TYPE"]["parameters"][0]["value_type"],
+        )
+        self.assertEqual("verified", constructs["*TYPE"]["operations"]["static_validation"])
+        self.assertEqual("unsupported", constructs["*TYPE"]["operations"]["generate"])
+        self.assertEqual("unassessed", constructs["*TYPE"]["operations"]["execute"])
         g_params = {item["name"]: item for item in constructs["*G-CONTROL"]["parameters"]}
         self.assertEqual(1000, g_params["G_ITER"]["default"])
         self.assertEqual("restart", constructs["*STATUS"]["parameters"][0]["default"])

@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.95.0`
-- Registry SHA-256: `EA1710C2CEC68EB1B68941057904874445DE05C2E062DBCE61B5E3B2095A3BDC`
+- Registry version: `0.96.0`
+- Registry SHA-256: `570E86CCE6806354CF4199013AD58D8DC85A9F64A5B13FD4DEA23CBE3199A911`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1480,11 +1480,11 @@ Starts a boundary problem and selects mechanical, thermal, or contact dispatch.
 - Match prefix: `*type`
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
-- `problem_type` (enum-record, required) (allowed: `mechanical`, `thermal`, `contact`): The following cleaned record is matched by its first four characters.
+- `problem_type` (case-normalized-prefix-record(mech,ther,cont), required): The following cleaned record is matched by its first four characters.
 
 #### `*TYPE` body
 
@@ -1494,11 +1494,13 @@ Termination: fixed-count. Dependencies: A new problem begins at each *TYPE and t
   - `problem-type` [once]: `problem_type`:case-normalized-prefix(mech)
   - `kinematic-options` [optional-once]: `flags`:subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)
   - Constraint: Canonical generation emits *TYPE before the problem-type record even though the parser can consume the type record directly.
+  - Constraint: Static validation permits no more than one options row and rejects tokens outside the registered flag subset.
 - **thermal** (problem_type begins ther, including thermo-mechanical):
   - `problem-type` [once]: `problem_type`:case-normalized-prefix(ther)
-  - `initial-temperature-change` [once]: `temperature`:real
+  - `initial-temperature-change` [once]: `temperature`:finite-real
   - `kinematic-options` [optional-once]: `flags`:subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)
   - Constraint: Temperature units follow the model's consistent unit system.
+  - Constraint: Static validation requires exactly one finite temperature row before the optional single options row.
 - **blocked-contact** (problem_type begins cont):
   - `problem-type` [once]: `problem_type`:case-normalized-prefix(cont)
   - Constraint: Contact problems are blocked from Agent generation because the only active body dispatch handles types 1 and 2 and the default branch stops.

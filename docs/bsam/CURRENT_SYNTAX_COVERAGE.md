@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.96.0` additionally verifies BOUNDARY `*TYPE` mechanical and thermal record shape, finite thermal temperature values, the bounded kinematic flag subset, and fail-closed contact dispatch.
+
 Registry `0.95.0` additionally verifies BOUNDARY `*NAME` default/explicit record shape, reserved-token rejection, cross-problem uniqueness, generation, and pinned-executable acceptance.
 
 Registry `0.94.0` additionally verifies command-only `*STOP` data shape, cluster termination boundaries, generation, and pinned-executable acceptance.

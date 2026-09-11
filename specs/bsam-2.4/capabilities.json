@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.95.0",
+  "registry_version": "0.96.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3082,21 +3082,21 @@
       "kind": "problem-start",
       "summary": "Starts a boundary problem and selects mechanical, thermal, or contact dispatch.",
       "coverage": "documented",
-      "parameters": [{"name": "problem_type", "value_type": "enum-record", "required": true, "allowed_values": ["mechanical", "thermal", "contact"], "summary": "The following cleaned record is matched by its first four characters."}],
+      "parameters": [{"name": "problem_type", "value_type": "case-normalized-prefix-record(mech,ther,cont)", "required": true, "summary": "The following cleaned record is matched by its first four characters."}],
       "evidence_ids": ["evidence.boundary-active-dispatch", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "nested-records",
         "termination": "fixed-count",
         "variants": [
-          {"name": "mechanical", "when": "problem_type begins mech", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(mech)", "required": true, "summary": "Selects mechanical analysis."}]}, {"name": "kinematic-options", "repetition": "optional-once", "fields": [{"name": "flags", "value_type": "subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)", "required": false, "summary": "Optional single record enabling kinematic update flags."}]}], "constraints": ["Canonical generation emits *TYPE before the problem-type record even though the parser can consume the type record directly."]},
-          {"name": "thermal", "when": "problem_type begins ther, including thermo-mechanical", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(ther)", "required": true, "summary": "Selects the mechanical plus thermal path."}]}, {"name": "initial-temperature-change", "repetition": "once", "fields": [{"name": "temperature", "value_type": "real", "required": true, "summary": "Initial uniform temperature change assigned to all selected-cluster nodes."}]}, {"name": "kinematic-options", "repetition": "optional-once", "fields": [{"name": "flags", "value_type": "subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)", "required": false, "summary": "Optional single record enabling kinematic update flags."}]}], "constraints": ["Temperature units follow the model's consistent unit system."]},
+          {"name": "mechanical", "when": "problem_type begins mech", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(mech)", "required": true, "summary": "Selects mechanical analysis."}]}, {"name": "kinematic-options", "repetition": "optional-once", "fields": [{"name": "flags", "value_type": "subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)", "required": false, "summary": "Optional single record enabling kinematic update flags."}]}], "constraints": ["Canonical generation emits *TYPE before the problem-type record even though the parser can consume the type record directly.", "Static validation permits no more than one options row and rejects tokens outside the registered flag subset."]},
+          {"name": "thermal", "when": "problem_type begins ther, including thermo-mechanical", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(ther)", "required": true, "summary": "Selects the mechanical plus thermal path."}]}, {"name": "initial-temperature-change", "repetition": "once", "fields": [{"name": "temperature", "value_type": "finite-real", "required": true, "summary": "Initial uniform temperature change assigned to all selected-cluster nodes."}]}, {"name": "kinematic-options", "repetition": "optional-once", "fields": [{"name": "flags", "value_type": "subset(GEO_NL,FIBER_ROT,DLM_NORMAL_ROT,MIC_NORMAL_ROT)", "required": false, "summary": "Optional single record enabling kinematic update flags."}]}], "constraints": ["Temperature units follow the model's consistent unit system.", "Static validation requires exactly one finite temperature row before the optional single options row."]},
           {"name": "blocked-contact", "when": "problem_type begins cont", "rows": [{"name": "problem-type", "repetition": "once", "fields": [{"name": "problem_type", "value_type": "case-normalized-prefix(cont)", "required": true, "summary": "Recognized as type 3 but rejected by the active outer type dispatch."}]}], "constraints": ["Contact problems are blocked from Agent generation because the only active body dispatch handles types 1 and 2 and the default branch stops."]}
         ],
         "dependencies": ["A new problem begins at each *TYPE and the preceding problem terminates when the dispatcher encounters it.", "Only mechanical and thermal problems may contain the registered nested BOUNDARY constructs."]

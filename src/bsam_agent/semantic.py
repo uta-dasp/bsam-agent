@@ -2852,6 +2852,58 @@ def augment_root_semantics(
         if command.startswith("*type"):
             boundary_problem_ordinal += 1
             selected_cluster_names = list(all_cluster_names)
+            type_error: str | None = None
+            problem_type = (
+                records[0].text.split("#", 1)[0].strip().casefold()
+                if records else ""
+            )
+            option_flags = {
+                "geo_nl", "fiber_rot", "dlm_normal_rot", "mic_normal_rot",
+            }
+            if not records or not problem_type:
+                type_error = "BOUNDARY TYPE requires a problem-type record"
+            elif problem_type.startswith("mech"):
+                option_rows = records[1:]
+                if len(option_rows) > 1:
+                    type_error = "mechanical BOUNDARY TYPE permits at most one kinematic-options record"
+            elif problem_type.startswith("ther"):
+                if len(records) < 2:
+                    type_error = "thermal BOUNDARY TYPE requires one finite temperature record"
+                    option_rows = []
+                else:
+                    temperature_fields = _fields(records[1].text)
+                    if (
+                        len(temperature_fields) != 1
+                        or _not_fortran_number(temperature_fields[0])
+                        or not math.isfinite(_fortran_real(temperature_fields[0]))
+                    ):
+                        type_error = "thermal BOUNDARY TYPE temperature must be one finite real"
+                    option_rows = records[2:]
+                    if len(option_rows) > 1:
+                        type_error = "thermal BOUNDARY TYPE permits at most one kinematic-options record"
+            elif problem_type.startswith("cont"):
+                option_rows = records[1:]
+                type_error = "contact BOUNDARY TYPE is rejected by the active BSAM dispatch"
+            else:
+                option_rows = records[1:]
+                type_error = "BOUNDARY TYPE must begin mechanical, thermal, or contact"
+
+            if type_error is None and option_rows:
+                flags = {
+                    token.casefold()
+                    for token in re.split(r"[\s,=]+", option_rows[0].text.split("#", 1)[0].strip())
+                    if token
+                }
+                if not flags or not flags <= option_flags:
+                    type_error = (
+                        "BOUNDARY TYPE kinematic options must be a subset of "
+                        "GEO_NL, FIBER_ROT, DLM_NORMAL_ROT, and MIC_NORMAL_ROT"
+                    )
+            if type_error is not None:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error", message=type_error,
+                    line=command_line.number, source=source,
+                ))
         elif command.startswith("*name"):
             if not records:
                 continue
