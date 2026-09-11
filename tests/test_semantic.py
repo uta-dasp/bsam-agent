@@ -745,6 +745,26 @@ class SemanticIndexTests(unittest.TestCase):
                     diagnostics = SourceSet.read(root).inspection()["diagnostics"]
                     self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
 
+    def test_transform_command_line_options_and_body_are_validated(self) -> None:
+        valid = (b"*TRANSFORM,INERTIA\n", b"*TRANSFORM,FLATTEN=1D-3,INERTIA\n")
+        invalid = (
+            b"*TRANSFORM\n",
+            b"*TRANSFORM,OTHER\n",
+            b"*TRANSFORM,INERTIA,FLATTEN\n",
+            b"*TRANSFORM,INERTIA,FLATTEN=NaN\n",
+            b"*TRANSFORM,INERTIA\nunexpected\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, transform in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n*NODE\n1,0,0,0\n" + transform))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, transform in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n*NODE\n1,0,0,0\n" + transform))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_build_rejects_data_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

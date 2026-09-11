@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.101.0`
-- Registry SHA-256: `D695DCC3EBD1BE89E92D5A64D902FBFBFA5F6D8F041002C6099CE456D112177B`
+- Registry version: `0.102.0`
+- Registry SHA-256: `21C221C77EBDF183878845A8D408460B8422E1A2502219FD6FB8C3C75564215B`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1435,7 +1435,7 @@ Centers cluster geometry and rotates it into its computed principal inertial coo
 - Dispatch prefix: `*TRAN`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-inertial-transform](#evidencefe-inertial-transform)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1449,7 +1449,8 @@ Termination: fixed-count. Dependencies: Elements must already be built with vali
 - **inertial-command-line-action** (INERTIA is present):
   - `command` [once]: `INERTIA`:required-command-line-flag
   - Constraint: The cluster is translated so its volume centroid is at the origin, then rotated to the ordered principal inertia frame.
-  - Constraint: FLATTEN is parsed but ignored by the called routine.
+  - Constraint: FLATTEN requires a finite real; it is parsed but ignored by the called routine.
+  - Constraint: Unknown command-line options and attached data rows are rejected.
   - Constraint: A node with exactly one or two constrained components causes BSAM to stop; a fully constrained vector is rotated.
   - Constraint: Loads and separately stored orientation vectors are not rotated by this routine, so Agent generation is blocked when either is already present.
 

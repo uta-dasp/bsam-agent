@@ -176,6 +176,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("blocked-definition", crack_variants)
         self.assertIn("region-by-cylinder", crack_variants)
         self.assertIn("parsed but ignored", json.dumps(commands["*TRANSFORM"]).lower())
+        self.assertEqual(
+            "verified", commands["*TRANSFORM"]["operations"]["static_validation"],
+        )
         self.assertIn("root cluster stream", json.dumps(commands["*STOP"]).lower())
         self.assertIn("include cycles", json.dumps(commands["*INCLUDE"]).lower())
 

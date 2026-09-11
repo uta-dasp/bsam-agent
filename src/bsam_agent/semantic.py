@@ -4346,6 +4346,42 @@ def build_semantic_index(
                             ),
                             line=command_line.number, source=source,
                         ))
+                elif command == "*TRAN":
+                    transform_tokens = [token for token in re.split(
+                        r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                    ) if token][1:]
+                    transform_error: str | None = None
+                    inertia = False
+                    position = 0
+                    while transform_error is None and position < len(transform_tokens):
+                        token = transform_tokens[position]
+                        prefix = token.casefold()[:3]
+                        if prefix == "ine":
+                            inertia = True
+                            position += 1
+                        elif prefix == "fla":
+                            if position + 1 >= len(transform_tokens):
+                                transform_error = "TRANSFORM FLATTEN requires a finite real value"
+                                break
+                            try:
+                                flatten = _fortran_real(transform_tokens[position + 1])
+                                if not math.isfinite(flatten):
+                                    raise ValueError
+                            except ValueError:
+                                transform_error = "TRANSFORM FLATTEN requires a finite real value"
+                                break
+                            position += 2
+                        else:
+                            transform_error = f"unknown TRANSFORM option {token}"
+                    if transform_error is None and not inertia:
+                        transform_error = "TRANSFORM requires the INERTIA option"
+                    if transform_error is None and records:
+                        transform_error = "TRANSFORM is command-line-only and cannot contain data records"
+                    if transform_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=transform_error,
+                            line=command_line.number, source=source,
+                        ))
                 if command in {"*SHIF", "*SCAL"} and records:
                     attributes["values"] = _fields(records[0].text)[:3]
                 elif command == "*FLIP":

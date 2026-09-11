@@ -111,6 +111,8 @@ Registry 0.100.0 verifies cluster `*BUILD` as command-only. Any attached data re
 
 Registry 0.101.0 verifies cluster `*FLIP`: omission retains the XY default, while an explicit command line accepts exactly one uppercase TYPE mapping from XY, YX, XZ, ZX, YZ, or ZY. Unknown options, lowercase mapping values, and attached data records are rejected.
 
+Registry 0.102.0 verifies cluster `*TRANSFORM` command-line structure: INERTIA is mandatory, FLATTEN is optional but must carry a finite real, unknown options are rejected, and no data row may follow. FLATTEN remains parsed-but-ineffective and generic transformation generation remains blocked.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.
