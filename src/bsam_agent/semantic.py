@@ -4480,10 +4480,37 @@ def build_semantic_index(
                 command == "*SPAC"
                 or command == "*CRAC" and command_line.text.lstrip().upper().startswith("*CRACK SPACING")
             ) and cluster:
+                spacing_tokens = [token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token][1:]
+                if command == "*CRAC" and spacing_tokens and spacing_tokens[0].casefold().startswith("spac"):
+                    spacing_tokens = spacing_tokens[1:]
+                spacing_error: str | None = None
+                prefixes = [token.casefold()[:3] for token in spacing_tokens]
+                if records:
+                    spacing_error = "SPACING is command-line-only and cannot contain data records"
+                elif not spacing_tokens:
+                    pass
+                elif prefixes[0] in {"str", "rel"} and len(spacing_tokens) == 1:
+                    pass
+                elif prefixes[0] == "val" and len(spacing_tokens) == 2:
+                    try:
+                        spacing_value = _fortran_real(spacing_tokens[1])
+                        if not math.isfinite(spacing_value) or spacing_value <= 0:
+                            raise ValueError
+                    except ValueError:
+                        spacing_error = "SPACING VALUE requires a positive finite real"
+                else:
+                    spacing_error = "SPACING accepts exactly one of STRICT, RELAXED, or VALUE=<positive-real>"
+                if spacing_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=spacing_error,
+                        line=command_line.number, source=source,
+                    ))
                 mode = (
                     "relaxed" if "RELAXED" in options else
                     "value" if "VALUE" in options else
-                    "strict" if "STRICT" in options else "unchanged"
+                    "strict"
                 )
                 setting = _entity(
                     index, "cluster-setting", f"{source}:{command_line.number}",

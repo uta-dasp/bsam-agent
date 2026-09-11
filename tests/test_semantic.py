@@ -765,6 +765,24 @@ class SemanticIndexTests(unittest.TestCase):
                 diagnostics = SourceSet.read(root).inspection()["diagnostics"]
                 self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
 
+    def test_spacing_command_line_modes_and_values_are_validated(self) -> None:
+        valid = (b"*SPACING\n", b"*SPACING,STRICT\n", b"*SPACING,RELAXED\n", b"*SPACING,VALUE=1D-3\n")
+        invalid = (
+            b"*SPACING,VALUE=0\n", b"*SPACING,VALUE=NaN\n",
+            b"*SPACING,STRICT,RELAXED\n", b"*SPACING,OTHER\n",
+            b"*SPACING\nunexpected\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, spacing in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + spacing))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, spacing in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + spacing))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_build_rejects_data_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

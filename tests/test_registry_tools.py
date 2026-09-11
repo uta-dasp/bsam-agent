@@ -107,6 +107,7 @@ class RegistryToolsTests(unittest.TestCase):
         spacing = {item["name"]: item for item in commands["*SPACING"]["parameters"]}
         self.assertEqual(["STRICT", "VALUE", "RELAXED"], spacing["mode"]["allowed_values"])
         self.assertEqual("STRICT", spacing["mode"]["default"])
+        self.assertEqual("verified", commands["*SPACING"]["operations"]["static_validation"])
         self.assertIn("idempotent", json.dumps(commands["*BUILD"]).lower())
         self.assertEqual("verified", commands["*BUILD"]["operations"]["static_validation"])
         for token in ("*TYPE", "*NAME", "*CONSTITUTIVE"):

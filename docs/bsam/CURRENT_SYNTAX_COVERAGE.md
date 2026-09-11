@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.103.0` additionally verifies cluster `*SPACING` strict default, mutually exclusive STRICT/RELAXED/VALUE modes, positive finite VALUE, unknown-option rejection, and command-only shape.
+
 Registry `0.102.0` additionally verifies cluster `*TRANSFORM` command-line grammar: required INERTIA, optional finite-real FLATTEN, unknown-option rejection, and no attached data rows; FLATTEN remains explicitly ineffective and generation-blocked.
 
 Registry `0.101.0` additionally verifies cluster `*FLIP` default and explicit command-line mappings, uppercase-sensitive TYPE values, rejection of unknown options, and its no-data-row contract.
