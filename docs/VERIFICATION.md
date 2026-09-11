@@ -107,6 +107,8 @@ Registry 0.98.0 verifies BOUNDARY `*LOADING SEQUENCE`: every row has one to nine
 
 Registry 0.99.0 verifies BOUNDARY `*CONNECTIONS` across penalty, nodal, and surface-contact state machines. It checks header and row cardinality, type-specific options, positive finite tolerances, positive declaration IDs, selected-cluster-qualified node sets, penalty `last` sentinels, ordered nodal selectors, and complete surface pairs. Type -21 and multiple penalty headers remain blocking because active execution does not safely dispatch them.
 
+Registry 0.100.0 verifies cluster `*BUILD` as command-only. Any attached data record now produces a structural validation error; valid instances retain their source-located topology operation and cluster dependency.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

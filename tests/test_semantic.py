@@ -731,6 +731,18 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_build_rejects_data_records(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n*BUILD\nunexpected\n"
+            ))
+            diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+        self.assertTrue(any(
+            item["code"] == "BSAM-E310" and "BUILD is command-only" in item["message"]
+            for item in diagnostics
+        ))
+
     def test_tolerance_and_spacing_are_source_located_cluster_settings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

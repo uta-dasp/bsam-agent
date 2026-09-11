@@ -108,6 +108,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(["STRICT", "VALUE", "RELAXED"], spacing["mode"]["allowed_values"])
         self.assertEqual("STRICT", spacing["mode"]["default"])
         self.assertIn("idempotent", json.dumps(commands["*BUILD"]).lower())
+        self.assertEqual("verified", commands["*BUILD"]["operations"]["static_validation"])
         for token in ("*TYPE", "*NAME", "*CONSTITUTIVE"):
             self.assertEqual("verified", commands[token]["operations"]["static_validation"])
             self.assertEqual("verified", commands[token]["operations"]["generate"])

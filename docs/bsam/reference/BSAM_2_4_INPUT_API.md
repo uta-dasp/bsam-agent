@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.99.0`
-- Registry SHA-256: `2B6503779EB2C74CFFB96BD775467D6E1EC6F1EEF583EE6D7DD580139EB51522`
+- Registry version: `0.100.0`
+- Registry SHA-256: `2914089F11DA14162F1A9110A0DD502AE2AF99AED5974AEFEBDA33B8C5E126E5`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1171,7 +1171,7 @@ Forces intermediate construction of element information before cluster input end
 - Dispatch prefix: `*BUIL`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-build-spacing](#evidencefe-build-spacing)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 #### `*BUILD` body
 

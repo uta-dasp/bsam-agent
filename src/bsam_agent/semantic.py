@@ -4380,7 +4380,13 @@ def build_semantic_index(
                         "end clusters", "end approximation",
                     }
                 ]
-                if command == "*STOP" and stop_data:
+                if command == "*BUIL" and records:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="BUILD is command-only and cannot contain data records",
+                        line=command_line.number, source=source,
+                    ))
+                elif command == "*STOP" and stop_data:
                     index.diagnostics.append(Diagnostic(
                         code="BSAM-E310", severity="error",
                         message="STOP is command-only and cannot contain data records",
