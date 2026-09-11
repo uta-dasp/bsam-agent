@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.90.0`
-- Registry SHA-256: `F3FCE803B2161F6DF896E87CBD83625D7392D429F8706549C1BCEE400E33E81C`
+- Registry version: `0.91.0`
+- Registry SHA-256: `9FA78701946F341A16639A3EDC6E751CBBC754FEDB53794FC65BED11DD1D0990`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -727,8 +727,8 @@ Allocates cluster dimensions before mesh entities are read.
 - Registry ID: `command.dimensions`
 - Dispatch prefix: `*DIME`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=implemented, `execute`=verified
 
 Remaining specification work:
 
@@ -740,6 +740,8 @@ Termination: fixed-count. Dependencies: Capacities must cover all entities produ
 
 - **capacities** (always):
   - `dimensions` [once]: `node_capacity`:integer, `element_capacity`:integer, `selection_count`:integer, `section_capacity`:integer
+  - Constraint: All four values are nonnegative allocation capacities; zero is valid for an unused array.
+  - Constraint: Node and element capacities must not be smaller than the entities populated by explicit or generation commands.
   - Constraint: Must precede commands that populate the allocated cluster arrays.
 
 ### `*NAME`
@@ -1839,7 +1841,7 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
 
 ## Registered generation profiles
 
-### `generation.mechanical-isotropic-solid-v1@1.2.0`
+### `generation.mechanical-isotropic-solid-v1@1.3.0`
 
 Builds one canonical current-syntax linear-mechanical deck from a validated Abaqus-style .ele mesh and a complete explicit isotropic solid analysis intent.
 
@@ -1905,6 +1907,7 @@ Builds one canonical current-syntax linear-mechanical deck from a validated Abaq
   - Every engineering field is required; the generator supplies no material, strength, orientation, solver, convergence, loading, boundary, load, restart, or unit default.
   - Boundary and load targets must resolve to explicit node sets in the validated mesh; the generator deterministically promotes every imported node set to a one-based node SELECTION required by runtime boundary assembly; version 1 rejects imported SURFACE records because BSAM has no active matching cluster dispatch.
   - Constraints and forces become named top-level BOUNDARY conditions selected for the generated cluster and are activated by one explicit static loading segment.
+  - Generated DIMENSIONS uses imported node/element capacities, exactly one node-selection slot per imported node set, and zero section slots because this profile emits no SECTION records.
   - The deck and manifest are created together without overwrite; partial output is removed on failure.
   - Canonical deck comments and the manifest bind generator, registry, profile, mesh, normalized intent, and output SHA-256 values.
 
@@ -2142,7 +2145,7 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 <a id="evidenceruntime-current-pardiso-definite-rejection"></a>
 - `evidence.runtime-current-pardiso-definite-rejection` — runtime: `local-probe/2026-09-10/generated-isotropic-solid-current-pardiso-definite` — A digest-bound generated deck using matrix_type=definite reached complete input parsing, then the pinned executable reported internal system type 0 as unimplemented and terminated with exit code 157; source inspection confirms the current parser assigns only indefinite and unsymmetric values.
 <a id="evidenceruntime-generated-isotropic-solid-success"></a>
-- `evidence.runtime-generated-isotropic-solid-success` — runtime: `local-probe/2026-09-10/generated-isotropic-solid-current-pardiso-indefinite` — A digest-bound profile 1.2.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly.
+- `evidence.runtime-generated-isotropic-solid-success` — runtime: `local-probe/2026-09-11/generated-isotropic-solid-profile-1.3.0` — A digest-bound profile 1.3.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; derived DIMENSIONS selection/section slots and explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>

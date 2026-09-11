@@ -59,7 +59,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("material.youngs_modulus", profile["required_choices"])
         self.assertIn("constraints", profile["required_choices"])
         self.assertIn("loads", profile["required_choices"])
-        self.assertEqual("1.2.0", profile["profile_version"])
+        self.assertEqual("1.3.0", profile["profile_version"])
         self.assertIn("command.selection", profile["capabilities"])
 
     def test_required_current_block_names(self) -> None:
@@ -128,6 +128,9 @@ class RegistryToolsTests(unittest.TestCase):
         }["ID"]["value_type"])
         self.assertEqual("unsupported", commands["*FIELD"]["operations"]["generate"])
         self.assertEqual("unassessed", commands["*FIELD"]["operations"]["execute"])
+        self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["generate"])
+        self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["execute"])
+        self.assertIn("zero is valid", json.dumps(commands["*DIMENSIONS"]).lower())
         tolerance = {item["name"]: item for item in commands["*TOLERANCE"]["parameters"]}
         self.assertEqual("PTOL", tolerance["TYPE"]["default"])
         exclusion = {item["name"]: item for item in commands["*EXCLUSION"]["parameters"]}

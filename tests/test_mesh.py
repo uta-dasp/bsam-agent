@@ -37,7 +37,7 @@ class MeshImportTests(unittest.TestCase):
         self.assertIn(b"*ELEMENT,TYPE=C3D8\r\n", rendered)
         self.assertTrue(rendered.endswith(b"\r\n"))
 
-    def test_rejects_missing_connectivity_and_dimension_mismatch(self) -> None:
+    def test_rejects_missing_connectivity_and_undersized_dimensions(self) -> None:
         fixture = Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele"
         raw = fixture.read_bytes()
         with tempfile.TemporaryDirectory() as directory:
@@ -47,9 +47,21 @@ class MeshImportTests(unittest.TestCase):
                 import_ele(missing)
 
             dimensions = Path(directory) / "dimensions.ele"
-            dimensions.write_bytes(raw.replace(b"8, 1, 2, 1", b"9, 1, 2, 1"))
-            with self.assertRaisesRegex(MeshImportError, "declares"):
+            dimensions.write_bytes(raw.replace(b"8, 1, 2, 1", b"7, 1, 2, 1"))
+            with self.assertRaisesRegex(MeshImportError, "smaller"):
                 import_ele(dimensions)
+
+    def test_dimensions_are_capacities_and_allow_zero_optional_slots(self) -> None:
+        fixture = Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele"
+        raw = fixture.read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            overallocated = root / "overallocated.ele"
+            overallocated.write_bytes(raw.replace(b"8, 1, 2, 1", b"9, 2, 0, 0"))
+            model = import_ele(overallocated)
+
+        self.assertEqual((9, 2, 0, 0), model.dimensions)
+        self.assertTrue(render_bsam_commands(model).startswith(b"*DIMENSIONS\n9,2,0,0\n"))
 
 
 if __name__ == "__main__":

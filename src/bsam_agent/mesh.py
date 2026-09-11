@@ -27,6 +27,16 @@ def _integer(value: str, line: int, role: str) -> int:
     return result
 
 
+def _nonnegative_integer(value: str, line: int, role: str) -> int:
+    try:
+        result = int(value)
+    except ValueError as exc:
+        raise MeshImportError(f"line {line}: {role} must be an integer") from exc
+    if result < 0:
+        raise MeshImportError(f"line {line}: {role} must be nonnegative")
+    return result
+
+
 def _real(value: str, line: int, role: str) -> float:
     try:
         result = float(value)
@@ -230,7 +240,10 @@ def import_ele(path: Path) -> MeshModel:
         if command == "*DIMENSIONS":
             if dimensions is not None or len(body) != 1:
                 raise MeshImportError(f"line {heading_line}: *DIMENSIONS requires one unique row")
-            dimensions = tuple(_integer(item, body[0][0], "dimension") for item in _fields(body[0][1]))
+            dimensions = tuple(
+                _nonnegative_integer(item, body[0][0], "dimension capacity")
+                for item in _fields(body[0][1])
+            )
         elif command == "*NODE":
             for line, record in body:
                 values = _fields(record)
@@ -361,20 +374,29 @@ def _validate_mesh(
             raise MeshImportError(f"line {orientation.line}: V1 and V3 must be nonzero and normal")
     if dimensions is not None:
         if len(dimensions) != 4:
-            raise MeshImportError("*DIMENSIONS must contain node, element, node-set, orientation-block counts")
-        actual = (len(nodes), len(elements), sum(item.kind == "node" for item in sets), int(bool(orientations)))
-        if dimensions != actual:
-            raise MeshImportError(f"*DIMENSIONS declares {dimensions}, but imported counts are {actual}")
+            raise MeshImportError(
+                "*DIMENSIONS must contain node, element, selection, and section capacities"
+            )
+        required = (len(nodes), len(elements))
+        if any(capacity < count for capacity, count in zip(dimensions[:2], required)):
+            raise MeshImportError(
+                f"*DIMENSIONS capacities {dimensions[:2]} are smaller than imported "
+                f"node and element counts {required}"
+            )
 
 
-def render_bsam_commands(model: MeshModel, newline: bytes = b"\n") -> bytes:
+def render_bsam_commands(
+    model: MeshModel, newline: bytes = b"\n", *,
+    selection_count: int | None = None,
+    section_capacity: int | None = None,
+) -> bytes:
     """Render a validated canonical mesh as current FE cluster commands."""
     lines: list[str] = []
-    dimensions = model.dimensions or (
-        len(model.nodes),
-        len(model.elements),
-        sum(item.kind == "node" for item in model.sets),
-        int(bool(model.orientations)),
+    declared = model.dimensions or (len(model.nodes), len(model.elements), 0, 0)
+    dimensions = (
+        declared[0], declared[1],
+        declared[2] if selection_count is None else selection_count,
+        declared[3] if section_capacity is None else section_capacity,
     )
     lines.extend(["*DIMENSIONS", ",".join(map(str, dimensions)), "*NODE"])
     for node in model.nodes:

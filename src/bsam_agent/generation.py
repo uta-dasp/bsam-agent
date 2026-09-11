@@ -14,7 +14,7 @@ from .source_set import SourceSet
 
 
 GENERATION_SCHEMA_VERSION = "0.1.0"
-GENERATOR_VERSION = "1.2.0"
+GENERATOR_VERSION = "1.3.0"
 PROFILE_ID = "generation.mechanical-isotropic-solid-v1"
 
 
@@ -293,9 +293,12 @@ def render_generated_deck(mesh_path: Path, intent: Any) -> tuple[bytes, dict[str
         "END MATERIALS", "CLUSTERS", "*TYPE", "solid", "*NAME", cluster["name"],
     ])
     deck = "\n".join(lines).encode("latin-1") + b"\n"
-    deck += render_bsam_commands(mesh)
+    node_sets = [item for item in mesh.sets if item.kind == "node"]
+    deck += render_bsam_commands(
+        mesh, selection_count=len(node_sets), section_capacity=0,
+    )
     for selection_id, mesh_set in enumerate(
-        (item for item in mesh.sets if item.kind == "node"), start=1,
+        node_sets, start=1,
     ):
         deck += (
             f"*SELECTION,ID={selection_id},TYPE=NODE\n{mesh_set.name}\n"

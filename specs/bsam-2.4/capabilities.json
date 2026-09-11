@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.90.0",
+  "registry_version": "0.91.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -573,8 +573,8 @@
     {
       "id": "evidence.runtime-generated-isotropic-solid-success",
       "kind": "runtime",
-      "locator": "local-probe/2026-09-10/generated-isotropic-solid-current-pardiso-indefinite",
-      "claim": "A digest-bound profile 1.2.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly."
+      "locator": "local-probe/2026-09-11/generated-isotropic-solid-profile-1.3.0",
+      "claim": "A digest-bound profile 1.3.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; derived DIMENSIONS selection/section slots and explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly."
     },
     {
       "id": "evidence.invocation-parser",
@@ -2073,13 +2073,13 @@
       "summary": "Allocates cluster dimensions before mesh entities are read.",
       "coverage": "documented",
       "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records", "evidence.runtime-generated-isotropic-solid-success"],
       "remaining_work": ["Confirm failure behavior for negative capacities and capacity overruns."],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
-        "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "rename": "unsupported", "generate": "verified",
+        "static_validation": "implemented", "execute": "verified"
       },
       "body": {
         "style": "single-record",
@@ -2097,7 +2097,7 @@
               {"name": "section_capacity", "value_type": "integer", "required": true, "summary": "Maximum layered sections allocated for the cluster."}
             ]
           }],
-          "constraints": ["Must precede commands that populate the allocated cluster arrays."]
+            "constraints": ["All four values are nonnegative allocation capacities; zero is valid for an unused array.", "Node and element capacities must not be smaller than the entities populated by explicit or generation commands.", "Must precede commands that populate the allocated cluster arrays."]
         }],
         "dependencies": ["Capacities must cover all entities produced by explicit and generation commands."]
       }
@@ -3504,7 +3504,7 @@
   "generation_profiles": [
     {
       "id": "generation.mechanical-isotropic-solid-v1",
-      "profile_version": "1.2.0",
+      "profile_version": "1.3.0",
       "status": "verified",
       "summary": "Builds one canonical current-syntax linear-mechanical deck from a validated Abaqus-style .ele mesh and a complete explicit isotropic solid analysis intent.",
       "tool": "generate_deck",
@@ -3569,6 +3569,7 @@
         "Every engineering field is required; the generator supplies no material, strength, orientation, solver, convergence, loading, boundary, load, restart, or unit default.",
         "Boundary and load targets must resolve to explicit node sets in the validated mesh; the generator deterministically promotes every imported node set to a one-based node SELECTION required by runtime boundary assembly; version 1 rejects imported SURFACE records because BSAM has no active matching cluster dispatch.",
         "Constraints and forces become named top-level BOUNDARY conditions selected for the generated cluster and are activated by one explicit static loading segment.",
+        "Generated DIMENSIONS uses imported node/element capacities, exactly one node-selection slot per imported node set, and zero section slots because this profile emits no SECTION records.",
         "The deck and manifest are created together without overwrite; partial output is removed on failure.",
         "Canonical deck comments and the manifest bind generator, registry, profile, mesh, normalized intent, and output SHA-256 values."
       ],

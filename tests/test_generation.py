@@ -66,6 +66,7 @@ class DeckGenerationTests(unittest.TestCase):
         self.assertEqual((self.root / "first.in").read_bytes(), (self.root / "second.in").read_bytes())
         deck = (self.root / "first.in").read_text(encoding="latin-1")
         self.assertIn("** INTENT-SHA256", deck)
+        self.assertIn("*DIMENSIONS\n8,1,2,0\n", deck)
         self.assertIn("*type=pardiso\nn_threads=2\nmatrix_type=indefinite", deck)
         self.assertIn(
             "type=disp,comp=xyz,name=constraint1,value=0,nset=coupon.bottom", deck
