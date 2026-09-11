@@ -112,6 +112,9 @@ class RegistryToolsTests(unittest.TestCase):
             self.assertEqual("verified", commands[token]["operations"]["static_validation"])
             self.assertEqual("verified", commands[token]["operations"]["generate"])
             self.assertEqual("verified", commands[token]["operations"]["execute"])
+        self.assertEqual("verified", commands["*STOP"]["operations"]["static_validation"])
+        self.assertEqual("verified", commands["*STOP"]["operations"]["generate"])
+        self.assertEqual("verified", commands["*STOP"]["operations"]["execute"])
 
     def test_field_selection_and_coordinate_operation_grammars_are_registered(self) -> None:
         commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}

@@ -111,8 +111,9 @@ class ConstitutiveCapabilityTests(unittest.TestCase):
             "110\n\t1 7\n\t1 3\n"
             "21\n\t1\n\t1 4\n"
         ).replace(
-            b"CLUSTERS\n",
-            b"USER\n" + b"1\n0\n1\n" * 6 + b"END USER\nCLUSTERS\n",
+            b"\nCLUSTERS\n",
+            b"\nUSER\n" + b"1\n0\n1\n" * 6 + b"END USER\nCLUSTERS\n",
+            1,
         )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "model.in"

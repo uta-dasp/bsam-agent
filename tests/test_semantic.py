@@ -333,6 +333,18 @@ class SemanticIndexTests(unittest.TestCase):
                 "BSAM-E310", {item["code"] for item in inspection["diagnostics"]},
             )
 
+    def test_cluster_stop_is_command_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(b"").replace(
+                b"*STOP\nEND CLUSTERS", b"*STOP\nunexpected\nEND CLUSTERS",
+            ))
+            inspection = SourceSet.read(root).inspection()
+        self.assertTrue(any(
+            item["code"] == "BSAM-E310" and "command-only" in item["message"]
+            for item in inspection["diagnostics"]
+        ))
+
     def test_cluster_name_shape_reservation_and_uniqueness_are_validated(self) -> None:
         cases = {
             "empty": b"*NAME\n",

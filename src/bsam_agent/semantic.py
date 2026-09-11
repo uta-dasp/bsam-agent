@@ -3967,6 +3967,18 @@ def build_semantic_index(
                     cursor += point_count + 1
             elif command in {"*BUIL", "*STOP"} and cluster:
                 operation_name = "build" if command == "*BUIL" else "stop"
+                stop_data = [
+                    line for line in records
+                    if line.stripped.casefold() not in {
+                        "end clusters", "end approximation",
+                    }
+                ]
+                if command == "*STOP" and stop_data:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="STOP is command-only and cannot contain data records",
+                        line=command_line.number, source=source,
+                    ))
                 topology = _entity(
                     index, "topology-operation", f"{source}:{command_line.number}",
                     source, command_line, cluster,
