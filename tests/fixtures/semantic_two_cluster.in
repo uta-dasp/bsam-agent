@@ -30,6 +30,7 @@ lower_ply
 1,1,2,3,4
 *SECTION,ELSET=solid,LAYERS=1
 1.,1
+*STOP
 *TYPE
 solid
 *NAME

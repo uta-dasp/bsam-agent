@@ -108,6 +108,10 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(["STRICT", "VALUE", "RELAXED"], spacing["mode"]["allowed_values"])
         self.assertEqual("STRICT", spacing["mode"]["default"])
         self.assertIn("idempotent", json.dumps(commands["*BUILD"]).lower())
+        for token in ("*TYPE", "*NAME", "*CONSTITUTIVE"):
+            self.assertEqual("verified", commands[token]["operations"]["static_validation"])
+            self.assertEqual("verified", commands[token]["operations"]["generate"])
+            self.assertEqual("verified", commands[token]["operations"]["execute"])
 
     def test_field_selection_and_coordinate_operation_grammars_are_registered(self) -> None:
         commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}

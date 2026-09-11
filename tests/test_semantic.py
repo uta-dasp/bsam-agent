@@ -228,9 +228,9 @@ class SemanticIndexTests(unittest.TestCase):
         semantic = inspection["semantic_model"]
 
         self.assertEqual(0, inspection["summary"]["errors"])
-        self.assertEqual(23, semantic["summary"]["entities"])
-        self.assertEqual(25, semantic["summary"]["references"])
-        self.assertEqual(25, semantic["summary"]["resolved_references"])
+        self.assertEqual(24, semantic["summary"]["entities"])
+        self.assertEqual(26, semantic["summary"]["references"])
+        self.assertEqual(26, semantic["summary"]["resolved_references"])
         keys = {item["key"] for item in semantic["entities"]}
         self.assertIn("cluster:lower_ply/node:1", keys)
         self.assertIn("cluster:upper_ply/node:1", keys)
@@ -312,6 +312,61 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_cluster_type_shape_and_boundaries_are_validated(self) -> None:
+        cases = {
+            "missing": b"*NODE\n1,0,0,0\n",
+            "empty": b"*TYPE\n",
+            "unknown": b"*TYPE\nshell\n",
+            "extra-row": b"*TYPE\nsolid\nextra\n",
+            "second-before-stop": b"*TYPE\nsolid\n*TYPE\nsolid\n",
+            "missing-stop": b"*TYPE\nsolid\n*NAME\nply1\n",
+        }
+        for name, cluster_body in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                raw = deck(b"").replace(
+                    b"*type\nsolid\n*STOP\n", cluster_body, 1,
+                )
+                root.write_bytes(raw)
+                inspection = SourceSet.read(root).inspection()
+            self.assertIn(
+                "BSAM-E310", {item["code"] for item in inspection["diagnostics"]},
+            )
+
+    def test_cluster_name_shape_reservation_and_uniqueness_are_validated(self) -> None:
+        cases = {
+            "empty": b"*NAME\n",
+            "multiple-tokens": b"*NAME\nply one\n",
+            "too-long": b"*NAME\n" + b"p" * 81 + b"\n",
+            "reserved": b"*NAME\nMATERIALS\n",
+        }
+        for name, records in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(deck(records))
+                inspection = SourceSet.read(root).inspection()
+            self.assertIn(
+                "BSAM-E310", {item["code"] for item in inspection["diagnostics"]},
+            )
+
+    def test_cluster_constitutive_assignment_shape_and_identity_are_validated(self) -> None:
+        cases = {
+            "empty": b"*CONSTITUTIVE\n",
+            "zero": b"*CONSTITUTIVE\n0\n",
+            "negative": b"*CONSTITUTIVE\n-1\n",
+            "nonnumeric": b"*CONSTITUTIVE\none\n",
+            "extra-field": b"*CONSTITUTIVE\n1,2\n",
+        }
+        for name, records in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + records))
+                inspection = SourceSet.read(root).inspection()
+            self.assertTrue(any(
+                item["code"] in {"BSAM-E300", "BSAM-E301", "BSAM-E310"}
+                for item in inspection["diagnostics"]
+            ))
+
     def test_cluster_dimensions_shape_order_and_uniqueness_are_validated(self) -> None:
         cases = {
             "short": b"*DIMENSIONS\n1,1,0\n",
@@ -371,7 +426,7 @@ class SemanticIndexTests(unittest.TestCase):
             root.write_bytes(deck(
                 b"*NAME\nfirst\n*NODE\n1,0,0,0\n1,1,0,0\n"
                 b"*ELEMENT,TYPE=C3D4\n10,1,2,1,1\n"
-                b"*NAME\nsecond\n*NODE\n1,0,0,0\n"
+                b"*STOP\n*TYPE\nsolid\n*NAME\nsecond\n*NODE\n1,0,0,0\n"
                 b"*ELEMENT,TYPE=C3D4\n20,1,1,1,1\n"
                 b"*NSET,NSET=wrong\n99\n*ELSET,ELSET=99\n"
             ))
@@ -1002,7 +1057,7 @@ class SemanticIndexTests(unittest.TestCase):
             root = Path(directory) / "model.in"
             raw = deck(
                 b"*NAME\nply1\n*NODE\n1,0,0,0\n"
-                b"*NAME\nply2\n*NODE\n1,0,0,0\n"
+                b"*STOP\n*TYPE\nsolid\n*NAME\nply2\n*NODE\n1,0,0,0\n"
             ).replace(
                 b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
                 b"BOUNDARY\n*type\nmechanical\n"
@@ -1030,7 +1085,7 @@ class SemanticIndexTests(unittest.TestCase):
             raw = deck(
                 b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
                 b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n*ELSET,ELSET=solid\n1\n"
-                b"*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*STOP\n*TYPE\nsolid\n*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
                 b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n*ELSET,ELSET=solid\n1\n"
             ).replace(
                 b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
@@ -1069,7 +1124,7 @@ class SemanticIndexTests(unittest.TestCase):
             root = Path(directory) / "model.in"
             raw = deck(
                 b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
-                b"*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*STOP\n*TYPE\nsolid\n*NAME\nply2\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
             ).replace(
                 b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
                 b"BOUNDARY\n*type\nmechanical\n*clusters\nply1\n*output\n"

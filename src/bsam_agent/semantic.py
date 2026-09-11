@@ -3228,6 +3228,7 @@ def build_semantic_index(
 
     index = SemanticIndex()
     cluster: str | None = None
+    cluster_open = False
     selection_capacity: int | None = None
     dimensions_seen = False
     cluster_population_started = False
@@ -3274,11 +3275,27 @@ def build_semantic_index(
                 _validate_registered_values(index, registered, parameters)
 
             if command == "*TYPE":
+                if cluster_open:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="a new cluster TYPE requires the previous cluster to STOP",
+                        line=command_line.number, source=source,
+                    ))
+                cluster_open = True
                 cluster_declaration_ordinal += 1
                 cluster = None
                 selection_capacity = None
                 dimensions_seen = False
                 cluster_population_started = False
+                if (
+                    len(records) != 1
+                    or not records[0].stripped.casefold().startswith("soli")
+                ):
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="cluster TYPE requires exactly one solid record",
+                        line=command_line.number, source=source,
+                    ))
                 representation = records[0].stripped.casefold() if records else ""
                 declaration = _entity(
                     index, "cluster-declaration", str(cluster_declaration_ordinal),
@@ -3302,6 +3319,14 @@ def build_semantic_index(
                 else:
                     pending_cluster_records = [declaration]
                 continue
+
+            if not cluster_open and command != "*STOP":
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message="TYPE must be the first command of each cluster",
+                    line=command_line.number, source=source,
+                ))
+                cluster_open = True
 
             if command == "*DIME":
                 values = _fields(records[0].text) if records else []
@@ -3360,8 +3385,30 @@ def build_semantic_index(
             if command in {"*NODE", "*ELEM", "*NGEN", "*NCOP", "*ELGE", "*SELE", "*SECT"}:
                 cluster_population_started = True
 
-            if command == "*NAME" and records:
-                cluster = records[0].stripped.casefold()
+            if command == "*NAME":
+                name_tokens = (
+                    records[0].text.split("#", 1)[0].replace(",", " ").split()
+                    if len(records) == 1 else []
+                )
+                reserved_names = {
+                    "input", "solver", "moisture", "boundary", "constitutive",
+                    "failure", "crack", "tables", "statistical", "ufunctions",
+                    "user", "clusters", "materials",
+                }
+                if (
+                    len(name_tokens) != 1 or len(name_tokens[0]) > 80
+                    or name_tokens[0].casefold() in reserved_names
+                ):
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message=(
+                            "cluster NAME requires one non-reserved token of at most "
+                            "80 characters"
+                        ),
+                        line=command_line.number, source=source,
+                    ))
+                    continue
+                cluster = name_tokens[0].casefold()
                 _entity(
                     index, "cluster", cluster, source, records[0], None,
                     {
@@ -3690,16 +3737,29 @@ def build_semantic_index(
                             source, line,
                             {"position": position},
                         )
-            elif command == "*CONS" and cluster and records:
-                value = _fields(records[0].text)
-                if value and value[0].isdigit():
+            elif command == "*CONS" and cluster:
+                value = _fields(records[0].text) if len(records) == 1 else []
+                try:
+                    constitutive_id = int(value[0])
+                    if len(value) != 1 or constitutive_id <= 0:
+                        raise ValueError
+                except (IndexError, ValueError):
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message=(
+                            "cluster CONSTITUTIVE requires exactly one positive "
+                            "declaration-order ID"
+                        ),
+                        line=command_line.number, source=source,
+                    ))
+                else:
                     assignment = _entity(
                         index, "cluster-constitutive", "assignment", source,
-                        command_line, cluster, {"constitutive": int(value[0])},
+                        command_line, cluster, {"constitutive": constitutive_id},
                     )
                     _reference(
                         index, assignment, "uses-constitutive",
-                        _key("constitutive", value[0], None), source, records[0],
+                        _key("constitutive", str(constitutive_id), None), source, records[0],
                     )
             elif command == "*BOUN" and cluster:
                 format_name = str(options.get("FORMAT") or "ABAQUS").upper()[:4]
@@ -3920,6 +3980,8 @@ def build_semantic_index(
                     index, topology, "targets-cluster",
                     _key("cluster", cluster, None), source, command_line,
                 )
+                if command == "*STOP":
+                    cluster_open = False
             elif command == "*TOLE" and cluster:
                 tolerance_type = str(options.get("TYPE") or "PTOL").upper()
                 value = _fields(records[0].text)[0] if records and _fields(records[0].text) else None
@@ -4004,6 +4066,15 @@ def build_semantic_index(
                             index, region, "targets-cluster",
                             _key("cluster", cluster, None), source, command_line,
                         )
+    if cluster_open:
+        last_source = source_entries[-1][1] if source_entries else "<root>"
+        last_lines = source_entries[-1][2] if source_entries else ()
+        last_line = last_lines[-1].number if last_lines else 1
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E310", severity="error",
+            message="cluster is missing its final STOP command",
+            line=last_line, source=last_source,
+        ))
     for dimensions, owner, capacities in dimension_allocations:
         owner_key = owner.casefold()
         owned = [

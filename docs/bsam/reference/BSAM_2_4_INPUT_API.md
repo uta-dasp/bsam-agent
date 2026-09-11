@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.92.0`
-- Registry SHA-256: `ABFB928CC07039F0DCF32469B55794C1CD43B7A8B985C0B2C40D2D8296EDE22F`
+- Registry version: `0.93.0`
+- Registry SHA-256: `0374B378493524D8FE1BD4E2B3E78E97B9F342CFD7D8EA4B98B66F4157C656F2`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -704,8 +704,8 @@ Starts a cluster and selects its representation; the active cluster reader accep
 - Registry ID: `command.type`
 - Dispatch prefix: `*TYPE`
 - Coverage: documented
-- Evidence: [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 Known parameters:
 
@@ -747,8 +747,8 @@ Assigns a name to the current cluster.
 - Registry ID: `command.name`
 - Dispatch prefix: `*NAME`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-cluster-controls](#evidencefe-cluster-controls), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 Known parameters:
 
@@ -760,8 +760,9 @@ Termination: fixed-count. Dependencies: Every cluster-qualified set reference us
 
 - **cluster-name** (*NAME is dispatched):
   - `name` [once]: `name`:one-list-directed-token-up-to-80-characters
-  - Constraint: The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.
-  - Constraint: The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness because name-based consumers otherwise select or compare ambiguously.
+  - Constraint: The Agent rejects INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, and MATERIALS case-insensitively before normalization.
+  - Constraint: Each NAME command contains one nonblank list-directed token of at most 80 characters; a later NAME changes the active cluster identity and that state persists across include return.
+  - Constraint: The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness across cluster declarations because name-based consumers otherwise select or compare ambiguously.
 
 ### `*CONSTITUTIVE`
 
@@ -770,8 +771,8 @@ Assigns the constitutive record used by the current cluster.
 - Registry ID: `command.constitutive`
 - Dispatch prefix: `*CONS`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-cluster-controls](#evidencefe-cluster-controls), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 Known parameters:
 
@@ -783,7 +784,8 @@ Termination: fixed-count. Dependencies: The ID must resolve to an existing CONST
 
 - **constitutive-reference** (always):
   - `constitutive` [once]: `constitutive_id`:positive-integer
-  - Constraint: The BSAM reader stores the integer without bounds checking; the Agent must reject zero, negative, and unresolved IDs.
+  - Constraint: Each assignment contains exactly one positive declaration-order ID.
+  - Constraint: The BSAM reader stores the integer without bounds checking; the Agent rejects zero, negative, malformed, and unresolved IDs.
 
 ### `*NODE`
 

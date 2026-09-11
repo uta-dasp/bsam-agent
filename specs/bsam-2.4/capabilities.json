@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.92.0",
+  "registry_version": "0.93.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2048,13 +2048,13 @@
       "summary": "Starts a cluster and selects its representation; the active cluster reader accepts solid FE clusters.",
       "coverage": "documented",
       "parameters": [{"name": "representation", "value_type": "enum-prefix", "required": true, "allowed_values": ["solid"], "summary": "The following data record is lowercased and accepted when its first four characters are soli."}],
-      "evidence_ids": ["evidence.cluster-parser", "evidence.fe-command-dispatch", "evidence.fe-cluster-controls"],
+      "evidence_ids": ["evidence.cluster-parser", "evidence.fe-command-dispatch", "evidence.fe-cluster-controls", "evidence.runtime-generated-isotropic-solid-success"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
-        "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "rename": "unsupported", "generate": "verified",
+        "static_validation": "verified", "execute": "verified"
       },
       "body": {
         "style": "single-record",
@@ -2112,18 +2112,18 @@
       "summary": "Assigns a name to the current cluster.",
       "coverage": "documented",
       "parameters": [{"name": "name", "value_type": "string-record", "required": true, "summary": "Cluster name; it is normalized to lowercase by the enclosing cluster parser."}],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.cluster-parser", "evidence.fe-cluster-controls"],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.cluster-parser", "evidence.fe-cluster-controls", "evidence.runtime-generated-isotropic-solid-success"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
-        "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "rename": "unsupported", "generate": "verified",
+        "static_validation": "verified", "execute": "verified"
       },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
-        "variants": [{"name": "cluster-name", "when": "*NAME is dispatched", "rows": [{"name": "name", "repetition": "once", "fields": [{"name": "name", "value_type": "one-list-directed-token-up-to-80-characters", "required": true, "summary": "Name assigned to the current cluster and later normalized to lowercase."}]}], "constraints": ["The name must not exactly equal INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, or MATERIALS before lowercase normalization.", "The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness because name-based consumers otherwise select or compare ambiguously."]}],
+        "variants": [{"name": "cluster-name", "when": "*NAME is dispatched", "rows": [{"name": "name", "repetition": "once", "fields": [{"name": "name", "value_type": "one-list-directed-token-up-to-80-characters", "required": true, "summary": "Name assigned to the current cluster and later normalized to lowercase."}]}], "constraints": ["The Agent rejects INPUT, SOLVER, MOISTURE, BOUNDARY, CONSTITUTIVE, FAILURE, CRACK, TABLES, STATISTICAL, UFUNCTIONS, USER, CLUSTERS, and MATERIALS case-insensitively before normalization.", "Each NAME command contains one nonblank list-directed token of at most 80 characters; a later NAME changes the active cluster identity and that state persists across include return.", "The BSAM reader does not reject duplicate cluster names; Agent generation requires uniqueness across cluster declarations because name-based consumers otherwise select or compare ambiguously."]}],
         "dependencies": ["Every cluster-qualified set reference uses the normalized lowercase cluster name.", "If *NAME is omitted, IAP_INI retains the generated noname<declaration-index> name and all child entities remain scoped to that identity.", "Renaming must update every BOUNDARY, CRACK, output, connection, and other cluster-qualified reference."]
       }
     },
@@ -2137,18 +2137,18 @@
       "summary": "Assigns the constitutive record used by the current cluster.",
       "coverage": "documented",
       "parameters": [{"name": "constitutive_id", "value_type": "positive-constitutive-id-record", "required": true, "summary": "The following data record selects one declaration-order CONSTITUTIVE definition."}],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-cluster-controls"],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-cluster-controls", "evidence.runtime-generated-isotropic-solid-success"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
-        "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "rename": "unsupported", "generate": "verified",
+        "static_validation": "verified", "execute": "verified"
       },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
-        "variants": [{"name": "constitutive-reference", "when": "always", "rows": [{"name": "constitutive", "repetition": "once", "fields": [{"name": "constitutive_id", "value_type": "positive-integer", "required": true, "summary": "References one existing CONSTITUTIVE entity by declaration order."}]}], "constraints": ["The BSAM reader stores the integer without bounds checking; the Agent must reject zero, negative, and unresolved IDs."]}],
+        "variants": [{"name": "constitutive-reference", "when": "always", "rows": [{"name": "constitutive", "repetition": "once", "fields": [{"name": "constitutive_id", "value_type": "positive-integer", "required": true, "summary": "References one existing CONSTITUTIVE entity by declaration order."}]}], "constraints": ["Each assignment contains exactly one positive declaration-order ID.", "The BSAM reader stores the integer without bounds checking; the Agent rejects zero, negative, malformed, and unresolved IDs."]}],
         "dependencies": ["The ID must resolve to an existing CONSTITUTIVE declaration.", "Deleting or reordering CONSTITUTIVE entries must update this reference atomically."]
       }
     },

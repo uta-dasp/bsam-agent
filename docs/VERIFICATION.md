@@ -93,6 +93,8 @@ Registry 0.91.0 corrects `.ele` DIMENSIONS semantics to BSAM's four allocation c
 
 Registry 0.92.0 verifies general `*DIMENSIONS` static validation for exactly four nonnegative integer capacities, one declaration before allocated records, and sufficient node, element, selection-ID, and section bounds, including bounded generated entities.
 
+Registry 0.93.0 verifies cluster declaration controls: each cluster begins with one supported solid `*TYPE` and ends with `*STOP`; each `*NAME` is one non-reserved token of at most 80 characters while later names preserve BSAM's state change across includes; each `*CONSTITUTIVE` is one positive declaration-order ID and must resolve.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.
