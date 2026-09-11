@@ -105,6 +105,8 @@ Registry 0.97.0 verifies BOUNDARY `*G-CONTROL` as a command-line-only construct.
 
 Registry 0.98.0 verifies BOUNDARY `*LOADING SEQUENCE`: every row has one to nine key/value pairs and exactly one header/change discriminator; static and fatigue headers require their safe explicit fields and numeric domains; change types, values, and boundary-condition references are checked; repeated blocks require balanced positive markers. Change rows for 2D and reduced fatigue remain blocked because their source allocation branches are incomplete.
 
+Registry 0.99.0 verifies BOUNDARY `*CONNECTIONS` across penalty, nodal, and surface-contact state machines. It checks header and row cardinality, type-specific options, positive finite tolerances, positive declaration IDs, selected-cluster-qualified node sets, penalty `last` sentinels, ordered nodal selectors, and complete surface pairs. Type -21 and multiple penalty headers remain blocking because active execution does not safely dispatch them.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

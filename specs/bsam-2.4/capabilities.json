@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.98.0",
+  "registry_version": "0.99.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3305,7 +3305,7 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "nested-records",
@@ -3319,7 +3319,7 @@
               {"name": "set-assignment", "repetition": "repeated", "fields": [{"name": "mset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Master node set for this row."}, {"name": "sset", "value_type": "cluster-name.node-set-name", "required": false, "summary": "Slave node set for this row."}, {"name": "material", "value_type": "material-id", "required": false, "summary": "Material associated with this row."}, {"name": "constitutive", "value_type": "constitutive-id", "required": false, "summary": "Constitutive law associated with this row."}, {"name": "failure", "value_type": "failure-id", "required": false, "summary": "Failure definition associated with this row."}]},
               {"name": "last", "repetition": "once", "fields": [{"name": "last", "value_type": "none-or-cluster-name-list", "required": true, "summary": "Ends the penalty connection and optionally lists terminal slave clusters."}]}
             ],
-            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing cluster name.", "The last record is the structural sentinel for a penalty connection.", "A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup.", "Type -2 is the active penalty form and dispatches search=vtms or search=sheff to distinct implementations.", "Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but blocks their creation and conversion to them."]
+            "constraints": ["At least one set-assignment row is required before last.", "Each referenced set must be qualified by an existing selected cluster name.", "The last record is the structural sentinel for a penalty connection and contains none or selected terminal clusters.", "A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; static validation rejects separate penalty headers because they reuse singular boundary arrays and fail during connection setup.", "Type -2 is the active penalty form and dispatches search=vtms or search=sheff to distinct implementations.", "Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but emits a blocking validation diagnostic."]
           },
           {
             "name": "nodal",

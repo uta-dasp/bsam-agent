@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.99.0` additionally verifies all BOUNDARY `*CONNECTIONS` variants: typed headers, bounded key/value rows, positive tolerances and declaration IDs, selected-cluster-qualified sets, penalty sentinels, ordered nodal selectors, surface pairs, and blocked type -21 or duplicate-penalty execution paths.
+
 Registry `0.98.0` additionally verifies BOUNDARY `*LOADING SEQUENCE` key/value cardinality, static and fatigue header requirements, change rows, finite numeric values, balanced positive block markers, boundary-condition references, and blocked unsafe fatigue branches.
 
 Registry `0.97.0` additionally verifies BOUNDARY `*G-CONTROL` command-line-only shape, four-character option dispatch, value requirements, safe numeric domains, threshold ordering, and UPDATE compatibility.

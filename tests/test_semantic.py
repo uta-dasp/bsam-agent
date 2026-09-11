@@ -1265,6 +1265,57 @@ class SemanticIndexTests(unittest.TestCase):
                     diagnostics = SourceSet.read(path).inspection()["diagnostics"]
                     self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
 
+    def test_boundary_connection_variants_are_structurally_validated(self) -> None:
+        valid_bodies = {
+            "penalty": b"type=-2,name=tie,tolerance=1D-5,search=vtms\nmset=ply1.edge\nlast=ply1\n",
+            "nodal": b"type=nodal,name=tie,component=xyz\nmset=all\nsset=ply1.edge\n",
+            "surface": b"type=surface,name=contact,tolerance=.01,search=sheff\nmset=ply1.edge,sset=ply1.edge\n",
+        }
+        invalid_bodies = {
+            "empty": b"",
+            "missing-header": b"mset=ply1.edge\n",
+            "unknown-type": b"type=rigid\nmset=ply1.edge\n",
+            "blocked-minus-21": b"type=-21\nmset=ply1.edge\nlast=none\n",
+            "bad-tolerance": b"type=-2,tolerance=0\nmset=ply1.edge\nlast=none\n",
+            "penalty-no-assignment": b"type=-2\nlast=none\n",
+            "penalty-unqualified": b"type=-2\nmset=edge\nlast=none\n",
+            "penalty-no-last": b"type=-2\nmset=ply1.edge\n",
+            "multiple-penalties": (
+                b"type=-2\nmset=ply1.edge\nlast=none\n"
+                b"type=-2\nmset=ply1.edge\nlast=none\n"
+            ),
+            "nodal-bad-component": b"type=nodal,component=123\nmset=all\nsset=all\n",
+            "nodal-wrong-order": b"type=nodal\nsset=all\nmset=all\n",
+            "surface-no-search": b"type=surface\nmset=ply1.edge,sset=ply1.edge\n",
+            "surface-missing-side": b"type=surface,search=sheff\nmset=ply1.edge\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, connection_body in valid_bodies.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"valid-{name}.in"
+                    path.write_bytes(deck(
+                        b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                    ).replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n*clusters\nply1\n*connections\n"
+                        + connection_body + b"END BOUNDARY",
+                    ))
+                    self.assertEqual(
+                        0, SourceSet.read(path).inspection()["summary"]["errors"],
+                    )
+            for name, connection_body in invalid_bodies.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"invalid-{name}.in"
+                    path.write_bytes(deck(
+                        b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                    ).replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n*clusters\nply1\n*connections\n"
+                        + connection_body + b"END BOUNDARY",
+                    ))
+                    diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_boundary_problem_names_must_be_unique(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

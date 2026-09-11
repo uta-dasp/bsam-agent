@@ -1977,6 +1977,143 @@ def _validate_boundary_loading_sequence(records: list[SourceLine]) -> str | None
     return None
 
 
+def _validate_boundary_connections(
+    records: list[SourceLine], selected_clusters: list[str],
+) -> str | None:
+    """Validate the three connection row-state machines used by IBN_INI."""
+    if not records:
+        return "BOUNDARY CONNECTIONS requires at least one typed connection"
+    selected = {name.casefold() for name in selected_clusters}
+    header_positions = [
+        index for index, line in enumerate(records) if "type" in _record_options(line)
+    ]
+    if not header_positions or header_positions[0] != 0:
+        return "BOUNDARY CONNECTIONS must begin each connection with a type header"
+    header_positions.append(len(records))
+    penalty_count = 0
+
+    def pairs(line: SourceLine) -> tuple[dict[str, str], str | None]:
+        tokens = [token for token in re.split(
+            r"[\s,=]+", line.text.split("#", 1)[0].strip(),
+        ) if token]
+        if len(tokens) % 2 or not tokens or len(tokens) > 8:
+            return {}, "CONNECTIONS keyed rows require one to four key/value pairs"
+        return {
+            tokens[index].casefold()[:4]: tokens[index + 1]
+            for index in range(0, len(tokens), 2)
+        }, None
+
+    def qualified(value: str) -> bool:
+        if value.count(".") != 1:
+            return False
+        cluster_name, set_name = value.split(".", 1)
+        return bool(cluster_name and set_name and cluster_name.casefold() in selected)
+
+    def validate_pair_values(options: dict[str, str]) -> str | None:
+        if not ({"mset", "sset"} & set(options)):
+            return "CONNECTIONS assignment rows require mset or sset"
+        for key in ("mset", "sset"):
+            if key in options and not qualified(options[key]):
+                return "CONNECTIONS set targets must be selected-cluster-qualified"
+        for key in ("mate", "cons", "fail"):
+            if key in options:
+                try:
+                    if int(options[key]) <= 0:
+                        raise ValueError
+                except ValueError:
+                    return "CONNECTIONS declaration references must be positive integers"
+        return None
+
+    for ordinal in range(len(header_positions) - 1):
+        start, end = header_positions[ordinal], header_positions[ordinal + 1]
+        header, error = pairs(records[start])
+        if error:
+            return error
+        connection_type = header.get("type", "").casefold()
+        body = records[start + 1:end]
+        common = {"type", "name", "tole", "sear"}
+        if connection_type in {"-2", "-21"}:
+            penalty_count += 1
+            if penalty_count > 1:
+                return "BOUNDARY CONNECTIONS permits only one active penalty chain"
+            if not set(header) <= common:
+                return "penalty CONNECTIONS header contains an unknown option"
+            if connection_type == "-21":
+                return "CONNECTIONS type -21 is rejected by the active execution dispatch"
+            search = header.get("sear", "vtms").casefold()
+            if not (search.startswith("vtms") or search.startswith("shef")):
+                return "penalty CONNECTIONS search must begin vtms or shef"
+            if len(body) < 2 or not body[-1].text.split("#", 1)[0].strip().casefold().startswith("last="):
+                return "penalty CONNECTIONS requires assignments followed by one last row"
+            for row in body[:-1]:
+                options, error = pairs(row)
+                if error:
+                    return error
+                if not set(options) <= {"mset", "sset", "mate", "cons", "fail"}:
+                    return "penalty CONNECTIONS assignment contains an unknown option"
+                error = validate_pair_values(options)
+                if error:
+                    return error
+            terminals = [
+                value.strip() for value in body[-1].text.split("#", 1)[0].split("=", 1)[1].split(",")
+                if value.strip()
+            ]
+            if not terminals or (
+                [value.casefold() for value in terminals] != ["none"]
+                and any(value.casefold() not in selected for value in terminals)
+            ):
+                return "penalty CONNECTIONS last targets must be none or selected clusters"
+        elif connection_type.startswith("noda"):
+            if not set(header) <= {"type", "name", "comp"}:
+                return "nodal CONNECTIONS header contains an unknown option"
+            component = header.get("comp")
+            if component is not None and component.casefold() not in {
+                "x", "y", "z", "xy", "yx", "xz", "zx", "yz", "zy",
+                "xyz", "yzx", "zxy", "xzy", "yxz", "zyx",
+            }:
+                return "nodal CONNECTIONS component is invalid"
+            if len(body) != 2:
+                return "nodal CONNECTIONS requires exactly one mset row and one sset row"
+            for row, expected in zip(body, ("mset", "sset")):
+                text = row.text.split("#", 1)[0].strip()
+                if "=" not in text or text.split("=", 1)[0].strip().casefold()[:4] != expected:
+                    return "nodal CONNECTIONS selector rows must be ordered mset then sset"
+                targets = [value.strip() for value in text.split("=", 1)[1].split(",") if value.strip()]
+                if not targets or not (
+                    [value.casefold() for value in targets] == ["all"]
+                    or all(qualified(value) for value in targets)
+                ):
+                    return "nodal CONNECTIONS selectors must be all or selected-cluster-qualified sets"
+        elif connection_type.startswith("surf"):
+            if not set(header) <= common:
+                return "surface CONNECTIONS header contains an unknown option"
+            if not header.get("sear", "").casefold().startswith("shef"):
+                return "surface CONNECTIONS requires search=sheff"
+            if not body:
+                return "surface CONNECTIONS requires at least one contact-pair row"
+            for row in body:
+                options, error = pairs(row)
+                if error:
+                    return error
+                if not set(options) <= {"mset", "sset", "mate", "cons", "fail"}:
+                    return "surface CONNECTIONS pair contains an unknown option"
+                if not {"mset", "sset"} <= set(options):
+                    return "surface CONNECTIONS pairs require both mset and sset"
+                error = validate_pair_values(options)
+                if error:
+                    return error
+        else:
+            return "BOUNDARY CONNECTIONS header has an unsupported type"
+        if "tole" in header:
+            try:
+                tolerance = _fortran_real(header["tole"])
+                if not math.isfinite(tolerance) or tolerance <= 0:
+                    raise ValueError
+            except ValueError:
+                return "BOUNDARY CONNECTIONS tolerance must be a positive finite real"
+    return None
+
+
 def _constitutive_modifier(line: SourceLine) -> tuple[str, list[int]] | None:
     """Mirror CON_INI's five-character modifier dispatch without consuming data rows."""
     text = line.text.split("#", 1)[0].strip()
@@ -3277,6 +3414,14 @@ def augment_root_semantics(
                             _key(target_kind, set_name, cluster_name), source, target_line,
                         )
         elif command.startswith("*connections"):
+            connection_error = _validate_boundary_connections(
+                records, selected_cluster_names,
+            )
+            if connection_error is not None:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error", message=connection_error,
+                    line=command_line.number, source=source,
+                ))
             connection: SemanticEntity | None = None
             connection_type = ""
             ordinal = 0

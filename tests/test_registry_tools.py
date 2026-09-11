@@ -223,6 +223,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("d_aa", convergence_text)
         self.assertIn("twelve convergence records", convergence_text)
         connection_text = json.dumps(constructs["*CONNECTIONS"]).lower()
+        self.assertEqual(
+            "verified", constructs["*CONNECTIONS"]["operations"]["static_validation"],
+        )
         self.assertIn("surface-contact", connection_text)
         self.assertIn("no -21 execution case", connection_text)
         loading_text = json.dumps(constructs["*LOADING SEQUENCE"]).lower()

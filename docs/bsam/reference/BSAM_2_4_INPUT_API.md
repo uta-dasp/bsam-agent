@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.98.0`
-- Registry SHA-256: `4638FF5FBEF1BC6623C582CC1DBE94824298BF6303F4433944C30B514F622E35`
+- Registry version: `0.99.0`
+- Registry SHA-256: `2B6503779EB2C74CFFB96BD775467D6E1EC6F1EEF583EE6D7DD580139EB51522`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1677,7 +1677,7 @@ Defines penalty, nodal, and surface-contact connections between cluster selectio
 - Match prefix: `*conn`
 - Coverage: documented
 - Evidence: [evidence.boundary-connections](#evidenceboundary-connections), [evidence.boundary-connection-execution](#evidenceboundary-connection-execution), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1696,11 +1696,11 @@ Termination: next-command. Dependencies: Referenced clusters must be selected by
   - `set-assignment` [repeated]: `mset`:cluster-name.node-set-name, `sset`:cluster-name.node-set-name, `material`:material-id, `constitutive`:constitutive-id, `failure`:failure-id
   - `last` [once]: `last`:none-or-cluster-name-list
   - Constraint: At least one set-assignment row is required before last.
-  - Constraint: Each referenced set must be qualified by an existing cluster name.
-  - Constraint: The last record is the structural sentinel for a penalty connection.
-  - Constraint: A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; separate penalty headers reuse singular boundary arrays and fail during connection setup.
+  - Constraint: Each referenced set must be qualified by an existing selected cluster name.
+  - Constraint: The last record is the structural sentinel for a penalty connection and contains none or selected terminal clusters.
+  - Constraint: A layered VTMS penalty chain is represented by one header, one ordered master-surface row per nonterminal layer, and a last row naming the terminal slave cluster; static validation rejects separate penalty headers because they reuse singular boundary arrays and fail during connection setup.
   - Constraint: Type -2 is the active penalty form and dispatches search=vtms or search=sheff to distinct implementations.
-  - Constraint: Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but blocks their creation and conversion to them.
+  - Constraint: Type -21 is parsed into the connection list but ibn_connections has no -21 execution case; the Agent preserves existing -21 records but emits a blocking validation diagnostic.
 - **nodal** (type is nodal):
   - `header` [once]: `type`:const(nodal), `name`:string, `component`:component
   - `master-sets` [once]: `mset`:all-or-comma-separated-cluster-qualified-node-sets
