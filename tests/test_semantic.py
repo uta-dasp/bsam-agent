@@ -312,6 +312,42 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_cluster_dimensions_shape_order_and_uniqueness_are_validated(self) -> None:
+        cases = {
+            "short": b"*DIMENSIONS\n1,1,0\n",
+            "negative": b"*DIMENSIONS\n1,-1,0,0\n",
+            "nonnumeric": b"*DIMENSIONS\n1,x,0,0\n",
+            "duplicate": b"*DIMENSIONS\n1,0,0,0\n*DIMENSIONS\n1,0,0,0\n",
+            "late": b"*NODE\n1,0,0,0\n*DIMENSIONS\n1,0,0,0\n",
+        }
+        for name, records in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + records))
+                inspection = SourceSet.read(root).inspection()
+            self.assertIn(
+                "BSAM-E310", {item["code"] for item in inspection["diagnostics"]},
+            )
+
+    def test_cluster_dimensions_capacities_cover_allocated_entities(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(
+                b"*NAME\nply1\n*DIMENSIONS\n0,0,0,0\n"
+                b"*NODE\n1,0,0,0\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n"
+                b"*NSET,NSET=edge\n1\n"
+                b"*ELSET,ELSET=solid\n1\n"
+                b"*SELECTION,ID=1,TYPE=NODE\nedge\n"
+                b"*SECTION,ELSET=solid,LAYERS=1\n1,1\n"
+            ))
+            inspection = SourceSet.read(root).inspection()
+        capacity_messages = [
+            item["message"] for item in inspection["diagnostics"]
+            if item["code"] == "BSAM-E310" and "DIMENSIONS" in item["message"]
+        ]
+        self.assertEqual(4, len(capacity_messages))
+
     def test_include_entities_use_workspace_independent_source_labels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)

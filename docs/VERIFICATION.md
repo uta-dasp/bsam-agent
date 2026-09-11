@@ -91,6 +91,8 @@ Registry 0.90.0 verifies cluster `*SELECTION` static validation for required pos
 
 Registry 0.91.0 corrects `.ele` DIMENSIONS semantics to BSAM's four allocation capacities: nodes, elements, selections, and sections. Import accepts zero unused slots and safe over-allocation while rejecting node/element under-allocation. Generation profile 1.3.0 derives one selection slot per imported node set and zero section slots; its controlled executable acceptance completed with exit code zero, the success sentinel, and no fatal marker.
 
+Registry 0.92.0 verifies general `*DIMENSIONS` static validation for exactly four nonnegative integer capacities, one declaration before allocated records, and sufficient node, element, selection-ID, and section bounds, including bounded generated entities.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

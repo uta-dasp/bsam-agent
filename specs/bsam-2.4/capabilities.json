@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.91.0",
+  "registry_version": "0.92.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2074,12 +2074,12 @@
       "coverage": "documented",
       "parameters": [],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records", "evidence.runtime-generated-isotropic-solid-success"],
-      "remaining_work": ["Confirm failure behavior for negative capacities and capacity overruns."],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "verified",
-        "static_validation": "implemented", "execute": "verified"
+        "static_validation": "verified", "execute": "verified"
       },
       "body": {
         "style": "single-record",
@@ -2091,10 +2091,10 @@
             "name": "dimensions",
             "repetition": "once",
             "fields": [
-              {"name": "node_capacity", "value_type": "integer", "required": true, "summary": "Maximum explicit/generated nodes allocated for the cluster."},
-              {"name": "element_capacity", "value_type": "integer", "required": true, "summary": "Maximum explicit/generated elements allocated for the cluster."},
-              {"name": "selection_count", "value_type": "integer", "required": true, "summary": "Number of preallocated selection slots."},
-              {"name": "section_capacity", "value_type": "integer", "required": true, "summary": "Maximum layered sections allocated for the cluster."}
+              {"name": "node_capacity", "value_type": "nonnegative-integer", "required": true, "summary": "Maximum explicit/generated nodes allocated for the cluster."},
+              {"name": "element_capacity", "value_type": "nonnegative-integer", "required": true, "summary": "Maximum explicit/generated elements allocated for the cluster."},
+              {"name": "selection_count", "value_type": "nonnegative-integer", "required": true, "summary": "Number of preallocated selection slots."},
+              {"name": "section_capacity", "value_type": "nonnegative-integer", "required": true, "summary": "Maximum layered sections allocated for the cluster."}
             ]
           }],
             "constraints": ["All four values are nonnegative allocation capacities; zero is valid for an unused array.", "Node and element capacities must not be smaller than the entities populated by explicit or generation commands.", "Must precede commands that populate the allocated cluster arrays."]

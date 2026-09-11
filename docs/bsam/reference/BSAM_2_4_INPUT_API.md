@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.91.0`
-- Registry SHA-256: `9FA78701946F341A16639A3EDC6E751CBBC754FEDB53794FC65BED11DD1D0990`
+- Registry version: `0.92.0`
+- Registry SHA-256: `ABFB928CC07039F0DCF32469B55794C1CD43B7A8B985C0B2C40D2D8296EDE22F`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -728,18 +728,14 @@ Allocates cluster dimensions before mesh entities are read.
 - Dispatch prefix: `*DIME`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-core-records](#evidencefe-core-records), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=implemented, `execute`=verified
-
-Remaining specification work:
-
-- Confirm failure behavior for negative capacities and capacity overruns.
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 #### `*DIMENSIONS` body
 
 Termination: fixed-count. Dependencies: Capacities must cover all entities produced by explicit and generation commands.
 
 - **capacities** (always):
-  - `dimensions` [once]: `node_capacity`:integer, `element_capacity`:integer, `selection_count`:integer, `section_capacity`:integer
+  - `dimensions` [once]: `node_capacity`:nonnegative-integer, `element_capacity`:nonnegative-integer, `selection_count`:nonnegative-integer, `section_capacity`:nonnegative-integer
   - Constraint: All four values are nonnegative allocation capacities; zero is valid for an unused array.
   - Constraint: Node and element capacities must not be smaller than the entities populated by explicit or generation commands.
   - Constraint: Must precede commands that populate the allocated cluster arrays.

@@ -3229,6 +3229,9 @@ def build_semantic_index(
     index = SemanticIndex()
     cluster: str | None = None
     selection_capacity: int | None = None
+    dimensions_seen = False
+    cluster_population_started = False
+    dimension_allocations: list[tuple[SemanticEntity, str, tuple[int, int, int, int]]] = []
     cluster_declaration_ordinal = 0
     pending_cluster_records: list[SemanticEntity] = []
     registered_cluster_commands = load_registry()["cluster_commands"]
@@ -3274,6 +3277,8 @@ def build_semantic_index(
                 cluster_declaration_ordinal += 1
                 cluster = None
                 selection_capacity = None
+                dimensions_seen = False
+                cluster_population_started = False
                 representation = records[0].stripped.casefold() if records else ""
                 declaration = _entity(
                     index, "cluster-declaration", str(cluster_declaration_ordinal),
@@ -3304,20 +3309,45 @@ def build_semantic_index(
                     "node_capacity", "element_capacity",
                     "selection_count", "section_capacity",
                 )
+                owner = cluster or (
+                    declared_cluster_names[cluster_declaration_ordinal - 1]
+                    if cluster_declaration_ordinal else None
+                ) or f"noname{cluster_declaration_ordinal}"
                 dimensions = _entity(
                     index, "cluster-dimensions", f"{source}:{command_line.number}",
                     source, command_line, cluster,
                     {name: values[position] if position < len(values) else None
-                     for position, name in enumerate(names)},
+                     for position, name in enumerate(names)} | {"owner": owner},
                 )
+                if dimensions_seen:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="cluster may contain only one DIMENSIONS command",
+                        line=command_line.number, source=source,
+                    ))
+                if cluster_population_started:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="DIMENSIONS must precede allocated cluster records",
+                        line=command_line.number, source=source,
+                    ))
+                dimensions_seen = True
+                parsed_dimensions: tuple[int, int, int, int] | None = None
                 try:
-                    parsed_selection_capacity = int(values[2])
-                    selection_capacity = (
-                        parsed_selection_capacity
-                        if parsed_selection_capacity >= 0 else None
-                    )
-                except (IndexError, ValueError):
+                    parsed_values = tuple(int(value) for value in values)
+                    if len(parsed_values) != 4 or any(value < 0 for value in parsed_values):
+                        raise ValueError
+                    parsed_dimensions = parsed_values  # type: ignore[assignment]
+                except ValueError:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="DIMENSIONS requires exactly four nonnegative integers",
+                        line=command_line.number, source=source,
+                    ))
                     selection_capacity = None
+                else:
+                    selection_capacity = parsed_dimensions[2]
+                    dimension_allocations.append((dimensions, owner, parsed_dimensions))
                 if cluster:
                     _reference(
                         index, dimensions, "configures-cluster",
@@ -3326,6 +3356,9 @@ def build_semantic_index(
                 else:
                     pending_cluster_records.append(dimensions)
                 continue
+
+            if command in {"*NODE", "*ELEM", "*NGEN", "*NCOP", "*ELGE", "*SELE", "*SECT"}:
+                cluster_population_started = True
 
             if command == "*NAME" and records:
                 cluster = records[0].stripped.casefold()
@@ -3971,6 +4004,33 @@ def build_semantic_index(
                             index, region, "targets-cluster",
                             _key("cluster", cluster, None), source, command_line,
                         )
+    for dimensions, owner, capacities in dimension_allocations:
+        owner_key = owner.casefold()
+        owned = [
+            item for item in index.entities
+            if str(item.attributes.get("cluster") or "").casefold() == owner_key
+        ]
+        counts = (
+            sum(item.kind == "node" for item in owned),
+            sum(item.kind == "element" for item in owned),
+            max(
+                (int(item.name) for item in owned if item.kind == "selection"),
+                default=0,
+            ),
+            sum(item.kind == "section" for item in owned),
+        )
+        labels = ("node", "element", "selection", "section")
+        for label, capacity, required in zip(labels, capacities, counts):
+            if required > capacity:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message=(
+                        f"DIMENSIONS {label} capacity {capacity} is smaller than "
+                        f"required count or ID {required}"
+                    ),
+                    line=dimensions.location.line,
+                    source=dimensions.location.source,
+                ))
     if resolve:
         index.resolve()
     return index

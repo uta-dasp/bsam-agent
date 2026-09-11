@@ -130,6 +130,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual("unassessed", commands["*FIELD"]["operations"]["execute"])
         self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["generate"])
         self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["execute"])
+        self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["static_validation"])
+        dimension_fields = commands["*DIMENSIONS"]["body"]["variants"][0]["rows"][0]["fields"]
+        self.assertTrue(all(item["value_type"] == "nonnegative-integer" for item in dimension_fields))
         self.assertIn("zero is valid", json.dumps(commands["*DIMENSIONS"]).lower())
         tolerance = {item["name"]: item for item in commands["*TOLERANCE"]["parameters"]}
         self.assertEqual("PTOL", tolerance["TYPE"]["default"])
