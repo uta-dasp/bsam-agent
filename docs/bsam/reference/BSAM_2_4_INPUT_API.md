@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.94.0`
-- Registry SHA-256: `841AA172D7FDBF7EE5DE78AE1A5D2A567C571A94CE24B72013C81372405C8C5A`
+- Registry version: `0.95.0`
+- Registry SHA-256: `EA1710C2CEC68EB1B68941057904874445DE05C2E062DBCE61B5E3B2095A3BDC`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1564,8 +1564,8 @@ Sets the current boundary-problem name from the following record.
 - Registry ID: `construct.boundary-name`
 - Match prefix: `*name`
 - Coverage: documented
-- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 Known parameters:
 
@@ -1577,8 +1577,9 @@ Termination: fixed-count. Dependencies: Names identify boundary problems in diag
 
 - **optional-name-record** (always):
   - `name` [optional-once]: `name`:one-list-directed-token-up-to-80-characters
-  - Constraint: The name may not equal a registered top-level block token.
-  - Constraint: Agent generation requires boundary-problem names to be unique even though this parser does not enforce uniqueness.
+  - Constraint: An empty body retains the source-defined boundname<problem-index> default; otherwise exactly one list-directed token of at most 80 characters is accepted.
+  - Constraint: The Agent rejects registered top-level block tokens case-insensitively.
+  - Constraint: Boundary-problem names must be unique case-insensitively even though this parser does not enforce uniqueness.
 
 ### `*STATUS`
 

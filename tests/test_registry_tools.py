@@ -195,6 +195,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("global-local-file", condition_text)
         self.assertIn("surface-stress", condition_text)
         self.assertIn("multi-file plan", condition_text)
+        self.assertEqual("verified", constructs["*NAME"]["operations"]["static_validation"])
+        self.assertEqual("verified", constructs["*NAME"]["operations"]["generate"])
+        self.assertEqual("verified", constructs["*NAME"]["operations"]["execute"])
 
     def test_major_boundary_record_groups_have_structured_bodies(self) -> None:
         constructs = {item["canonical"]: item for item in self.registry["nested_constructs"]}

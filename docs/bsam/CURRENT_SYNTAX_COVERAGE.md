@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.95.0` additionally verifies BOUNDARY `*NAME` default/explicit record shape, reserved-token rejection, cross-problem uniqueness, generation, and pinned-executable acceptance.
+
 Registry `0.94.0` additionally verifies command-only `*STOP` data shape, cluster termination boundaries, generation, and pinned-executable acceptance.
 
 Current addendum: registry `0.93.0` retains the inventory below and now contains 77 local evidence records. Its verified generation profile 1.3.0 derives correct BSAM DIMENSIONS allocation slots, emits explicit node `*SELECTION` records, excludes the defective current PARDISO `definite` spelling, and completed a digest-bound pinned-executable run with exit code zero, the success sentinel, and no fatal marker. `*SELECTION` and `*DIMENSIONS` static validation enforce their full bounded contracts. Cluster `*TYPE`, `*NAME`, and `*CONSTITUTIVE` validation now enforce declaration boundaries, cardinality, supported values, unique/reserved naming, and resolved positive constitutive IDs. The runtime evidence qualifies the generated forms, while defective `*FIELD` execution remains unassessed. The detailed `0.87.0` paragraph below remains the prior baseline narrative for the unchanged capability families.

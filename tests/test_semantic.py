@@ -1091,6 +1091,42 @@ class SemanticIndexTests(unittest.TestCase):
                 item["code"] for item in inspection["diagnostics"]
             ].count("BSAM-E301"))
 
+    def test_boundary_name_optional_record_and_constraints_are_validated(self) -> None:
+        valid_empty = deck(b"*NAME\nply1\n").replace(
+            b"*type\nmechanical\nEND BOUNDARY",
+            b"*type\nmechanical\n*name\nEND BOUNDARY",
+        )
+        invalid_records = {
+            "multiple-records": b"first\nsecond\n",
+            "multiple-tokens": b"first case\n",
+            "too-long": b"x" * 81 + b"\n",
+            "reserved": b"MATERIALS\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(valid_empty)
+            self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for name, name_body in invalid_records.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"{name}.in"
+                    path.write_bytes(deck(b"*NAME\nply1\n").replace(
+                        b"*type\nmechanical\nEND BOUNDARY",
+                        b"*type\nmechanical\n*name\n" + name_body + b"END BOUNDARY",
+                    ))
+                    diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
+    def test_boundary_problem_names_must_be_unique(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(deck(b"*NAME\nply1\n").replace(
+                b"*type\nmechanical\nEND BOUNDARY",
+                b"*type\nmechanical\n*name\ncase1\n"
+                b"*type\nmechanical\n*name\nCASE1\nEND BOUNDARY",
+            ))
+            diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+        self.assertIn("BSAM-E300", {item["code"] for item in diagnostics})
+
     def test_boundary_outputs_resolve_cluster_node_set_and_element_set_selectors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

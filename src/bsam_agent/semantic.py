@@ -2844,11 +2844,49 @@ def augment_root_semantics(
     boundary_body = _top_block_body(all_lines, "BOUNDARY")
     all_cluster_names = [item.name for item in index.entities if item.kind == "cluster"]
     selected_cluster_names = list(all_cluster_names)
+    boundary_problem_ordinal = 0
+    boundary_names: dict[str, int] = {}
     for command_line, body in _command_spans(boundary_body):
         command = command_line.text.lstrip().split(",", 1)[0].casefold()
         records = [line for line in body if line.stripped and not line.stripped.startswith("**")]
         if command.startswith("*type"):
+            boundary_problem_ordinal += 1
             selected_cluster_names = list(all_cluster_names)
+        elif command.startswith("*name"):
+            if not records:
+                continue
+            tokens = records[0].text.split("#", 1)[0].replace(",", " ").split()
+            reserved_names = {
+                "input", "solver", "moisture", "boundary", "constitutive",
+                "failure", "crack", "tables", "statistical", "ufunctions",
+                "user", "clusters", "materials",
+            }
+            if (
+                len(records) != 1 or len(tokens) != 1 or len(tokens[0]) > 80
+                or tokens[0].casefold() in reserved_names
+            ):
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message=(
+                        "BOUNDARY NAME must be empty for its default or contain one "
+                        "non-reserved token of at most 80 characters"
+                    ),
+                    line=command_line.number, source=source,
+                ))
+                continue
+            normalized_name = tokens[0].casefold()
+            previous_problem = boundary_names.get(normalized_name)
+            if (
+                previous_problem is not None
+                and previous_problem != boundary_problem_ordinal
+            ):
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E300", severity="error",
+                    message=f"duplicate BOUNDARY problem name {tokens[0]}",
+                    line=records[0].number, source=source,
+                ))
+            else:
+                boundary_names[normalized_name] = boundary_problem_ordinal
         elif command.startswith("*clusters"):
             named_clusters = [
                 (name, line)

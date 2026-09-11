@@ -97,6 +97,8 @@ Registry 0.93.0 verifies cluster declaration controls: each cluster begins with 
 
 Registry 0.94.0 verifies `*STOP` as a command-only cluster terminator, rejects attached data and reachable commands lacking a new `*TYPE`, and retains the source-proven include-stop boundary behavior. The generated profile's final `*STOP` remains runtime-qualified.
 
+Registry 0.95.0 verifies BOUNDARY `*NAME`: an empty body retains the indexed default, while an explicit name is one non-reserved token of at most 80 characters and must remain unique across boundary problems. The generated explicit-name form is runtime-qualified.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.
