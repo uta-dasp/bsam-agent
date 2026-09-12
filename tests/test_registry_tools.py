@@ -41,6 +41,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(44, counts["primary_entity_capabilities"])
         self.assertEqual(13, counts["additional_entity_outputs"])
         self.assertEqual(25, counts["reference_contracts"])
+        self.assertEqual(11, counts["operation_impacts"])
         self.assertEqual(5, counts["obsolete_tokens"])
         self.assertEqual(82, counts["evidence"])
 
@@ -94,6 +95,35 @@ class RegistryToolsTests(unittest.TestCase):
             for item in contract["decision_sources"]
         }
         self.assertEqual({"user-approved": True, "source-derived": False}, sources)
+
+    def test_change_impacts_cover_every_supported_entity_operation(self) -> None:
+        active = [
+            *self.registry["top_level_blocks"],
+            *self.registry["cluster_commands"],
+            *self.registry["nested_constructs"],
+        ]
+        expected = {
+            (operation, item["id"])
+            for item in active
+            for operation in ("create", "delete", "rename")
+            if item.get("operations", {}).get(operation) in {"implemented", "verified"}
+        }
+        contract = self.registry["change_contract"]
+        actual = {
+            (item["operation"], capability_id)
+            for item in contract["operation_impacts"]
+            for capability_id in item["capability_ids"]
+        }
+        self.assertEqual(expected, actual)
+        self.assertEqual(11, len(actual))
+        self.assertTrue(all(
+            item["direct_impacts"] and item["dependent_checks"]
+            for item in contract["operation_impacts"]
+        ))
+        self.assertEqual(
+            {item["id"] for item in self.registry["transformations"]},
+            set(contract["transformation_ids"]),
+        )
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -188,6 +218,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("at most ten", selection_text)
         self.assertIn("blocks individual element labels", selection_text)
         self.assertEqual("verified", commands["*SELECTION"]["operations"]["generate"])
+        self.assertEqual("unsupported", commands["*SELECTION"]["operations"]["create"])
         self.assertEqual("verified", commands["*SELECTION"]["operations"]["execute"])
         self.assertEqual("verified", commands["*SELECTION"]["operations"]["static_validation"])
         self.assertEqual("positive-integer", {

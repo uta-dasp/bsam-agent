@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.8.0",
-  "registry_version": "0.130.0",
+  "schema_version": "1.9.0",
+  "registry_version": "0.131.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2624,7 +2624,7 @@
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
-        "modify": "unsupported", "create": "verified", "delete": "unsupported",
+        "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "verified",
         "static_validation": "verified", "execute": "verified"
       },
@@ -3772,6 +3772,62 @@
       "evidence_ids": ["evidence.current-vtms-deck-notch", "evidence.baseline-syntax-transition"]
     }
   ],
+  "change_contract": {
+    "schema_version": "1.0.0",
+    "operation_impacts": [
+      {
+        "operation": "create",
+        "capability_ids": ["command.node"],
+        "adapter": "preview_create_entity",
+        "direct_impacts": ["Insert one explicit NODE row in the named cluster without overwriting the source set."],
+        "dependent_checks": ["Require a unique in-range label, finite coordinates, a source-located insertion point, and available DIMENSIONS node capacity."]
+      },
+      {
+        "operation": "create",
+        "capability_ids": ["command.element"],
+        "adapter": "preview_create_entity",
+        "direct_impacts": ["Insert one explicit ELEMENT row and optionally attach it to an implicit ELSET in the named cluster."],
+        "dependent_checks": ["Require a unique in-range label, registered topology width, resolved node connectivity, safe ELSET handling, and available DIMENSIONS element capacity."]
+      },
+      {
+        "operation": "create",
+        "capability_ids": ["command.nset", "command.elset"],
+        "adapter": "preview_create_entity",
+        "direct_impacts": ["Insert one new explicit set declaration and its exact member rows in the named cluster."],
+        "dependent_checks": ["Require a unique safe name, resolved type-compatible members, no duplicate membership, and a source-located insertion point before cluster termination."]
+      },
+      {
+        "operation": "delete",
+        "capability_ids": ["command.node", "command.element"],
+        "adapter": "preview_delete_entity",
+        "direct_impacts": ["Remove exactly one source-located explicit mesh record."],
+        "dependent_checks": ["Block generated, ambiguous, multiply defined, implicitly owned, or referenced entities using the complete reverse-reference graph."]
+      },
+      {
+        "operation": "delete",
+        "capability_ids": ["command.nset", "command.elset"],
+        "adapter": "preview_delete_entity",
+        "direct_impacts": ["Remove one isolated explicit set command and all of its owned member rows."],
+        "dependent_checks": ["Block implicit, generated, repeated, ambiguous, or referenced definitions and revalidate every cluster allocation and target relationship."]
+      },
+      {
+        "operation": "rename",
+        "capability_ids": ["command.nset", "command.elset"],
+        "adapter": "preview_rename_entity",
+        "direct_impacts": ["Rewrite the exact set definition token and every resolved reference token across the bound root/include source set."],
+        "dependent_checks": ["Block implicit, generated, duplicate, ambiguous, overlength, colliding, or unrecognized definitions; validate the composed atomic source-set plan."]
+      },
+      {
+        "operation": "rename",
+        "capability_ids": ["construct.boundary-conditions"],
+        "adapter": "preview_rename_entity",
+        "direct_impacts": ["Rewrite one boundary-condition NAME and every loading-sequence CHANGE selector that resolves to it."],
+        "dependent_checks": ["Require unique bounded names, exact source locations, complete reverse references, and a valid atomic rendered source set."]
+      }
+    ],
+    "transformation_ids": ["transformation.notch-expand-plies", "transformation.migrate-legacy-solver"],
+    "transformation_policy": "Each transformation owns explicit applicability, approved or source-derived decisions, direct impacts, dependencies, validation, revision binding, and non-overwriting apply behavior in its registered versioned contract."
+  },
   "entity_contract": {
     "schema_version": "1.0.0",
     "capability_record_policy": "Every occurrence of each active top-level block, cluster command, and nested construct exposes a source-located RegisteredConstruct; entity_kind identifies its primary queryable entity when one exists.",

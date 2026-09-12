@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.131.0` closes change-impact specification. Eleven verified create, delete, and rename capability-operation pairs now declare their exact adapter, direct source-set effects, and required dependent checks; both versioned transformations remain linked to their explicit applicability, decisions, impacts, and dependencies. Standalone SELECTION creation is corrected to unsupported because selection generation is verified only inside the complete deck profile, not through the generic entity-create adapter.
+
 Registry `0.130.0` closes the semantic reference matrix. Twenty-five source/target contracts cover all 36 edge kinds across the source graph, mesh topology, sets, generated entities, sections, orientations, materials, constitutives, failures, analysis controls, loads, connections, named data, and USER functions. Runtime edge creation now fails closed when its source kind, target kind, or dependency class disagrees with the registry; conditional entity output coverage also includes implicit sets, structured-material attribution, and implicit solvers.
 
 Registry `0.129.0` closes the active entity-output inventory. All 54 active capabilities are machine-classified as producing a primary queryable entity or intentionally producing only a source-located capability record; conditional cluster, generated node/element, included source-file, structured material-parameter, and loading-change entities are registered separately. Registry validation rejects omissions, overlaps, and unknown capability ownership.

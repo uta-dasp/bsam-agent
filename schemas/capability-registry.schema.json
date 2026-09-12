@@ -18,11 +18,12 @@
     "obsolete_tokens",
     "execution_contract",
     "dependency_contract",
-    "entity_contract"
+    "entity_contract",
+    "change_contract"
   ],
   "properties": {
     "schema_version": {
-      "const": "1.8.0"
+      "const": "1.9.0"
     },
     "registry_version": {
       "type": "string",
@@ -78,6 +79,9 @@
     },
     "entity_contract": {
       "$ref": "#/$defs/entityContract"
+    },
+    "change_contract": {
+      "$ref": "#/$defs/changeContract"
     }
   },
   "$defs": {
@@ -202,6 +206,51 @@
         "entity_kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
         "cardinality": { "enum": ["zero-or-one", "zero-or-more"] },
         "condition": { "type": "string", "minLength": 1 }
+      }
+    },
+    "changeContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "operation_impacts", "transformation_ids", "transformation_policy"],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "operation_impacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/operationImpact" }
+        },
+        "transformation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^transformation\\.[a-z0-9-]+$" }
+        },
+        "transformation_policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operationImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "capability_ids", "adapter", "direct_impacts", "dependent_checks"],
+      "properties": {
+        "operation": { "enum": ["create", "delete", "rename"] },
+        "capability_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^(block|command|construct)\\.[a-z0-9-]+$" }
+        },
+        "adapter": { "type": "string", "minLength": 1 },
+        "direct_impacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "dependent_checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "generationProfile": {

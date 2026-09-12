@@ -82,10 +82,11 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "execution_contract",
             "dependency_contract",
             "entity_contract",
+            "change_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "1.8.0":
+    if data["schema_version"] != "1.9.0":
         raise RegistryError("unsupported schema_version")
 
     dependency = data["dependency_contract"]
@@ -446,6 +447,53 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
                 f"{item['id']} references missing evidence: {', '.join(missing_evidence)}"
             )
 
+    change_contract = data["change_contract"]
+    _require_keys(
+        change_contract,
+        {
+            "schema_version", "operation_impacts", "transformation_ids",
+            "transformation_policy",
+        },
+        "change_contract",
+    )
+    if change_contract["schema_version"] != "1.0.0":
+        raise RegistryError("unsupported change_contract schema_version")
+    impact_pairs: list[str] = []
+    for item in change_contract["operation_impacts"]:
+        _require_keys(
+            item,
+            {
+                "operation", "capability_ids", "adapter", "direct_impacts",
+                "dependent_checks",
+            },
+            "operation impact",
+        )
+        missing_capabilities = sorted(set(item["capability_ids"]) - capability_ids)
+        if missing_capabilities:
+            raise RegistryError(
+                "operation impact references missing capabilities: "
+                + ", ".join(missing_capabilities)
+            )
+        impact_pairs.extend(
+            f"{item['operation']}:{capability_id}"
+            for capability_id in item["capability_ids"]
+        )
+    _unique(impact_pairs, "operation impact")
+    expected_impact_pairs = {
+        f"{operation}:{item['id']}"
+        for _, item in records
+        for operation in ("create", "delete", "rename")
+        if item.get("operations", {}).get(operation) in {"implemented", "verified"}
+    }
+    if set(impact_pairs) != expected_impact_pairs:
+        raise RegistryError(
+            "change_contract operation impacts must exactly cover supported changes"
+        )
+    transformation_ids = change_contract["transformation_ids"]
+    _unique(transformation_ids, "change-contract transformation")
+    if set(transformation_ids) != {item["id"] for item in transformations}:
+        raise RegistryError("change_contract must reference every registered transformation")
+
     obsolete_tokens = data["obsolete_tokens"]
     _unique([item["token"] for item in obsolete_tokens], "obsolete token")
     for item in obsolete_tokens:
@@ -491,6 +539,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "primary_entity_capabilities": len(records) - len(no_primary),
         "additional_entity_outputs": len(output_keys),
         "reference_contracts": len(reference_contracts),
+        "operation_impacts": len(impact_pairs),
         "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
             item["coverage"] in {"documented", "runtime-verified"}
@@ -578,7 +627,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['operation_impacts']} supported change impacts, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -777,6 +826,29 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- `{item['id']}` (user input {'required' if item['requires_user_input'] else 'not required'}): {item['summary']}"
         for item in dependency["decision_sources"]
     )
+
+    change_contract = data["change_contract"]
+    lines.extend(["", "## Change impact contract", ""])
+    for item in change_contract["operation_impacts"]:
+        capabilities = ", ".join(f"`{value}`" for value in item["capability_ids"])
+        lines.extend([
+            f"### `{item['operation']}` via `{item['adapter']}`",
+            "",
+            f"- Capabilities: {capabilities}",
+            "- Direct impacts:",
+        ])
+        lines.extend(f"  - {value}" for value in item["direct_impacts"])
+        lines.append("- Required dependent checks:")
+        lines.extend(f"  - {value}" for value in item["dependent_checks"])
+        lines.append("")
+    transformations = ", ".join(
+        f"`{value}`" for value in change_contract["transformation_ids"]
+    )
+    lines.extend([
+        f"- Registered transformation impacts: {transformations}",
+        f"- Transformation policy: {change_contract['transformation_policy']}",
+        "",
+    ])
 
     lines.extend(["", "## Registered generation profiles", ""])
     for item in data["generation_profiles"]:

@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.130.0`
-- Registry SHA-256: `430B7B9E477088A3CC062B38F29E55E3547022AFF7E4BE99FB2D4866131590D8`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, and 44 capabilities with primary entity output
+- Registry version: `0.131.0`
+- Registry SHA-256: `9FFBD518A24B99B1824FA70139F75DD29189FE981F0135FB8B4ED6A28D8B8F9F`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 11 supported change impacts, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -1076,7 +1076,7 @@ Defines an indexed node or element selection used by later operations.
 - Dispatch prefix: `*SELE`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-field-selection](#evidencefe-field-selection), [evidence.runtime-generated-isotropic-solid-success](#evidenceruntime-generated-isotropic-solid-success)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=verified, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=verified, `static_validation`=verified, `execute`=verified
 
 Known parameters:
 
@@ -1992,6 +1992,68 @@ Decision provenance:
 
 - `user-approved` (user input required): The value or policy comes from explicit user intent and may not be guessed from examples or defaults.
 - `source-derived` (user input not required): A verified deterministic algorithm derives the value from the bound source set and records the derivation.
+
+## Change impact contract
+
+### `create` via `preview_create_entity`
+
+- Capabilities: `command.node`
+- Direct impacts:
+  - Insert one explicit NODE row in the named cluster without overwriting the source set.
+- Required dependent checks:
+  - Require a unique in-range label, finite coordinates, a source-located insertion point, and available DIMENSIONS node capacity.
+
+### `create` via `preview_create_entity`
+
+- Capabilities: `command.element`
+- Direct impacts:
+  - Insert one explicit ELEMENT row and optionally attach it to an implicit ELSET in the named cluster.
+- Required dependent checks:
+  - Require a unique in-range label, registered topology width, resolved node connectivity, safe ELSET handling, and available DIMENSIONS element capacity.
+
+### `create` via `preview_create_entity`
+
+- Capabilities: `command.nset`, `command.elset`
+- Direct impacts:
+  - Insert one new explicit set declaration and its exact member rows in the named cluster.
+- Required dependent checks:
+  - Require a unique safe name, resolved type-compatible members, no duplicate membership, and a source-located insertion point before cluster termination.
+
+### `delete` via `preview_delete_entity`
+
+- Capabilities: `command.node`, `command.element`
+- Direct impacts:
+  - Remove exactly one source-located explicit mesh record.
+- Required dependent checks:
+  - Block generated, ambiguous, multiply defined, implicitly owned, or referenced entities using the complete reverse-reference graph.
+
+### `delete` via `preview_delete_entity`
+
+- Capabilities: `command.nset`, `command.elset`
+- Direct impacts:
+  - Remove one isolated explicit set command and all of its owned member rows.
+- Required dependent checks:
+  - Block implicit, generated, repeated, ambiguous, or referenced definitions and revalidate every cluster allocation and target relationship.
+
+### `rename` via `preview_rename_entity`
+
+- Capabilities: `command.nset`, `command.elset`
+- Direct impacts:
+  - Rewrite the exact set definition token and every resolved reference token across the bound root/include source set.
+- Required dependent checks:
+  - Block implicit, generated, duplicate, ambiguous, overlength, colliding, or unrecognized definitions; validate the composed atomic source-set plan.
+
+### `rename` via `preview_rename_entity`
+
+- Capabilities: `construct.boundary-conditions`
+- Direct impacts:
+  - Rewrite one boundary-condition NAME and every loading-sequence CHANGE selector that resolves to it.
+- Required dependent checks:
+  - Require unique bounded names, exact source locations, complete reverse references, and a valid atomic rendered source set.
+
+- Registered transformation impacts: `transformation.notch-expand-plies`, `transformation.migrate-legacy-solver`
+- Transformation policy: Each transformation owns explicit applicability, approved or source-derived decisions, direct impacts, dependencies, validation, revision binding, and non-overwriting apply behavior in its registered versioned contract.
+
 
 ## Registered generation profiles
 

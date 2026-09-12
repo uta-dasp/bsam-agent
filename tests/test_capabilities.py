@@ -360,6 +360,19 @@ class CapabilitySliceTests(unittest.TestCase):
                     "entity_name": "one", "new_name": "two", "plan_path": "rename.json",
                 })
 
+    def test_profile_only_selection_creation_is_not_a_generic_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(structural_deck())
+            with self.assertRaisesRegex(ApiError, "create is unsupported"):
+                LocalAgentApi(root).dispatch("preview_create_entity", {
+                    "source": "model.in", "capability": "command.selection",
+                    "attributes": {
+                        "cluster": "ply1", "id": 1, "members": ["corner"],
+                    },
+                    "plan_path": "selection.json",
+                })
+
     def test_generic_structural_adapters_are_capability_gated(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
