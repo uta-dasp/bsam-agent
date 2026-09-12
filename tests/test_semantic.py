@@ -946,6 +946,34 @@ class SemanticIndexTests(unittest.TestCase):
             )
             self.assertTrue(all(item["status"] == "resolved" for item in references))
 
+    def test_orientation_header_rows_and_element_vectors_are_validated(self) -> None:
+        valid = (
+            b"*ORIENTATION,NAME=ORI\nedge,0,0,0,0,0,0,.5\n",
+            b"*ORIENTATION,NAME=ORI-ELE\nsolid,1,0,0,0,0,1,.5\n",
+        )
+        invalid = (
+            b"*ORIENTATION\nedge,1,0,0,0,0,1,.5\n",
+            b"*ORIENTATION,NAME=OTHER\nedge,1,0,0,0,0,1,.5\n",
+            b"*ORIENTATION,NAME=ORI\nedge,1,0,0\n",
+            b"*ORIENTATION,NAME=ORI\nedge,1,0,0,0,0,1,NaN\n",
+            b"*ORIENTATION,NAME=ORI-ELE\nsolid,0,0,0,0,0,1,.5\n",
+            b"*ORIENTATION,NAME=ORI-ELE\nsolid,1,0,0,1,0,0,.5\n",
+        )
+        prefix = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+            b"*NSET,NSET=edge\n1\n*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n*ELSET,ELSET=solid\n1\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, orientation in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(prefix + orientation))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, orientation in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + orientation))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_coordinate_operations_and_integration_dependencies_resolve(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

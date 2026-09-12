@@ -4364,11 +4364,49 @@ def build_semantic_index(
                 member_kind = "element" if orientation_name == "ORI-ELE" else "node"
                 set_kind = f"{member_kind}-set"
                 known_keys = {item.key for item in index.entities}
+                orientation_tokens = [token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token]
+                orientation_error: str | None = None
+                if not (
+                    len(orientation_tokens) == 3
+                    and orientation_tokens[1].casefold() == "name"
+                    and orientation_tokens[2].upper() in {"ORI", "ORI-NODE", "ORI-ELE"}
+                ):
+                    orientation_error = "ORIENTATION requires exactly NAME=ORI|ORI-NODE|ORI-ELE"
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=orientation_error,
+                        line=command_line.number, source=source,
+                    ))
                 for line in records:
                     values = _fields(line.text)
                     if not values:
                         continue
                     target = values[0]
+                    row_error: str | None = None
+                    numeric_orientation: list[float] = []
+                    if len(values) != 8:
+                        row_error = "ORIENTATION rows require one target, six vector values, and fiber volume"
+                    elif len(target) > 20 and not target.lstrip("+").isdigit():
+                        row_error = "ORIENTATION set targets may contain at most 20 characters"
+                    else:
+                        try:
+                            numeric_orientation = [_fortran_real(item) for item in values[1:]]
+                            if not all(math.isfinite(item) for item in numeric_orientation):
+                                raise ValueError
+                        except ValueError:
+                            row_error = "ORIENTATION values must be finite reals"
+                    if row_error is None and member_kind == "element":
+                        v1, v3 = numeric_orientation[:3], numeric_orientation[3:6]
+                        if not any(v1) or not any(v3):
+                            row_error = "element ORIENTATION V1 and V3 must be nonzero"
+                        elif abs(sum(left * right for left, right in zip(v1, v3))) > 1.0e-8:
+                            row_error = "element ORIENTATION V1 and V3 must be orthogonal within 1e-8"
+                    if row_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=row_error,
+                            line=line.number, source=source,
+                        ))
                     orientation = _entity(
                         index, "orientation-record", f"{source}:{line.number}",
                         source, line, cluster,

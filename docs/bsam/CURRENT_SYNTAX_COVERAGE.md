@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.109.0` additionally resolves cluster `*ORIENTATION` nodal/elemental behavior and verifies NAME selection, eight-field finite rows, source-bounded targets, references, and elemental nonzero orthogonal V1/V3 geometry without inventing nodal restrictions.
+
 Registry `0.108.0` additionally verifies cluster `*FIELD` required VARIABLES 1–10, exact finite-real row widths, source-bounded set names, and resolved targets; generation remains unsupported and execution unassessed because the consumer-state defect is unchanged.
 
 Registry `0.107.0` additionally verifies cluster `*LOAD` as option-free repeated three-field rows with DOF 1–3, finite values, source-bounded set names, and resolved node or node-set targets.

@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.108.0`
-- Registry SHA-256: `B0951506763A7666DE6003E76AECE2AE048EEDDF671E81CE6E24329F634EBE84`
+- Registry version: `0.109.0`
+- Registry SHA-256: `C3C017116727306CB97D9312E4CCF5F3B053FB658EBF43A5059B4B3ABE37C0A2`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1145,15 +1145,11 @@ Defines nodal or elemental orientation data.
 - Dispatch prefix: `*ORIE`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-integration-orientation](#evidencefe-integration-orientation)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
 - `NAME` (enum, required) (allowed: `ORI`, `ORI-NODE`, `ORI-ELE`): Selects nodal orientation (ORI or ORI-NODE) or elemental orientation (ORI-ELE).
-
-Remaining specification work:
-
-- Confirm zero-vector handling in nodal mode and the exact interpretation of fiber_volume.
 
 #### `*ORIENTATION` body
 
@@ -1162,6 +1158,7 @@ Termination: next-command-or-eof. Dependencies: The selected node/element or set
 - **nodal** (NAME is ORI or ORI-NODE):
   - `orientation` [repeated]: `target`:node-label-or-node-set-name, `v1_x`:real, `v1_y`:real, `v1_z`:real, `v3_x`:real, `v3_y`:real, `v3_z`:real, `fiber_volume`:real
   - Constraint: The target is resolved as a node set first, otherwise as a numeric node label.
+  - Constraint: The source stores nodal V1 directly and stores cross(V3,V1) as V2 without rejecting or normalizing zero or non-orthogonal inputs; static validation therefore enforces finite width but does not invent elemental constraints for nodal mode.
 - **elemental** (NAME is ORI-ELE):
   - `orientation` [repeated]: `target`:element-label-or-element-set-name, `v1_x`:real, `v1_y`:real, `v1_z`:real, `v3_x`:real, `v3_y`:real, `v3_z`:real, `fiber_volume`:real
   - Constraint: V1 and V3 must be nonzero and mutually normal; the parser normalizes them and derives V2.

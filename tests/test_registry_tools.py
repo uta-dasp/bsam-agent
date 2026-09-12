@@ -91,6 +91,8 @@ class RegistryToolsTests(unittest.TestCase):
         commands = {item["canonical"]: item for item in self.registry["cluster_commands"]}
         for token in ("*DIMENSIONS", "*NODE", "*ELEMENT", "*NSET", "*ELSET", "*INTEGRATION", "*ORIENTATION", "*SECTION"):
             self.assertIn("body", commands[token], token)
+        self.assertEqual("verified", commands["*ORIENTATION"]["operations"]["static_validation"])
+        self.assertEqual([], commands["*ORIENTATION"]["remaining_work"])
         section = commands["*SECTION"]
         self.assertEqual("count-from-command-parameter", section["body"]["variants"][0]["rows"][0]["repetition"])
         self.assertTrue(any("atomically" in item for item in section["body"]["dependencies"]))

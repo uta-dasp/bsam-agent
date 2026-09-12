@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.108.0",
+  "registry_version": "0.109.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2668,18 +2668,18 @@
         }
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation"],
-      "remaining_work": ["Confirm zero-vector handling in nodal mode and the exact interpretation of fiber_volume."],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
         "variants": [
-          {"name": "nodal", "when": "NAME is ORI or ORI-NODE", "rows": [{"name": "orientation", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "One node or an existing node set."}, {"name": "v1_x", "value_type": "real", "required": true, "summary": "Material direction V1 X."}, {"name": "v1_y", "value_type": "real", "required": true, "summary": "Material direction V1 Y."}, {"name": "v1_z", "value_type": "real", "required": true, "summary": "Material direction V1 Z."}, {"name": "v3_x", "value_type": "real", "required": true, "summary": "Thickness direction V3 X."}, {"name": "v3_y", "value_type": "real", "required": true, "summary": "Thickness direction V3 Y."}, {"name": "v3_z", "value_type": "real", "required": true, "summary": "Thickness direction V3 Z."}, {"name": "fiber_volume", "value_type": "real", "required": true, "summary": "Fiber-volume value assigned to each target node."}]}], "constraints": ["The target is resolved as a node set first, otherwise as a numeric node label."]},
+          {"name": "nodal", "when": "NAME is ORI or ORI-NODE", "rows": [{"name": "orientation", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "One node or an existing node set."}, {"name": "v1_x", "value_type": "real", "required": true, "summary": "Material direction V1 X."}, {"name": "v1_y", "value_type": "real", "required": true, "summary": "Material direction V1 Y."}, {"name": "v1_z", "value_type": "real", "required": true, "summary": "Material direction V1 Z."}, {"name": "v3_x", "value_type": "real", "required": true, "summary": "Thickness direction V3 X."}, {"name": "v3_y", "value_type": "real", "required": true, "summary": "Thickness direction V3 Y."}, {"name": "v3_z", "value_type": "real", "required": true, "summary": "Thickness direction V3 Z."}, {"name": "fiber_volume", "value_type": "real", "required": true, "summary": "Fiber-volume value assigned directly to each target node."}]}], "constraints": ["The target is resolved as a node set first, otherwise as a numeric node label.", "The source stores nodal V1 directly and stores cross(V3,V1) as V2 without rejecting or normalizing zero or non-orthogonal inputs; static validation therefore enforces finite width but does not invent elemental constraints for nodal mode."]},
           {"name": "elemental", "when": "NAME is ORI-ELE", "rows": [{"name": "orientation", "repetition": "repeated", "fields": [{"name": "target", "value_type": "element-label-or-element-set-name", "required": true, "summary": "One element or an existing element set."}, {"name": "v1_x", "value_type": "real", "required": true, "summary": "Material direction V1 X."}, {"name": "v1_y", "value_type": "real", "required": true, "summary": "Material direction V1 Y."}, {"name": "v1_z", "value_type": "real", "required": true, "summary": "Material direction V1 Z."}, {"name": "v3_x", "value_type": "real", "required": true, "summary": "Thickness direction V3 X."}, {"name": "v3_y", "value_type": "real", "required": true, "summary": "Thickness direction V3 Y."}, {"name": "v3_z", "value_type": "real", "required": true, "summary": "Thickness direction V3 Z."}, {"name": "fiber_volume", "value_type": "real", "required": true, "summary": "Fiber-volume value assigned to each target element."}]}], "constraints": ["V1 and V3 must be nonzero and mutually normal; the parser normalizes them and derives V2."]}
         ],
         "dependencies": ["The selected node/element or set must already exist."]

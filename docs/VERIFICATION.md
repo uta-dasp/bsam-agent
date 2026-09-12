@@ -125,6 +125,8 @@ Registry 0.107.0 verifies cluster `*LOAD`: command-line options are rejected; ea
 
 Registry 0.108.0 verifies cluster `*FIELD` input shape: VARIABLES is required once in the range 1–10; each row has one target and exactly that many finite values; target lengths and references are checked. This does not qualify execution or generation because the existing node field-state defect remains.
 
+Registry 0.109.0 verifies cluster `*ORIENTATION`: NAME selects nodal or elemental mode, rows contain one target plus six finite vector components and finite fiber volume, and targets resolve within source buffer limits. Elemental V1/V3 must be nonzero and orthogonal within the source's `1e-8` raw-dot tolerance; nodal vectors retain the source's unchecked direct/cross-product semantics.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.
