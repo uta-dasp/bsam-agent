@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.109.0",
+  "registry_version": "0.110.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2266,12 +2266,12 @@
         "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
-        "variants": [{"name": "translated-node-set-copies", "when": "always", "rows": [{"name": "copy", "repetition": "repeated", "fields": [{"name": "source_set", "value_type": "existing-node-set-name", "required": true, "summary": "Ordered nodes copied by the row."}, {"name": "copy_count", "value_type": "positive-integer", "required": true, "summary": "Number of translated copies of every source node."}, {"name": "label_offset", "value_type": "nonzero-integer", "required": true, "summary": "Added once per copy index to each source label."}, {"name": "dx", "value_type": "real", "required": true, "summary": "Translation per copy index in X."}, {"name": "dy", "value_type": "real", "required": true, "summary": "Translation per copy index in Y."}, {"name": "dz", "value_type": "real", "required": true, "summary": "Translation per copy index in Z."}]}], "constraints": ["Generated copy j has label source_label+j*label_offset and coordinates source_coordinates+j*(dx,dy,dz).", "All generated labels must be positive and globally unique."]}],
+        "variants": [{"name": "translated-node-set-copies", "when": "always", "rows": [{"name": "copy", "repetition": "repeated", "fields": [{"name": "source_set", "value_type": "existing-node-set-name", "required": true, "summary": "Ordered nodes copied by the row."}, {"name": "copy_count", "value_type": "positive-integer", "required": true, "summary": "Number of translated copies of every source node."}, {"name": "label_offset", "value_type": "nonzero-integer", "required": true, "summary": "Added once per copy index to each source label."}, {"name": "dx", "value_type": "real", "required": true, "summary": "Translation per copy index in X."}, {"name": "dy", "value_type": "real", "required": true, "summary": "Translation per copy index in Y."}, {"name": "dz", "value_type": "real", "required": true, "summary": "Translation per copy index in Z."}]}], "constraints": ["Each row has exactly six fields; source/output set names respect the 20-character source buffer; translations are finite.", "Static expansion is bounded to 100000 copies per row.", "Generated copy j has label source_label+j*label_offset and coordinates source_coordinates+j*(dx,dy,dz).", "All generated labels must be positive and globally unique."]}],
         "dependencies": ["source_set must already exist and contain at least one node.", "DIMENSIONS node_capacity and the node-label lookup allocation must cover every copy.", "NSET creates or appends generated copies when supplied; source nodes are not added."]
       }
     },

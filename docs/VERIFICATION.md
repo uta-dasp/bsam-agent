@@ -127,6 +127,8 @@ Registry 0.108.0 verifies cluster `*FIELD` input shape: VARIABLES is required on
 
 Registry 0.109.0 verifies cluster `*ORIENTATION`: NAME selects nodal or elemental mode, rows contain one target plus six finite vector components and finite fiber volume, and targets resolve within source buffer limits. Elemental V1/V3 must be nonzero and orthogonal within the source's `1e-8` raw-dot tolerance; nodal vectors retain the source's unchecked direct/cross-product semantics.
 
+Registry 0.110.0 verifies `*NCOPY`: only optional NSET targeting is accepted; rows have exactly source set, count, offset, and three finite translations; source sets must exist and contain nodes; copy expansion is bounded; offsets are nonzero; and generated labels remain positive and unique.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

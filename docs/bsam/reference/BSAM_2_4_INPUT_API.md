@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.109.0`
-- Registry SHA-256: `C3C017116727306CB97D9312E4CCF5F3B053FB658EBF43A5059B4B3ABE37C0A2`
+- Registry version: `0.110.0`
+- Registry SHA-256: `67B99A523BBC4D27B4BBED45655C4C74206DE505608C62B40B4951B7EB9C82B2`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -855,7 +855,7 @@ Copies nodes using compact copy records.
 - Dispatch prefix: `*NCOP`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-node-generation](#evidencefe-node-generation)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -867,6 +867,8 @@ Termination: next-command-or-eof. Dependencies: source_set must already exist an
 
 - **translated-node-set-copies** (always):
   - `copy` [repeated]: `source_set`:existing-node-set-name, `copy_count`:positive-integer, `label_offset`:nonzero-integer, `dx`:real, `dy`:real, `dz`:real
+  - Constraint: Each row has exactly six fields; source/output set names respect the 20-character source buffer; translations are finite.
+  - Constraint: Static expansion is bounded to 100000 copies per row.
   - Constraint: Generated copy j has label source_label+j*label_offset and coordinates source_coordinates+j*(dx,dy,dz).
   - Constraint: All generated labels must be positive and globally unique.
 

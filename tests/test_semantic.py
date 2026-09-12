@@ -1574,6 +1574,29 @@ class SemanticIndexTests(unittest.TestCase):
             )
             self.assertTrue(all(item["status"] == "resolved" for item in references))
 
+    def test_ncopy_options_rows_and_generated_labels_are_validated(self) -> None:
+        valid = b"*NCOPY,NSET=copies\nsource,2,10,1D0,0,-1\n"
+        invalid = (
+            b"*NCOPY,OTHER=x\nsource,1,10,0,0,1\n",
+            b"*NCOPY\nsource,1,10,0,0\n",
+            b"*NCOPY\nsource,0,10,0,0,1\n",
+            b"*NCOPY\nsource,100001,10,0,0,1\n",
+            b"*NCOPY\nsource,1,0,0,0,1\n",
+            b"*NCOPY\nsource,1,10,0,0,NaN\n",
+            b"*NCOPY\nmissing,1,10,0,0,1\n",
+            b"*NCOPY\nsource,1,-2,0,0,1\n",
+        )
+        prefix = b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=source\n1\n"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(prefix + valid))
+            self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, ncopy in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + ncopy))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_boundary_output_rejects_missing_and_out_of_scope_set_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

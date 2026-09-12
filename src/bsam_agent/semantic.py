@@ -3890,6 +3890,23 @@ def build_semantic_index(
             elif command in {"*NGEN", "*NCOP"} and cluster:
                 operation_name = "ngen" if command == "*NGEN" else "ncopy"
                 output_set = options.get("NSET")
+                if command == "*NCOP":
+                    ncopy_tokens = [token for token in re.split(
+                        r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                    ) if token]
+                    if not (
+                        len(ncopy_tokens) == 1
+                        or (
+                            len(ncopy_tokens) == 3
+                            and ncopy_tokens[1].casefold()[:3] == "nse"
+                            and 0 < len(ncopy_tokens[2]) <= 20
+                        )
+                    ):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message="NCOPY accepts only optional NSET=<name> targeting",
+                            line=command_line.number, source=source,
+                        ))
                 if output_set:
                     _entity(
                         index, "node-set", output_set, source, command_line, cluster,
@@ -3907,6 +3924,40 @@ def build_semantic_index(
                         if not values:
                             continue
                         source_set_key = _key("node-set", values[0], cluster)
+                        ncopy_error: str | None = None
+                        if len(values) != 6:
+                            ncopy_error = "NCOPY rows require source set, count, offset, dx, dy, and dz"
+                        elif len(values[0]) > 20:
+                            ncopy_error = "NCOPY source-set names may contain at most 20 characters"
+                        else:
+                            try:
+                                copy_count = int(values[1])
+                                label_offset = int(values[2])
+                                translations = [_fortran_real(item) for item in values[3:6]]
+                                if (
+                                    not 1 <= copy_count <= 100_000 or label_offset == 0
+                                    or not all(math.isfinite(item) for item in translations)
+                                ):
+                                    raise ValueError
+                            except ValueError:
+                                ncopy_error = (
+                                    "NCOPY requires count 1..100000, nonzero integer offset, "
+                                    "and finite translations"
+                                )
+                        source_members = _set_member_entities(index, source_set_key, "node")
+                        if ncopy_error is None and not source_members:
+                            ncopy_error = "NCOPY source set must already exist and contain nodes"
+                        if ncopy_error is None and any(
+                            int(member.name) + copy_index * label_offset <= 0
+                            for member in source_members
+                            for copy_index in range(1, copy_count + 1)
+                        ):
+                            ncopy_error = "NCOPY generated node labels must remain positive"
+                        if ncopy_error is not None:
+                            index.diagnostics.append(Diagnostic(
+                                code="BSAM-E310", severity="error", message=ncopy_error,
+                                line=line.number, source=source,
+                            ))
                         _reference(
                             index, generation, "copies-node-set",
                             source_set_key, source, line,
