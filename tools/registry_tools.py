@@ -85,15 +85,16 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         },
         "registry",
     )
-    if data["schema_version"] != "1.7.0":
+    if data["schema_version"] != "1.8.0":
         raise RegistryError("unsupported schema_version")
 
     dependency = data["dependency_contract"]
     _require_keys(
-        dependency, {"schema_version", "classes", "decision_sources"},
+        dependency,
+        {"schema_version", "classes", "reference_contracts", "decision_sources"},
         "dependency_contract",
     )
-    if dependency["schema_version"] != "1.0.0":
+    if dependency["schema_version"] != "1.1.0":
         raise RegistryError("unsupported dependency_contract schema_version")
     dependency_classes = dependency["classes"]
     for item in dependency_classes:
@@ -340,6 +341,43 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             for capability_id in item["capability_ids"]
         )
     _unique(output_keys, "additional entity output")
+    declared_entity_kinds = {
+        str(item["entity_kind"]) for _, item in records if item.get("entity_kind")
+    } | {str(item["entity_kind"]) for item in additional_outputs}
+    reference_contracts = dependency["reference_contracts"]
+    contracted_reference_kinds: list[str] = []
+    classification_by_kind = {
+        kind: str(item["id"])
+        for item in dependency_classes
+        for kind in item["reference_kinds"]
+    }
+    for item in reference_contracts:
+        _require_keys(
+            item,
+            {
+                "kinds", "classification", "source_entity_kinds",
+                "target_entity_kinds", "forward_policy", "reverse_policy",
+            },
+            "reference contract",
+        )
+        contracted_reference_kinds.extend(item["kinds"])
+        if any(
+            classification_by_kind.get(kind) != item["classification"]
+            for kind in item["kinds"]
+        ):
+            raise RegistryError("reference contract classification disagrees with dependency class")
+        unknown_entities = sorted(
+            (set(item["source_entity_kinds"]) | set(item["target_entity_kinds"]))
+            - declared_entity_kinds
+        )
+        if unknown_entities:
+            raise RegistryError(
+                "reference contract uses undeclared entity kinds: "
+                + ", ".join(unknown_entities)
+            )
+    _unique(contracted_reference_kinds, "reference contract kind")
+    if set(contracted_reference_kinds) != set(reference_kinds):
+        raise RegistryError("reference contracts must exactly cover classified reference kinds")
     generation_profiles = data["generation_profiles"]
     _unique([item["id"] for item in generation_profiles], "generation profile id")
     _unique(
@@ -452,6 +490,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "dependency_classes": len(dependency_classes),
         "primary_entity_capabilities": len(records) - len(no_primary),
         "additional_entity_outputs": len(output_keys),
+        "reference_contracts": len(reference_contracts),
         "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
             item["coverage"] in {"documented", "runtime-verified"}
@@ -539,7 +578,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -719,6 +758,20 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
             f"- Change policy: {item['change_policy']}",
             "",
         ])
+    lines.extend([
+        "Reference matrix:", "",
+        "| Kinds | Class | Source entities | Target entities | Forward policy | Reverse/change policy |",
+        "|---|---|---|---|---|---|",
+    ])
+    for item in dependency["reference_contracts"]:
+        kinds = ", ".join(f"`{value}`" for value in item["kinds"])
+        sources = ", ".join(f"`{value}`" for value in item["source_entity_kinds"])
+        targets = ", ".join(f"`{value}`" for value in item["target_entity_kinds"])
+        lines.append(
+            f"| {kinds} | `{item['classification']}` | {sources} | {targets} | "
+            f"{_escape_cell(item['forward_policy'])} | {_escape_cell(item['reverse_policy'])} |"
+        )
+    lines.append("")
     lines.extend(["Decision provenance:", ""])
     lines.extend(
         f"- `{item['id']}` (user input {'required' if item['requires_user_input'] else 'not required'}): {item['summary']}"

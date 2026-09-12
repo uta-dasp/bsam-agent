@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any, Iterable
 
 from .registry import load_registry
@@ -63,6 +64,20 @@ def dependency_class(
     if len(matches) != 1:
         raise ValueError(
             f"semantic reference kind {reference_kind!r} must have one dependency class"
+        )
+    return matches[0]
+
+
+@lru_cache(maxsize=None)
+def reference_contract(reference_kind: str) -> dict[str, Any]:
+    """Return the unique source/target contract for a semantic-reference kind."""
+    matches = [
+        item for item in load_registry()["dependency_contract"]["reference_contracts"]
+        if reference_kind in item["kinds"]
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"semantic reference kind {reference_kind!r} must have one reference contract"
         )
     return matches[0]
 

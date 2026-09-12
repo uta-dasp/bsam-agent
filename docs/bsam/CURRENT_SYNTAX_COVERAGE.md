@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.130.0` closes the semantic reference matrix. Twenty-five source/target contracts cover all 36 edge kinds across the source graph, mesh topology, sets, generated entities, sections, orientations, materials, constitutives, failures, analysis controls, loads, connections, named data, and USER functions. Runtime edge creation now fails closed when its source kind, target kind, or dependency class disagrees with the registry; conditional entity output coverage also includes implicit sets, structured-material attribution, and implicit solvers.
+
 Registry `0.129.0` closes the active entity-output inventory. All 54 active capabilities are machine-classified as producing a primary queryable entity or intentionally producing only a source-located capability record; conditional cluster, generated node/element, included source-file, structured material-parameter, and loading-change entities are registered separately. Registry validation rejects omissions, overlaps, and unknown capability ownership.
 
 Registry `0.128.0` introduces the shared dependency contract. Every emitted semantic edge is classified as a deterministic structural reference or a pinned-source BSAM semantic constraint; engineering decisions are represented separately as required choices with explicit user-approved or source-derived provenance. The semantic model now exposes this classification on each reference, and unknown reference kinds fail closed.

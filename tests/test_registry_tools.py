@@ -39,7 +39,8 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(3, counts["dependency_classes"])
         self.assertEqual(44, counts["primary_entity_capabilities"])
-        self.assertEqual(7, counts["additional_entity_outputs"])
+        self.assertEqual(13, counts["additional_entity_outputs"])
+        self.assertEqual(25, counts["reference_contracts"])
         self.assertEqual(5, counts["obsolete_tokens"])
         self.assertEqual(82, counts["evidence"])
 
@@ -64,6 +65,10 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn(("command.ngen", "node"), additional)
         self.assertIn(("command.elgen", "element"), additional)
         self.assertIn(("block.materials", "material-parameter"), additional)
+        self.assertIn(("block.materials", "structured-material"), additional)
+        self.assertIn(("command.node", "node-set"), additional)
+        self.assertIn(("command.element", "element-set"), additional)
+        self.assertIn(("construct.boundary-solver-schedule", "solver"), additional)
         self.assertIn(
             ("construct.boundary-loading-sequence", "load-change"), additional,
         )
@@ -79,6 +84,11 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(set(), structural & semantic)
         self.assertEqual(36, len(structural | semantic))
         self.assertEqual([], classes["engineering-decision"]["reference_kinds"])
+        contracts = contract["reference_contracts"]
+        contracted = {kind for item in contracts for kind in item["kinds"]}
+        self.assertEqual(structural | semantic, contracted)
+        self.assertTrue(all(item["forward_policy"] for item in contracts))
+        self.assertTrue(all(item["reverse_policy"] for item in contracts))
         sources = {
             item["id"]: item["requires_user_input"]
             for item in contract["decision_sources"]

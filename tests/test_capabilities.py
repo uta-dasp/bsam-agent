@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
-from bsam_agent.capabilities import capability_manifest, dependency_class
+from bsam_agent.capabilities import capability_manifest, dependency_class, reference_contract
 from bsam_agent.provider import ProviderConfig
 from bsam_agent.orchestrator import ChatOrchestrator, capability_applicability, relevant_tools
 from bsam_agent.source_set import SourceSet
@@ -56,8 +56,13 @@ class CapabilitySliceTests(unittest.TestCase):
         self.assertEqual(
             "bsam-semantic-constraint", dependency_class("uses-material"),
         )
+        connectivity = reference_contract("connectivity")
+        self.assertEqual(["element"], connectivity["source_entity_kinds"])
+        self.assertEqual(["node"], connectivity["target_entity_kinds"])
         with self.assertRaisesRegex(ValueError, "must have one dependency class"):
             dependency_class("unregistered-reference")
+        with self.assertRaisesRegex(ValueError, "must have one reference contract"):
+            reference_contract("unregistered-reference")
 
     def test_cluster_and_boundary_containers_are_registered_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

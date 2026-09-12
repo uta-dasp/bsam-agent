@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.7.0",
-  "registry_version": "0.129.0",
+  "schema_version": "1.8.0",
+  "registry_version": "0.130.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3804,9 +3804,39 @@
       },
       {
         "capability_ids": ["block.materials"],
+        "entity_kind": "structured-material",
+        "cardinality": "zero-or-more",
+        "condition": "Each source-bounded structured type-998 or type-999 entry creates an attribution entity in addition to its declaration-order material entity."
+      },
+      {
+        "capability_ids": ["block.materials"],
         "entity_kind": "material-parameter",
         "cardinality": "zero-or-more",
-        "condition": "A structured type-998 or type-999 parameter becomes a source-located entity when it owns a TABLES, STATISTICAL, or UFUNCTIONS reference."
+        "condition": "A material reference expression outside an attributable type-998 or type-999 group becomes a source-located fallback entity rather than being assigned a guessed material identity."
+      },
+      {
+        "capability_ids": ["command.node"],
+        "entity_kind": "node-set",
+        "cardinality": "zero-or-one",
+        "condition": "A NODE command with NSET creates one implicit-membership node-set identity in addition to its node entities."
+      },
+      {
+        "capability_ids": ["command.element"],
+        "entity_kind": "element-set",
+        "cardinality": "zero-or-one",
+        "condition": "An ELEMENT command with ELSET creates one implicit-membership element-set identity in addition to its element entities."
+      },
+      {
+        "capability_ids": ["command.ngen", "command.ncopy"],
+        "entity_kind": "node-set",
+        "cardinality": "zero-or-one",
+        "condition": "A bounded generation command with NSET creates one generated-membership node-set identity."
+      },
+      {
+        "capability_ids": ["construct.boundary-solver-schedule"],
+        "entity_kind": "solver",
+        "cardinality": "zero-or-one",
+        "condition": "A solver schedule creates the source-defined implicit default solver identity only when the SOLVER block declared none."
       },
       {
         "capability_ids": ["construct.boundary-loading-sequence"],
@@ -3817,7 +3847,7 @@
     ]
   },
   "dependency_contract": {
-    "schema_version": "1.0.0",
+    "schema_version": "1.1.0",
     "classes": [
       {
         "id": "structural-reference",
@@ -3839,6 +3869,208 @@
         "summary": "A value or policy that cannot be selected from BSAM structure or semantics and therefore is never represented as a semantic reference.",
         "reference_kinds": [],
         "change_policy": "Require an explicit user-approved value unless a registered transformation records the decision as source-derived under a verified algorithm."
+      }
+    ],
+    "reference_contracts": [
+      {
+        "kinds": ["includes-file"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["include-operation"],
+        "target_entity_kinds": ["source-file"],
+        "forward_policy": "A resolved contained INCLUDE occurrence links to its workspace-stable loaded file identity.",
+        "reverse_policy": "Moving, renaming, or deleting the target file must update every include occurrence atomically or remain blocked."
+      },
+      {
+        "kinds": ["connectivity"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["element"],
+        "target_entity_kinds": ["node"],
+        "forward_policy": "Every topology position resolves to one node in the element's cluster scope.",
+        "reverse_policy": "A referenced node cannot be deleted; node renumbering must update every connectivity position atomically."
+      },
+      {
+        "kinds": ["member-of", "contains"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["node", "element", "node-set", "element-set"],
+        "target_entity_kinds": ["node", "element", "node-set", "element-set"],
+        "forward_policy": "Explicit, implicit, and generated membership resolve within one cluster and preserve their source-defined direction.",
+        "reverse_policy": "Member or set deletion and rename must account for both edge directions and every repeated set extension."
+      },
+      {
+        "kinds": ["copies-node-set", "uses-node-endpoint", "uses-node-set-endpoint"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["node-generation"],
+        "target_entity_kinds": ["node", "node-set"],
+        "forward_policy": "NGEN and NCOPY resolve source endpoints or copy sets before deriving bounded nodes.",
+        "reverse_policy": "Source nodes and sets cannot be deleted or renamed unless the generation row and all derived dependencies are revalidated atomically."
+      },
+      {
+        "kinds": ["uses-seed-element"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["element-generation"],
+        "target_entity_kinds": ["element"],
+        "forward_policy": "ELGEN resolves one seed element before deriving shifted connectivity.",
+        "reverse_policy": "The seed element cannot be deleted or renumbered while the generation record remains."
+      },
+      {
+        "kinds": ["assigns-to"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["section"],
+        "target_entity_kinds": ["element-set"],
+        "forward_policy": "Each SECTION resolves its target element set in the active cluster.",
+        "reverse_policy": "Element-set deletion or rename must update the SECTION header atomically or remain blocked."
+      },
+      {
+        "kinds": ["targets-node", "targets-node-set"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["boundary-condition", "nodal-boundary", "nodal-load", "nodal-field", "orientation-record", "coordinate-operation"],
+        "target_entity_kinds": ["node", "node-set"],
+        "forward_policy": "Nodal controls and operations use source-defined set-first or explicit-node target resolution.",
+        "reverse_policy": "Target deletion or rename must retarget every dependent control or operation atomically; ambiguous target forms remain blocked."
+      },
+      {
+        "kinds": ["targets-element", "targets-element-set"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["orientation-record", "integration-scheme", "crack-region"],
+        "target_entity_kinds": ["element", "element-set"],
+        "forward_policy": "Element orientations, integration overrides, and crack selectors resolve in the active cluster.",
+        "reverse_policy": "Referenced elements or sets cannot be deleted or renamed without an atomic dependent update and validation."
+      },
+      {
+        "kinds": ["selects-node", "selects-node-set", "selects-element", "selects-element-set"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["selection", "output-selection"],
+        "target_entity_kinds": ["node", "node-set", "element", "element-set"],
+        "forward_policy": "Cluster SELECTION and BOUNDARY OUTPUT selectors expand exact explicit, qualified, LIST, or ALL targets.",
+        "reverse_policy": "Selected entities and sets cannot be deleted or renamed unless every selector is safely rewritten and re-expanded."
+      },
+      {
+        "kinds": ["mset", "sset"],
+        "classification": "structural-reference",
+        "source_entity_kinds": ["connection"],
+        "target_entity_kinds": ["node-set"],
+        "forward_policy": "Nodal CONNECTION master and slave selectors resolve qualified sets or bounded ALL expansions.",
+        "reverse_policy": "A participating set cannot be deleted or renamed without rebuilding and validating the connection definition."
+      },
+      {
+        "kinds": ["uses-table"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["structured-material", "material-parameter"],
+        "target_entity_kinds": ["table"],
+        "forward_policy": "Every table_ or poly_ material expression resolves the encoded preceding TABLES identity.",
+        "reverse_policy": "TABLES rename or deletion must update all material expressions atomically; grid edits must preserve registered shape and ordering."
+      },
+      {
+        "kinds": ["uses-user-function"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["structured-material", "material-parameter"],
+        "target_entity_kinds": ["user-function"],
+        "forward_policy": "Every ufunc_ material expression resolves a preceding named UFUNCTIONS entry.",
+        "reverse_policy": "Function rename or deletion must update all consuming expressions and rerun monotonicity and reference validation."
+      },
+      {
+        "kinds": ["uses-statistical-distribution"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["structured-material", "material-parameter"],
+        "target_entity_kinds": ["statistical-distribution"],
+        "forward_policy": "Every stat_ material expression resolves a preceding named STATISTICAL entry.",
+        "reverse_policy": "Distribution rename or deletion must update all material consumers and revalidate its seed dependencies."
+      },
+      {
+        "kinds": ["uses-numeric-user-function"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["constitutive", "material"],
+        "target_entity_kinds": ["numeric-user-function"],
+        "forward_policy": "Legacy material and constitutive selectors resolve declaration-order USER identities.",
+        "reverse_policy": "USER deletion or reordering must preserve every ordinal consumer or remain blocked."
+      },
+      {
+        "kinds": ["uses-material"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["material", "constitutive", "section", "connection"],
+        "target_entity_kinds": ["material"],
+        "forward_policy": "Mixtures, constitutives, sections, and connections resolve declaration-order MATERIALS identities with consumer compatibility checks.",
+        "reverse_policy": "Material deletion, reordering, or type change must preserve ordinals and revalidate every stiffness, strength, section, and connection consumer."
+      },
+      {
+        "kinds": ["uses-failure"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["constitutive", "failure", "connection"],
+        "target_entity_kinds": ["failure"],
+        "forward_policy": "Constitutive, wrapper, and connection selectors resolve declaration-order FAILURE identities without cycles.",
+        "reverse_policy": "Failure deletion, reordering, or type change must update all ordinal consumers and rerun wrapper and material-strength compatibility."
+      },
+      {
+        "kinds": ["uses-constitutive"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["constitutive", "section", "cluster-constitutive", "connection"],
+        "target_entity_kinds": ["constitutive"],
+        "forward_policy": "Wrappers, cluster assignments, CONNECTION sections, and boundary connections resolve declaration-order CONSTITUTIVE identities.",
+        "reverse_policy": "Constitutive deletion, reordering, or type change must update every consumer and revalidate material, failure, and element compatibility."
+      },
+      {
+        "kinds": ["uses-solver"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["solver-schedule"],
+        "target_entity_kinds": ["solver"],
+        "forward_policy": "A BOUNDARY solver schedule resolves the first one or two declared or implicit solver identities.",
+        "reverse_policy": "Solver deletion or reordering must preserve the scheduled ordinal range and all required current solver parameters."
+      },
+      {
+        "kinds": ["uses-cluster"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["material"],
+        "target_entity_kinds": ["cluster"],
+        "forward_policy": "COMPRO material ownership resolves its declaration-order finite-element cluster.",
+        "reverse_policy": "The owned cluster cannot be deleted or reordered without rebuilding the external-material relationship."
+      },
+      {
+        "kinds": ["uses-seed-cluster", "uses-seed-section"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["statistical-distribution"],
+        "target_entity_kinds": ["cluster", "section"],
+        "forward_policy": "Fiber-seeded statistical distributions resolve their approximation cluster and optional section window.",
+        "reverse_policy": "Seed cluster or section changes require revalidation of orientation, element coverage, and distribution indexing."
+      },
+      {
+        "kinds": ["declares-cluster", "configures-cluster"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["cluster-declaration", "cluster-dimensions"],
+        "target_entity_kinds": ["cluster"],
+        "forward_policy": "TYPE and DIMENSIONS state binds to the following named or implicit cluster identity.",
+        "reverse_policy": "Cluster rename or deletion must retain declaration binding and capacity validation across all child records."
+      },
+      {
+        "kinds": ["selects-cluster"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["cluster-selection", "output-selection"],
+        "target_entity_kinds": ["cluster"],
+        "forward_policy": "BOUNDARY CLUSTERS and data-file OUTPUT selectors resolve explicit or expanded ALL cluster identities.",
+        "reverse_policy": "Cluster rename or deletion must update and re-expand every selector while preserving active problem scope."
+      },
+      {
+        "kinds": ["targets-cluster"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["boundary-condition", "crack", "include-operation", "coordinate-operation", "topology-operation", "cluster-setting", "exclusion-region", "crack-region"],
+        "target_entity_kinds": ["cluster"],
+        "forward_policy": "Analysis controls and cluster-local operations resolve their explicit, inherited, named, or ordinal cluster target.",
+        "reverse_policy": "Cluster rename, reorder, or deletion must update all global and local targets and rerun scope and topology validation."
+      },
+      {
+        "kinds": ["terminal-cluster"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["connection"],
+        "target_entity_kinds": ["cluster"],
+        "forward_policy": "The penalty CONNECTION last record resolves each terminal slave cluster.",
+        "reverse_policy": "Terminal cluster changes require rebuilding the ordered connection chain and validating its singular shared arrays."
+      },
+      {
+        "kinds": ["changes-boundary-condition"],
+        "classification": "bsam-semantic-constraint",
+        "source_entity_kinds": ["load-change"],
+        "target_entity_kinds": ["boundary-condition"],
+        "forward_policy": "Each loading-sequence CHANGE record resolves one named boundary condition.",
+        "reverse_policy": "Boundary-condition rename or deletion must update all loading changes atomically; unresolved changes remain blocking errors."
       }
     ],
     "decision_sources": [

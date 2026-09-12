@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from .capabilities import canonical_parameter, dependency_class, match_nested_construct, nested_constructs, operational_support
+from .capabilities import canonical_parameter, dependency_class, match_nested_construct, nested_constructs, operational_support, reference_contract
 from .document import Diagnostic, SourceLine
 from .registry import load_registry
 
@@ -282,12 +282,21 @@ def _entity(index: SemanticIndex, kind: str, name: str, source: str, line: Sourc
 def _reference(index: SemanticIndex, source_entity: SemanticEntity, kind: str,
                target_key: str, source: str, line: SourceLine,
                attributes: dict[str, Any] | None = None) -> None:
+    contract = reference_contract(kind)
+    target_kind = target_key.rsplit("/", 1)[-1].split(":", 1)[0]
+    if (
+        source_entity.kind not in contract["source_entity_kinds"]
+        or target_kind not in contract["target_entity_kinds"]
+    ):
+        raise ValueError(
+            f"semantic reference {kind!r} violates its registered source/target contract"
+        )
     index.references.append(SemanticReference(
         id=index.reference_id(
             source_entity.id, kind, target_key, source, line.number,
         ),
         kind=kind,
-        classification=dependency_class(kind),
+        classification=str(contract["classification"]),
         source_entity_id=source_entity.id,
         target_key=target_key,
         location=_location(source, line),
@@ -366,13 +375,19 @@ def augment_include_graph_semantics(
                 for item in index.references
             ):
                 continue
+            contract = reference_contract("includes-file")
+            if (
+                operation.kind not in contract["source_entity_kinds"]
+                or file_entities[target].kind not in contract["target_entity_kinds"]
+            ):
+                raise ValueError("includes-file violates its registered source/target contract")
             index.references.append(SemanticReference(
                 id=index.reference_id(
                     operation.id, "includes-file", target_key,
                     operation.location.source, operation.location.line,
                 ),
                 kind="includes-file",
-                classification=dependency_class("includes-file"),
+                classification=str(contract["classification"]),
                 source_entity_id=operation.id,
                 target_key=target_key,
                 location=operation.location,

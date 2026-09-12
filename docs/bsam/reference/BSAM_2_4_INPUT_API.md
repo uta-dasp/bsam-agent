@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.129.0`
-- Registry SHA-256: `19104447F6E406AB99E62896CA72A33AF327FE399A939D1A21DC11205A41933F`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, and 44 capabilities with primary entity output
+- Registry version: `0.130.0`
+- Registry SHA-256: `430B7B9E477088A3CC062B38F29E55E3547022AFF7E4BE99FB2D4866131590D8`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -1924,7 +1924,12 @@ Additional conditional outputs:
 - `command.ngen`, `command.ncopy` -> `node` (zero-or-more): Validated bounded generation rows derive concrete node identities and coordinates in addition to the generation-operation entity.
 - `command.elgen` -> `element` (zero-or-more): Validated bounded generation rows derive concrete element identities and shifted connectivity in addition to the generation-operation entity.
 - `command.include` -> `source-file` (zero-or-one): A resolved contained include target is represented by one workspace-stable source-file entity; the root source-file entity is source-set-owned.
-- `block.materials` -> `material-parameter` (zero-or-more): A structured type-998 or type-999 parameter becomes a source-located entity when it owns a TABLES, STATISTICAL, or UFUNCTIONS reference.
+- `block.materials` -> `structured-material` (zero-or-more): Each source-bounded structured type-998 or type-999 entry creates an attribution entity in addition to its declaration-order material entity.
+- `block.materials` -> `material-parameter` (zero-or-more): A material reference expression outside an attributable type-998 or type-999 group becomes a source-located fallback entity rather than being assigned a guessed material identity.
+- `command.node` -> `node-set` (zero-or-one): A NODE command with NSET creates one implicit-membership node-set identity in addition to its node entities.
+- `command.element` -> `element-set` (zero-or-one): An ELEMENT command with ELSET creates one implicit-membership element-set identity in addition to its element entities.
+- `command.ngen`, `command.ncopy` -> `node-set` (zero-or-one): A bounded generation command with NSET creates one generated-membership node-set identity.
+- `construct.boundary-solver-schedule` -> `solver` (zero-or-one): A solver schedule creates the source-defined implicit default solver identity only when the SOLVER block declared none.
 - `construct.boundary-loading-sequence` -> `load-change` (zero-or-more): Each loading-sequence CHANGE record creates one entity referencing the named boundary condition.
 
 ## Dependency and decision contract
@@ -1952,6 +1957,36 @@ A value or policy that cannot be selected from BSAM structure or semantics and t
 - Representation: `required-choice`
 - Semantic reference kinds: none
 - Change policy: Require an explicit user-approved value unless a registered transformation records the decision as source-derived under a verified algorithm.
+
+Reference matrix:
+
+| Kinds | Class | Source entities | Target entities | Forward policy | Reverse/change policy |
+|---|---|---|---|---|---|
+| `includes-file` | `structural-reference` | `include-operation` | `source-file` | A resolved contained INCLUDE occurrence links to its workspace-stable loaded file identity. | Moving, renaming, or deleting the target file must update every include occurrence atomically or remain blocked. |
+| `connectivity` | `structural-reference` | `element` | `node` | Every topology position resolves to one node in the element's cluster scope. | A referenced node cannot be deleted; node renumbering must update every connectivity position atomically. |
+| `member-of`, `contains` | `structural-reference` | `node`, `element`, `node-set`, `element-set` | `node`, `element`, `node-set`, `element-set` | Explicit, implicit, and generated membership resolve within one cluster and preserve their source-defined direction. | Member or set deletion and rename must account for both edge directions and every repeated set extension. |
+| `copies-node-set`, `uses-node-endpoint`, `uses-node-set-endpoint` | `structural-reference` | `node-generation` | `node`, `node-set` | NGEN and NCOPY resolve source endpoints or copy sets before deriving bounded nodes. | Source nodes and sets cannot be deleted or renamed unless the generation row and all derived dependencies are revalidated atomically. |
+| `uses-seed-element` | `structural-reference` | `element-generation` | `element` | ELGEN resolves one seed element before deriving shifted connectivity. | The seed element cannot be deleted or renumbered while the generation record remains. |
+| `assigns-to` | `structural-reference` | `section` | `element-set` | Each SECTION resolves its target element set in the active cluster. | Element-set deletion or rename must update the SECTION header atomically or remain blocked. |
+| `targets-node`, `targets-node-set` | `structural-reference` | `boundary-condition`, `nodal-boundary`, `nodal-load`, `nodal-field`, `orientation-record`, `coordinate-operation` | `node`, `node-set` | Nodal controls and operations use source-defined set-first or explicit-node target resolution. | Target deletion or rename must retarget every dependent control or operation atomically; ambiguous target forms remain blocked. |
+| `targets-element`, `targets-element-set` | `structural-reference` | `orientation-record`, `integration-scheme`, `crack-region` | `element`, `element-set` | Element orientations, integration overrides, and crack selectors resolve in the active cluster. | Referenced elements or sets cannot be deleted or renamed without an atomic dependent update and validation. |
+| `selects-node`, `selects-node-set`, `selects-element`, `selects-element-set` | `structural-reference` | `selection`, `output-selection` | `node`, `node-set`, `element`, `element-set` | Cluster SELECTION and BOUNDARY OUTPUT selectors expand exact explicit, qualified, LIST, or ALL targets. | Selected entities and sets cannot be deleted or renamed unless every selector is safely rewritten and re-expanded. |
+| `mset`, `sset` | `structural-reference` | `connection` | `node-set` | Nodal CONNECTION master and slave selectors resolve qualified sets or bounded ALL expansions. | A participating set cannot be deleted or renamed without rebuilding and validating the connection definition. |
+| `uses-table` | `bsam-semantic-constraint` | `structured-material`, `material-parameter` | `table` | Every table_ or poly_ material expression resolves the encoded preceding TABLES identity. | TABLES rename or deletion must update all material expressions atomically; grid edits must preserve registered shape and ordering. |
+| `uses-user-function` | `bsam-semantic-constraint` | `structured-material`, `material-parameter` | `user-function` | Every ufunc_ material expression resolves a preceding named UFUNCTIONS entry. | Function rename or deletion must update all consuming expressions and rerun monotonicity and reference validation. |
+| `uses-statistical-distribution` | `bsam-semantic-constraint` | `structured-material`, `material-parameter` | `statistical-distribution` | Every stat_ material expression resolves a preceding named STATISTICAL entry. | Distribution rename or deletion must update all material consumers and revalidate its seed dependencies. |
+| `uses-numeric-user-function` | `bsam-semantic-constraint` | `constitutive`, `material` | `numeric-user-function` | Legacy material and constitutive selectors resolve declaration-order USER identities. | USER deletion or reordering must preserve every ordinal consumer or remain blocked. |
+| `uses-material` | `bsam-semantic-constraint` | `material`, `constitutive`, `section`, `connection` | `material` | Mixtures, constitutives, sections, and connections resolve declaration-order MATERIALS identities with consumer compatibility checks. | Material deletion, reordering, or type change must preserve ordinals and revalidate every stiffness, strength, section, and connection consumer. |
+| `uses-failure` | `bsam-semantic-constraint` | `constitutive`, `failure`, `connection` | `failure` | Constitutive, wrapper, and connection selectors resolve declaration-order FAILURE identities without cycles. | Failure deletion, reordering, or type change must update all ordinal consumers and rerun wrapper and material-strength compatibility. |
+| `uses-constitutive` | `bsam-semantic-constraint` | `constitutive`, `section`, `cluster-constitutive`, `connection` | `constitutive` | Wrappers, cluster assignments, CONNECTION sections, and boundary connections resolve declaration-order CONSTITUTIVE identities. | Constitutive deletion, reordering, or type change must update every consumer and revalidate material, failure, and element compatibility. |
+| `uses-solver` | `bsam-semantic-constraint` | `solver-schedule` | `solver` | A BOUNDARY solver schedule resolves the first one or two declared or implicit solver identities. | Solver deletion or reordering must preserve the scheduled ordinal range and all required current solver parameters. |
+| `uses-cluster` | `bsam-semantic-constraint` | `material` | `cluster` | COMPRO material ownership resolves its declaration-order finite-element cluster. | The owned cluster cannot be deleted or reordered without rebuilding the external-material relationship. |
+| `uses-seed-cluster`, `uses-seed-section` | `bsam-semantic-constraint` | `statistical-distribution` | `cluster`, `section` | Fiber-seeded statistical distributions resolve their approximation cluster and optional section window. | Seed cluster or section changes require revalidation of orientation, element coverage, and distribution indexing. |
+| `declares-cluster`, `configures-cluster` | `bsam-semantic-constraint` | `cluster-declaration`, `cluster-dimensions` | `cluster` | TYPE and DIMENSIONS state binds to the following named or implicit cluster identity. | Cluster rename or deletion must retain declaration binding and capacity validation across all child records. |
+| `selects-cluster` | `bsam-semantic-constraint` | `cluster-selection`, `output-selection` | `cluster` | BOUNDARY CLUSTERS and data-file OUTPUT selectors resolve explicit or expanded ALL cluster identities. | Cluster rename or deletion must update and re-expand every selector while preserving active problem scope. |
+| `targets-cluster` | `bsam-semantic-constraint` | `boundary-condition`, `crack`, `include-operation`, `coordinate-operation`, `topology-operation`, `cluster-setting`, `exclusion-region`, `crack-region` | `cluster` | Analysis controls and cluster-local operations resolve their explicit, inherited, named, or ordinal cluster target. | Cluster rename, reorder, or deletion must update all global and local targets and rerun scope and topology validation. |
+| `terminal-cluster` | `bsam-semantic-constraint` | `connection` | `cluster` | The penalty CONNECTION last record resolves each terminal slave cluster. | Terminal cluster changes require rebuilding the ordered connection chain and validating its singular shared arrays. |
+| `changes-boundary-condition` | `bsam-semantic-constraint` | `load-change` | `boundary-condition` | Each loading-sequence CHANGE record resolves one named boundary condition. | Boundary-condition rename or deletion must update all loading changes atomically; unresolved changes remain blocking errors. |
 
 Decision provenance:
 
