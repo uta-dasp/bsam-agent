@@ -334,6 +334,16 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual("verified", block["operations"]["static_validation"])
         self.assertIn("fewer than 250", json.dumps(block).lower())
 
+    def test_numeric_user_static_contract_is_verified(self) -> None:
+        block = next(
+            item for item in self.registry["top_level_blocks"]
+            if item["id"] == "block.user"
+        )
+        self.assertEqual("verified", block["operations"]["static_validation"])
+        self.assertIn("disabled-sentinel", {
+            item["name"] for item in block["body"]["variants"]
+        })
+
     def test_table_grid_and_interpolation_contract_is_registered(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "TABLES")
         self.assertEqual("documented", block["coverage"])
@@ -400,7 +410,7 @@ class RegistryToolsTests(unittest.TestCase):
         parameters = {item["name"]: item for item in block["parameters"]}
         self.assertEqual([1, 2, 3, 4, 5, 101, 201], parameters["type"]["allowed_values"])
         variants = {item["name"]: item for item in block["body"]["variants"]}
-        self.assertEqual(7, len(variants))
+        self.assertEqual(8, len(variants))
         self.assertIn("inline-spline-type-101", variants)
         self.assertIn("inline-curve-type-201", variants)
         blocked_external = json.dumps(variants["external-spline-type-100"]).lower()

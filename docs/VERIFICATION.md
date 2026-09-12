@@ -139,6 +139,8 @@ Registry 0.114.0 verifies cluster-local `*BOUNDARY`: FORMAT is limited to source
 
 Registry 0.115.0 verifies `*NGEN`: canonical options, finite positive bias, exact direct/paired rows, nonempty equal-size endpoint sets, progressing increments, bounded unique positive labels, and finite derived coordinates are enforced. Arc mode requires finite noncollinear geometry and one generation row because the source's double record advance makes additional rows unsafe. NGEN and NCOPY now retain derived coordinates for validated chained generation.
 
+Registry 0.121.0 verifies the optional USER block: exact termination and zero sentinel; complete finite analytic records; increasing piecewise segments; monotonic inline scalar/vector splines; traversal-free type-100 path preservation; bounded type-301 sparse-matrix structure; no unconsumed records; and preserved declaration capacity.
+
 Registry 0.120.0 verifies global CRACK declarations: exact optional-block termination; types 101, 201, and 301; bounded counts and canonical spacing; populated cluster targets; at most eight recognized options; finite, nondegenerate geometry and thresholds; exact predefined-point consumption; and fewer than 250 declarations so END CRACK remains readable.
 
 Registry 0.119.0 verifies the optional MOISTURE block while retaining unsupported execution: exact single-block termination, canonical unique key/value records, registered settings, positive step indices, bounded converter basenames, and a relative traversal-free directory.

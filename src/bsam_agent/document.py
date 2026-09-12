@@ -54,6 +54,7 @@ _DIAGNOSTIC_CLASSIFICATION: dict[str, tuple[str, str]] = {
     "BSAM-E350": ("structure", "source-defined"),
     "BSAM-E360": ("structure", "source-defined"),
     "BSAM-E370": ("structure", "source-defined"),
+    "BSAM-E380": ("bsam-semantic-constraints", "source-defined"),
     "BSAM-E390": ("structure", "source-defined"),
 }
 

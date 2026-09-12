@@ -1322,12 +1322,50 @@ def augment_numeric_user_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
     """Cursor-parse deterministic numeric USER declarations and preserve blocked forms."""
+    all_lines = tuple(lines)
     definition = next(
         item for item in load_registry()["top_level_blocks"]
         if item["id"] == "block.user"
     )
+    headers = [line for line in all_lines if line.stripped == "USER"]
+    if not headers:
+        return
+    static_verified = operational_support(definition)["static_validation"] == "verified"
+    if static_verified and len(headers) != 1:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message=f"USER must occur at most once; found {len(headers)}",
+            line=headers[0].number, source=source,
+        ))
+    block_header = headers[0]
+    header_index = all_lines.index(block_header)
+    top_level_tokens = {
+        str(item["canonical"]) for item in load_registry()["top_level_blocks"]
+    }
+    next_block = next(
+        (
+            position for position in range(header_index + 1, len(all_lines))
+            if all_lines[position].first_field in top_level_tokens
+        ),
+        len(all_lines),
+    )
+    end_index = next(
+        (
+            position for position in range(header_index + 1, next_block)
+            if all_lines[position].stripped == "END USER"
+        ),
+        None,
+    )
+    if static_verified and end_index is None:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="USER is missing its exact END USER terminator",
+            line=block_header.number, source=source,
+        ))
+    if end_index is None:
+        end_index = next_block
     body = [
-        line for line in _top_block_body(tuple(lines), "USER")
+        line for line in all_lines[header_index + 1:end_index]
         if line.stripped and not line.stripped.startswith(("#", "**"))
     ]
     cursor = 0
@@ -1346,6 +1384,14 @@ def augment_numeric_user_semantics(
             break
         function_type = int(fields[0])
         if function_type <= 0:
+            if function_type == 0 and cursor == len(body) - 1:
+                cursor += 1
+            elif static_verified:
+                _table_error(
+                    index, "BSAM-E380",
+                    "USER permits only a final exact zero disabled sentinel",
+                    source, header,
+                )
             break
         ordinal += 1
         cursor += 1
@@ -1364,6 +1410,13 @@ def augment_numeric_user_semantics(
                 file_line = body[cursor]
                 cursor += 1
                 external_file = file_line.text[:30].strip()
+                if static_verified and (
+                    not external_file or len(file_line.text.strip()) > 30
+                    or re.match(r"^(?:[A-Za-z]:|[\\/])", external_file)
+                    or re.search(r"(?:^|[\\/])\.\.(?:[\\/]|$)", external_file)
+                    or any(mark in external_file for mark in ('"', "'"))
+                ):
+                    complete = False
                 parameters["external_file"] = (
                     parameter(external_file, "external_file", file_line),
                 )
@@ -1373,6 +1426,30 @@ def augment_numeric_user_semantics(
                 })
         elif function_type == 301:
             attributes["preservation"] = "blocked-sparse-matrix"
+            if cursor + 2 >= len(body):
+                complete = False
+            else:
+                matrix_header, pointer_line, column_line = body[cursor:cursor + 3]
+                cursor += 3
+                try:
+                    n, m, coefficient_count = map(int, _record_fields(matrix_header)[:3])
+                    pointers = [int(value) for value in _record_fields(pointer_line)]
+                    columns = [int(value) for value in _record_fields(column_line)]
+                    if (
+                        n <= 0 or m <= 0 or coefficient_count < 0
+                        or coefficient_count > 100_000
+                        or len(pointers) != n + 1
+                        or pointers[0] != 0 or pointers[-1] != coefficient_count
+                        or any(right < left for left, right in zip(pointers, pointers[1:]))
+                        or len(columns) != coefficient_count
+                        or any(value < 1 or value > m for value in columns)
+                    ):
+                        raise ValueError
+                except (ValueError, TypeError):
+                    complete = False
+                else:
+                    attributes["matrix_shape"] = [n, m]
+                    attributes["coefficient_count"] = coefficient_count
         elif function_type in {1, 2, 3, 4, 5, 101, 201}:
             if cursor >= len(body):
                 complete = False
@@ -1390,6 +1467,13 @@ def augment_numeric_user_semantics(
             if count >= 0:
                 parameters["count"] = (parameter(count, "count", count_line),)
                 attributes["count"] = count
+                if (
+                    (function_type == 1 and count < 0)
+                    or (function_type in {2, 3, 4, 5} and count <= 0)
+                    or (function_type in {101, 201} and count < 2)
+                    or count > 100_000
+                ):
+                    complete = False
             row_count = count + 1 if function_type == 1 else count
             row_width = 1 if function_type == 1 else 2
             if function_type == 201:
@@ -1402,7 +1486,7 @@ def augment_numeric_user_semantics(
                     range_line = body[cursor]
                     cursor += 1
                     try:
-                        range_values = [float(value) for value in _fields(range_line.text)[:2]]
+                        range_values = [_fortran_real(value) for value in _fields(range_line.text)[:2]]
                     except ValueError:
                         range_values = []
                     if len(range_values) != 2 or not all(map(math.isfinite, range_values)):
@@ -1418,7 +1502,7 @@ def augment_numeric_user_semantics(
                     row_line = body[cursor]
                     cursor += 1
                     try:
-                        row = [float(value) for value in _fields(row_line.text)[:row_width]]
+                        row = [_fortran_real(value) for value in _fields(row_line.text)[:row_width]]
                     except ValueError:
                         row = []
                     if len(row) != row_width or not all(map(math.isfinite, row)):
@@ -1439,6 +1523,11 @@ def augment_numeric_user_semantics(
                     or all(right < left for left, right in zip(x_values, x_values[1:]))
                 )
                 if not monotonic:
+                    complete = False
+            if function_type == 5 and complete:
+                endpoints = [row[1] for row in data]
+                start = attributes["range"][0]
+                if not all(right > left for left, right in zip([start, *endpoints], endpoints)):
                     complete = False
         else:
             attributes["preservation"] = "unsupported-type"
@@ -1464,7 +1553,7 @@ def augment_numeric_user_semantics(
                 "complete": complete,
             },
         ))
-        if not complete and function_type not in {100, 301}:
+        if not complete and (static_verified or function_type not in {100, 301}):
             _table_error(
                 index, "BSAM-E380",
                 f"numeric USER function {ordinal} has an incomplete or invalid type-{function_type} body",
@@ -1473,6 +1562,24 @@ def augment_numeric_user_semantics(
             break
         if function_type == 301:
             break
+
+    if static_verified:
+        if ordinal == 0 and not (len(body) == 1 and _record_fields(body[0]) == ["0"]):
+            _table_error(
+                index, "BSAM-E380", "USER block requires a declaration or exact zero sentinel",
+                source, block_header,
+            )
+        if cursor < len(body):
+            _table_error(
+                index, "BSAM-E380", "USER block contains unconsumed or invalid records",
+                source, body[cursor],
+            )
+        if ordinal >= 10_000:
+            _table_error(
+                index, "BSAM-E380",
+                "USER block must contain fewer than 10000 declarations to preserve END USER",
+                source, block_header,
+            )
 
 
 def _solver_parameter(

@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.121.0` additionally verifies the optional USER block: exact envelope and disabled sentinel, bounded analytic coefficients, increasing piecewise segments, monotonic inline splines, traversal-free external-file preservation, bounded sparse-matrix structure, complete cursor consumption, and declaration capacity.
+
 Registry `0.120.0` additionally verifies global CRACK declarations: exact optional-block termination, active types 101/201/301, bounded leading counts and spacing, populated cluster targets, up to eight recognized option rows, finite orientation/threshold/length values, exact predefined-point consumption, and the source's declaration-capacity boundary.
 
 Registry `0.119.0` additionally verifies the optional, execution-blocked MOISTURE block: exact single-block termination, canonical unique key/value records, registered keys, positive step indices, bounded basenames, and a relative traversal-free directory.

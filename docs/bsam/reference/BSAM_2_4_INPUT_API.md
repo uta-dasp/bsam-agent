@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.120.0`
-- Registry SHA-256: `E4497F55142A26EDD0B5EB53430C31C599557F81EC2290651A4D5CC39FAC65A9`
+- Registry version: `0.121.0`
+- Registry SHA-256: `70D3FFBB9FD57041897723CD052F96DBE3B24B670A13CCE3D80EEB5713F9D928`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -86,7 +86,7 @@ Known parameters:
 
 #### `SOLVER` body
 
-Termination: next-top-level-block. Dependencies: Solver IDs are one-based declaration order.; *SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs.; A boundary schedule 2 requires a second current-format solver definition.
+Termination: END USER after a complete function record. Dependencies: Solver IDs are one-based declaration order.; *SOLVER inside BOUNDARY selects the schedule that maps nonlinear iterations to declared solver IDs.; A boundary schedule 2 requires a second current-format solver definition.
 
 - **current-pardiso** (record begins *type=pardiso or *type=cpardiso):
   - `solver-header` [once]: `*type`:enum(pardiso,cpardiso)
@@ -554,7 +554,7 @@ Defines numeric user-function records, including polynomial and discrete forms.
 - Termination: `END USER` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.user-parser](#evidenceuser-parser), [evidence.user-evaluator](#evidenceuser-evaluator), [evidence.user-spline](#evidenceuser-spline), [evidence.user-sparse-matrix](#evidenceuser-sparse-matrix), [evidence.user-active-consumer](#evidenceuser-active-consumer)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -567,6 +567,9 @@ Known parameters:
 
 Termination: next-top-level-block. Dependencies: USER function IDs are one-based declaration order and are referenced numerically by constitutive/material selection records.; At most 10,000 entries are stored.; END USER terminates the block after a complete function record; a nonpositive next type also returns.; Function and coefficient units are determined by each consumer.
 
+- **disabled-sentinel** (the block contains only type 0):
+  - `type` [once]: `type`:const(0)
+  - Constraint: Zero must be the final and only record when used; negative sentinels are rejected by static validation.
 - **polynomial-type-1** (type is 1):
   - `type` [once]: `type`:const(1)
   - `order` [once]: `order`:nonnegative-integer

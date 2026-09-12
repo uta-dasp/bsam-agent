@@ -121,6 +121,33 @@ class NumericUserCapabilityTests(unittest.TestCase):
             if item["capability_id"] == "block.user"
         ]))
 
+    def test_static_validation_rejects_incomplete_and_unsafe_numeric_functions(self) -> None:
+        invalid = {
+            "empty": b"",
+            "unsupported": b"9\n",
+            "zero-terms": b"2\n0\n",
+            "short-spline": b"101\n1\n0,0\n",
+            "nonmonotonic-spline": b"101\n3\n0,0\n1,1\n0,2\n",
+            "piecewise-order": b"5\n1\n1,0\n2,1\n",
+            "unsafe-external": b"100\n../points.dat\n",
+            "bad-sparse": b"301\n2,2,1\n0,2,1\n3\n",
+        }
+        for name, body in invalid.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "invalid.in"
+                path.write_bytes(numeric_user_deck(body))
+                diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+            self.assertTrue(any(
+                item["severity"] == "error" and item["code"] == "BSAM-E380"
+                for item in diagnostics
+            ))
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "disabled.in"
+            path.write_bytes(numeric_user_deck(b"0\n"))
+            inspection = SourceSet.read(path).inspection()
+        self.assertEqual(0, inspection["summary"]["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

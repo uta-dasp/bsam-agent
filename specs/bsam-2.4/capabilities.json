@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.120.0",
+  "registry_version": "0.121.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -775,7 +775,7 @@
       },
       "body": {
         "style": "repeated-record-groups",
-        "termination": "next-top-level-block",
+        "termination": "END USER after a complete function record",
         "variants": [
           {
             "name": "current-pardiso",
@@ -1772,12 +1772,18 @@
         "parse": "implemented", "semantic": "implemented", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "repeated-record-groups",
         "termination": "next-top-level-block",
         "variants": [
+          {
+            "name": "disabled-sentinel",
+            "when": "the block contains only type 0",
+            "rows": [{"name": "type", "repetition": "once", "fields": [{"name": "type", "value_type": "const(0)", "required": true, "summary": "Returns without defining a numeric function."}]}],
+            "constraints": ["Zero must be the final and only record when used; negative sentinels are rejected by static validation."]
+          },
           {
             "name": "polynomial-type-1",
             "when": "type is 1",
