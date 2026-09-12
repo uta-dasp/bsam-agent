@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.106.0`
-- Registry SHA-256: `229FEE8256A4AB93306D6DA603F9C2CE9BBDD4CBCE2A773B820C1CDFDA30301F`
+- Registry version: `0.107.0`
+- Registry SHA-256: `B9B4D068322A8014C8DBE40528035515E48A39DC5A2D40579C5D5A9F95CBA52A`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1023,7 +1023,7 @@ Applies cluster-local nodal loading records.
 - Dispatch prefix: `*LOAD`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-load-records](#evidencefe-load-records)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 #### `*LOAD` body
 
@@ -1031,7 +1031,8 @@ Termination: next-command-or-eof. Dependencies: Targets must refer to nodes or n
 
 - **nodal-loads** (always):
   - `load` [repeated]: `target`:node-label-or-node-set-name, `degree_of_freedom`:integer(1..3), `value`:real
-  - Constraint: Rows are comma-delimited.
+  - Constraint: Rows are comma-delimited and contain exactly three fields with a finite value.
+  - Constraint: No command-line options are accepted, and node-set targets are bounded by the source's 20-character lookup buffer.
   - Constraint: Later rows targeting the same node and degree of freedom replace earlier values rather than accumulate.
   - Constraint: A missing numeric node target stops the program; Agent validation also rejects missing node-set targets instead of relying on numeric fallback failure.
 

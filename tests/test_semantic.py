@@ -482,6 +482,27 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual(3, sum(item["kind"] == "targets-node-set" for item in references))
             self.assertTrue(all(item["status"] == "resolved" for item in references))
 
+    def test_cluster_load_rows_and_values_are_validated(self) -> None:
+        valid = b"*LOAD\nedge,1,1D-3\n1,3,-2\n"
+        invalid = (
+            b"*LOAD,OTHER\nedge,1,1\n",
+            b"*LOAD\nedge,1\n",
+            b"*LOAD\nedge,0,1\n",
+            b"*LOAD\nedge,4,1\n",
+            b"*LOAD\nedge,1,NaN\n",
+            b"*LOAD\nthis_node_set_name_is_too_long,1,1\n",
+        )
+        prefix = b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(prefix + valid))
+            self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, load in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + load))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_missing_cluster_boundary_and_load_targets_are_errors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

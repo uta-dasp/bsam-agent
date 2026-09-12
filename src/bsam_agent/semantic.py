@@ -4190,11 +4190,38 @@ def build_semantic_index(
                         {"format": format_name},
                     )
             elif command == "*LOAD" and cluster:
+                load_tokens = [token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token]
+                if len(load_tokens) != 1:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="LOAD does not accept command-line options",
+                        line=command_line.number, source=source,
+                    ))
                 for line in records:
                     values = _fields(line.text)
                     if not values:
                         continue
                     target = values[0]
+                    load_error: str | None = None
+                    if len(values) != 3:
+                        load_error = "LOAD rows require exactly target, degree of freedom, and value"
+                    elif len(target) > 20 and not target.lstrip("+").isdigit():
+                        load_error = "LOAD node-set targets may contain at most 20 characters"
+                    else:
+                        try:
+                            degree = int(values[1])
+                            magnitude = _fortran_real(values[2])
+                            if degree not in {1, 2, 3} or not math.isfinite(magnitude):
+                                raise ValueError
+                        except ValueError:
+                            load_error = "LOAD requires degree of freedom 1..3 and a finite real value"
+                    if load_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=load_error,
+                            line=line.number, source=source,
+                        ))
                     load = _entity(
                         index, "nodal-load", f"{source}:{line.number}", source,
                         line, cluster, {"target": target},

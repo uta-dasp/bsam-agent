@@ -121,6 +121,8 @@ Registry 0.105.0 verifies cluster `*SHIFT` and `*SCALE`: omission or ALL targets
 
 Registry 0.106.0 verifies cluster `*EXCLUSION`: BOX, PLANE, and PREVIOUS shape flags are mutually exclusive; INSIDE and OUTSIDE are mutually exclusive and invalid with PREVIOUS; each variant has exact finite-real width and safe geometric domains.
 
+Registry 0.107.0 verifies cluster `*LOAD`: command-line options are rejected; each row contains exactly a node/node-set target, DOF 1–3, and finite real value; node-set names respect the source lookup buffer; and target references must resolve.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

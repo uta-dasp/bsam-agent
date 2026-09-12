@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.107.0` additionally verifies cluster `*LOAD` as option-free repeated three-field rows with DOF 1–3, finite values, source-bounded set names, and resolved node or node-set targets.
+
 Registry `0.106.0` additionally verifies cluster `*EXCLUSION` shape/side exclusivity, exact BOX/PLANE/PREVIOUS record widths, finite geometry, ordered box bounds, nonzero plane normals, nonnegative bands, and positive prior-crack diameter.
 
 Registry `0.105.0` additionally verifies cluster `*SHIFT` and `*SCALE` ALL/NSET targeting, source buffer limits, exactly one three-finite-real vector, and nonzero scale factors.

@@ -104,6 +104,7 @@ class RegistryToolsTests(unittest.TestCase):
         load_text = json.dumps(commands["*LOAD"]).lower()
         self.assertIn("integer(1..3)", load_text)
         self.assertIn("replace earlier values", load_text)
+        self.assertEqual("verified", commands["*LOAD"]["operations"]["static_validation"])
         spacing = {item["name"]: item for item in commands["*SPACING"]["parameters"]}
         self.assertEqual(["STRICT", "VALUE", "RELAXED"], spacing["mode"]["allowed_values"])
         self.assertEqual("STRICT", spacing["mode"]["default"])
