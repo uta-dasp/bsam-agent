@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.125.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; remaining specification work concerns material compatibility, shared edit contracts, and engineering-decision boundaries.
+Status: in progress. Registry `0.126.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; the active solid material/constitutive/element compatibility map is enforced. Remaining specification work concerns structured-material creation contracts, shared edit contracts, and engineering-decision boundaries.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -196,6 +196,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Validate `*DIMENSIONS` cardinality, nonnegative capacities, declaration order, uniqueness, and node/element/selection/section allocation bounds.
 - [x] Validate explicit node/element headers, exact finite rows, topology widths, fixed lookup-label limits, duplicate labels, and DIMENSIONS capacity overruns.
 - [x] Validate explicit, generated-range, and coordinate-box node/element sets, including headers, bounded expansion, resolved members, and duplicate-membership policy.
+- [x] Validate material compatibility across direct constitutives, solid cluster assignments, and direct or CONNECTION section layers for every active solid element family.
 - [x] Validate cluster `*TYPE`, `*NAME`, and `*CONSTITUTIVE` cardinality, ordering, values, uniqueness, reserved names, and declaration-order references.
 - [x] Validate command-only cluster `*STOP` records and cluster termination/reachability boundaries.
 - [x] Validate optional/default BOUNDARY `*NAME` records, token limits, reserved names, and case-insensitive cross-problem uniqueness.

@@ -38,7 +38,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(1, counts["generation_profiles"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(77, counts["evidence"])
+        self.assertEqual(79, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -431,6 +431,8 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("replace the entire type-specific body atomically", contract)
         self.assertIn("eight rows per element", contract)
         self.assertIn("blocks creation until a runtime-verified", contract)
+        self.assertIn("types 15, 300, 500, and 998", contract)
+        self.assertIn("b3d10 input alias normalized to c3d10", contract)
 
     def test_numeric_user_function_variants_are_bounded(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "USER")

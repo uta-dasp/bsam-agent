@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.125.0`
-- Registry SHA-256: `DF8DD61F7CEF9A6C7CE08050AE8EC026CC19B5DB64E36A3D3E7AB582CBC1DDCC`
+- Registry version: `0.126.0`
+- Registry SHA-256: `EA9A5149858CD33C5EE86F79EFB5B4CCCA87ACFB30A1181891AB51F802309BAD`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -373,7 +373,7 @@ Defines bulk and interface material records, including current structured materi
 - Required: yes
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
 - Coverage: partially-documented
-- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.user-active-consumer](#evidenceuser-active-consumer), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.material-solid-stiffness](#evidencematerial-solid-stiffness), [evidence.material-interface-strength](#evidencematerial-interface-strength), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.user-active-consumer](#evidenceuser-active-consumer), [evidence.constitutive-fe-consumer](#evidenceconstitutive-fe-consumer), [evidence.fe-element-types](#evidencefe-element-types), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
 - Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
@@ -387,11 +387,10 @@ Known parameters:
 Remaining specification work:
 
 - Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.
-- Map material-type compatibility to each constitutive and element family.
 
 #### `MATERIALS` body
 
-Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
+Termination: next-top-level-block. Dependencies: Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.; Direct CONSTITUTIVE types 1-8 and 10 pass the same material reference to active consumers; their distinctions select orientation behavior rather than a different material storage family. Parsed constitutive wrappers remain unavailable for solid assignment.; C3D8, Y3D8, X3D8, C3D4, and C3D10, including the B3D10 input alias normalized to C3D10, use the solid constitutive/stiffness path. LC3D8 uses that path per layer, with SECTION CONNECTION entries selecting layer constitutives and otherwise retaining the cluster constitutive.; Solid assignments accept material types 1-7, 10-12, 40-41, 50, 100-106, 200, 210, 800, and 999 because MAT_STF_INIT implements those branches.; Material types 15, 300, 500, and 998 have no active solid-stiffness branch and are rejected from cluster constitutive and SECTION solid assignments. Type 998 is instead an interface-strength material consumed by surface/MIC failure paths; type 300 delegates strength interpolation only, and types 15 and 500 have no active stiffness consumer.; CONSTITUTIVE type 8 is intended for COMPRO material type 800, but the source does not enforce that pairing; the Agent records the intent without inventing a hard constraint.; table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.; stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.; ufunc_<name> requires a preceding UFUNCTIONS entry.; Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.; Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.; COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order.
 
 - **structured-bulk-type-999** (the entry header is numeric type 999):
   - `parameter` [repeated]: `key=value`:one-or-more-structured-bulk-keys paired with one-or-more values
@@ -2126,6 +2125,10 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.material-structured-bulk` — source: `source/libbsam/material.f90:162-632` — Parses structured bulk-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, polynomial-table, and user-function parameter forms.
 <a id="evidencematerial-structured-interface"></a>
 - `evidence.material-structured-interface` — source: `source/libbsam/interface_material.f90:123-464` — Parses structured interface-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, and user-function parameter forms.
+<a id="evidencematerial-solid-stiffness"></a>
+- `evidence.material-solid-stiffness` — source: `source/libbsam/mat_stiffness.f90:92-1074` — Dispatches the active solid-element stiffness initializer for material types 1-7, 10-12, 40-41, 50, 100-106, 200, 210, 800, and 999; parsed types 15, 300, 500, and 998 have no solid-stiffness branch.
+<a id="evidencematerial-interface-strength"></a>
+- `evidence.material-interface-strength` — source: `source/libbsam/mat_strng.f90:114-241` — Maps structured interface material type 998 into penalty, tolerance, friction, strength, toughness, and fatigue values for interface failure consumers.
 <a id="evidencefailure-parser"></a>
 - `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-339` — Locates optional FAILURE and parses every accepted no-data, degradation-table, wrapper, CFV, and LARC04 criterion record, including interface types 34, 35, and 36.
 <a id="evidencefailure-storage"></a>

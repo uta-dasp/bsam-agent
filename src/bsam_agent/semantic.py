@@ -2950,6 +2950,15 @@ _FAILURE_NO_DATA_TYPES = {
 _FAILURE_SINGLE_REFERENCE_TYPES = {22, 23, 25, 29, 30}
 
 
+# MAT_STF_INIT has explicit solid-stiffness branches for exactly these active
+# material declarations. Types 15, 300, 500, and 998 are parsed, but do not
+# provide a stiffness branch for the solid-element constitutive path.
+_SOLID_STIFFNESS_MATERIAL_TYPES = frozenset({
+    1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 40, 41, 50,
+    100, 101, 102, 103, 104, 105, 106, 200, 210, 800, 999,
+})
+
+
 def augment_failure_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
@@ -4065,6 +4074,78 @@ def augment_direct_constitutive_references(
                 index, entity, "uses-failure", _key("failure", str(failure_id), None),
                 source, line,
             )
+
+
+def validate_material_compatibility_semantics(index: SemanticIndex) -> None:
+    """Reject material declarations without a solid-stiffness consumer branch."""
+    entities = {item.id: item for item in index.entities}
+    outgoing: dict[str, list[SemanticReference]] = {}
+    for reference in index.references:
+        outgoing.setdefault(reference.source_entity_id, []).append(reference)
+
+    def resolved_target(reference: SemanticReference) -> SemanticEntity | None:
+        if reference.status != "resolved" or len(reference.target_entity_ids) != 1:
+            return None
+        return entities.get(reference.target_entity_ids[0])
+
+    def material_for_constitutive(
+        constitutive: SemanticEntity,
+    ) -> SemanticEntity | None:
+        material_references = [
+            item for item in outgoing.get(constitutive.id, ())
+            if item.kind == "uses-material"
+        ]
+        if len(material_references) != 1:
+            return None
+        return resolved_target(material_references[0])
+
+    consumers: list[tuple[SemanticEntity, SemanticReference, SemanticEntity]] = []
+    for consumer in index.entities:
+        references = outgoing.get(consumer.id, ())
+        if consumer.kind == "cluster-constitutive":
+            constitutive_references = [
+                item for item in references if item.kind == "uses-constitutive"
+            ]
+            if len(constitutive_references) != 1:
+                continue
+            constitutive = resolved_target(constitutive_references[0])
+            if constitutive is None:
+                continue
+            material = material_for_constitutive(constitutive)
+            if material is not None:
+                consumers.append((consumer, constitutive_references[0], material))
+        elif consumer.kind == "section":
+            reference_kind = (
+                "uses-constitutive"
+                if consumer.attributes.get("connection") else "uses-material"
+            )
+            for reference in references:
+                if reference.kind != reference_kind:
+                    continue
+                target = resolved_target(reference)
+                if target is None:
+                    continue
+                material = (
+                    material_for_constitutive(target)
+                    if reference_kind == "uses-constitutive" else target
+                )
+                if material is not None:
+                    consumers.append((consumer, reference, material))
+
+    for consumer, reference, material in consumers:
+        material_type = material.attributes.get("type")
+        if material_type in _SOLID_STIFFNESS_MATERIAL_TYPES:
+            continue
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E380",
+            severity="error",
+            message=(
+                f"{consumer.kind} solid assignment resolves MATERIALS type "
+                f"{material_type}, which has no active solid-stiffness branch"
+            ),
+            line=reference.location.line,
+            source=reference.location.source,
+        ))
 
 
 def augment_root_semantics(

@@ -14,6 +14,7 @@ from .semantic import (
     augment_include_graph_semantics,
     augment_root_semantics,
     build_semantic_index,
+    validate_material_compatibility_semantics,
 )
 
 
@@ -330,6 +331,7 @@ class SourceSet:
             root_document = SourceDocument.from_bytes(replacements[self.root], str(self.root))
         augment_root_semantics(index, "<root>", root_document.lines)
         index.resolve()
+        validate_material_compatibility_semantics(index)
         return index
 
     def inspection(self) -> dict[str, Any]:

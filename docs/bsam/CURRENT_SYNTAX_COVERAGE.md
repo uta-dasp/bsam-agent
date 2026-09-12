@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.126.0` maps the active material/constitutive/element compatibility boundary. Direct constitutive types 1-8 and 10 route the same material identity into the solid path; C3D8, Y3D8, X3D8, C3D4, C3D10/B3D10, and layered LC3D8 assignments require a material with an active stiffness branch. Parsed types 15, 300, 500, and structured interface type 998 are rejected from solid cluster and section assignments; type 998 remains available to interface failure consumers.
+
 Registry `0.125.0` closes the CLUSTERS reverse-dependency gap: explicit, generated-range, and coordinate-box membership edges now join connectivity, selection, orientation, integration, boundary/load/field, coordinate-operation, NGEN/NCOPY, ELGEN, section, and crack-region dependencies in guarded node/element/set deletion checks.
 
 Registry `0.124.0` closes NSET/ELSET membership validation: canonical headers and mutually exclusive modes, source-bounded names and labels, exact records with source-compatible empty sets, progressing generated ranges capped at 100000 members, finite ordered coordinate boxes, resolved explicit/generated members, derived box membership, and duplicate-member rejection across repeated explicit declarations.

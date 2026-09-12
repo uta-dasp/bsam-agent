@@ -29,6 +29,62 @@ def material_deck() -> bytes:
 
 
 class StructuredMaterialCapabilityTests(unittest.TestCase):
+    def test_solid_assignments_reject_materials_without_stiffness_branches(self) -> None:
+        material_bodies = {
+            15: "15\n1 2 3\n0.1 0.2\n1\n1\n1\n",
+            300: "300\n1\n1 0.5\n0.5\n",
+            500: "500\n1 1\n1 0.5\n",
+            998: "998\nK=1\n*end\n",
+        }
+        for material_type, material_body in material_bodies.items():
+            with self.subTest(material_type=material_type), tempfile.TemporaryDirectory() as directory:
+                raw = (
+                    "INPUT\n3\nEND INPUT\n"
+                    "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+                    "CONSTITUTIVE\n1\n1 1 0\nEND CONSTITUTIVE\n"
+                    "FAILURE\n4\nEND FAILURE\n"
+                    f"MATERIALS\n{material_body}END MATERIALS\n"
+                    "USER\n1\n0\n1\nEND USER\n"
+                    "CLUSTERS\n*type\nsolid\n*NAME\nply1\n"
+                    "*CONSTITUTIVE\n1\n*STOP\nEND CLUSTERS\n"
+                ).encode("latin-1")
+                path = Path(directory) / "invalid.in"
+                path.write_bytes(raw)
+                inspection = SourceSet.read(path).inspection()
+
+            compatibility = [
+                item for item in inspection["diagnostics"]
+                if item["code"] == "BSAM-E380"
+            ]
+            self.assertEqual(1, len(compatibility))
+            self.assertIn(f"type {material_type}", compatibility[0]["message"])
+            self.assertEqual(
+                "bsam-semantic-constraints", compatibility[0]["level"],
+            )
+
+    def test_structured_bulk_and_j2_materials_are_solid_compatible(self) -> None:
+        for material_type, material_body in (
+            (999, "999\nE=1\n*end\n"),
+            (50, "50\nE=1\nNU=0.3\nY0=1\n*end\n"),
+        ):
+            with self.subTest(material_type=material_type), tempfile.TemporaryDirectory() as directory:
+                raw = (
+                    "INPUT\n3\nEND INPUT\n"
+                    "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+                    "CONSTITUTIVE\n1\n1 1 0\nEND CONSTITUTIVE\n"
+                    "FAILURE\n4\nEND FAILURE\n"
+                    f"MATERIALS\n{material_body}END MATERIALS\n"
+                    "CLUSTERS\n*type\nsolid\n*NAME\nply1\n"
+                    "*CONSTITUTIVE\n1\n*STOP\nEND CLUSTERS\n"
+                ).encode("latin-1")
+                path = Path(directory) / "valid.in"
+                path.write_bytes(raw)
+                inspection = SourceSet.read(path).inspection()
+
+            self.assertNotIn(
+                "BSAM-E380", {item["code"] for item in inspection["diagnostics"]},
+            )
+
     def test_orthotropic_nonlinear_shear_resolves_numeric_users(self) -> None:
         properties = (
             "1 2 3\n1 2 3\n1\n0.1 1 2 3\n0.1\n0.1\n"

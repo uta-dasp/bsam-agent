@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.125.0",
+  "registry_version": "0.126.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -451,6 +451,22 @@
       "line_start": 123,
       "line_end": 464,
       "claim": "Parses structured interface-material key/value rows, dispatches every implemented key, and resolves constant, table, statistical, and user-function parameter forms."
+    },
+    {
+      "id": "evidence.material-solid-stiffness",
+      "kind": "source",
+      "locator": "source/libbsam/mat_stiffness.f90",
+      "line_start": 92,
+      "line_end": 1074,
+      "claim": "Dispatches the active solid-element stiffness initializer for material types 1-7, 10-12, 40-41, 50, 100-106, 200, 210, 800, and 999; parsed types 15, 300, 500, and 998 have no solid-stiffness branch."
+    },
+    {
+      "id": "evidence.material-interface-strength",
+      "kind": "source",
+      "locator": "source/libbsam/mat_strng.f90",
+      "line_start": 114,
+      "line_end": 241,
+      "claim": "Maps structured interface material type 998 into penalty, tolerance, friction, strength, toughness, and fatigue values for interface failure consumers."
     },
     {
       "id": "evidence.failure-parser",
@@ -1430,7 +1446,7 @@
           "summary": "Material-parameter values may be constants or table_<name>, stat_<name>_<initial>, ufunc_<name>, a combined table/stat expression, and for bulk material parameters poly_<table-name>... ."
         }
       ],
-      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.user-active-consumer", "evidence.current-vtms-deck-tric"],
+      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.material-solid-stiffness", "evidence.material-interface-strength", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.user-active-consumer", "evidence.constitutive-fe-consumer", "evidence.fe-element-types", "evidence.current-vtms-deck-tric"],
       "operations": {
         "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
@@ -1585,11 +1601,10 @@
             "constraints": ["The cluster must already exist and contain finite elements.", "The external file must contain exactly eight rows per element in current element order.", "Type 800 mutates element orientations, swaps integration points 3/4 and 7/8, and validates nonzero orientation vectors; generation and editing remain blocked until an atomic multi-file plan and an executable-verified COMPRO fixture exist."]
           }
         ],
-        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
+        "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "Direct CONSTITUTIVE types 1-8 and 10 pass the same material reference to active consumers; their distinctions select orientation behavior rather than a different material storage family. Parsed constitutive wrappers remain unavailable for solid assignment.", "C3D8, Y3D8, X3D8, C3D4, and C3D10, including the B3D10 input alias normalized to C3D10, use the solid constitutive/stiffness path. LC3D8 uses that path per layer, with SECTION CONNECTION entries selecting layer constitutives and otherwise retaining the cluster constitutive.", "Solid assignments accept material types 1-7, 10-12, 40-41, 50, 100-106, 200, 210, 800, and 999 because MAT_STF_INIT implements those branches.", "Material types 15, 300, 500, and 998 have no active solid-stiffness branch and are rejected from cluster constitutive and SECTION solid assignments. Type 998 is instead an interface-strength material consumed by surface/MIC failure paths; type 300 delegates strength interpolation only, and types 15 and 500 have no active stiffness consumer.", "CONSTITUTIVE type 8 is intended for COMPRO material type 800, but the source does not enforce that pairing; the Agent records the intent without inventing a hard constraint.", "table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
       },
       "remaining_work": [
-        "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.",
-        "Map material-type compatibility to each constitutive and element family."
+        "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation."
       ]
     },
     {
