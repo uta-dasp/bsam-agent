@@ -4856,16 +4856,48 @@ def build_semantic_index(
                 continue
 
             if command == "*NODE":
+                node_tokens = [token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token]
                 nset = options.get("NSET")
+                if not (
+                    len(node_tokens) == 1
+                    or (
+                        len(node_tokens) == 3
+                        and node_tokens[1].upper() == "NSET"
+                        and 0 < len(node_tokens[2]) <= 20
+                    )
+                ):
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="NODE accepts only optional NSET=<name> with at most 20 characters",
+                        line=command_line.number, source=source,
+                    ))
                 if nset:
                     _entity(index, "node-set", nset, source, command_line, cluster, {
                         "definition": "implicit-command-membership",
                     })
                 for line in records:
-                    values = _fields(line.text)
-                    if len(values) < 4 or not values[0].isdigit():
+                    values = _record_fields(line)
+                    try:
+                        label = int(values[0])
+                        coordinates = [_fortran_real(value) for value in values[1:4]]
+                        if (
+                            len(values) != 4 or not 1 <= label <= 999_999
+                            or not all(math.isfinite(value) for value in coordinates)
+                        ):
+                            raise ValueError
+                    except (IndexError, ValueError):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=(
+                                "NODE rows require a label from 1 through 999999 and "
+                                "exactly three finite coordinates"
+                            ),
+                            line=line.number, source=source,
+                        ))
                         continue
-                    node = _entity(index, "node", values[0], source, line, cluster, {
+                    node = _entity(index, "node", str(label), source, line, cluster, {
                         "coordinates": values[1:4],
                     })
                     if nset:
@@ -4873,24 +4905,59 @@ def build_semantic_index(
 
             elif command == "*ELEM":
                 elset = options.get("ELSET")
-                element_type = options.get("TYPE")
+                element_type = str(options.get("TYPE") or "").upper()
+                element_widths = {
+                    "C3D8": 8, "Y3D8": 8, "X3D8": 8, "LC3D8": 8,
+                    "C3D4": 4, "C3D10": 10, "B3D10": 10,
+                }
+                element_header_error: str | None = None
+                if set(options) - {"TYPE", "ELSET"}:
+                    element_header_error = "ELEMENT accepts only TYPE and optional ELSET"
+                elif element_type not in element_widths:
+                    element_header_error = "ELEMENT requires a registered TYPE"
+                elif elset is not None and not 0 < len(elset) <= 20:
+                    element_header_error = "ELEMENT ELSET names may contain at most 20 characters"
+                if element_header_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=element_header_error,
+                        line=command_line.number, source=source,
+                    ))
                 if elset:
                     _entity(index, "element-set", elset, source, command_line, cluster, {
                         "definition": "implicit-command-membership",
                     })
                 for line in records:
-                    values = _fields(line.text)
-                    if len(values) < 2 or not values[0].isdigit():
+                    values = _record_fields(line)
+                    expected = element_widths.get(element_type)
+                    try:
+                        label = int(values[0])
+                        connectivity = [int(value) for value in values[1:]]
+                        if (
+                            expected is None or len(connectivity) != expected
+                            or not 1 <= label <= 999_999
+                            or any(value <= 0 or value > 999_999 for value in connectivity)
+                        ):
+                            raise ValueError
+                    except (IndexError, ValueError):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=(
+                                "ELEMENT rows require a label from 1 through 999999 and "
+                                "the registered TYPE connectivity width of positive labels"
+                            ),
+                            line=line.number, source=source,
+                        ))
                         continue
-                    element = _entity(index, "element", values[0], source, line, cluster, {
+                    element = _entity(index, "element", str(label), source, line, cluster, {
                         "element_type": element_type,
-                        "connectivity": values[1:],
+                        "connectivity": [str(value) for value in connectivity],
                     })
-                    for position, label in enumerate(values[1:], start=1):
-                        if label.isdigit():
-                            _reference(index, element, "connectivity", _key("node", label, cluster), source, line, {
-                                "position": position,
-                            })
+                    for position, node_label in enumerate(connectivity, start=1):
+                        _reference(
+                            index, element, "connectivity",
+                            _key("node", str(node_label), cluster), source, line,
+                            {"position": position},
+                        )
                     if elset:
                         _reference(index, element, "member-of", _key("element-set", elset, cluster), source, line)
 

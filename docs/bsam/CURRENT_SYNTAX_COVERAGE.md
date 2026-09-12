@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.123.0` closes the explicit mesh-record limits: NODE and ELEMENT accept only registered headers, enforce exact finite row shapes, topology-specific connectivity widths, positive labels within the source's fixed 999999 lookup bound, duplicate-label diagnostics, resolved connectivity, and DIMENSIONS node/element capacity checks.
+
 Registry `0.122.0` additionally verifies the required MATERIALS block: exact single-block termination, all 28 active numeric dispatches and the named type-50 header, source-bounded declaration capacity, complete per-type cursor consumption, structured key/value dispatch, legacy row types and widths, finite numeric values, source-defined ranges, order-sensitive options, and traversal-free external paths. Static validation is now verified for all 54 active constructs.
 
 Registry `0.121.0` additionally verifies the optional USER block: exact envelope and disabled sentinel, bounded analytic coefficients, increasing piecewise segments, monotonic inline splines, traversal-free external-file preservation, bounded sparse-matrix structure, complete cursor consumption, and declaration capacity.

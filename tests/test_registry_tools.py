@@ -352,6 +352,12 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual("verified", block["operations"]["static_validation"])
         self.assertEqual(28, len(block["parameters"][0]["allowed_values"]) - 1)
 
+    def test_explicit_mesh_record_limits_are_closed(self) -> None:
+        commands = {item["id"]: item for item in self.registry["cluster_commands"]}
+        for capability in ("command.node", "command.element"):
+            self.assertEqual([], commands[capability]["remaining_work"])
+            self.assertIn("999999", json.dumps(commands[capability]))
+
     def test_table_grid_and_interpolation_contract_is_registered(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "TABLES")
         self.assertEqual("documented", block["coverage"])

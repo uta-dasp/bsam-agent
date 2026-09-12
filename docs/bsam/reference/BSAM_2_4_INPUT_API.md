@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.122.0`
-- Registry SHA-256: `13DCB0479A6230F39FE1EE1DBE7E2C3750E0E88E9CCF1EEF722D1956324FAD58`
+- Registry version: `0.123.0`
+- Registry SHA-256: `D092A9CD6CA5F0495D4B3829894E20C61A85D37A39A0410D92B108F565518EC6`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -808,10 +808,6 @@ Known parameters:
 
 - `NSET` (node-set-name, optional): Creates or appends the listed nodes to the named node set.
 
-Remaining specification work:
-
-- Confirm duplicate-label and capacity-overrun diagnostics.
-
 #### `*NODE` body
 
 Termination: next-command-or-eof. Dependencies: DIMENSIONS node_capacity must be large enough.; NSET creates or appends membership when supplied on the command line.
@@ -819,6 +815,8 @@ Termination: next-command-or-eof. Dependencies: DIMENSIONS node_capacity must be
 - **explicit-nodes** (always):
   - `node` [repeated]: `node_label`:positive-integer, `x`:real, `y`:real, `z`:real
   - Constraint: Comment and blank lines are ignored; the next non-comment line beginning with * ends the command.
+  - Constraint: Labels are limited to 1 through 999999 by the fixed source lookup array and must be unique within a cluster.
+  - Constraint: Rows contain exactly one label and three finite coordinates; DIMENSIONS node_capacity must cover the resulting node count.
 
 ### `*NGEN`
 
@@ -898,10 +896,6 @@ Known parameters:
 - `TYPE` (enum, required) (allowed: `C3D8`, `Y3D8`, `X3D8`, `LC3D8`, `C3D4`, `C3D10`, `B3D10`): Selects the element topology; B3D10 is internally mapped to C3D10 with a Bernstein flag.
 - `ELSET` (element-set-name, optional): Creates or appends elements to the named element set.
 
-Remaining specification work:
-
-- Confirm duplicate-label and capacity-overrun diagnostics.
-
 #### `*ELEMENT` body
 
 Termination: next-command-or-eof. Dependencies: TYPE is required.; Referenced nodes must already exist.; DIMENSIONS element_capacity must be large enough.
@@ -910,7 +904,8 @@ Termination: next-command-or-eof. Dependencies: TYPE is required.; Referenced no
   - `element` [repeated]: `element_label`:positive-integer, `node_labels`:integer-list(element-type-width)
   - Constraint: C3D8, Y3D8, X3D8, and LC3D8 require 8 connectivity labels; C3D4 requires 4; C3D10 and B3D10 require 10.
   - Constraint: Every connectivity node label must resolve to a node before BUILD or STOP.
-  - Constraint: Element labels must be positive and unique; Agent validation rejects duplicates before the source lookup is overwritten.
+  - Constraint: Element and connectivity labels are limited to 1 through 999999 by the fixed source lookup arrays; element labels must be unique within a cluster.
+  - Constraint: DIMENSIONS element_capacity must cover the resulting element count.
 
 ### `*ELGEN`
 

@@ -547,6 +547,49 @@ class SemanticIndexTests(unittest.TestCase):
         ]
         self.assertEqual(4, len(capacity_messages))
 
+    def test_explicit_node_and_element_contracts_fail_closed(self) -> None:
+        invalid_commands = (
+            b"*NODE,OTHER=value\n1,0,0,0\n",
+            b"*NODE\n0,0,0,0\n",
+            b"*NODE\n1000000,0,0,0\n",
+            b"*NODE\n1,NaN,0,0\n",
+            b"*ELEMENT\n1,1,1,1,1\n",
+            b"*ELEMENT,TYPE=C3D4\n0,1,1,1,1\n",
+            b"*ELEMENT,TYPE=C3D4\n1,1,1,1\n",
+            b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1000000\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for ordinal, command in enumerate(invalid_commands):
+                with self.subTest(ordinal=ordinal):
+                    root = Path(directory) / f"invalid-{ordinal}.in"
+                    root.write_bytes(deck(b"*NAME\nply1\n" + command))
+                    diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
+            duplicate = Path(directory) / "duplicate.in"
+            duplicate.write_bytes(deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n1,1,0,0\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n1,1,1,1,1\n"
+            ))
+            duplicate_codes = {
+                item["code"] for item in SourceSet.read(duplicate).inspection()["diagnostics"]
+            }
+            self.assertIn("BSAM-E300", duplicate_codes)
+
+            capacity = Path(directory) / "capacity.in"
+            capacity.write_bytes(deck(
+                b"*NAME\nply1\n*DIMENSIONS\n1,0,0,0\n"
+                b"*NODE\n1,0,0,0\n2,1,0,0\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,1,1,1\n"
+            ))
+            messages = [
+                item["message"]
+                for item in SourceSet.read(capacity).inspection()["diagnostics"]
+                if item["code"] == "BSAM-E310" and "capacity" in item["message"]
+            ]
+            self.assertTrue(any("node capacity" in message for message in messages))
+            self.assertTrue(any("element capacity" in message for message in messages))
+
     def test_include_entities_use_workspace_independent_source_labels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)

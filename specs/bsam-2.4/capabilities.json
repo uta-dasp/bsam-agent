@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.122.0",
+  "registry_version": "0.123.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2191,7 +2191,7 @@
         }
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
-      "remaining_work": ["Confirm duplicate-label and capacity-overrun diagnostics."],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "verified", "delete": "verified",
@@ -2210,7 +2210,7 @@
             {"name": "y", "value_type": "real", "required": true, "summary": "Global Y coordinate."},
             {"name": "z", "value_type": "real", "required": true, "summary": "Global Z coordinate."}
           ]}],
-          "constraints": ["Comment and blank lines are ignored; the next non-comment line beginning with * ends the command."]
+          "constraints": ["Comment and blank lines are ignored; the next non-comment line beginning with * ends the command.", "Labels are limited to 1 through 999999 by the fixed source lookup array and must be unique within a cluster.", "Rows contain exactly one label and three finite coordinates; DIMENSIONS node_capacity must cover the resulting node count."]
         }],
         "dependencies": ["DIMENSIONS node_capacity must be large enough.", "NSET creates or appends membership when supplied on the command line."]
       }
@@ -2321,7 +2321,7 @@
         }
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records", "evidence.fe-element-generation", "evidence.fe-element-types"],
-      "remaining_work": ["Confirm duplicate-label and capacity-overrun diagnostics."],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "verified", "delete": "verified",
@@ -2338,7 +2338,7 @@
             {"name": "element_label", "value_type": "positive-integer", "required": true, "summary": "External element label."},
             {"name": "node_labels", "value_type": "integer-list(element-type-width)", "required": true, "summary": "Connectivity labels; count is selected by TYPE."}
           ]}],
-          "constraints": ["C3D8, Y3D8, X3D8, and LC3D8 require 8 connectivity labels; C3D4 requires 4; C3D10 and B3D10 require 10.", "Every connectivity node label must resolve to a node before BUILD or STOP.", "Element labels must be positive and unique; Agent validation rejects duplicates before the source lookup is overwritten."]
+          "constraints": ["C3D8, Y3D8, X3D8, and LC3D8 require 8 connectivity labels; C3D4 requires 4; C3D10 and B3D10 require 10.", "Every connectivity node label must resolve to a node before BUILD or STOP.", "Element and connectivity labels are limited to 1 through 999999 by the fixed source lookup arrays; element labels must be unique within a cluster.", "DIMENSIONS element_capacity must cover the resulting element count."]
         }],
         "dependencies": ["TYPE is required.", "Referenced nodes must already exist.", "DIMENSIONS element_capacity must be large enough."]
       }
