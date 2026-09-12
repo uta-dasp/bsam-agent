@@ -38,7 +38,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(1, counts["generation_profiles"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(79, counts["evidence"])
+        self.assertEqual(82, counts["evidence"])
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]
@@ -406,7 +406,8 @@ class RegistryToolsTests(unittest.TestCase):
 
     def test_material_types_and_structured_grammars_are_registered(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "MATERIALS")
-        self.assertEqual("partially-documented", block["coverage"])
+        self.assertEqual("documented", block["coverage"])
+        self.assertEqual([], block["remaining_work"])
         parameters = {item["name"]: item for item in block["parameters"]}
         numeric_types = [value for value in parameters["type"]["allowed_values"] if isinstance(value, int)]
         self.assertEqual(28, len(numeric_types))
@@ -433,6 +434,11 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("blocks creation until a runtime-verified", contract)
         self.assertIn("types 15, 300, 500, and 998", contract)
         self.assertIn("b3d10 input alias normalized to c3d10", contract)
+        self.assertIn("stress-per-length", contract)
+        self.assertIn("mass-per-volume", contract)
+        self.assertIn("return huge", contract)
+        self.assertIn("as ply thickness", contract)
+        self.assertIn("rho/density", contract)
 
     def test_numeric_user_function_variants_are_bounded(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "USER")

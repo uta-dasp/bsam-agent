@@ -85,6 +85,23 @@ class StructuredMaterialCapabilityTests(unittest.TestCase):
                 "BSAM-E380", {item["code"] for item in inspection["diagnostics"]},
             )
 
+    def test_structured_j2_accepts_mass_density_aliases(self) -> None:
+        for density in ("rho=7.8", "density=7.8"):
+            with self.subTest(density=density), tempfile.TemporaryDirectory() as directory:
+                raw = (
+                    "INPUT\n3\nEND INPUT\n"
+                    "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+                    "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+                    "MATERIALS\n50\nE=1\nNU=0.3\nY0=1\n"
+                    f"{density}\n*end\nEND MATERIALS\n"
+                    "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+                ).encode("latin-1")
+                path = Path(directory) / "valid.in"
+                path.write_bytes(raw)
+                diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+
+            self.assertNotIn("BSAM-E350", {item["code"] for item in diagnostics})
+
     def test_orthotropic_nonlinear_shear_resolves_numeric_users(self) -> None:
         properties = (
             "1 2 3\n1 2 3\n1\n0.1 1 2 3\n0.1\n0.1\n"

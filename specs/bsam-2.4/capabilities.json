@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.126.0",
+  "registry_version": "0.127.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -467,6 +467,30 @@
       "line_start": 114,
       "line_end": 241,
       "claim": "Maps structured interface material type 998 into penalty, tolerance, friction, strength, toughness, and fatigue values for interface failure consumers."
+    },
+    {
+      "id": "evidence.material-missing-value-policy",
+      "kind": "source",
+      "locator": "source/libbsam/material.f90",
+      "line_start": 643,
+      "line_end": 1079,
+      "claim": "Returns HUGE for absent polymorphic bulk/J2 parameters, except for explicitly coded scalar and eta defaults, and exposes the stiffness, strength, toughness, density, thermal, swelling, load-vector, fatigue, and J2 accessors consumed downstream."
+    },
+    {
+      "id": "evidence.interface-material-missing-value-policy",
+      "kind": "source",
+      "locator": "source/libbsam/interface_material.f90",
+      "line_start": 470,
+      "line_end": 660,
+      "claim": "Returns HUGE for absent interface parameters while defining only friction=0, initval=1e12, and eta1/eta2=2.225 as accessor defaults."
+    },
+    {
+      "id": "evidence.j2-material-consumer",
+      "kind": "source",
+      "locator": "source/libbsam/mat_stiffness.f90",
+      "line_start": 348,
+      "line_end": 405,
+      "claim": "Unconditionally reads E, nu, Y0, Yinf, beta, isotropic hardening, and kinematic hardening for material type 50 and rejects near-zero E or nu before constructing isotropic stiffness."
     },
     {
       "id": "evidence.failure-parser",
@@ -1410,7 +1434,7 @@
         "tokens": ["*end for structured material entries", "END MATERIALS"],
         "certainty": "accepted-current"
       },
-      "coverage": "partially-documented",
+      "coverage": "documented",
       "parameters": [
         {
           "name": "type",
@@ -1446,7 +1470,7 @@
           "summary": "Material-parameter values may be constants or table_<name>, stat_<name>_<initial>, ufunc_<name>, a combined table/stat expression, and for bulk material parameters poly_<table-name>... ."
         }
       ],
-      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.material-solid-stiffness", "evidence.material-interface-strength", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.user-active-consumer", "evidence.constitutive-fe-consumer", "evidence.fe-element-types", "evidence.current-vtms-deck-tric"],
+      "evidence_ids": ["evidence.material-parser", "evidence.material-structured-bulk", "evidence.material-structured-interface", "evidence.material-solid-stiffness", "evidence.material-interface-strength", "evidence.material-missing-value-policy", "evidence.interface-material-missing-value-policy", "evidence.j2-material-consumer", "evidence.table-material-reference", "evidence.ufunction-interface-material-reference", "evidence.user-active-consumer", "evidence.constitutive-fe-consumer", "evidence.fe-element-types", "evidence.current-vtms-deck-tric"],
       "operations": {
         "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
@@ -1464,7 +1488,7 @@
               {"name": "parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "one-or-more-structured-bulk-keys paired with one-or-more values", "required": false, "summary": "Assigns bulk properties; canonical generation emits one key/value assignment per line."}]},
               {"name": "material-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-lowercase-sentinel", "required": true, "summary": "Terminates this structured material entry."}]}
             ],
-            "constraints": ["The initializer lowercases and normalizes commas and whitespace before parsing.", "Every assignment line must contain exactly one equals sign.", "Unknown keys warn and then stop in the active dispatch; canonical generation uses only registered keys.", "The advertised load_vector keyword has no dispatch case and is blocked from generation."]
+            "constraints": ["The initializer lowercases and normalizes commas and whitespace before parsing.", "Every assignment line must contain exactly one equals sign.", "Unknown keys warn and then stop in the active dispatch; canonical generation uses only registered keys.", "The advertised load_vector keyword has no dispatch case and is blocked from generation.", "A solid type-999 creation profile must explicitly provide E11, E22, E33, G13, G23, G12, nu13, nu23, nu12, Xt, Xc, Yt, Yc, S13, S23, one of S or S12, Gxt, Gxc, Fxt, Fxc, Fgt, Fgc, one of rho or density, and a11, a22, and a33; absent polymorphic properties return HUGE rather than usable engineering defaults.", "Elastic moduli and strengths use stress units; Gxt and Gxc use energy-per-area; nu and F coefficients are dimensionless; thermal alpha values use inverse-temperature; rho/density uses mass-per-volume. The parser performs no unit conversion, so every value must use one consistent deck unit system.", "b11-b33, lv1-lv6, S-N, thermal/moisture, and CDM data are conditional on the selected analysis and failure consumers and require an explicit verified creation profile.", "The active source uses density as mass density in the C3D8 mass path but also as ply thickness in a damage characteristic-length path; structured type-999 creation remains unsupported until that engineering ambiguity is resolved for a selected profile."]
           },
           {
             "name": "structured-interface-type-998",
@@ -1473,16 +1497,16 @@
               {"name": "parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "one-or-more-structured-interface-keys paired with one-or-more values", "required": false, "summary": "Assigns interface properties; canonical generation emits one key/value assignment per line."}]},
               {"name": "material-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-lowercase-sentinel", "required": true, "summary": "Terminates this structured interface entry."}]}
             ],
-            "constraints": ["The initializer lowercases and normalizes commas and whitespace before parsing.", "Every assignment line must contain exactly one equals sign.", "The init alias is dispatched but omitted from the initializer's accepted-key check and therefore warns; canonical generation uses initval.", "Unknown keys warn and then stop in the active dispatch."]
+            "constraints": ["The initializer lowercases and normalizes commas and whitespace before parsing.", "Every assignment line must contain exactly one equals sign.", "The init alias is dispatched but omitted from the initializer's accepted-key check and therefore warns; canonical generation uses initval.", "Unknown keys warn and then stop in the active dispatch.", "A base interface creation profile must explicitly provide one of K, penalty, or penalty_stiffness; one of tol or tolerance; Yt; Yc; S; one of GIc or G1c; and one of GIIc or G11c. Mode-III toughness is conditional on its consumer. Other absent interface parameters return HUGE.", "Penalty stiffness uses stress-per-length; tolerance and initval use length; strengths and S-N values use stress; critical energy-release rates use energy-per-area; friction, tangent, Davila, and eta parameters are dimensionless; rel_t uses time. Paris-law C dimensions depend on its exponent and the deck unit system.", "Friction=0, initval=1e12, and eta1/eta2=2.225 are source accessor defaults, but creation may not silently choose them; fatigue, temperature, amplitude, and release controls require an explicit verified profile."]
           },
           {
             "name": "structured-j2-type-50",
             "when": "the entry header is numeric type 50 or type=mises",
             "rows": [
-              {"name": "plasticity-parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "enum(e,nu,y0,yinf,pbeta,hiso,hkin)=real-or-reference-expression", "required": false, "summary": "Assigns isotropic elasticity and J2 hardening properties through the bulk structured-material initializer."}]},
+              {"name": "plasticity-parameter", "repetition": "repeated", "fields": [{"name": "key=value", "value_type": "enum(e,nu,y0,yinf,pbeta,hiso,hkin,rho,density)=real-or-reference-expression", "required": false, "summary": "Assigns isotropic elasticity, J2 hardening, and mass-density properties through the bulk structured-material initializer."}]},
               {"name": "material-end", "repetition": "once", "fields": [{"name": "*end", "value_type": "exact-lowercase-sentinel", "required": true, "summary": "Terminates this J2 material entry."}]}
             ],
-            "constraints": ["The named header parser recognizes only type=mises or type=50 and an optional name pair.", "Canonical generation restricts type 50 to the seven J2 keys even though the shared class dispatcher exposes other bulk keys."]
+            "constraints": ["The named header parser recognizes only type=mises or type=50 and an optional name pair.", "A type-50 creation profile must explicitly provide E, nu, Y0, Yinf, pbeta, hiso, and hkin; each is read unconditionally and an absent property returns HUGE. The C3D8 mass path additionally requires one of rho or density.", "E, Y0, Yinf, hiso, and hkin use stress units; nu and pbeta are dimensionless; rho/density uses mass-per-volume. The parser performs no unit conversion, so every value must use one consistent deck unit system.", "Canonical generation is restricted to the seven J2 constitutive keys plus rho/density; unrelated keys exposed by the shared bulk dispatcher remain blocked."]
           },
           {
             "name": "legacy-orthotropic-family",
@@ -1603,9 +1627,7 @@
         ],
         "dependencies": ["Material IDs are one-based declaration order and are referenced by CONSTITUTIVE records.", "Direct CONSTITUTIVE types 1-8 and 10 pass the same material reference to active consumers; their distinctions select orientation behavior rather than a different material storage family. Parsed constitutive wrappers remain unavailable for solid assignment.", "C3D8, Y3D8, X3D8, C3D4, and C3D10, including the B3D10 input alias normalized to C3D10, use the solid constitutive/stiffness path. LC3D8 uses that path per layer, with SECTION CONNECTION entries selecting layer constitutives and otherwise retaining the cluster constitutive.", "Solid assignments accept material types 1-7, 10-12, 40-41, 50, 100-106, 200, 210, 800, and 999 because MAT_STF_INIT implements those branches.", "Material types 15, 300, 500, and 998 have no active solid-stiffness branch and are rejected from cluster constitutive and SECTION solid assignments. Type 998 is instead an interface-strength material consumed by surface/MIC failure paths; type 300 delegates strength interpolation only, and types 15 and 500 have no active stiffness consumer.", "CONSTITUTIVE type 8 is intended for COMPRO material type 800, but the source does not enforce that pairing; the Agent records the intent without inventing a hard constraint.", "table_<name> and every underscore-separated name after poly_ require preceding TABLES entries with matching normalized names.", "stat_<name>_<initial> requires a preceding STATISTICAL entry; when combined with a table, the table supplies the initial lookup.", "ufunc_<name> requires a preceding UFUNCTIONS entry.", "Orthotropic nonlinear-shear uf= selectors resolve to declaration-order USER functions.", "Changing a material type must revalidate every constitutive consumer and replace the entire type-specific body atomically.", "COMPRO type 800 cluster_id resolves against one-based CLUSTERS declaration order."]
       },
-      "remaining_work": [
-        "Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation."
-      ]
+      "remaining_work": []
     },
     {
       "id": "block.failure",

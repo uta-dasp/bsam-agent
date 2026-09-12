@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.126.0`
-- Registry SHA-256: `EA9A5149858CD33C5EE86F79EFB5B4CCCA87ACFB30A1181891AB51F802309BAD`
+- Registry version: `0.127.0`
+- Registry SHA-256: `6CE57D6B74E96CC697BD4C3ADA7EA94FE92F9C7586622FB51936F16CE3CDAF03`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -27,7 +27,7 @@ Coverage labels describe specification work, not parser availability. `identifie
 | `CONSTITUTIVE` | yes | exact-case-sensitive | `CON_INI` | documented | Defines constitutive law records that reference material and failure definitions. |
 | `TABLES` | no | exact-case-sensitive | `TABLE_INI / table initializer` | documented | Defines named lookup tables used by material data. |
 | `STATISTICAL` | no | exact-case-sensitive | `STAT_DIST_INI / statistical distribution initializer` | documented | Defines named statistical distributions that modify material data. |
-| `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | partially-documented | Defines bulk and interface material records, including current structured material forms. |
+| `MATERIALS` | yes | exact-case-sensitive | `MAT_INI / material initializers` | documented | Defines bulk and interface material records, including current structured material forms. |
 | `FAILURE` | no | exact-case-sensitive | `FAI_INI` | documented | Defines failure criterion records referenced by constitutive laws and damage behavior. |
 | `USER` | no | exact-case-sensitive | `USF_INI` | documented | Defines numeric user-function records, including polynomial and discrete forms. |
 | `CRACK` | no | exact-case-sensitive | `CRK_INI` | documented | Defines global finite-element crack insertion controls for crack types 101, 201, and 301. |
@@ -372,8 +372,8 @@ Defines bulk and interface material records, including current structured materi
 - Lookup token/matcher: `MATERIALS` / exact-case-sensitive
 - Required: yes
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
-- Coverage: partially-documented
-- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.material-solid-stiffness](#evidencematerial-solid-stiffness), [evidence.material-interface-strength](#evidencematerial-interface-strength), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.user-active-consumer](#evidenceuser-active-consumer), [evidence.constitutive-fe-consumer](#evidenceconstitutive-fe-consumer), [evidence.fe-element-types](#evidencefe-element-types), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
+- Coverage: documented
+- Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.material-solid-stiffness](#evidencematerial-solid-stiffness), [evidence.material-interface-strength](#evidencematerial-interface-strength), [evidence.material-missing-value-policy](#evidencematerial-missing-value-policy), [evidence.interface-material-missing-value-policy](#evidenceinterface-material-missing-value-policy), [evidence.j2-material-consumer](#evidencej2-material-consumer), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.user-active-consumer](#evidenceuser-active-consumer), [evidence.constitutive-fe-consumer](#evidenceconstitutive-fe-consumer), [evidence.fe-element-types](#evidencefe-element-types), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
 - Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
@@ -383,10 +383,6 @@ Known parameters:
 - `structured_bulk_key` (enum, optional) (allowed: `e11`, `e22`, `e33`, `g13`, `g23`, `g12`, `nu13`, `nu23`, `nu12`, `xt`, `xc`, `yt`, `yc`, `s`, `s13`, `s12`, `s23`, `fxt`, `fxc`, `fgt`, `fgc`, `gxt`, `gxc`, `rho`, `density`, `a11`, `a22`, `a33`, `b11`, `b22`, `b33`, `lv1`, `lv2`, `lv3`, `lv4`, `lv5`, `lv6`, `s1`, `s2`, `eta1`, `*fiber`, `*max_crack_angle`, `cure_temp`, `tcure`, `amp`, `test_temp`, `*cdm`, `e`, `nu`, `y0`, `yinf`, `pbeta`, `hiso`, `hkin`): Implemented lowercase keys for structured bulk type 999 and the shared type-50 initializer; density and tcure are aliases.
 - `structured_interface_key` (enum, optional) (allowed: `k`, `penalty`, `penalty_stiffness`, `tol`, `tolerance`, `fric`, `friction`, `initval`, `yt`, `yc`, `s`, `gic`, `g1c`, `giic`, `g11c`, `giiic`, `g111c`, `s1`, `s2`, `eta1`, `m1`, `m2`, `c1`, `c2`, `eta2`, `cure_temp`, `tcure`, `amp`, `test_temp`, `davila`, `tangent`, `rel_t`): Implemented canonical keys and aliases for structured interface type 998.
 - `structured_parameter_value` (real-or-reference-expression, optional): Material-parameter values may be constants or table_<name>, stat_<name>_<initial>, ufunc_<name>, a combined table/stat expression, and for bulk material parameters poly_<table-name>... .
-
-Remaining specification work:
-
-- Validate required-property sets and physical units for structured types 50, 998, and 999 before enabling material creation.
 
 #### `MATERIALS` body
 
@@ -399,6 +395,10 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - Constraint: Every assignment line must contain exactly one equals sign.
   - Constraint: Unknown keys warn and then stop in the active dispatch; canonical generation uses only registered keys.
   - Constraint: The advertised load_vector keyword has no dispatch case and is blocked from generation.
+  - Constraint: A solid type-999 creation profile must explicitly provide E11, E22, E33, G13, G23, G12, nu13, nu23, nu12, Xt, Xc, Yt, Yc, S13, S23, one of S or S12, Gxt, Gxc, Fxt, Fxc, Fgt, Fgc, one of rho or density, and a11, a22, and a33; absent polymorphic properties return HUGE rather than usable engineering defaults.
+  - Constraint: Elastic moduli and strengths use stress units; Gxt and Gxc use energy-per-area; nu and F coefficients are dimensionless; thermal alpha values use inverse-temperature; rho/density uses mass-per-volume. The parser performs no unit conversion, so every value must use one consistent deck unit system.
+  - Constraint: b11-b33, lv1-lv6, S-N, thermal/moisture, and CDM data are conditional on the selected analysis and failure consumers and require an explicit verified creation profile.
+  - Constraint: The active source uses density as mass density in the C3D8 mass path but also as ply thickness in a damage characteristic-length path; structured type-999 creation remains unsupported until that engineering ambiguity is resolved for a selected profile.
 - **structured-interface-type-998** (the entry header is numeric type 998):
   - `parameter` [repeated]: `key=value`:one-or-more-structured-interface-keys paired with one-or-more values
   - `material-end` [once]: `*end`:exact-lowercase-sentinel
@@ -406,11 +406,16 @@ Termination: next-top-level-block. Dependencies: Material IDs are one-based decl
   - Constraint: Every assignment line must contain exactly one equals sign.
   - Constraint: The init alias is dispatched but omitted from the initializer's accepted-key check and therefore warns; canonical generation uses initval.
   - Constraint: Unknown keys warn and then stop in the active dispatch.
+  - Constraint: A base interface creation profile must explicitly provide one of K, penalty, or penalty_stiffness; one of tol or tolerance; Yt; Yc; S; one of GIc or G1c; and one of GIIc or G11c. Mode-III toughness is conditional on its consumer. Other absent interface parameters return HUGE.
+  - Constraint: Penalty stiffness uses stress-per-length; tolerance and initval use length; strengths and S-N values use stress; critical energy-release rates use energy-per-area; friction, tangent, Davila, and eta parameters are dimensionless; rel_t uses time. Paris-law C dimensions depend on its exponent and the deck unit system.
+  - Constraint: Friction=0, initval=1e12, and eta1/eta2=2.225 are source accessor defaults, but creation may not silently choose them; fatigue, temperature, amplitude, and release controls require an explicit verified profile.
 - **structured-j2-type-50** (the entry header is numeric type 50 or type=mises):
-  - `plasticity-parameter` [repeated]: `key=value`:enum(e,nu,y0,yinf,pbeta,hiso,hkin)=real-or-reference-expression
+  - `plasticity-parameter` [repeated]: `key=value`:enum(e,nu,y0,yinf,pbeta,hiso,hkin,rho,density)=real-or-reference-expression
   - `material-end` [once]: `*end`:exact-lowercase-sentinel
   - Constraint: The named header parser recognizes only type=mises or type=50 and an optional name pair.
-  - Constraint: Canonical generation restricts type 50 to the seven J2 keys even though the shared class dispatcher exposes other bulk keys.
+  - Constraint: A type-50 creation profile must explicitly provide E, nu, Y0, Yinf, pbeta, hiso, and hkin; each is read unconditionally and an absent property returns HUGE. The C3D8 mass path additionally requires one of rho or density.
+  - Constraint: E, Y0, Yinf, hiso, and hkin use stress units; nu and pbeta are dimensionless; rho/density uses mass-per-volume. The parser performs no unit conversion, so every value must use one consistent deck unit system.
+  - Constraint: Canonical generation is restricted to the seven J2 constitutive keys plus rho/density; unrelated keys exposed by the shared bulk dispatcher remain blocked.
 - **legacy-orthotropic-family** (type is 1, 5, 6, 7, 100, or 101-106):
   - `feature-option` [zero-to-five-before-properties]: `option`:enum(*fiber <real>,*cfv_,*shear,*tension,*bimodular <compression-modulus> <strain-threshold>)
   - `engineering-and-strength-properties` [ordered-record-sequence]: `records`:E1-Xt-Xc; E2-Yt-Yc-[MAX_ANGLE value]; E3; nu13-GXT-FXT-FGT; nu23[-GXC-FXC-FGC for 103/104/106]; nu12; G13; G23; G12-S-S13; rho; alpha1; alpha2-or-six-type-100-values
@@ -2129,6 +2134,12 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.material-solid-stiffness` — source: `source/libbsam/mat_stiffness.f90:92-1074` — Dispatches the active solid-element stiffness initializer for material types 1-7, 10-12, 40-41, 50, 100-106, 200, 210, 800, and 999; parsed types 15, 300, 500, and 998 have no solid-stiffness branch.
 <a id="evidencematerial-interface-strength"></a>
 - `evidence.material-interface-strength` — source: `source/libbsam/mat_strng.f90:114-241` — Maps structured interface material type 998 into penalty, tolerance, friction, strength, toughness, and fatigue values for interface failure consumers.
+<a id="evidencematerial-missing-value-policy"></a>
+- `evidence.material-missing-value-policy` — source: `source/libbsam/material.f90:643-1079` — Returns HUGE for absent polymorphic bulk/J2 parameters, except for explicitly coded scalar and eta defaults, and exposes the stiffness, strength, toughness, density, thermal, swelling, load-vector, fatigue, and J2 accessors consumed downstream.
+<a id="evidenceinterface-material-missing-value-policy"></a>
+- `evidence.interface-material-missing-value-policy` — source: `source/libbsam/interface_material.f90:470-660` — Returns HUGE for absent interface parameters while defining only friction=0, initval=1e12, and eta1/eta2=2.225 as accessor defaults.
+<a id="evidencej2-material-consumer"></a>
+- `evidence.j2-material-consumer` — source: `source/libbsam/mat_stiffness.f90:348-405` — Unconditionally reads E, nu, Y0, Yinf, beta, isotropic hardening, and kinematic hardening for material type 50 and rejects near-zero E or nu before constructing isotropic stiffness.
 <a id="evidencefailure-parser"></a>
 - `evidence.failure-parser` — source: `source/libbsam/fai_ini.f90:20-339` — Locates optional FAILURE and parses every accepted no-data, degradation-table, wrapper, CFV, and LARC04 criterion record, including interface types 34, 35, and 36.
 <a id="evidencefailure-storage"></a>

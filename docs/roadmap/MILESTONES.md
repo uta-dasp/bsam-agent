@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.126.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; the active solid material/constitutive/element compatibility map is enforced. Remaining specification work concerns structured-material creation contracts, shared edit contracts, and engineering-decision boundaries.
+Status: in progress. Registry `0.127.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; grammar completion now includes structured-material consumer-required properties, dimensional units, and explicit engineering ambiguities. Remaining specification work concerns shared edit contracts and engineering-decision boundaries.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -51,10 +51,10 @@ Status: in progress. Registry `0.126.0` currently inventories 13 top-level block
 - [x] Document exact positional grammars for all 25 legacy MATERIALS types and block unsafe external/fragile paths.
 - [x] Document all 29 finite-element CLUSTERS command grammars, explicitly blocking unsafe source paths.
 - [x] Document all 12 nested BOUNDARY construct grammars, defaults, dependencies, and unsafe source paths.
-- [ ] Record exact command matching, record layouts, termination, and repetition.
-- [ ] Complete parameter types, defaults, allowed values, ranges, and units.
-- [ ] Record conditional variants and cross-parameter constraints.
-- [ ] Mark unsupported ambiguity explicitly; never infer grammar from examples alone.
+- [x] Record exact command matching, record layouts, termination, and repetition.
+- [x] Complete parameter types, defaults, allowed values, ranges, and units.
+- [x] Record conditional variants and cross-parameter constraints.
+- [x] Mark unsupported ambiguity explicitly; never infer grammar from examples alone.
 
 ### M1.3 Entity and dependency specification
 
@@ -197,6 +197,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Validate explicit node/element headers, exact finite rows, topology widths, fixed lookup-label limits, duplicate labels, and DIMENSIONS capacity overruns.
 - [x] Validate explicit, generated-range, and coordinate-box node/element sets, including headers, bounded expansion, resolved members, and duplicate-membership policy.
 - [x] Validate material compatibility across direct constitutives, solid cluster assignments, and direct or CONNECTION section layers for every active solid element family.
+- [x] Register consumer-required structured-material property groups, dimensional units, missing-value sentinels, source defaults, and fail-closed creation ambiguities.
 - [x] Validate cluster `*TYPE`, `*NAME`, and `*CONSTITUTIVE` cardinality, ordering, values, uniqueness, reserved names, and declaration-order references.
 - [x] Validate command-only cluster `*STOP` records and cluster termination/reachability boundaries.
 - [x] Validate optional/default BOUNDARY `*NAME` records, token limits, reserved names, and case-insensitive cross-problem uniqueness.

@@ -3416,7 +3416,7 @@ def _material_structured_rows_valid(
         "cure_temp", "tcure", "amp", "test_temp", "davila", "tangent", "rel_t",
     }
     allowed = (
-        {"e", "nu", "y0", "yinf", "pbeta", "hiso", "hkin"}
+        {"e", "nu", "y0", "yinf", "pbeta", "hiso", "hkin", "rho", "density"}
         if material_type == 50 else interface_keys if material_type == 998 else bulk_keys
     )
     direct_real = {
