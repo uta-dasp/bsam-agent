@@ -135,6 +135,8 @@ Registry 0.112.0 verifies `*INTEGRATION`: it accepts no options; each exact two-
 
 Registry 0.113.0 verifies `*SECTION`: canonical ELSET and bounded positive LAYERS are required, CONNECTION is an optional valueless flag, rows contain exactly finite positive thickness and a positive definition ID, thickness totals remain finite before normalization, and references select MATERIALS or CONSTITUTIVE according to CONNECTION.
 
+Registry 0.114.0 verifies cluster-local `*BOUNDARY`: FORMAT is limited to source-recognized ABAQUS, LIST, or POLYNOMIAL modes; rows have exact cardinality, finite values, valid component/coordinate indices, and resolved format-appropriate targets. Polynomial individual-node targeting is rejected because the source pauses and writes through a stale index in that branch.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

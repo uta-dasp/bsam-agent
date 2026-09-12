@@ -528,6 +528,50 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual(3, sum(item["kind"] == "targets-node-set" for item in references))
             self.assertTrue(all(item["status"] == "resolved" for item in references))
 
+    def test_cluster_boundary_formats_rows_and_safe_targets_are_validated(self) -> None:
+        valid = (
+            b"*BOUNDARY\nedge,1,3,1D-3\n+2,2,2,-1\n",
+            b"*BOUNDARY,FORMAT=LIST\n1,0,1D0,-1\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,1,2,0,3\n"
+            b"edge,3,1,2,1,0,-1\n",
+        )
+        invalid = (
+            b"*BOUNDARY,OTHER=LIST\n1,0,0,0\n",
+            b"*BOUNDARY,FORMAT\n1,0,0,0\n",
+            b"*BOUNDARY,FORMAT=ABA\n1,1,1,0\n",
+            b"*BOUNDARY\nedge 1 1 0\n",
+            b"*BOUNDARY\nedge,1,1\n",
+            b"*BOUNDARY\nedge,0,1,0\n",
+            b"*BOUNDARY\nedge,3,2,0\n",
+            b"*BOUNDARY\nedge,1,1,NaN\n",
+            b"*BOUNDARY\nthis_node_set_name_is_too_long,1,1,0\n",
+            b"*BOUNDARY,FORMAT=LIST\nedge,0,0,0\n",
+            b"*BOUNDARY,FORMAT=LIST\n0,0,0,0\n",
+            b"*BOUNDARY,FORMAT=LIST\n1,0,0\n",
+            b"*BOUNDARY,FORMAT=LIST\n1,0,0,NaN\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\n1,1,1,0,1\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nmissing,1,1,0,1\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,0,1,0,1\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,1,4,0,1\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,1,1,5,1,2,3,4,5,6\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,1,1,2,1,2\n",
+            b"*BOUNDARY,FORMAT=POLYNOMIAL\nedge,1,1,0,NaN\n",
+        )
+        prefix = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n"
+            b"*NSET,NSET=edge\n1,2\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, boundary in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(prefix + boundary))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, boundary in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + boundary))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_cluster_load_rows_and_values_are_validated(self) -> None:
         valid = b"*LOAD\nedge,1,1D-3\n1,3,-2\n"
         invalid = (

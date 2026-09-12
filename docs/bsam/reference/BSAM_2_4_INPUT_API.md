@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.113.0`
-- Registry SHA-256: `1216742445020A986790DA1EE54BAE1B598BF78BD9A9DB4B1D2D335C588EE9E1`
+- Registry version: `0.114.0`
+- Registry SHA-256: `5A0ACC96409F9450035DDF18F95344F520B5C0197B604F25599EB0DD8F89DBA8`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -997,7 +997,7 @@ Applies cluster-local boundary data using supported row formats.
 - Dispatch prefix: `*BOUN`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-boundary-records](#evidencefe-boundary-records)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1009,15 +1009,17 @@ Termination: next-command-or-eof. Dependencies: Every target must already exist 
 
 - **abaqus-style** (FORMAT is ABAQUS or omitted):
   - `constraint` [repeated]: `target`:node-label-or-node-set-name, `first_degree_of_freedom`:integer(1..3), `last_degree_of_freedom`:integer(1..3), `value`:real
-  - Constraint: Rows are comma-delimited and require first_degree_of_freedom <= last_degree_of_freedom.
+  - Constraint: The command accepts only optional canonical FORMAT with a source-recognized value of at least four characters; omission and ABAQUS both select this variant.
+  - Constraint: Rows have exactly four comma-delimited fields, finite values, positive node labels or source-buffer-bounded node-set names, and ordered degrees 1..3.
   - Constraint: Later rows replace earlier prescribed values on the same node/component.
 - **list-directed** (FORMAT is LIST):
   - `constraint` [repeated]: `node_label`:existing-node-label, `ux`:real, `uy`:real, `uz`:real
+  - Constraint: Rows contain exactly one positive existing node label and three finite displacements; node-set targets are rejected.
   - Constraint: Every row activates all three translational components.
 - **polynomial** (FORMAT is POLYNOMIAL):
   - `constraint` [repeated]: `target`:node-set-name-for-safe-generation, `degree_of_freedom`:integer(1..3), `coordinate`:integer(1..3), `order`:integer(0..4), `coefficients`:real-list(order+1)
-  - Constraint: Rows are comma-delimited.
-  - Constraint: The individual-node branch pauses and stores through the stale loop variable j rather than degree_of_freedom; Agent generation requires a node-set target until corrected.
+  - Constraint: Rows are comma-delimited and contain an existing node-set target, degree and coordinate indices 1..3, polynomial order 0..4, and exactly order+1 finite coefficients.
+  - Constraint: The individual-node branch pauses and stores through the stale loop variable j rather than degree_of_freedom; Agent static validation and generation reject individual-node targets until corrected.
 
 ### `*LOAD`
 

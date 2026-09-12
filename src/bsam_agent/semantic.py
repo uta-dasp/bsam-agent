@@ -494,7 +494,7 @@ def _registered_parameter_values(
     parameters = construct.get("parameters", [])
     if (
         len(parameters) == 1 and not found
-        and construct.get("id") != "command.tolerance"
+        and construct.get("id") not in {"command.tolerance", "command.boundary"}
     ):
         record = next((line for line in active_lines[1:] if "=" not in line.text), None)
         if record is not None:
@@ -4366,18 +4366,126 @@ def build_semantic_index(
                         _key("constitutive", str(constitutive_id), None), source, records[0],
                     )
             elif command == "*BOUN" and cluster:
-                format_name = str(options.get("FORMAT") or "ABAQUS").upper()[:4]
+                boundary_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                format_name = "ABAQ"
+                header_error: str | None = None
+                if boundary_options:
+                    if len(boundary_options) != 1 or "=" not in boundary_options[0]:
+                        header_error = (
+                            "BOUNDARY accepts only optional FORMAT=<ABAQUS|LIST|POLYNOMIAL>"
+                        )
+                    else:
+                        option_name, option_value = boundary_options[0].split("=", 1)
+                        format_name = option_value.strip().upper()[:4]
+                        if (
+                            option_name.strip().upper() != "FORMAT"
+                            or format_name not in {"ABAQ", "LIST", "POLY"}
+                            or len(option_value.strip()) < 4
+                        ):
+                            header_error = (
+                                "BOUNDARY FORMAT must begin ABAQUS, LIST, or POLYNOMIAL"
+                            )
+                if header_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=header_error,
+                        line=command_line.number, source=source,
+                    ))
                 for line in records:
-                    values = _fields(line.text)
+                    values = _record_fields(line)
                     if not values:
                         continue
                     target = values[0]
+                    reference_target = target
+                    boundary_error: str | None = None
+                    if format_name == "ABAQ":
+                        try:
+                            first_degree = int(values[1])
+                            last_degree = int(values[2])
+                            magnitude = _fortran_real(values[3])
+                            if (
+                                len(line.text.split("#", 1)[0].split(",")) != 4
+                                or len(values) != 4
+                                or not 1 <= first_degree <= last_degree <= 3
+                                or not math.isfinite(magnitude)
+                            ):
+                                raise ValueError
+                        except (IndexError, ValueError):
+                            boundary_error = (
+                                "ABAQUS BOUNDARY rows require comma-delimited target, "
+                                "ordered degrees 1..3, and one finite value"
+                            )
+                        if target.lstrip("+-").isdigit():
+                            if int(target) <= 0:
+                                boundary_error = (
+                                    "ABAQUS BOUNDARY node labels must be positive"
+                                )
+                            else:
+                                reference_target = str(int(target))
+                    elif format_name == "LIST":
+                        try:
+                            node_label = int(target)
+                            displacements = [_fortran_real(item) for item in values[1:4]]
+                            if (
+                                len(values) != 4 or node_label <= 0
+                                or not all(math.isfinite(item) for item in displacements)
+                            ):
+                                raise ValueError
+                        except (IndexError, ValueError):
+                            boundary_error = (
+                                "LIST BOUNDARY rows require a positive node label and "
+                                "three finite displacements"
+                            )
+                        else:
+                            reference_target = str(node_label)
+                    elif format_name == "POLY":
+                        try:
+                            degree = int(values[1])
+                            coordinate = int(values[2])
+                            order = int(values[3])
+                            coefficients = [
+                                _fortran_real(item) for item in values[4:]
+                            ]
+                            target_key = _key("node-set", target, cluster)
+                            if (
+                                len(line.text.split("#", 1)[0].split(",")) != len(values)
+                                or not 1 <= degree <= 3
+                                or not 1 <= coordinate <= 3
+                                or not 0 <= order <= 4
+                                or len(coefficients) != order + 1
+                                or not all(math.isfinite(item) for item in coefficients)
+                                or target.lstrip("+-").isdigit()
+                                or len(target) > 20
+                                or not any(item.key == target_key for item in index.entities)
+                            ):
+                                raise ValueError
+                        except (IndexError, ValueError):
+                            boundary_error = (
+                                "POLYNOMIAL BOUNDARY rows require an existing node set, "
+                                "degree/coordinate 1..3, order 0..4, and order+1 finite "
+                                "comma-delimited coefficients"
+                            )
+                    if (
+                        format_name == "ABAQ" and len(target) > 20
+                        and not target.lstrip("+").isdigit()
+                    ):
+                        boundary_error = (
+                            "ABAQUS BOUNDARY node-set targets may contain at most 20 characters"
+                        )
+                    if boundary_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=boundary_error,
+                            line=line.number, source=source,
+                        ))
                     boundary = _entity(
                         index, "nodal-boundary", f"{source}:{line.number}", source,
                         line, cluster, {"format": format_name, "target": target},
                     )
                     target_key, reference_kind = _cluster_nodal_target_key(
-                        index, target, cluster, node_only=format_name == "LIST",
+                        index, reference_target, cluster, node_only=format_name == "LIST",
                     )
                     _reference(
                         index, boundary, reference_kind, target_key, source, line,

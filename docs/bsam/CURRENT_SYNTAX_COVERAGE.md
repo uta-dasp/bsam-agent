@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.114.0` additionally verifies cluster-local `*BOUNDARY` FORMAT selection and exact finite ABAQUS, LIST, and POLYNOMIAL rows, including ordered component ranges, source-buffer-safe targets, polynomial cardinality, and rejection of the source's unsafe polynomial individual-node branch.
+
 Registry `0.113.0` additionally verifies `*SECTION` ELSET/LAYERS/CONNECTION headers, source-buffer-bounded layer counts, exact positive layer rows, finite normalized thicknesses, and material-or-constitutive reference selection.
 
 Registry `0.112.0` additionally verifies option-free `*INTEGRATION` headers, bounded positive point counts, exact finite point rows, uniquely resolved X3D8/Y3D8 targets, and source-defined last-header replacement semantics.
