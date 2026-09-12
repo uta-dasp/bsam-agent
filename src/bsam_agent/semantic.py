@@ -724,6 +724,110 @@ def _validate_boundary_container(
                 line=line.number, source=source,
             ))
 
+
+def _validate_moisture_block(
+    index: SemanticIndex, definition: dict[str, Any], source: str,
+    lines: tuple[SourceLine, ...],
+) -> None:
+    """Validate canonical, execution-blocked MOISTURE settings."""
+    canonical = str(definition["canonical"])
+    headers = [line for line in lines if line.stripped == canonical]
+    if len(headers) != 1:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message=f"{canonical} must occur at most once; found {len(headers)}",
+            line=headers[0].number if headers else None, source=source,
+        ))
+    if not headers:
+        return
+
+    header = headers[0]
+    header_index = lines.index(header)
+    top_level_tokens = {
+        str(item["canonical"]) for item in load_registry()["top_level_blocks"]
+    }
+    next_block = next(
+        (
+            position for position in range(header_index + 1, len(lines))
+            if lines[position].first_field in top_level_tokens
+        ),
+        len(lines),
+    )
+    end_index = next(
+        (
+            position for position in range(header_index + 1, next_block)
+            if lines[position].stripped == "END MOISTURE"
+        ),
+        None,
+    )
+    if end_index is None:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="MOISTURE is missing its exact END MOISTURE terminator",
+            line=header.number, source=source,
+        ))
+        end_index = next_block
+
+    definitions = {
+        str(item["name"]).casefold(): item for item in definition["parameters"]
+    }
+    seen: set[str] = set()
+    for line in lines[header_index + 1:end_index]:
+        text = line.text.strip()
+        if not text or text.startswith("**"):
+            continue
+        if text.count("=") != 1:
+            index.diagnostics.append(Diagnostic(
+                code="BSAM-E390", severity="error",
+                message="MOISTURE settings require one canonical key=value pair per line",
+                line=line.number, source=source, provenance="agent-policy",
+            ))
+            continue
+        raw_key, raw_value = (item.strip() for item in text.split("=", 1))
+        key = raw_key.casefold()
+        if key not in definitions:
+            index.diagnostics.append(Diagnostic(
+                code="BSAM-E390", severity="error",
+                message=f"unregistered MOISTURE setting: {raw_key or '<empty>'}",
+                line=line.number, source=source,
+            ))
+            continue
+        if key in seen:
+            index.diagnostics.append(Diagnostic(
+                code="BSAM-E390", severity="error",
+                message=f"MOISTURE setting {raw_key} may occur only once",
+                line=line.number, source=source, provenance="agent-policy",
+            ))
+        seen.add(key)
+        values = [item for item in re.split(r"[\s,]+", raw_value) if item]
+        invalid = not values
+        if key == "steps":
+            invalid = invalid or any(
+                not item.lstrip("+").isdigit() or int(item) <= 0 for item in values
+            )
+        elif key != "converter_utils":
+            invalid = invalid or len(values) != 1
+        if key in {"converter", "converter_utils"}:
+            invalid = invalid or any(
+                not re.fullmatch(r"[A-Za-z0-9_.-]+", item) for item in values
+            )
+        if key == "directory":
+            directory = raw_value.strip()
+            invalid = invalid or bool(
+                re.match(r"^(?:[A-Za-z]:|[\\/])", directory)
+                or re.search(r"(?:^|[\\/])\.\.(?:[\\/]|$)", directory)
+                or any(mark in directory for mark in ('"', "'"))
+            )
+        if invalid:
+            index.diagnostics.append(Diagnostic(
+                code="BSAM-E310", severity="error",
+                message=(
+                    f"invalid MOISTURE setting {raw_key}={raw_value!r}; expected "
+                    f"{definitions[key]['value_type']}"
+                ),
+                line=line.number, source=source,
+            ))
+
 def augment_registered_boundary_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
@@ -848,6 +952,11 @@ def augment_registered_top_level_semantics(
                 _validate_clusters_container(index, definition, source, all_lines)
             elif capability_id == "block.boundary":
                 _validate_boundary_container(index, definition, source, all_lines)
+        if (
+            capability_id == "block.moisture"
+            and operational_support(definition)["static_validation"] == "verified"
+        ):
+            _validate_moisture_block(index, definition, source, all_lines)
         if (
             is_single_record
             and operational_support(definition)["static_validation"] == "verified"

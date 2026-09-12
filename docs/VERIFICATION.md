@@ -139,6 +139,8 @@ Registry 0.114.0 verifies cluster-local `*BOUNDARY`: FORMAT is limited to source
 
 Registry 0.115.0 verifies `*NGEN`: canonical options, finite positive bias, exact direct/paired rows, nonempty equal-size endpoint sets, progressing increments, bounded unique positive labels, and finite derived coordinates are enforced. Arc mode requires finite noncollinear geometry and one generation row because the source's double record advance makes additional rows unsafe. NGEN and NCOPY now retain derived coordinates for validated chained generation.
 
+Registry 0.119.0 verifies the optional MOISTURE block while retaining unsupported execution: exact single-block termination, canonical unique key/value records, registered settings, positive step indices, bounded converter basenames, and a relative traversal-free directory.
+
 Registry 0.118.0 verifies the required BOUNDARY container around its 12 validated constructs: one exact block and terminator, at least one explicit `*TYPE` problem boundary, and registered nested dispatch only. The source-readable implicit first problem type is rejected under explicit-boundary Agent policy.
 
 Registry 0.117.0 verifies the required CLUSTERS container around the fully validated FE command stream: one exact current block, at least one `*TYPE`-started cluster, registered command dispatch across root and include streams, every cluster closed by `*STOP`, and an exact current or registered compatibility terminator. Generic mesh import rejects neutral Abaqus `*SURFACE` records because BSAM has no active matching cluster dispatch.

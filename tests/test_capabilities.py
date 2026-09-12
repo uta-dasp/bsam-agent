@@ -103,6 +103,27 @@ class CapabilitySliceTests(unittest.TestCase):
         self.assertEqual("unsupported", record["operations"]["execute"])
         self.assertEqual("blocked", workflow["attributes"]["execution"])
 
+    def test_moisture_static_validation_rejects_unsafe_or_ambiguous_settings(self) -> None:
+        base = boundary_deck(b"d_reduction=0.5\n")
+        invalid_blocks = {
+            "missing-end": b"MOISTURE\nprogram=mdsim\n",
+            "unknown": b"MOISTURE\nother=value\nEND MOISTURE\n",
+            "malformed": b"MOISTURE\nprogram mdsim\nEND MOISTURE\n",
+            "duplicate": b"MOISTURE\nprogram=one\nprogram=two\nEND MOISTURE\n",
+            "bad-steps": b"MOISTURE\nsteps=1,0\nEND MOISTURE\n",
+            "unsafe-directory": b"MOISTURE\ndirectory=../external\nEND MOISTURE\n",
+        }
+        for name, block in invalid_blocks.items():
+            raw = base.replace(b"CLUSTERS\n", block + b"CLUSTERS\n", 1)
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "model.in"
+                path.write_bytes(raw)
+                diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+            self.assertTrue(any(
+                item["severity"] == "error" and item["code"] in {"BSAM-E310", "BSAM-E390"}
+                for item in diagnostics
+            ))
+
     def test_input_format_is_a_registered_source_located_record(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "model.in"

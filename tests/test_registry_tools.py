@@ -324,6 +324,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("blocked by default", contract)
         self.assertIn("mdsim.conf", contract)
         self.assertIn("disables moisture rather than stopping", contract)
+        self.assertEqual("verified", block["operations"]["static_validation"])
 
     def test_table_grid_and_interpolation_contract_is_registered(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "TABLES")

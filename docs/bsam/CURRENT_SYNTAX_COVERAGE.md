@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.119.0` additionally verifies the optional, execution-blocked MOISTURE block: exact single-block termination, canonical unique key/value records, registered keys, positive step indices, bounded basenames, and a relative traversal-free directory.
+
 Registry `0.118.0` additionally verifies the required BOUNDARY container: one exact block and terminator, at least one explicit `*TYPE` problem boundary, and registered nested dispatch only. The source's implicit first problem-type record remains parseable but fails closed under deterministic Agent policy because it cannot establish an explicit typed problem boundary.
 
 Registry `0.117.0` additionally verifies the required CLUSTERS container: one exact current block, at least one `*TYPE`-started cluster, registered command dispatch across root and include streams, per-cluster `*STOP`, and exact current or registered compatibility termination. Generic mesh import now rejects neutral Abaqus `*SURFACE` records instead of emitting a command absent from BSAM's active dispatch.
