@@ -1252,6 +1252,66 @@ class SemanticIndexTests(unittest.TestCase):
             )
             self.assertEqual({"121", "131", "221", "231"}, copy_members)
 
+    def test_ngen_headers_variants_geometry_and_coordinates_are_validated(self) -> None:
+        prefix = (
+            b"*NAME\nply1\n*NODE\n"
+            b"1,0,0,0\n5,4,0,0\n11,0,2,0\n15,4,2,0\n"
+            b"21,1,0,0\n25,0,1,0\n26,-1,0,0\n200002,10,0,0\n"
+            b"*NSET,NSET=starts\n11\n*NSET,NSET=ends\n15\n"
+            b"*NSET,NSET=ends2\n15,25\n*NSET,NSET=source\n1,5\n"
+        )
+        valid = (
+            b"*NGEN,NSET=line,BIAS=2\n1,5,1\n"
+            b"*NGEN,NSET=paired\nstarts,ends,1\n"
+            b"*NGEN,NSET=arc,ARC\n0,0,0\n21,25,1\n"
+            b"*NCOPY,NSET=copies\nsource,1,100,0,0,1\n"
+            b"*NGEN,NSET=chained\n101,105,1\n"
+        )
+        invalid = (
+            b"*NGEN,OTHER\n1,5,1\n",
+            b"*NGEN,BIAS=1,BIAS=2\n1,5,1\n",
+            b"*NGEN,NSET=abcdefghijklmnopqrstu\n1,5,1\n",
+            b"*NGEN,BIAS=0\n1,5,1\n",
+            b"*NGEN,BIAS=NaN\n1,5,1\n",
+            b"*NGEN,ARC=yes\n0,0,0\n21,25,1\n",
+            b"*NGEN\n1,5\n",
+            b"*NGEN\n1 5 1\n",
+            b"*NGEN\n1,5,0\n",
+            b"*NGEN\n5,1,1\n",
+            b"*NGEN\n99,100,1\n",
+            b"*NGEN\nstarts,ends2,1\n",
+            b"*NGEN\n1,200002,1\n",
+            b"*NODE\n3,2,0,0\n*NGEN\n1,5,1\n",
+            b"*NGEN,ARC\n0,0,0\n",
+            b"*NGEN,ARC\n0,0,0\n21,25,1\n21,25,1\n",
+            b"*NGEN,ARC\n0,0,0\n** unsafe consumed row\n21,25,1\n",
+            b"*NGEN,ARC\n0,0,NaN\n21,25,1\n",
+            b"*NGEN,ARC\n0,0,0\n21,26,1\n",
+            b"*NGEN,ARC\n0,0,0\n21,21,1\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(prefix + valid))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(0, inspection["summary"]["errors"])
+            nodes = {
+                item["name"]: item for item in inspection["semantic_model"]["entities"]
+                if item["kind"] == "node"
+            }
+            self.assertEqual([1.0, 0.0, 0.0], nodes["3"]["attributes"]["coordinates"])
+            self.assertEqual([2.0, 0.0, 1.0], nodes["103"]["attributes"]["coordinates"])
+            self.assertAlmostEqual(
+                2 ** -0.5, nodes["23"]["attributes"]["coordinates"][0], places=12,
+            )
+            self.assertAlmostEqual(
+                2 ** -0.5, nodes["23"]["attributes"]["coordinates"][1], places=12,
+            )
+            for index, command in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + command))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_generated_node_identities_resolve_downstream_connectivity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

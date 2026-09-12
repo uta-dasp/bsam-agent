@@ -408,6 +408,19 @@ def _set_member_entities(
     return result
 
 
+def _node_coordinates(entity: SemanticEntity) -> tuple[float, float, float] | None:
+    raw = entity.attributes.get("coordinates")
+    if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+        return None
+    try:
+        coordinates = tuple(_fortran_real(str(item)) for item in raw)
+    except ValueError:
+        return None
+    if not all(math.isfinite(item) for item in coordinates):
+        return None
+    return coordinates  # type: ignore[return-value]
+
+
 def _bounded_generated_labels(start: int, end: int, increment: int) -> tuple[int, ...]:
     if increment == 0 or (end - start) * increment <= 0:
         return ()
@@ -3889,8 +3902,61 @@ def build_semantic_index(
 
             elif command in {"*NGEN", "*NCOP"} and cluster:
                 operation_name = "ngen" if command == "*NGEN" else "ncopy"
-                output_set = options.get("NSET")
-                if command == "*NCOP":
+                output_set: str | None = None
+                ngen_arc = False
+                ngen_bias = 1.0
+                if command == "*NGEN":
+                    ngen_options = [
+                        field.strip()
+                        for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                        if field.strip()
+                    ]
+                    parsed_ngen_options: dict[str, str | None] = {}
+                    ngen_header_error: str | None = None
+                    for field in ngen_options:
+                        if "=" in field:
+                            option_name, option_value = field.split("=", 1)
+                            name = option_name.strip().upper()
+                            value = option_value.strip()
+                        else:
+                            name, value = field.strip().upper(), None
+                        if name not in {"NSET", "BIAS", "ARC"}:
+                            ngen_header_error = f"unknown NGEN option {name or field}"
+                            break
+                        if name in parsed_ngen_options:
+                            ngen_header_error = f"duplicate NGEN option {name}"
+                            break
+                        if name == "ARC" and value is not None:
+                            ngen_header_error = "NGEN ARC is a flag and takes no value"
+                            break
+                        if name != "ARC" and not value:
+                            ngen_header_error = f"NGEN {name} requires a value"
+                            break
+                        parsed_ngen_options[name] = value
+                    output_set = parsed_ngen_options.get("NSET")
+                    ngen_arc = "ARC" in parsed_ngen_options
+                    if output_set is not None and len(output_set) > 20:
+                        ngen_header_error = ngen_header_error or (
+                            "NGEN NSET names may contain at most 20 characters"
+                        )
+                    try:
+                        ngen_bias = _fortran_real(str(
+                            parsed_ngen_options.get("BIAS", "1")
+                        ))
+                        if not math.isfinite(ngen_bias) or ngen_bias <= 0:
+                            raise ValueError
+                    except ValueError:
+                        ngen_header_error = ngen_header_error or (
+                            "NGEN BIAS must be a finite positive real"
+                        )
+                    if ngen_header_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=ngen_header_error,
+                            line=command_line.number, source=source,
+                        ))
+                else:
+                    output_set = options.get("NSET")
                     ncopy_tokens = [token for token in re.split(
                         r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
                     ) if token]
@@ -3907,7 +3973,7 @@ def build_semantic_index(
                             message="NCOPY accepts only optional NSET=<name> targeting",
                             line=command_line.number, source=source,
                         ))
-                if output_set:
+                if output_set and len(output_set) <= 20:
                     _entity(
                         index, "node-set", output_set, source, command_line, cluster,
                         {"definition": "generated-command-membership", "generator": operation_name},
@@ -3917,7 +3983,46 @@ def build_semantic_index(
                     source, command_line, cluster,
                     {"operation": operation_name, "output_set": output_set},
                 )
-                generation_records = records[1:] if command == "*NGEN" and "ARC" in options else records
+                generation_records = records[1:] if command == "*NGEN" and ngen_arc else records
+                ngen_center: tuple[float, float, float] | None = None
+                ngen_arc_body_error: str | None = None
+                if command == "*NGEN" and ngen_arc:
+                    if len(records) != 2:
+                        ngen_arc_body_error = (
+                            "ARC NGEN requires exactly one center row and one generation row"
+                        )
+                    else:
+                        center_position = body.index(records[0])
+                        generation_position = body.index(records[1])
+                        if any(
+                            not item.stripped or item.stripped.startswith("**")
+                            for item in body[center_position + 1:generation_position]
+                        ):
+                            ngen_arc_body_error = (
+                                "ARC NGEN cannot contain blank or comment records between "
+                                "its center and generation row"
+                            )
+                        center_values = _record_fields(records[0])
+                        try:
+                            parsed_center = tuple(
+                                _fortran_real(item) for item in center_values
+                            )
+                            if (
+                                len(parsed_center) != 3
+                                or not all(math.isfinite(item) for item in parsed_center)
+                            ):
+                                raise ValueError
+                            ngen_center = parsed_center  # type: ignore[assignment]
+                        except ValueError:
+                            ngen_arc_body_error = ngen_arc_body_error or (
+                                "ARC NGEN center rows require exactly three finite reals"
+                            )
+                    if ngen_arc_body_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=ngen_arc_body_error,
+                            line=command_line.number, source=source,
+                        ))
                 for line in generation_records:
                     values = _fields(line.text)
                     if command == "*NCOP":
@@ -3962,24 +4067,41 @@ def build_semantic_index(
                             index, generation, "copies-node-set",
                             source_set_key, source, line,
                         )
-                        if len(values) >= 3:
+                        if len(values) == 6:
                             try:
                                 copy_count, label_offset = int(values[1]), int(values[2])
+                                translations = [
+                                    _fortran_real(item) for item in values[3:6]
+                                ]
                             except ValueError:
                                 continue
-                            if 0 < copy_count <= 100_000 and label_offset != 0:
+                            if (
+                                0 < copy_count <= 100_000 and label_offset != 0
+                                and all(math.isfinite(item) for item in translations)
+                            ):
                                 for member in _set_member_entities(index, source_set_key, "node"):
                                     try:
                                         source_label = int(member.name)
                                     except ValueError:
                                         continue
+                                    source_coordinates = _node_coordinates(member)
                                     for copy_index in range(1, copy_count + 1):
                                         label = source_label + copy_index * label_offset
                                         if label <= 0:
                                             continue
+                                        attributes: dict[str, Any] = {
+                                            "generated_by": "ncopy",
+                                            "source_node": source_label,
+                                        }
+                                        if source_coordinates is not None:
+                                            attributes["coordinates"] = [
+                                                source_coordinates[axis]
+                                                + copy_index * translations[axis]
+                                                for axis in range(3)
+                                            ]
                                         generated = _entity(
                                             index, "node", str(label), source, line, cluster,
-                                            {"generated_by": "ncopy", "source_node": source_label},
+                                            attributes,
                                         )
                                         if output_set:
                                             _reference(
@@ -3987,75 +4109,262 @@ def build_semantic_index(
                                                 _key("node-set", output_set, cluster), source, line,
                                             )
                         continue
-                    if len(values) < 2:
-                        continue
-                    if "ARC" in options:
-                        targets = ((values[0], "node"), (values[1], "node"))
-                    else:
-                        first_key, first_kind = _cluster_nodal_target_key(
-                            index, values[0], cluster,
-                        )
-                        first_target_kind = "node-set" if first_kind == "targets-node-set" else "node"
-                        targets = ((values[0], first_target_kind), (values[1], first_target_kind))
+                    row_error: str | None = None
+                    if len(values) != 3:
+                        row_error = "NGEN generation rows require exactly three fields"
+                    elif not ngen_arc and len(
+                        line.text.split("#", 1)[0].split(",")
+                    ) != 3:
+                        row_error = "straight NGEN rows require three comma-delimited fields"
+                    try:
+                        increment = int(values[2])
+                        if increment == 0:
+                            raise ValueError
+                    except (IndexError, ValueError):
+                        increment = 0
+                        row_error = row_error or "NGEN label increments must be nonzero integers"
+
+                    first_key, first_kind = _cluster_nodal_target_key(
+                        index, values[0] if values else "", cluster,
+                        node_only=ngen_arc,
+                    )
+                    first_target_kind = (
+                        "node-set" if first_kind == "targets-node-set" else "node"
+                    )
+                    targets = (
+                        (values[0] if values else "", first_target_kind),
+                        (values[1] if len(values) > 1 else "", first_target_kind),
+                    )
                     for endpoint, target_kind in targets:
                         _reference(
                             index, generation, f"uses-{target_kind}-endpoint",
                             _key(target_kind, endpoint, cluster), source, line,
                         )
-                    try:
-                        increment = int(values[2])
-                    except (IndexError, ValueError):
-                        continue
-                    endpoint_pairs: list[tuple[int, int]] = []
-                    if targets[0][1] == "node":
+
+                    endpoint_pairs: list[tuple[SemanticEntity, SemanticEntity]] = []
+                    if row_error is None and first_target_kind == "node":
                         try:
                             start_label, end_label = int(values[0]), int(values[1])
+                            if start_label <= 0 or end_label <= 0:
+                                raise ValueError
                         except ValueError:
-                            continue
-                        known_keys = {item.key for item in index.entities}
-                        if (
-                            _key("node", str(start_label), cluster) not in known_keys
-                            or _key("node", str(end_label), cluster) not in known_keys
-                        ):
-                            continue
-                        endpoint_pairs.append((start_label, end_label))
-                    else:
+                            row_error = "NGEN node endpoints must be positive integer labels"
+                        else:
+                            start_nodes = [
+                                item for item in index.entities
+                                if item.key == _key("node", str(start_label), cluster)
+                            ]
+                            end_nodes = [
+                                item for item in index.entities
+                                if item.key == _key("node", str(end_label), cluster)
+                            ]
+                            if len(start_nodes) != 1 or len(end_nodes) != 1:
+                                row_error = (
+                                    "NGEN endpoint nodes must resolve uniquely before generation"
+                                )
+                            else:
+                                endpoint_pairs.append((start_nodes[0], end_nodes[0]))
+                    elif row_error is None:
+                        if len(values[0]) > 20 or len(values[1]) > 20:
+                            row_error = (
+                                "NGEN endpoint-set names may contain at most 20 characters"
+                            )
                         first_members = _set_member_entities(
                             index, _key("node-set", values[0], cluster), "node",
                         )
                         second_members = _set_member_entities(
                             index, _key("node-set", values[1], cluster), "node",
                         )
-                        if len(first_members) != len(second_members):
-                            continue
-                        try:
-                            endpoint_pairs.extend(
-                                (int(first.name), int(second.name))
-                                for first, second in zip(first_members, second_members)
+                        if (
+                            not first_members or not second_members
+                            or len(first_members) != len(second_members)
+                        ):
+                            row_error = (
+                                "NGEN endpoint sets must exist, be nonempty, and have equal size"
                             )
+                        else:
+                            endpoint_pairs.extend(zip(first_members, second_members))
+
+                    generated_by_pair: list[
+                        tuple[SemanticEntity, SemanticEntity, tuple[int, ...]]
+                    ] = []
+                    generated_keys: set[str] = set()
+                    existing_node_keys = {
+                        item.key for item in index.entities if item.kind == "node"
+                    }
+                    total_generated = 0
+                    for start_node, end_node in endpoint_pairs:
+                        try:
+                            start_label, end_label = int(start_node.name), int(end_node.name)
                         except ValueError:
-                            continue
-                    for start_label, end_label in endpoint_pairs:
+                            row_error = "NGEN endpoint labels must be integers"
+                            break
+                        if (end_label - start_label) * increment <= 0:
+                            row_error = (
+                                "NGEN increment must progress from a distinct start toward end"
+                            )
+                            break
+                        labels = _bounded_generated_labels(
+                            start_label, end_label, increment,
+                        )
+                        expected_count = len(range(start_label + increment, end_label, increment))
+                        total_generated += expected_count
+                        if expected_count > 100_000 or total_generated > 100_000:
+                            row_error = (
+                                "NGEN expansion is limited to 100000 generated nodes per row"
+                            )
+                            break
+                        for label in labels:
+                            generated_key = _key("node", str(label), cluster)
+                            if (
+                                label <= 0 or generated_key in existing_node_keys
+                                or generated_key in generated_keys
+                            ):
+                                row_error = (
+                                    "NGEN generated labels must be positive and globally unique"
+                                )
+                                break
+                            generated_keys.add(generated_key)
+                        if row_error is not None:
+                            break
+                        start_coordinates = _node_coordinates(start_node)
+                        end_coordinates = _node_coordinates(end_node)
+                        if start_coordinates is None or end_coordinates is None:
+                            row_error = (
+                                "NGEN endpoints require finite three-dimensional coordinates"
+                            )
+                            break
+                        if not ngen_arc and not all(math.isfinite(
+                            end_coordinates[axis] - start_coordinates[axis]
+                        ) for axis in range(3)):
+                            row_error = "NGEN endpoint coordinate differences must be finite"
+                            break
+                        generated_by_pair.append((start_node, end_node, labels))
+
+                    if row_error is None and ngen_header_error is not None:
+                        row_error = "NGEN generation requires a valid command header"
+                    if row_error is None and ngen_arc_body_error is not None:
+                        row_error = "ARC NGEN requires a valid header and body"
+                    if row_error is None and ngen_arc:
+                        assert ngen_center is not None
+                        start_coordinates = _node_coordinates(generated_by_pair[0][0])
+                        end_coordinates = _node_coordinates(generated_by_pair[0][1])
+                        assert start_coordinates is not None and end_coordinates is not None
+                        start_vector = tuple(
+                            start_coordinates[axis] - ngen_center[axis]
+                            for axis in range(3)
+                        )
+                        end_vector = tuple(
+                            end_coordinates[axis] - ngen_center[axis]
+                            for axis in range(3)
+                        )
+                        if not all(math.isfinite(item) for item in (*start_vector, *end_vector)):
+                            row_error = "ARC NGEN endpoint vectors must remain finite"
+                        start_norm = math.hypot(*start_vector)
+                        end_norm = math.hypot(*end_vector)
+                        if row_error is None and (start_norm == 0 or end_norm == 0):
+                            row_error = (
+                                "ARC NGEN endpoint radii must be nonzero and noncollinear"
+                            )
+                        if row_error is None:
+                            start_unit = tuple(item / start_norm for item in start_vector)
+                            end_unit = tuple(item / end_norm for item in end_vector)
+                            unit_cross = (
+                                start_unit[1] * end_unit[2] - start_unit[2] * end_unit[1],
+                                start_unit[2] * end_unit[0] - start_unit[0] * end_unit[2],
+                                start_unit[0] * end_unit[1] - start_unit[1] * end_unit[0],
+                            )
+                            if math.hypot(*unit_cross) == 0:
+                                row_error = (
+                                    "ARC NGEN endpoint radii must be nonzero and noncollinear"
+                                )
+
+                    if row_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=row_error,
+                            line=line.number, source=source,
+                        ))
+                        continue
+
+                    for start_node, end_node, labels in generated_by_pair:
+                        start_label, end_label = int(start_node.name), int(end_node.name)
+                        start_coordinates = _node_coordinates(start_node)
+                        end_coordinates = _node_coordinates(end_node)
+                        assert start_coordinates is not None and end_coordinates is not None
                         if output_set:
                             output_set_key = _key("node-set", output_set, cluster)
-                            endpoint_keys = {
-                                _key("node", str(start_label), cluster),
-                                _key("node", str(end_label), cluster),
-                            }
-                            for endpoint_entity in index.entities:
-                                if endpoint_entity.key in endpoint_keys:
-                                    _reference_once(
-                                        index, endpoint_entity, "member-of",
-                                        output_set_key, source, line,
+                            _reference_once(
+                                index, start_node, "member-of", output_set_key, source, line,
+                            )
+                            _reference_once(
+                                index, end_node, "member-of", output_set_key, source, line,
+                            )
+                        for label in labels:
+                            fraction = (
+                                (label - start_label) / (end_label - start_label)
+                            ) ** ngen_bias
+                            if ngen_arc:
+                                assert ngen_center is not None
+                                start_vector = tuple(
+                                    start_coordinates[axis] - ngen_center[axis]
+                                    for axis in range(3)
+                                )
+                                end_vector = tuple(
+                                    end_coordinates[axis] - ngen_center[axis]
+                                    for axis in range(3)
+                                )
+                                start_norm = math.hypot(*start_vector)
+                                end_norm = math.hypot(*end_vector)
+                                start_unit = tuple(item / start_norm for item in start_vector)
+                                end_unit = tuple(item / end_norm for item in end_vector)
+                                unit_cross = (
+                                    start_unit[1] * end_unit[2] - start_unit[2] * end_unit[1],
+                                    start_unit[2] * end_unit[0] - start_unit[0] * end_unit[2],
+                                    start_unit[0] * end_unit[1] - start_unit[1] * end_unit[0],
+                                )
+                                cross_norm = math.hypot(*unit_cross)
+                                axis = tuple(item / cross_norm for item in unit_cross)
+                                angle = math.acos(max(-1.0, min(1.0, sum(
+                                    start_unit[axis_index] * end_unit[axis_index]
+                                    for axis_index in range(3)
+                                )))) * fraction
+                                axis_cross_start = (
+                                    axis[1] * start_vector[2] - axis[2] * start_vector[1],
+                                    axis[2] * start_vector[0] - axis[0] * start_vector[2],
+                                    axis[0] * start_vector[1] - axis[1] * start_vector[0],
+                                )
+                                axis_dot_start = sum(
+                                    axis[axis_index] * start_vector[axis_index]
+                                    for axis_index in range(3)
+                                )
+                                coordinates = [
+                                    ngen_center[axis_index]
+                                    + start_vector[axis_index] * math.cos(angle)
+                                    + axis_cross_start[axis_index] * math.sin(angle)
+                                    + axis[axis_index] * axis_dot_start * (1 - math.cos(angle))
+                                    for axis_index in range(3)
+                                ]
+                            else:
+                                coordinates = [
+                                    start_coordinates[axis_index]
+                                    + fraction * (
+                                        end_coordinates[axis_index]
+                                        - start_coordinates[axis_index]
                                     )
-                        for label in _bounded_generated_labels(
-                            start_label, end_label, increment,
-                        ):
+                                    for axis_index in range(3)
+                                ]
+                            if not all(math.isfinite(item) for item in coordinates):
+                                index.diagnostics.append(Diagnostic(
+                                    code="BSAM-E310", severity="error",
+                                    message="NGEN generated coordinates must remain finite",
+                                    line=line.number, source=source,
+                                ))
+                                continue
                             generated = _entity(
                                 index, "node", str(label), source, line, cluster,
                                 {
                                     "generated_by": "ngen", "start_node": start_label,
-                                    "end_node": end_label,
+                                    "end_node": end_label, "coordinates": coordinates,
                                 },
                             )
                             if output_set:

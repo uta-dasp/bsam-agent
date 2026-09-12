@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.114.0`
-- Registry SHA-256: `5A0ACC96409F9450035DDF18F95344F520B5C0197B604F25599EB0DD8F89DBA8`
+- Registry version: `0.115.0`
+- Registry SHA-256: `BCBA1D8ECCDD11D3F46496232A47759017E5FDB3BDFA2BBE4AF403E2DC99C830`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -821,7 +821,7 @@ Generates nodes from compact generation records.
 - Dispatch prefix: `*NGEN`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-node-generation](#evidencefe-node-generation)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -831,21 +831,25 @@ Known parameters:
 
 #### `*NGEN` body
 
-Termination: next-command-or-eof. Dependencies: All endpoint nodes and sets must be defined before NGEN.; DIMENSIONS node_capacity and the node-label lookup allocation must cover all generated nodes and labels.; NSET creates or appends both endpoints and generated nodes when supplied.; BIAS must be positive to keep the interpolation finite and monotone.
+Termination: next-command-or-eof. Dependencies: All endpoint nodes and sets must be defined before NGEN and expose finite coordinates; coordinates derived by prior bounded NGEN/NCOPY rows remain eligible endpoints.; DIMENSIONS node_capacity and the node-label lookup allocation must cover all generated nodes and labels.; NSET creates or appends both endpoints and generated nodes when supplied.; BIAS must be finite and positive to keep the interpolation finite and monotone.
 
 - **straight-between-nodes** (ARC is absent and the first endpoint token is not a node-set name):
   - `generation` [repeated]: `start_node`:existing-node-label, `end_node`:existing-node-label, `label_increment`:nonzero-integer
-  - Constraint: Increment sign must progress from start_node toward end_node and divide the label interval without colliding with existing labels.
+  - Constraint: NGEN accepts only canonical NSET and finite positive BIAS values plus the valueless ARC flag; duplicates, unknown options, and output-set names beyond the 20-character source buffer are rejected.
+  - Constraint: Rows have exactly three comma-delimited fields; endpoints resolve uniquely with finite coordinates, and the nonzero increment sign must progress from a distinct start toward end.
+  - Constraint: Generation is bounded to 100000 nodes per row and every generated label and coordinate must remain positive/unique and finite.
   - Constraint: Coordinates use s=((label-start)/(end-start))^BIAS along the endpoint segment.
 - **straight-between-paired-node-sets** (ARC is absent and the first endpoint token resolves to a node set):
   - `generation` [repeated]: `start_set`:existing-node-set-name, `end_set`:existing-node-set-name, `label_increment`:nonzero-integer
-  - Constraint: Both sets must exist and contain the same number of nodes in corresponding order.
-  - Constraint: Every endpoint-label interval must be compatible with the common increment and produce globally unique labels.
+  - Constraint: Both source-buffer-bounded sets must exist, be nonempty, and contain the same number of nodes in corresponding order.
+  - Constraint: Every endpoint-label interval must progress with the common nonzero increment; total row expansion is bounded to 100000 and produces finite coordinates with globally unique positive labels.
 - **circular-arc** (ARC is present):
   - `center` [once]: `cx`:real, `cy`:real, `cz`:real
-  - `generation` [repeated]: `start_node`:existing-node-label, `end_node`:existing-node-label, `label_increment`:nonzero-integer
-  - Constraint: Endpoint radii must be nonzero and their radial vectors must not be collinear because the local arc frame normalizes their cross product.
-  - Constraint: The implementation uses the start radius for all generated nodes and advances the end angle counterclockwise by at most one revolution.
+  - `generation` [once]: `start_node`:existing-node-label, `end_node`:existing-node-label, `label_increment`:nonzero-integer
+  - Constraint: The center row has exactly three finite reals and is followed by exactly one three-field generation row; multiple generation rows are rejected because the source advances the input record twice per loop iteration.
+  - Constraint: Blank or comment records cannot occur between the center and generation row because the direct list-directed read consumes that physical record.
+  - Constraint: Endpoint radii must be finite and nonzero and their radial vectors must not be collinear because the local arc frame normalizes their cross product.
+  - Constraint: The implementation uses the start radius for all generated nodes and advances toward the end radial direction.
 
 ### `*NCOPY`
 
