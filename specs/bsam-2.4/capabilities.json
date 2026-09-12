@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.119.0",
+  "registry_version": "0.120.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -1932,12 +1932,26 @@
         "parse": "implemented", "semantic": "implemented", "inspect": "verified",
         "modify": "unassessed", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "repeated-record-groups",
         "termination": "END CRACK after a complete crack entry",
         "variants": [
+          {
+            "name": "disabled-sentinel",
+            "when": "the block contains only type 0",
+            "rows": [
+              {
+                "name": "type",
+                "repetition": "once",
+                "fields": [
+                  {"name": "type", "value_type": "const(0)", "required": true, "summary": "Returns from crack initialization without creating a declaration."}
+                ]
+              }
+            ],
+            "constraints": ["Zero is the only canonical nonpositive sentinel; negative values remain rejected by static validation."]
+          },
           {
             "name": "active-fe-crack-types",
             "when": "type is 101, 201, or 301",
@@ -2020,6 +2034,7 @@
               "The parser silently raises n_gap values below 6 for type 101 and below 2 for types 201 and 301; Agent generation uses the effective minimum instead of relying on mutation.",
               "The selected cluster must exist, contain finite-element nodes, and support the requested crack insertion path.",
               "The parser examines at most eight option slots before predefined crack records; canonical generation emits no more than eight recognized option lines.",
+              "List-directed trailing fields on the four leading records are ignored by the source and retained for compatibility; validation owns only the registered leading values.",
               "Canonical option spelling preserves the parser's mixed case-sensitive dispatch: *MODE_CRACKS is uppercase, while *fiber, *normal, *full_field, *angle, *min, and *max begin lowercase.",
               "A fixed normal or predefined-crack NORMAL vector must have nonzero magnitude.",
               "Types other than 101, 201, and 301 stop in the active dispatch; legacy case bodies remaining later in the routine are unreachable and blocked from generation.",

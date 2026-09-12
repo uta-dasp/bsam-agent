@@ -1003,16 +1003,244 @@ def augment_registered_top_level_semantics(
         _validate_registered_values(index, definition, parameters)
 
 
+def _validate_global_crack_block(
+    index: SemanticIndex, definition: dict[str, Any], source: str,
+    lines: tuple[SourceLine, ...],
+) -> None:
+    """Cursor-validate active global FE crack declarations."""
+    headers = [line for line in lines if line.stripped == "CRACK"]
+    if not headers:
+        return
+    if len(headers) != 1:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message=f"CRACK must occur at most once; found {len(headers)}",
+            line=headers[0].number if headers else None, source=source,
+        ))
+
+    header = headers[0]
+    header_index = lines.index(header)
+    top_level_tokens = {
+        str(item["canonical"]) for item in load_registry()["top_level_blocks"]
+    }
+    next_block = next(
+        (
+            position for position in range(header_index + 1, len(lines))
+            if lines[position].first_field in top_level_tokens
+        ),
+        len(lines),
+    )
+    end_index = next(
+        (
+            position for position in range(header_index + 1, next_block)
+            if lines[position].stripped == "END CRACK"
+        ),
+        None,
+    )
+    if end_index is None:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="CRACK is missing its exact END CRACK terminator",
+            line=header.number, source=source,
+        ))
+        end_index = next_block
+
+    body = [
+        line for line in lines[header_index + 1:end_index]
+        if line.text.split("#", 1)[0].strip()
+        and not line.text.lstrip().startswith(("#", "**"))
+    ]
+    if len(body) == 1 and _record_fields(body[0]) == ["0"]:
+        return
+    allowed_types = {101, 201, 301}
+    option_tokens = {
+        "*MODE_CRACKS", "*full_field", "*normal", "*fiber",
+        "*angle", "*min", "*max",
+    }
+    cursor = 0
+    declarations = 0
+
+    def error(message: str, line: SourceLine, *, policy: bool = False) -> None:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E350", severity="error", message=message,
+            line=line.number, source=source,
+            provenance="agent-policy" if policy else None,
+        ))
+
+    def finite_values(values: list[str]) -> list[float] | None:
+        try:
+            parsed = [_fortran_real(value) for value in values]
+        except ValueError:
+            return None
+        return parsed if all(math.isfinite(value) for value in parsed) else None
+
+    while cursor < len(body):
+        type_line = body[cursor]
+        type_fields = _record_fields(type_line)
+        try:
+            crack_type = int(type_fields[0])
+        except (IndexError, ValueError):
+            error("CRACK declaration must begin with type 101, 201, or 301", type_line)
+            break
+        if crack_type not in allowed_types:
+            error(f"unsupported active CRACK type {crack_type}", type_line)
+            break
+        declarations += 1
+        cursor += 1
+        if cursor + 2 >= len(body):
+            error("CRACK declaration is missing one or more fixed leading records", type_line)
+            break
+
+        counts_line, spacing_line, cluster_line = body[cursor:cursor + 3]
+        cursor += 3
+        count_fields = _record_fields(counts_line)
+        try:
+            predefined_count, maximum_count = map(int, count_fields[:2])
+            if predefined_count < 0 or maximum_count < 0 or predefined_count > maximum_count:
+                raise ValueError
+        except (ValueError, TypeError):
+            error(
+                "CRACK counts require nonnegative predefined and maximum values with predefined <= maximum",
+                counts_line,
+            )
+            break
+
+        spacing_fields = _record_fields(spacing_line)
+        minimum_gap = 6 if crack_type == 101 else 2
+        try:
+            gap = int(spacing_fields[0])
+            if gap < minimum_gap:
+                raise ValueError
+        except (IndexError, ValueError):
+            error(
+                f"CRACK type {crack_type} requires canonical n_gap >= {minimum_gap}",
+                spacing_line, policy=True,
+            )
+
+        cluster_fields = _record_fields(cluster_line)
+        if not cluster_fields or len(cluster_fields[0]) > 80:
+            error("CRACK cluster selector requires one bounded ID or name", cluster_line)
+        elif cluster_fields[0].lstrip("+").isdigit() and int(cluster_fields[0]) <= 0:
+            error("CRACK numeric cluster selector must be positive", cluster_line)
+        else:
+            selector = cluster_fields[0].casefold()
+            clusters = [item for item in index.entities if item.kind == "cluster"]
+            target = (
+                clusters[int(selector) - 1]
+                if selector.isdigit() and int(selector) <= len(clusters)
+                else next((item for item in clusters if item.name.casefold() == selector), None)
+            )
+            if target is None:
+                error(f"CRACK cluster selector does not resolve uniquely: {cluster_fields[0]}", cluster_line)
+            else:
+                target_name = target.name.casefold()
+                kinds = {
+                    item.kind for item in index.entities
+                    if str(item.attributes.get("cluster") or "").casefold() == target_name
+                }
+                if not {"node", "element"} <= kinds:
+                    error("CRACK target cluster requires a populated finite-element mesh", cluster_line)
+
+        option_count = 0
+        while cursor < len(body):
+            option_line = body[cursor]
+            clean = option_line.text.split("#", 1)[0].strip()
+            parts = [item for item in re.split(r"[\s,=]+", clean) if item]
+            token = parts[0] if parts else ""
+            if token not in option_tokens:
+                break
+            cursor += 1
+            option_count += 1
+            values = parts[1:]
+            option_error: str | None = None
+            if token == "*MODE_CRACKS":
+                try:
+                    limits = [int(value) for value in values]
+                    if len(limits) != 2 or any(value < 0 for value in limits):
+                        raise ValueError
+                except ValueError:
+                    option_error = "*MODE_CRACKS requires exactly two nonnegative integers"
+            elif token == "*normal":
+                normal = finite_values(values)
+                if values and (
+                    normal is None or len(normal) != 3
+                    or not any(value != 0 for value in normal)
+                ):
+                    option_error = "*normal requires no values or one nonzero finite three-vector"
+            elif token == "*fiber" and values:
+                option_error = "*fiber accepts no values"
+            elif token == "*full_field":
+                upper = [value.upper() for value in values]
+                marker = upper.index("CRACK_EXTENSION") if "CRACK_EXTENSION" in upper else len(values)
+                growth = finite_values(values[:marker])
+                extension = finite_values(values[marker + 1:]) if marker < len(values) else []
+                if (
+                    growth is None or len(growth) > 2
+                    or extension is None or len(extension) > 2
+                ):
+                    option_error = "*full_field accepts at most two finite values per threshold pair"
+            elif token in {"*angle", "*min", "*max"}:
+                parsed = finite_values(values)
+                if parsed is None or len(parsed) > 1 or (
+                    token in {"*min", "*max"} and parsed and parsed[0] <= 0
+                ):
+                    option_error = (
+                        f"{token} accepts at most one finite value"
+                        if token == "*angle"
+                        else f"{token} accepts at most one finite positive value"
+                    )
+            if option_error is not None:
+                error(option_error, option_line)
+        if option_count > 8:
+            error("CRACK declaration permits at most eight recognized option rows", type_line)
+
+        for _ in range(predefined_count):
+            if cursor >= len(body):
+                error("CRACK declaration has fewer predefined points than declared", counts_line)
+                break
+            point_line = body[cursor]
+            point_fields = _record_fields(point_line)
+            cursor += 1
+            coordinates = finite_values(point_fields[:3])
+            if coordinates is None or len(coordinates) != 3:
+                error("predefined CRACK point requires three finite coordinates", point_line)
+                continue
+            position = 3
+            seen_options: set[str] = set()
+            while position < len(point_fields):
+                token = point_fields[position].upper()
+                if token in seen_options or token not in {"NORMAL", "LENGTH"}:
+                    error("predefined CRACK point has an unknown or repeated option", point_line)
+                    break
+                seen_options.add(token)
+                width = 3 if token == "NORMAL" else 1
+                values = finite_values(point_fields[position + 1:position + 1 + width])
+                if values is None or len(values) != width or (
+                    token == "NORMAL" and not any(value != 0 for value in values)
+                ) or (token == "LENGTH" and values[0] <= 0):
+                    error(f"predefined CRACK {token} has invalid values", point_line)
+                    break
+                position += width + 1
+
+    if declarations == 0:
+        error("CRACK block requires at least one active declaration", header)
+    elif declarations >= 250:
+        error("CRACK block must contain fewer than 250 declarations to preserve END CRACK", header, policy=True)
+
+
 def augment_crack_capability_records(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
     """Type the fixed leading records of global FE crack declarations."""
+    all_lines = tuple(lines)
     definition = next(
         item for item in load_registry()["top_level_blocks"]
         if item["id"] == "block.crack"
     )
+    if operational_support(definition)["static_validation"] == "verified":
+        _validate_global_crack_block(index, definition, source, all_lines)
     body = [
-        line for line in _top_block_body(tuple(lines), "CRACK")
+        line for line in _top_block_body(all_lines, "CRACK")
         if line.stripped and not line.stripped.startswith(("#", "**"))
     ]
     header_positions = [

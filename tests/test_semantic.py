@@ -212,7 +212,10 @@ class SemanticIndexTests(unittest.TestCase):
     def test_global_crack_leading_records_and_named_cluster_are_typed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
-            raw = deck(b"*NAME\nply1\n").replace(
+            raw = deck(
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n"
+            ).replace(
                 b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
                 b"CRACK\n301\n0,10\n3,-ngap\nply1,-approximation\n"
                 b"*normal\nEND CRACK\nCONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
@@ -236,6 +239,46 @@ class SemanticIndexTests(unittest.TestCase):
         self.assertEqual("ply1", record["parameters"]["cluster"][0]["value"])
         self.assertEqual("cluster:ply1", reference["target_key"])
         self.assertEqual("resolved", reference["status"])
+
+    def test_global_crack_static_validation_rejects_incomplete_or_unsafe_entries(self) -> None:
+        mesh = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+            b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n"
+        )
+        base = deck(mesh)
+        invalid_blocks = {
+            "empty": b"CRACK\nEND CRACK\n",
+            "missing-end": b"CRACK\n101\n0,1\n6\nply1\n",
+            "unsupported-type": b"CRACK\n1\nEND CRACK\n",
+            "bad-counts": b"CRACK\n101\n2,1\n6\nply1\nEND CRACK\n",
+            "low-gap": b"CRACK\n101\n0,1\n5\nply1\nEND CRACK\n",
+            "missing-cluster": b"CRACK\n101\n0,1\n6\nmissing\nEND CRACK\n",
+            "zero-normal": b"CRACK\n101\n0,1\n6\nply1\n*normal,0,0,0\nEND CRACK\n",
+            "missing-point": b"CRACK\n101\n1,1\n6\nply1\nEND CRACK\n",
+        }
+        for name, block in invalid_blocks.items():
+            raw = base.replace(
+                b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+                block + b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+            )
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(raw)
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+            self.assertTrue(any(
+                item["severity"] == "error" and item["code"] in {"BSAM-E350", "BSAM-E390"}
+                for item in diagnostics
+            ))
+
+        disabled = base.replace(
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+            b"CRACK\n0\nEND CRACK\nCONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "disabled.in"
+            root.write_bytes(disabled)
+            inspection = SourceSet.read(root).inspection()
+        self.assertEqual(0, inspection["summary"]["errors"])
 
     def test_cluster_commands_emit_uniform_registered_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1517,7 +1560,8 @@ class SemanticIndexTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
             raw = deck(
-                b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+                b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+                b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n*NSET,NSET=edge\n1\n"
             ).replace(
                 b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
                 b"BOUNDARY\n*type\nmechanical\n"
@@ -1537,7 +1581,7 @@ class SemanticIndexTests(unittest.TestCase):
                 b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\n",
                 b"CONSTITUTIVE\n1\n\t1 1 0\nEND CONSTITUTIVE\n"
                 b"FAILURE\n4\nEND FAILURE\n"
-                b"CRACK\n301\n\t0 1 0 0\n\t1 -approximation\nEND CRACK\n",
+                b"CRACK\n301\n\t0 1 0 0\n\t2 -ngap\n\t1 -approximation\nEND CRACK\n",
             ).replace(
                 b"MATERIALS\n0\nEND MATERIALS\n",
                 b"MATERIALS\n999\nE11=1\n*end\nEND MATERIALS\n",

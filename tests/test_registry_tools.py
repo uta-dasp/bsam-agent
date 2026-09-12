@@ -326,6 +326,14 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("disables moisture rather than stopping", contract)
         self.assertEqual("verified", block["operations"]["static_validation"])
 
+    def test_global_crack_static_contract_is_verified(self) -> None:
+        block = next(
+            item for item in self.registry["top_level_blocks"]
+            if item["id"] == "block.crack"
+        )
+        self.assertEqual("verified", block["operations"]["static_validation"])
+        self.assertIn("fewer than 250", json.dumps(block).lower())
+
     def test_table_grid_and_interpolation_contract_is_registered(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "TABLES")
         self.assertEqual("documented", block["coverage"])
@@ -408,7 +416,11 @@ class RegistryToolsTests(unittest.TestCase):
         parameters = {item["name"]: item for item in block["parameters"]}
         self.assertEqual([101, 201, 301], parameters["type"]["allowed_values"])
         self.assertEqual("fiber", parameters["orientation"]["default"])
-        rows = {item["name"]: item for item in block["body"]["variants"][0]["rows"]}
+        active = next(
+            item for item in block["body"]["variants"]
+            if item["name"] == "active-fe-crack-types"
+        )
+        rows = {item["name"]: item for item in active["rows"]}
         self.assertEqual("predefined_count-times", rows["predefined-crack"]["repetition"])
         contract = json.dumps(block)
         self.assertIn("*MODE_CRACKS", contract)

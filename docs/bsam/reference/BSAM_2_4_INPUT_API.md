@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.119.0`
-- Registry SHA-256: `3C6145EBDC0EDFAFDF0721B51BBA3D7FB695E634BBFC50F91EF8A712E97804E3`
+- Registry version: `0.120.0`
+- Registry SHA-256: `E4497F55142A26EDD0B5EB53430C31C599557F81EC2290651A4D5CC39FAC65A9`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -623,7 +623,7 @@ Defines global finite-element crack insertion controls for crack types 101, 201,
 - Termination: `END CRACK` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.crack-parser](#evidencecrack-parser), [evidence.crack-storage](#evidencecrack-storage), [evidence.crack-active-consumer](#evidencecrack-active-consumer), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unassessed, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=verified, `modify`=unassessed, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -640,6 +640,9 @@ Known parameters:
 
 Termination: END CRACK after a complete crack entry. Dependencies: Crack IDs are one-based declaration order; each global CRACK declaration selects its cluster, and setup derives the cluster's reverse crack list.; cluster resolves to an existing one-based solid CLUSTERS declaration or a uniquely matched cluster name.; Predefined points must lie in supported elements of the selected mesh; insertion performs element-location and topology-specific checks.; Growth and extension threshold pairs are indexed by failure mode.; END CRACK is recognized after a complete entry by reading the next record's first three characters as END.
 
+- **disabled-sentinel** (the block contains only type 0):
+  - `type` [once]: `type`:const(0)
+  - Constraint: Zero is the only canonical nonpositive sentinel; negative values remain rejected by static validation.
 - **active-fe-crack-types** (type is 101, 201, or 301):
   - `type` [once]: `type`:enum(101,201,301)
   - `counts` [once]: `predefined_count`:nonnegative-integer, `maximum_count`:nonnegative-integer
@@ -654,6 +657,7 @@ Termination: END CRACK after a complete crack entry. Dependencies: Crack IDs are
   - Constraint: The parser silently raises n_gap values below 6 for type 101 and below 2 for types 201 and 301; Agent generation uses the effective minimum instead of relying on mutation.
   - Constraint: The selected cluster must exist, contain finite-element nodes, and support the requested crack insertion path.
   - Constraint: The parser examines at most eight option slots before predefined crack records; canonical generation emits no more than eight recognized option lines.
+  - Constraint: List-directed trailing fields on the four leading records are ignored by the source and retained for compatibility; validation owns only the registered leading values.
   - Constraint: Canonical option spelling preserves the parser's mixed case-sensitive dispatch: *MODE_CRACKS is uppercase, while *fiber, *normal, *full_field, *angle, *min, and *max begin lowercase.
   - Constraint: A fixed normal or predefined-crack NORMAL vector must have nonzero magnitude.
   - Constraint: Types other than 101, 201, and 301 stop in the active dispatch; legacy case bodies remaining later in the routine are unreachable and blocked from generation.
