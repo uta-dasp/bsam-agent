@@ -131,6 +131,8 @@ Registry 0.110.0 verifies `*NCOPY`: only optional NSET targeting is accepted; ro
 
 Registry 0.111.0 verifies `*ELGEN`: TYPE is the sole required option; rows contain exactly seven integers; seeds resolve uniquely with matching topology; grid expansion is positive and bounded; shifted connectivity resolves to positive nodes; and generated element labels remain positive and unique. Zero combined offsets retain the source's skip behavior.
 
+Registry 0.112.0 verifies `*INTEGRATION`: it accepts no options; each exact two-integer header selects one existing X3D8/Y3D8 element and 1–100000 point rows; point rows contain four finite reals and cannot be replaced by physical comments or blanks. Repeated headers retain the source's clear-and-replace behavior.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

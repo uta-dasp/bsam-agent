@@ -1005,6 +1005,52 @@ class SemanticIndexTests(unittest.TestCase):
                 item["code"] for item in inspection["diagnostics"]
             ].count("BSAM-E301"))
 
+    def test_integration_headers_points_targets_and_replacement_are_validated(self) -> None:
+        nodes = b"".join(
+            f"{label},{label},0,0\n".encode() for label in range(1, 9)
+        )
+        mesh = (
+            b"*NAME\nply1\n*NODE\n" + nodes
+            + b"*ELEMENT,TYPE=X3D8\n1,1,2,3,4,5,6,7,8\n"
+            b"*ELEMENT,TYPE=Y3D8\n2,1,2,3,4,5,6,7,8\n"
+        )
+        valid = (
+            b"*INTEGRATION\n1,1\n0,0,0,1D0\n2,1\n0,0,0,1\n"
+            b"1,2\n-.5,0,0,1\n.5,0,0,1\n"
+        )
+        invalid = (
+            b"*INTEGRATION,TYPE=CUSTOM\n1,1\n0,0,0,1\n",
+            b"*INTEGRATION\n1,1,2\n0,0,0,1\n",
+            b"*INTEGRATION\n0,1\n0,0,0,1\n",
+            b"*INTEGRATION\n1,0\n",
+            b"*INTEGRATION\n1,100001\n",
+            b"*INTEGRATION\n99,1\n0,0,0,1\n",
+            b"*ELEMENT,TYPE=C3D8\n3,1,2,3,4,5,6,7,8\n"
+            b"*INTEGRATION\n3,1\n0,0,0,1\n",
+            b"*INTEGRATION\n1,2\n0,0,0,1\n",
+            b"*INTEGRATION\n1,1\n** missing point\n",
+            b"*INTEGRATION\n1,1\n0,0,1\n",
+            b"*INTEGRATION\n1,1\n0,0,0,NaN\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(mesh + valid))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(0, inspection["summary"]["errors"])
+            schemes = [
+                item for item in inspection["semantic_model"]["entities"]
+                if item["kind"] == "integration-scheme"
+            ]
+            self.assertEqual([1, 1, 2], [
+                item["attributes"]["replacement_order"] for item in schemes
+            ])
+            self.assertEqual(2, len(schemes[-1]["attributes"]["points"]))
+            for index, command in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(mesh + command))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_all_node_coordinate_operations_target_the_current_cluster(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

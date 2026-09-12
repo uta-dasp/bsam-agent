@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.111.0",
+  "registry_version": "0.112.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -217,8 +217,8 @@
       "kind": "source",
       "locator": "source/libbsam/mod_fe_element_library.f90",
       "line_start": 30,
-      "line_end": 117,
-      "claim": "Enumerates the six allocatable element types and dispatches their topology sizes."
+      "line_end": 174,
+      "claim": "Enumerates the six allocatable element types, dispatches their topology sizes, and shows that custom integration allocation and point assignment are both effective for X3D8 and Y3D8."
     },
     {
       "id": "evidence.fe-boundary-records",
@@ -2623,16 +2623,16 @@
       "entity_kind": "integration-scheme",
       "routing_terms": ["integration scheme", "integration schemes", "integration points"],
       "dispatch_prefix": "*INTE",
-      "summary": "Sets the integration scheme for supported X3D8 elements.",
+      "summary": "Sets the integration scheme for supported X3D8 and Y3D8 elements.",
       "coverage": "documented",
       "parameters": [],
-      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation"],
-      "remaining_work": ["Confirm behavior for non-X3D8 elements, repeated element headers, and nonpositive integration counts."],
+      "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-integration-orientation", "evidence.fe-element-types"],
+      "remaining_work": [],
       "operations": {
         "parse": "implemented", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "nested-records",
@@ -2644,9 +2644,9 @@
             {"name": "element-header", "repetition": "repeated", "fields": [{"name": "element_label", "value_type": "positive-integer", "required": true, "summary": "Existing element receiving the scheme."}, {"name": "integration_point_count", "value_type": "positive-integer", "required": true, "summary": "Number of point rows that immediately follow."}]},
             {"name": "integration-point", "repetition": "count-from-previous-field", "fields": [{"name": "p1", "value_type": "real", "required": true, "summary": "First parametric coordinate."}, {"name": "p2", "value_type": "real", "required": true, "summary": "Second parametric coordinate."}, {"name": "p3", "value_type": "real", "required": true, "summary": "Third parametric coordinate."}, {"name": "gauss_weight", "value_type": "real", "required": true, "summary": "Integration weight."}]}
           ],
-          "constraints": ["Each element header is followed immediately by exactly integration_point_count point rows."]
+          "constraints": ["INTEGRATION accepts no command-line options; each header has exactly one positive element label and one point count from 1 through 100000.", "Each element header is followed immediately by exactly integration_point_count physical point rows, each containing four finite reals; blank and comment rows cannot satisfy the declared count.", "Targets resolve uniquely and custom point assignment is effective only for X3D8 and Y3D8.", "A repeated header for one element clears and replaces its earlier integration scheme; the last complete header is effective."]
         }],
-        "dependencies": ["The target element must already exist."]
+        "dependencies": ["The target element must already exist uniquely and have X3D8 or Y3D8 topology."]
       }
     },
     {

@@ -4689,28 +4689,111 @@ def build_semantic_index(
                         _key("cluster", cluster, None), source, command_line,
                     )
             elif command == "*INTE" and cluster:
-                if any(line.stripped.startswith("**") for line in body):
-                    continue
+                integration_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                if integration_options:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error",
+                        message="INTEGRATION does not accept command-line options",
+                        line=command_line.number, source=source,
+                    ))
                 cursor = 0
-                while cursor < len(records):
-                    line = records[cursor]
-                    values = _fields(line.text)
-                    if len(values) < 2 or not values[0].isdigit():
-                        break
+                replacement_counts: dict[str, int] = {}
+                while cursor < len(body):
+                    line = body[cursor]
+                    if not line.stripped or line.stripped.startswith("**"):
+                        cursor += 1
+                        continue
+                    values = _record_fields(line)
                     try:
+                        element_label = int(values[0])
                         point_count = int(values[1])
-                    except ValueError:
+                        if (
+                            len(values) != 2 or element_label <= 0
+                            or not 1 <= point_count <= 100_000
+                        ):
+                            raise ValueError
+                    except (IndexError, ValueError):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=(
+                                "INTEGRATION headers require a positive element label and "
+                                "point count from 1 through 100000"
+                            ),
+                            line=line.number, source=source,
+                        ))
                         break
+                    element_key = _key("element", str(element_label), cluster)
+                    targets = [item for item in index.entities if item.key == element_key]
+                    target_type = (
+                        str(targets[0].attributes.get("element_type") or "").upper()
+                        if len(targets) == 1 else ""
+                    )
+                    target_error: str | None = None
+                    if len(targets) != 1:
+                        target_error = (
+                            "INTEGRATION target element must resolve uniquely before use"
+                        )
+                    elif target_type not in {"X3D8", "Y3D8"}:
+                        target_error = "INTEGRATION is effective only for X3D8 and Y3D8 elements"
+                    if target_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=target_error,
+                            line=line.number, source=source,
+                        ))
+                    point_rows: list[list[float]] = []
+                    point_error: str | None = None
+                    for point_index in range(point_count):
+                        point_cursor = cursor + point_index + 1
+                        if point_cursor >= len(body):
+                            point_error = (
+                                "INTEGRATION header is not followed by its declared point rows"
+                            )
+                            break
+                        point_line = body[point_cursor]
+                        point_values = _record_fields(point_line)
+                        try:
+                            parsed_point = [_fortran_real(item) for item in point_values]
+                            if (
+                                not point_line.stripped
+                                or point_line.stripped.startswith("**")
+                                or len(parsed_point) != 4
+                                or not all(math.isfinite(item) for item in parsed_point)
+                            ):
+                                raise ValueError
+                        except ValueError:
+                            point_error = (
+                                "INTEGRATION point rows require four finite real values; "
+                                "blank and comment rows cannot satisfy the declared count"
+                            )
+                            break
+                        point_rows.append(parsed_point)
+                    if point_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=point_error,
+                            line=line.number, source=source,
+                        ))
+                    replacement_counts[element_key] = (
+                        replacement_counts.get(element_key, 0) + 1
+                    )
                     integration = _entity(
                         index, "integration-scheme", f"{source}:{line.number}",
                         source, line, cluster,
-                        {"element": values[0], "point_count": point_count},
+                        {
+                            "element": str(element_label),
+                            "point_count": point_count,
+                            "points": point_rows,
+                            "replacement_order": replacement_counts[element_key],
+                        },
                     )
                     _reference(
                         index, integration, "targets-element",
-                        _key("element", values[0], cluster), source, line,
+                        element_key, source, line,
                     )
-                    if point_count < 1 or cursor + point_count >= len(records):
+                    if point_error is not None:
                         break
                     cursor += point_count + 1
             elif command in {"*BUIL", "*STOP"} and cluster:

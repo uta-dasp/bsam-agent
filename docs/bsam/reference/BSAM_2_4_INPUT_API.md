@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.111.0`
-- Registry SHA-256: `0A4B8768E8963AE81C4969E10C70671A9B814CB2284FCF3ED71DEFDB772B6B02`
+- Registry version: `0.112.0`
+- Registry SHA-256: `359B5971E3F7796A40AB90D86E3502596378E6E28D2D7097335561E8CF25EC48`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -681,7 +681,7 @@ The parser dispatches on the first five characters (the leading `*` plus four le
 | `*FIELD` | `*FIEL` | documented | `VARIABLES` | Applies field values with a configured variable count. |
 | `*SELECTION` | `*SELE` | documented | `ID`, `TYPE` | Defines an indexed node or element selection used by later operations. |
 | `*TOLERANCE` | `*TOLE` | documented | `TYPE` | Overrides one of the model tolerances used by geometry and crack operations. |
-| `*INTEGRATION` | `*INTE` | documented | — | Sets the integration scheme for supported X3D8 elements. |
+| `*INTEGRATION` | `*INTE` | documented | — | Sets the integration scheme for supported X3D8 and Y3D8 elements. |
 | `*ORIENTATION` | `*ORIE` | documented | `NAME` | Defines nodal or elemental orientation data. |
 | `*BUILD` | `*BUIL` | documented | — | Forces intermediate construction of element information before cluster input ends. |
 | `*STOP` | `*STOP` | documented | — | Finishes the current FE cluster reader after updating element data. |
@@ -1120,26 +1120,25 @@ Termination: fixed-count. Dependencies: PTOL affects proximity operations, ITOL 
 
 ### `*INTEGRATION`
 
-Sets the integration scheme for supported X3D8 elements.
+Sets the integration scheme for supported X3D8 and Y3D8 elements.
 
 - Registry ID: `command.integration`
 - Dispatch prefix: `*INTE`
 - Coverage: documented
-- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-integration-orientation](#evidencefe-integration-orientation)
-- Operational support: `parse`=implemented, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
-
-Remaining specification work:
-
-- Confirm behavior for non-X3D8 elements, repeated element headers, and nonpositive integration counts.
+- Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-integration-orientation](#evidencefe-integration-orientation), [evidence.fe-element-types](#evidencefe-element-types)
+- Operational support: `parse`=implemented, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 #### `*INTEGRATION` body
 
-Termination: next-command-or-eof. Dependencies: The target element must already exist.
+Termination: next-command-or-eof. Dependencies: The target element must already exist uniquely and have X3D8 or Y3D8 topology.
 
 - **per-element-scheme** (always):
   - `element-header` [repeated]: `element_label`:positive-integer, `integration_point_count`:positive-integer
   - `integration-point` [count-from-previous-field]: `p1`:real, `p2`:real, `p3`:real, `gauss_weight`:real
-  - Constraint: Each element header is followed immediately by exactly integration_point_count point rows.
+  - Constraint: INTEGRATION accepts no command-line options; each header has exactly one positive element label and one point count from 1 through 100000.
+  - Constraint: Each element header is followed immediately by exactly integration_point_count physical point rows, each containing four finite reals; blank and comment rows cannot satisfy the declared count.
+  - Constraint: Targets resolve uniquely and custom point assignment is effective only for X3D8 and Y3D8.
+  - Constraint: A repeated header for one element clears and replaces its earlier integration scheme; the last complete header is effective.
 
 ### `*ORIENTATION`
 
@@ -2062,7 +2061,7 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 <a id="evidencefe-element-generation"></a>
 - `evidence.fe-element-generation` — source: `source/libbsam/mod_fe_input.f90:2263-2472` — Defines explicit element connectivity and structured grid-offset ELGEN records.
 <a id="evidencefe-element-types"></a>
-- `evidence.fe-element-types` — source: `source/libbsam/mod_fe_element_library.f90:30-117` — Enumerates the six allocatable element types and dispatches their topology sizes.
+- `evidence.fe-element-types` — source: `source/libbsam/mod_fe_element_library.f90:30-174` — Enumerates the six allocatable element types, dispatches their topology sizes, and shows that custom integration allocation and point assignment are both effective for X3D8 and Y3D8.
 <a id="evidencefe-boundary-records"></a>
 - `evidence.fe-boundary-records` — source: `source/libbsam/mod_fe_input.f90:2661-2879` — Defines ABAQUS, LIST, and POLYNOMIAL cluster-local boundary rows, target resolution, and polynomial-order handling.
 <a id="evidencefe-crack-controls"></a>
