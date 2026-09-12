@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.106.0` additionally verifies cluster `*EXCLUSION` shape/side exclusivity, exact BOX/PLANE/PREVIOUS record widths, finite geometry, ordered box bounds, nonzero plane normals, nonnegative bands, and positive prior-crack diameter.
+
 Registry `0.105.0` additionally verifies cluster `*SHIFT` and `*SCALE` ALL/NSET targeting, source buffer limits, exactly one three-finite-real vector, and nonzero scale factors.
 
 Registry `0.104.0` additionally verifies cluster `*TOLERANCE` optional uppercase TYPE selection, unknown-option rejection, exactly one value record, and a nonnegative finite real value.

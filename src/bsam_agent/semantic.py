@@ -4599,6 +4599,46 @@ def build_semantic_index(
                 )
                 side = "outside" if "OUTSIDE" in options else "inside"
                 values = _fields(records[0].text) if records else []
+                exclusion_tokens = [token.casefold()[:3] for token in re.split(
+                    r"[\s,]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token][1:]
+                shape_tokens = [token for token in exclusion_tokens if token in {"box", "pla", "pre"}]
+                side_tokens = [token for token in exclusion_tokens if token in {"ins", "out"}]
+                exclusion_error: str | None = None
+                if (
+                    any(token not in {"box", "pla", "pre", "ins", "out"} for token in exclusion_tokens)
+                    or len(shape_tokens) > 1 or len(side_tokens) > 1
+                    or "pre" in shape_tokens and side_tokens
+                ):
+                    exclusion_error = "EXCLUSION shape and side flags are type-valid and mutually exclusive"
+                expected = 1 if shape == "previous" else 7 if shape == "plane" else 6
+                numeric_values: list[float] = []
+                if exclusion_error is None:
+                    if len(records) != 1 or len(values) != expected:
+                        exclusion_error = f"{shape.upper()} EXCLUSION requires exactly {expected} real values"
+                    else:
+                        try:
+                            numeric_values = [_fortran_real(item) for item in values]
+                            if not all(math.isfinite(item) for item in numeric_values):
+                                raise ValueError
+                        except ValueError:
+                            exclusion_error = "EXCLUSION geometry values must be finite reals"
+                if exclusion_error is None and shape == "box" and any(
+                    numeric_values[index] > numeric_values[index + 3] for index in range(3)
+                ):
+                    exclusion_error = "BOX EXCLUSION minimum bounds must not exceed maximum bounds"
+                if exclusion_error is None and shape == "plane":
+                    if not any(numeric_values[index] != 0 for index in range(3, 6)):
+                        exclusion_error = "PLANE EXCLUSION normal must be nonzero"
+                    elif numeric_values[6] < 0:
+                        exclusion_error = "PLANE EXCLUSION distance must be nonnegative"
+                if exclusion_error is None and shape == "previous" and numeric_values[0] <= 0:
+                    exclusion_error = "PREVIOUS EXCLUSION diameter must be positive"
+                if exclusion_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=exclusion_error,
+                        line=command_line.number, source=source,
+                    ))
                 exclusion = _entity(
                     index, "exclusion-region", f"{source}:{command_line.number}",
                     source, command_line, cluster,

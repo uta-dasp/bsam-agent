@@ -150,6 +150,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual("verified", commands["*SCALE"]["operations"]["static_validation"])
         exclusion = {item["name"]: item for item in commands["*EXCLUSION"]["parameters"]}
         self.assertEqual("BOX", exclusion["shape"]["default"])
+        self.assertEqual("verified", commands["*EXCLUSION"]["operations"]["static_validation"])
         self.assertIn("xy=(-y,x,z)", json.dumps(commands["*FLIP"]).lower())
         self.assertEqual("verified", commands["*FLIP"]["operations"]["static_validation"])
 

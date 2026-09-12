@@ -699,6 +699,32 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_exclusion_variants_and_geometry_are_validated(self) -> None:
+        valid = (
+            b"*EXCLUSION\n0,0,0,1,1,1\n",
+            b"*EXCLUSION,PLANE,OUTSIDE\n0,0,0,0,0,1,0\n",
+            b"*EXCLUSION,PREVIOUS\n1D-3\n",
+        )
+        invalid = (
+            b"*EXCLUSION,BOX,PLANE\n0,0,0,1,1,1\n",
+            b"*EXCLUSION,PREVIOUS,INSIDE\n1\n",
+            b"*EXCLUSION,OTHER\n0,0,0,1,1,1\n",
+            b"*EXCLUSION\n1,0,0,0,1,1\n",
+            b"*EXCLUSION,PLANE\n0,0,0,0,0,0,1\n",
+            b"*EXCLUSION,PLANE\n0,0,0,0,0,1,-1\n",
+            b"*EXCLUSION,PREVIOUS\n0\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, exclusion in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + exclusion))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, exclusion in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + exclusion))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_build_and_stop_are_source_located_topology_operations(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
