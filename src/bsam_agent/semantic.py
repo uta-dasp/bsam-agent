@@ -4232,11 +4232,50 @@ def build_semantic_index(
                     _reference(index, load, reference_kind, target_key, source, line)
             elif command == "*FIEL" and cluster:
                 variables = options.get("VARIABLES")
+                field_tokens = [token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token]
+                field_error: str | None = None
+                variable_count = 0
+                if not (
+                    len(field_tokens) == 3
+                    and field_tokens[1].casefold()[:3] == "var"
+                ):
+                    field_error = "FIELD requires exactly VARIABLES=<integer(1..10)>"
+                else:
+                    try:
+                        variable_count = int(field_tokens[2])
+                        if not 1 <= variable_count <= 10:
+                            raise ValueError
+                    except ValueError:
+                        field_error = "FIELD VARIABLES must be an integer from 1 through 10"
+                if field_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=field_error,
+                        line=command_line.number, source=source,
+                    ))
                 for line in records:
                     values = _fields(line.text)
                     if not values:
                         continue
                     target = values[0]
+                    row_error: str | None = None
+                    if field_error is None and len(values) != variable_count + 1:
+                        row_error = f"FIELD rows require one target and {variable_count} values"
+                    elif len(target) > 20 and not target.lstrip("+").isdigit():
+                        row_error = "FIELD node-set targets may contain at most 20 characters"
+                    elif field_error is None:
+                        try:
+                            field_values = [_fortran_real(item) for item in values[1:]]
+                            if not all(math.isfinite(item) for item in field_values):
+                                raise ValueError
+                        except ValueError:
+                            row_error = "FIELD values must be finite reals"
+                    if row_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=row_error,
+                            line=line.number, source=source,
+                        ))
                     field_value = _entity(
                         index, "nodal-field", f"{source}:{line.number}", source,
                         line, cluster, {"target": target, "variables": variables},

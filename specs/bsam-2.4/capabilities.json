@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.107.0",
+  "registry_version": "0.108.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2530,12 +2530,12 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
-        "variants": [{"name": "nodal-field-values", "when": "VARIABLES is present", "rows": [{"name": "field", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "Selects an existing node set first, otherwise an existing numeric node label."}, {"name": "values", "value_type": "real-list(VARIABLES)", "required": true, "summary": "Replaces the first VARIABLES field slots on every target node."}]}], "constraints": ["Rows are comma-delimited and must contain exactly VARIABLES values.", "VARIABLES is mandatory because the source local has no visible default.", "The source does not update node%nfield for node-set targets and writes it through an incorrect index for individual targets; Agent generation is blocked until this consumer-state defect is resolved or proven harmless."]}],
+        "variants": [{"name": "nodal-field-values", "when": "VARIABLES is present", "rows": [{"name": "field", "repetition": "repeated", "fields": [{"name": "target", "value_type": "node-label-or-node-set-name", "required": true, "summary": "Selects an existing node set first, otherwise an existing numeric node label."}, {"name": "values", "value_type": "real-list(VARIABLES)", "required": true, "summary": "Replaces the first VARIABLES field slots on every target node."}]}], "constraints": ["Rows are comma-delimited and must contain exactly VARIABLES finite real values.", "VARIABLES is mandatory, unique, and limited to 1..10 because the source local has no visible default and node storage has ten slots.", "Unknown command-line options and node-set targets beyond the source's 20-character lookup buffer are rejected.", "The source does not update node%nfield for node-set targets and writes it through an incorrect index for individual targets; Agent generation is blocked until this consumer-state defect is resolved or proven harmless."]}],
         "dependencies": ["Targets must refer to nodes or node sets already created in the current cluster.", "Downstream material or analysis consumers determine the meaning and units of each field position."]
       }
     },

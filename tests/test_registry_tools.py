@@ -138,6 +138,7 @@ class RegistryToolsTests(unittest.TestCase):
         }["ID"]["value_type"])
         self.assertEqual("unsupported", commands["*FIELD"]["operations"]["generate"])
         self.assertEqual("unassessed", commands["*FIELD"]["operations"]["execute"])
+        self.assertEqual("verified", commands["*FIELD"]["operations"]["static_validation"])
         self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["generate"])
         self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["execute"])
         self.assertEqual("verified", commands["*DIMENSIONS"]["operations"]["static_validation"])

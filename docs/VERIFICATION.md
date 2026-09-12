@@ -123,6 +123,8 @@ Registry 0.106.0 verifies cluster `*EXCLUSION`: BOX, PLANE, and PREVIOUS shape f
 
 Registry 0.107.0 verifies cluster `*LOAD`: command-line options are rejected; each row contains exactly a node/node-set target, DOF 1–3, and finite real value; node-set names respect the source lookup buffer; and target references must resolve.
 
+Registry 0.108.0 verifies cluster `*FIELD` input shape: VARIABLES is required once in the range 1–10; each row has one target and exactly that many finite values; target lengths and references are checked. This does not qualify execution or generation because the existing node field-state defect remains.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

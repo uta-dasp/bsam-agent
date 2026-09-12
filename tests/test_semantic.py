@@ -553,6 +553,28 @@ class SemanticIndexTests(unittest.TestCase):
             )
             self.assertTrue(all(item["status"] == "resolved" for item in references))
 
+    def test_cluster_field_variable_count_rows_and_values_are_validated(self) -> None:
+        valid = b"*FIELD,VARIABLES=2\nedge,1D0,-2\n1,3,4\n"
+        invalid = (
+            b"*FIELD\nedge,1\n",
+            b"*FIELD,OTHER=1\nedge,1\n",
+            b"*FIELD,VARIABLES=0\nedge\n",
+            b"*FIELD,VARIABLES=11\nedge," + b"1," * 10 + b"1\n",
+            b"*FIELD,VARIABLES=2\nedge,1\n",
+            b"*FIELD,VARIABLES=1\nedge,NaN\n",
+            b"*FIELD,VARIABLES=1\nthis_node_set_name_is_too_long,1\n",
+        )
+        prefix = b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(prefix + valid))
+            self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, field in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + field))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_missing_cluster_field_target_is_an_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
