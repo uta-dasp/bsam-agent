@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.123.0`
-- Registry SHA-256: `D092A9CD6CA5F0495D4B3829894E20C61A85D37A39A0410D92B108F565518EC6`
+- Registry version: `0.124.0`
+- Registry SHA-256: `CB3514A6D8A9BB9BCC8D1A944E3CE9053ECD15A7215DEC6C57D8BE536B2452E9`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -950,22 +950,20 @@ Known parameters:
 - `GENERATE` (flag, optional): Selects generated-range mode and is mutually exclusive with BOX.
 - `BOX` (flag, optional): Selects coordinate-box mode and is mutually exclusive with GENERATE.
 
-Remaining specification work:
-
-- Confirm missing-label and duplicate-membership diagnostics.
-
 #### `*NSET` body
 
-Termination: next-command-or-eof. Dependencies: All selected node labels must already exist.
+Termination: next-command-or-eof. Dependencies: All selected node labels must already exist.; Repeated explicit declarations extend one logical set; duplicate membership is rejected under Agent policy because the source silently deduplicates it.
 
 - **explicit** (neither GENERATE nor BOX):
   - `labels` [repeated]: `node_labels`:positive-integer-list
 - **generated-range** (GENERATE):
   - `range` [repeated]: `first_label`:positive-integer, `last_label`:positive-integer, `increment`:nonzero-integer
   - Constraint: GENERATE and BOX are mutually exclusive.
+  - Constraint: The increment must progress from first_label toward last_label and expansion is bounded to 100000 members.
 - **coordinate-box** (BOX):
   - `bounds` [repeated]: `xmin`:real, `ymin`:real, `zmin`:real, `xmax`:real, `ymax`:real, `zmax`:real
   - Constraint: GENERATE and BOX are mutually exclusive.
+  - Constraint: Bounds must be finite and ordered; matching existing nodes become explicit semantic members.
 
 ### `*ELSET`
 
@@ -982,18 +980,15 @@ Known parameters:
 - `ELSET` (element-set-name, required): Names the target element set.
 - `GENERATE` (flag, optional): Selects generated-range mode.
 
-Remaining specification work:
-
-- Confirm missing-label and duplicate-membership diagnostics.
-
 #### `*ELSET` body
 
-Termination: next-command-or-eof. Dependencies: All selected element labels must already exist.
+Termination: next-command-or-eof. Dependencies: All selected element labels must already exist.; Repeated explicit declarations extend one logical set; duplicate membership is rejected under Agent policy because the source silently deduplicates it.
 
 - **explicit** (GENERATE absent):
   - `labels` [repeated]: `element_labels`:positive-integer-list
 - **generated-range** (GENERATE):
   - `range` [repeated]: `first_label`:positive-integer, `last_label`:positive-integer, `increment`:nonzero-integer
+  - Constraint: The increment must progress from first_label toward last_label and expansion is bounded to 100000 members.
 
 ### `*BOUNDARY`
 

@@ -590,6 +590,62 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertTrue(any("node capacity" in message for message in messages))
             self.assertTrue(any("element capacity" in message for message in messages))
 
+    def test_node_and_element_set_membership_contracts_fail_closed(self) -> None:
+        mesh = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,2,0,0\n4,0,1,0\n"
+            b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n2,1,2,3,4\n"
+        )
+        valid_sets = (
+            b"*NSET,NSET=edge\n1,2\n"
+            b"*NSET,NSET=odd,GENERATE\n1,3,2\n"
+            b"*NSET,NSET=near,BOX\n0,-1,-1,1,0,1\n"
+            b"*ELSET,ELSET=solid,GENERATE\n1,2,1\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(mesh + valid_sets))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(0, inspection["summary"]["errors"])
+            contains = [
+                item for item in inspection["semantic_model"]["references"]
+                if item["kind"] == "contains"
+            ]
+            self.assertEqual(8, len(contains))
+            self.assertTrue(all(item["status"] == "resolved" for item in contains))
+
+            invalid_sets = (
+                b"*NSET\n1\n",
+                b"*NSET,NSET=edge,OTHER\n1\n",
+                b"*NSET,NSET=edge,GENERATE,BOX\n1,2,1\n",
+                b"*NSET,NSET=edge\n99\n",
+                b"*NSET,NSET=edge,GENERATE\n3,1,1\n",
+                b"*NSET,NSET=edge,GENERATE\n1,999999,1\n",
+                b"*NSET,NSET=edge,BOX\n1,0,0,0,1,1\n",
+                b"*ELSET,ELSET=solid,BOX\n1\n",
+            )
+            for ordinal, command in enumerate(invalid_sets):
+                with self.subTest(ordinal=ordinal):
+                    invalid = Path(directory) / f"invalid-set-{ordinal}.in"
+                    invalid.write_bytes(deck(mesh + command))
+                    diagnostics = SourceSet.read(invalid).inspection()["diagnostics"]
+                self.assertTrue(any(
+                    item["code"] in {"BSAM-E301", "BSAM-E310"}
+                    for item in diagnostics
+                ))
+
+            duplicate = Path(directory) / "duplicate-members.in"
+            duplicate.write_bytes(deck(
+                mesh
+                + b"*NSET,NSET=edge\n1,2\n*NSET,NSET=edge\n2,3\n"
+                + b"*ELSET,ELSET=solid\n1\n*ELSET,ELSET=solid\n1,2\n"
+            ))
+            duplicate_messages = [
+                item["message"]
+                for item in SourceSet.read(duplicate).inspection()["diagnostics"]
+                if item["code"] == "BSAM-E310" and "duplicate" in item["message"]
+            ]
+            self.assertEqual(2, len(duplicate_messages))
+
     def test_include_entities_use_workspace_independent_source_labels(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)

@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.123.0",
+  "registry_version": "0.124.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2406,7 +2406,7 @@
         }
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
-      "remaining_work": ["Confirm missing-label and duplicate-membership diagnostics."],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "verified", "create": "verified", "delete": "verified",
@@ -2418,10 +2418,10 @@
         "termination": "next-command-or-eof",
         "variants": [
           {"name": "explicit", "when": "neither GENERATE nor BOX", "rows": [{"name": "labels", "repetition": "repeated", "fields": [{"name": "node_labels", "value_type": "positive-integer-list", "required": true, "summary": "One or more existing node labels."}]}], "constraints": []},
-          {"name": "generated-range", "when": "GENERATE", "rows": [{"name": "range", "repetition": "repeated", "fields": [{"name": "first_label", "value_type": "positive-integer", "required": true, "summary": "First node label."}, {"name": "last_label", "value_type": "positive-integer", "required": true, "summary": "Inclusive last node label."}, {"name": "increment", "value_type": "nonzero-integer", "required": true, "summary": "Label step."}]}], "constraints": ["GENERATE and BOX are mutually exclusive."]},
-          {"name": "coordinate-box", "when": "BOX", "rows": [{"name": "bounds", "repetition": "repeated", "fields": [{"name": "xmin", "value_type": "real", "required": true, "summary": "Minimum X."}, {"name": "ymin", "value_type": "real", "required": true, "summary": "Minimum Y."}, {"name": "zmin", "value_type": "real", "required": true, "summary": "Minimum Z."}, {"name": "xmax", "value_type": "real", "required": true, "summary": "Maximum X."}, {"name": "ymax", "value_type": "real", "required": true, "summary": "Maximum Y."}, {"name": "zmax", "value_type": "real", "required": true, "summary": "Maximum Z."}]}], "constraints": ["GENERATE and BOX are mutually exclusive."]}
+          {"name": "generated-range", "when": "GENERATE", "rows": [{"name": "range", "repetition": "repeated", "fields": [{"name": "first_label", "value_type": "positive-integer", "required": true, "summary": "First node label."}, {"name": "last_label", "value_type": "positive-integer", "required": true, "summary": "Inclusive last node label."}, {"name": "increment", "value_type": "nonzero-integer", "required": true, "summary": "Label step."}]}], "constraints": ["GENERATE and BOX are mutually exclusive.", "The increment must progress from first_label toward last_label and expansion is bounded to 100000 members."]},
+          {"name": "coordinate-box", "when": "BOX", "rows": [{"name": "bounds", "repetition": "repeated", "fields": [{"name": "xmin", "value_type": "real", "required": true, "summary": "Minimum X."}, {"name": "ymin", "value_type": "real", "required": true, "summary": "Minimum Y."}, {"name": "zmin", "value_type": "real", "required": true, "summary": "Minimum Z."}, {"name": "xmax", "value_type": "real", "required": true, "summary": "Maximum X."}, {"name": "ymax", "value_type": "real", "required": true, "summary": "Maximum Y."}, {"name": "zmax", "value_type": "real", "required": true, "summary": "Maximum Z."}]}], "constraints": ["GENERATE and BOX are mutually exclusive.", "Bounds must be finite and ordered; matching existing nodes become explicit semantic members."]}
         ],
-        "dependencies": ["All selected node labels must already exist."]
+        "dependencies": ["All selected node labels must already exist.", "Repeated explicit declarations extend one logical set; duplicate membership is rejected under Agent policy because the source silently deduplicates it."]
       }
     },
     {
@@ -2448,7 +2448,7 @@
         }
       ],
       "evidence_ids": ["evidence.fe-command-dispatch", "evidence.fe-core-records"],
-      "remaining_work": ["Confirm missing-label and duplicate-membership diagnostics."],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "verified", "create": "verified", "delete": "verified",
@@ -2460,9 +2460,9 @@
         "termination": "next-command-or-eof",
         "variants": [
           {"name": "explicit", "when": "GENERATE absent", "rows": [{"name": "labels", "repetition": "repeated", "fields": [{"name": "element_labels", "value_type": "positive-integer-list", "required": true, "summary": "One or more existing element labels."}]}], "constraints": []},
-          {"name": "generated-range", "when": "GENERATE", "rows": [{"name": "range", "repetition": "repeated", "fields": [{"name": "first_label", "value_type": "positive-integer", "required": true, "summary": "First element label."}, {"name": "last_label", "value_type": "positive-integer", "required": true, "summary": "Inclusive last element label."}, {"name": "increment", "value_type": "nonzero-integer", "required": true, "summary": "Label step."}]}], "constraints": []}
+          {"name": "generated-range", "when": "GENERATE", "rows": [{"name": "range", "repetition": "repeated", "fields": [{"name": "first_label", "value_type": "positive-integer", "required": true, "summary": "First element label."}, {"name": "last_label", "value_type": "positive-integer", "required": true, "summary": "Inclusive last element label."}, {"name": "increment", "value_type": "nonzero-integer", "required": true, "summary": "Label step."}]}], "constraints": ["The increment must progress from first_label toward last_label and expansion is bounded to 100000 members."]}
         ],
-        "dependencies": ["All selected element labels must already exist."]
+        "dependencies": ["All selected element labels must already exist.", "Repeated explicit declarations extend one logical set; duplicate membership is rejected under Agent policy because the source silently deduplicates it."]
       }
     },
     {

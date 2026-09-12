@@ -32,7 +32,7 @@ class NotchProjectIntegrationTests(unittest.TestCase):
         )
         semantic = inspection["semantic_model"]["summary"]
         self.assertEqual(20557, semantic["entities"])
-        self.assertEqual(58755, semantic["resolved_references"])
+        self.assertEqual(68763, semantic["resolved_references"])
         self.assertEqual(0, semantic["unresolved_references"])
         solvers = [
             entity

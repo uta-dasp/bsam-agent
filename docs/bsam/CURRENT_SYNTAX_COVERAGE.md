@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.124.0` closes NSET/ELSET membership validation: canonical headers and mutually exclusive modes, source-bounded names and labels, exact records with source-compatible empty sets, progressing generated ranges capped at 100000 members, finite ordered coordinate boxes, resolved explicit/generated members, derived box membership, and duplicate-member rejection across repeated explicit declarations.
+
 Registry `0.123.0` closes the explicit mesh-record limits: NODE and ELEMENT accept only registered headers, enforce exact finite row shapes, topology-specific connectivity widths, positive labels within the source's fixed 999999 lookup bound, duplicate-label diagnostics, resolved connectivity, and DIMENSIONS node/element capacity checks.
 
 Registry `0.122.0` additionally verifies the required MATERIALS block: exact single-block termination, all 28 active numeric dispatches and the named type-50 header, source-bounded declaration capacity, complete per-type cursor consumption, structured key/value dispatch, legacy row types and widths, finite numeric values, source-defined ranges, order-sensitive options, and traversal-free external paths. Static validation is now verified for all 54 active constructs.

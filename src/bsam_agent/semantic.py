@@ -4644,6 +4644,7 @@ def build_semantic_index(
     dimensions_seen = False
     cluster_population_started = False
     dimension_allocations: list[tuple[SemanticEntity, str, tuple[int, int, int, int]]] = []
+    explicit_set_memberships: dict[str, set[str]] = {}
     cluster_declaration_ordinal = 0
     pending_cluster_records: list[SemanticEntity] = []
     registered_cluster_commands = load_registry()["cluster_commands"]
@@ -5589,17 +5590,149 @@ def build_semantic_index(
                 entity_kind = "node-set" if command == "*NSET" else "element-set"
                 member_kind = "node" if command == "*NSET" else "element"
                 option_name = "NSET" if command == "*NSET" else "ELSET"
-                name = options.get(option_name)
+                command_name = "NSET" if command == "*NSET" else "ELSET"
+                allowed_options = {option_name, "GENERATE"} | ({"BOX"} if command == "*NSET" else set())
+                parsed_options: dict[str, str | None] = {}
+                set_error: str | None = None
+                for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]:
+                    field = field.strip()
+                    if not field:
+                        continue
+                    if "=" in field:
+                        raw_name, raw_value = field.split("=", 1)
+                        option = raw_name.strip().upper()
+                        value = raw_value.strip()
+                    else:
+                        option, value = field.upper(), None
+                    if option not in allowed_options:
+                        set_error = f"unknown {command_name} option {option or field}"
+                        break
+                    if option in parsed_options:
+                        set_error = f"duplicate {command_name} option {option}"
+                        break
+                    if option in {"GENERATE", "BOX"} and value is not None:
+                        set_error = f"{command_name} {option} is a flag and takes no value"
+                        break
+                    if option == option_name and not value:
+                        set_error = f"{command_name} requires {option_name}=<name>"
+                        break
+                    parsed_options[option] = value
+                name = parsed_options.get(option_name)
                 if not name:
+                    set_error = set_error or f"{command_name} requires {option_name}=<name>"
+                elif len(name) > 20:
+                    set_error = set_error or f"{command_name} names may contain at most 20 characters"
+                if "GENERATE" in parsed_options and "BOX" in parsed_options:
+                    set_error = set_error or f"{command_name} GENERATE and BOX are mutually exclusive"
+                if set_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=set_error,
+                        line=command_line.number, source=source,
+                    ))
+                if not name or len(name) > 20:
                     continue
+                mode = (
+                    "generate" if "GENERATE" in parsed_options
+                    else "box" if "BOX" in parsed_options else "explicit"
+                )
                 entity = _entity(index, entity_kind, name, source, command_line, cluster, {
-                    "mode": "generate" if "GENERATE" in options else "box" if "BOX" in options else "explicit",
+                    "mode": mode,
                 })
-                if "GENERATE" not in options and "BOX" not in options:
-                    for line in records:
-                        for label in _fields(line.text):
-                            if label.isdigit():
-                                _reference(index, entity, "contains", _key(member_kind, label, cluster), source, line)
+                seen = explicit_set_memberships.setdefault(entity.key, set())
+                for line in records:
+                    member_keys: list[str] = []
+                    if mode == "explicit":
+                        fields = _record_fields(line)
+                        try:
+                            labels = [int(value) for value in fields]
+                            if not labels or any(
+                                value <= 0 or value > 999_999 for value in labels
+                            ):
+                                raise ValueError
+                        except ValueError:
+                            index.diagnostics.append(Diagnostic(
+                                code="BSAM-E310", severity="error",
+                                message=(
+                                    f"explicit {command_name} rows require positive integer "
+                                    "labels from 1 through 999999"
+                                ),
+                                line=line.number, source=source,
+                            ))
+                            continue
+                        member_keys = [
+                            _key(member_kind, str(label), cluster) for label in labels
+                        ]
+                    elif mode == "generate":
+                        fields = _record_fields(line)
+                        try:
+                            first, last, increment = map(int, fields)
+                            if (
+                                len(fields) != 3 or not 1 <= first <= 999_999
+                                or not 1 <= last <= 999_999 or increment == 0
+                                or (last - first) * increment < 0
+                            ):
+                                raise ValueError
+                            label_range = range(
+                                first, last + (1 if increment > 0 else -1), increment,
+                            )
+                            if len(label_range) == 0 or len(label_range) > 100_000:
+                                raise ValueError
+                        except (TypeError, ValueError):
+                            index.diagnostics.append(Diagnostic(
+                                code="BSAM-E310", severity="error",
+                                message=(
+                                    f"generated {command_name} rows require a progressing, "
+                                    "bounded three-integer range"
+                                ),
+                                line=line.number, source=source,
+                            ))
+                            continue
+                        member_keys = [
+                            _key(member_kind, str(label), cluster) for label in label_range
+                        ]
+                    else:
+                        fields = _record_fields(line)
+                        try:
+                            bounds = [_fortran_real(value) for value in fields]
+                            if (
+                                len(bounds) != 6 or not all(map(math.isfinite, bounds))
+                                or any(bounds[axis] > bounds[axis + 3] for axis in range(3))
+                            ):
+                                raise ValueError
+                        except ValueError:
+                            index.diagnostics.append(Diagnostic(
+                                code="BSAM-E310", severity="error",
+                                message=(
+                                    "BOX NSET rows require six finite coordinates with "
+                                    "ordered minimum and maximum bounds"
+                                ),
+                                line=line.number, source=source,
+                            ))
+                            continue
+                        member_keys = [
+                            item.key for item in index.entities
+                            if item.kind == "node"
+                            and str(item.attributes.get("cluster") or "").casefold()
+                            == str(cluster or "").casefold()
+                            and (coordinates := _node_coordinates(item)) is not None
+                            and all(
+                                bounds[axis] <= coordinates[axis] <= bounds[axis + 3]
+                                for axis in range(3)
+                            )
+                        ]
+                    for member_key in member_keys:
+                        if member_key in seen:
+                            index.diagnostics.append(Diagnostic(
+                                code="BSAM-E310", severity="error",
+                                message=f"duplicate {command_name} membership for {member_key}",
+                                line=line.number, source=source,
+                                provenance="agent-policy",
+                            ))
+                            continue
+                        seen.add(member_key)
+                        _reference(
+                            index, entity, "contains", member_key, source, line,
+                        )
 
             elif command == "*SECT":
                 section_options = [
