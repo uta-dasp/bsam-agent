@@ -4232,20 +4232,67 @@ def build_semantic_index(
                                 _reference(index, entity, "contains", _key(member_kind, label, cluster), source, line)
 
             elif command == "*SECT":
-                elset = options.get("ELSET")
-                if elset:
-                    connection_form = "CONNECTION" in options
+                section_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                parsed_section_options: dict[str, str | None] = {}
+                section_error: str | None = None
+                for field in section_options:
+                    if "=" in field:
+                        option_name, option_value = field.split("=", 1)
+                        name = option_name.strip().upper()
+                        value = option_value.strip()
+                    else:
+                        name, value = field.strip().upper(), None
+                    if name not in {"ELSET", "LAYERS", "CONNECTION"}:
+                        section_error = f"unknown SECTION option {name or field}"
+                        break
+                    if name in parsed_section_options:
+                        section_error = f"duplicate SECTION option {name}"
+                        break
+                    if name == "CONNECTION" and value is not None:
+                        section_error = "SECTION CONNECTION is a flag and takes no value"
+                        break
+                    if name != "CONNECTION" and not value:
+                        section_error = f"SECTION {name} requires a value"
+                        break
+                    parsed_section_options[name] = value
+                elset = parsed_section_options.get("ELSET")
+                connection_form = "CONNECTION" in parsed_section_options
+                try:
+                    layer_count = int(str(parsed_section_options.get("LAYERS", "")))
+                    if not 1 <= layer_count <= 99_999:
+                        raise ValueError
+                except ValueError:
+                    layer_count = 0
+                    section_error = section_error or (
+                        "SECTION LAYERS must be an integer from 1 through 99999"
+                    )
+                if not elset:
+                    section_error = section_error or "SECTION requires ELSET=<name>"
+                elif len(elset) > 20:
+                    section_error = section_error or (
+                        "SECTION ELSET names may contain at most 20 characters"
+                    )
+                if section_error is not None:
+                    _table_error(
+                        index, "BSAM-E310", section_error, source, command_line,
+                    )
+                if elset and len(elset) <= 20 and layer_count > 0:
                     attributes: dict[str, Any] = {
-                        "layers": options.get("LAYERS"),
+                        "layers": layer_count,
                         "connection": connection_form,
                     }
                     layer_rows: list[tuple[int, float, SourceLine]] = []
                     try:
-                        layer_count = int(str(options.get("LAYERS", "")))
-                        if layer_count <= 0 or len(records) != layer_count:
+                        if len(records) != layer_count:
                             raise ValueError
                         for line in records:
                             fields = _record_fields(line)
+                            if len(fields) != 2:
+                                raise ValueError
                             thickness = _fortran_real(fields[0])
                             material_id = int(fields[1])
                             if (
@@ -4254,16 +4301,24 @@ def build_semantic_index(
                             ):
                                 raise ValueError
                             layer_rows.append((material_id, thickness, line))
+                        total_thickness = sum(item[1] for item in layer_rows)
+                        if not math.isfinite(total_thickness) or total_thickness <= 0:
+                            raise ValueError
                     except (IndexError, ValueError):
                         _table_error(
                             index, "BSAM-E310",
-                            "SECTION requires exactly LAYERS positive thickness/material rows",
+                            (
+                                "SECTION requires exactly LAYERS two-field rows with finite "
+                                "positive thickness and positive definition IDs"
+                            ),
                             source, command_line,
                         )
                     else:
                         attributes.update({
                             "layers": layer_count,
-                            "layer_thicknesses": [item[1] for item in layer_rows],
+                            "layer_thicknesses": [
+                                item[1] / total_thickness for item in layer_rows
+                            ],
                             (
                                 "layer_constitutive_ids" if connection_form
                                 else "layer_material_ids"

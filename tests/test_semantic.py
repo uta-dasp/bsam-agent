@@ -163,6 +163,52 @@ class SemanticIndexTests(unittest.TestCase):
         self.assertTrue(all(item["status"] == "resolved" for item in references))
         self.assertEqual(0, inspection["summary"]["errors"])
 
+    def test_section_header_rows_and_normalized_thicknesses_are_validated(self) -> None:
+        mesh = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n"
+            b"*ELEMENT,TYPE=C3D4,ELSET=solid\n1,1,1,1,1\n"
+        )
+        materials = (
+            b"MATERIALS\n10\n1 0 0\n1 1 1\n"
+            b"10\n2 0 0\n2 2 2\nEND MATERIALS\n"
+        )
+        valid = b"*SECTION,ELSET=solid,LAYERS=2\n1,1\n3,2\n"
+        invalid = (
+            b"*SECTION,LAYERS=1\n1,1\n",
+            b"*SECTION,ELSET=solid\n1,1\n",
+            b"*SECTION,ELSET=solid,LAYERS=0\n",
+            b"*SECTION,ELSET=solid,LAYERS=100000\n",
+            b"*SECTION,ELSET=solid,LAYERS=1,OTHER\n1,1\n",
+            b"*SECTION,ELSET=solid,ELSET=solid,LAYERS=1\n1,1\n",
+            b"*SECTION,ELSET=solid,LAYERS=1,CONNECTION=yes\n1,1\n",
+            b"*SECTION,ELSET=abcdefghijklmnopqrstu,LAYERS=1\n1,1\n",
+            b"*SECTION,ELSET=solid,LAYERS=2\n1,1\n",
+            b"*SECTION,ELSET=solid,LAYERS=1\n1,1,2\n",
+            b"*SECTION,ELSET=solid,LAYERS=1\n-1,1\n",
+            b"*SECTION,ELSET=solid,LAYERS=1\nNaN,1\n",
+            b"*SECTION,ELSET=solid,LAYERS=2\n1D308,1\n1D308,2\n",
+            b"*SECTION,ELSET=solid,LAYERS=1\n1,0\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(mesh + valid).replace(
+                b"MATERIALS\n0\nEND MATERIALS\n", materials,
+            ))
+            inspection = SourceSet.read(root).inspection()
+            self.assertEqual(0, inspection["summary"]["errors"])
+            section = next(
+                item for item in inspection["semantic_model"]["entities"]
+                if item["kind"] == "section"
+            )
+            self.assertEqual([0.25, 0.75], section["attributes"]["layer_thicknesses"])
+            for index, command in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(mesh + command).replace(
+                    b"MATERIALS\n0\nEND MATERIALS\n", materials,
+                ))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_global_crack_leading_records_and_named_cluster_are_typed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

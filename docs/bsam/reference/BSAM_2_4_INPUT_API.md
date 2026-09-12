@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.112.0`
-- Registry SHA-256: `359B5971E3F7796A40AB90D86E3502596378E6E28D2D7097335561E8CF25EC48`
+- Registry version: `0.113.0`
+- Registry SHA-256: `1216742445020A986790DA1EE54BAE1B598BF78BD9A9DB4B1D2D335C588EE9E1`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1370,7 +1370,7 @@ Assigns layered section information to an existing element set.
 - Dispatch prefix: `*SECT`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-section-reader](#evidencefe-section-reader), [evidence.fe-section-connection-consumer](#evidencefe-section-connection-consumer)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1384,8 +1384,10 @@ Termination: next-command-or-eof. Dependencies: ELSET must name an existing elem
 
 - **layer-stack** (always):
   - `layer` [count-from-command-parameter]: `thickness`:positive-real, `definition_id`:positive-material-or-constitutive-id
-  - Constraint: The number of non-comment layer rows must equal LAYERS; fewer rows are fatal.
-  - Constraint: Layer thicknesses are divided by their total before assignment.
+  - Constraint: ELSET and LAYERS are required canonical options, CONNECTION is an optional valueless flag, duplicates and other options are rejected, and names respect the 20-character source buffer.
+  - Constraint: LAYERS is limited to the positive range representable by the source's five-character option buffer, 1 through 99999.
+  - Constraint: The number of non-comment layer rows must equal LAYERS; each row has exactly one finite positive thickness and one positive definition ID.
+  - Constraint: Layer thicknesses must have a finite positive sum and are divided by that sum before assignment.
   - Constraint: Without CONNECTION each definition_id resolves in MATERIALS; with CONNECTION each definition_id resolves in CONSTITUTIVE.
 
 ### `*CRACK`

@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.112.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
+Status: in progress. Registry `0.113.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -213,6 +213,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Validate `*NCOPY` options, source sets, exact rows, bounded counts, offsets, finite translations, and generated-label safety.
 - [x] Validate `*ELGEN` TYPE, exact integer rows, seed topology, bounded grids, shifted connectivity, and generated-label safety.
 - [x] Validate `*INTEGRATION` headers, bounded point rows, finite values, effective element types, targets, and replacement semantics.
+- [x] Validate `*SECTION` options, bounded layer counts, exact rows, finite thickness normalization, definition IDs, and references.
 - [ ] Validate structure, types, ranges, cardinality, and required records for every supported construct.
 - [ ] Validate references, dependency rules, mesh connectivity, sets, topology, and cross-feature constraints.
 - [ ] Add golden no-op and minimal-patch tests for every syntax family.

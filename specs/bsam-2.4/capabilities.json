@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.112.0",
+  "registry_version": "0.113.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2983,7 +2983,7 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "verified", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "records",
@@ -2995,7 +2995,7 @@
             {"name": "thickness", "value_type": "positive-real", "required": true, "summary": "Relative or absolute ply thickness; all rows are normalized by their sum."},
             {"name": "definition_id", "value_type": "positive-material-or-constitutive-id", "required": true, "summary": "MATERIALS identifier normally, or CONSTITUTIVE identifier when CONNECTION is present."}
           ]}],
-          "constraints": ["The number of non-comment layer rows must equal LAYERS; fewer rows are fatal.", "Layer thicknesses are divided by their total before assignment.", "Without CONNECTION each definition_id resolves in MATERIALS; with CONNECTION each definition_id resolves in CONSTITUTIVE."]
+          "constraints": ["ELSET and LAYERS are required canonical options, CONNECTION is an optional valueless flag, duplicates and other options are rejected, and names respect the 20-character source buffer.", "LAYERS is limited to the positive range representable by the source's five-character option buffer, 1 through 99999.", "The number of non-comment layer rows must equal LAYERS; each row has exactly one finite positive thickness and one positive definition ID.", "Layer thicknesses must have a finite positive sum and are divided by that sum before assignment.", "Without CONNECTION each definition_id resolves in MATERIALS; with CONNECTION each definition_id resolves in CONSTITUTIVE."]
         }],
         "dependencies": ["ELSET must name an existing element set.", "DIMENSIONS section_capacity must include this section.", "Every definition_id must resolve in the declaration family selected by CONNECTION.", "A ply-count edit must update LAYERS and the layer-row sequence atomically."]
       }

@@ -133,6 +133,8 @@ Registry 0.111.0 verifies `*ELGEN`: TYPE is the sole required option; rows conta
 
 Registry 0.112.0 verifies `*INTEGRATION`: it accepts no options; each exact two-integer header selects one existing X3D8/Y3D8 element and 1–100000 point rows; point rows contain four finite reals and cannot be replaced by physical comments or blanks. Repeated headers retain the source's clear-and-replace behavior.
 
+Registry 0.113.0 verifies `*SECTION`: canonical ELSET and bounded positive LAYERS are required, CONNECTION is an optional valueless flag, rows contain exactly finite positive thickness and a positive definition ID, thickness totals remain finite before normalization, and references select MATERIALS or CONSTITUTIVE according to CONNECTION.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

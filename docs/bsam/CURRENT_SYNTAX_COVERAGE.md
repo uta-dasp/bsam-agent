@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.113.0` additionally verifies `*SECTION` ELSET/LAYERS/CONNECTION headers, source-buffer-bounded layer counts, exact positive layer rows, finite normalized thicknesses, and material-or-constitutive reference selection.
+
 Registry `0.112.0` additionally verifies option-free `*INTEGRATION` headers, bounded positive point counts, exact finite point rows, uniquely resolved X3D8/Y3D8 targets, and source-defined last-header replacement semantics.
 
 Registry `0.111.0` additionally verifies `*ELGEN`'s sole required TYPE option, exact seven-integer rows, uniquely resolved topology-compatible seeds, bounded positive grids, positive existing shifted connectivity, and positive unique generated labels.
