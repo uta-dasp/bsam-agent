@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.103.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
+Status: in progress. Registry `0.104.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -204,6 +204,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Validate cluster `*FLIP` command-line TYPE mappings, uppercase values, unknown options, and command-only shape.
 - [x] Validate cluster `*TRANSFORM` required INERTIA, optional finite FLATTEN, unknown options, and command-only shape.
 - [x] Validate cluster `*SPACING` default, mutually exclusive command-line modes, positive VALUE, and command-only shape.
+- [x] Validate cluster `*TOLERANCE` TYPE option, uppercase values, exact record cardinality, and nonnegative finite values.
 - [ ] Validate structure, types, ranges, cardinality, and required records for every supported construct.
 - [ ] Validate references, dependency rules, mesh connectivity, sets, topology, and cross-feature constraints.
 - [ ] Add golden no-op and minimal-patch tests for every syntax family.

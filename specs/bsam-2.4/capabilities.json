@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.103.0",
+  "registry_version": "0.104.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2607,12 +2607,12 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
-        "variants": [{"name": "tolerance-value", "when": "always", "rows": [{"name": "value", "repetition": "once", "fields": [{"name": "value", "value_type": "nonnegative-real", "required": true, "summary": "Replaces the selected cluster tolerance."}]}], "constraints": ["The source reader accepts any real without range checking; Agent generation requires nonnegative values.", "Allocated defaults are PTOL=1e-6, ITOL=1e-8, FTOL=1e-10, and OTOL=0.", "PTOL has coordinate-length units; ITOL, FTOL, and OTOL are dimensionless parametric or shape-function tolerances."]}],
+        "variants": [{"name": "tolerance-value", "when": "always", "rows": [{"name": "value", "repetition": "once", "fields": [{"name": "value", "value_type": "nonnegative-real", "required": true, "summary": "Replaces the selected cluster tolerance."}]}], "constraints": ["Static validation requires exactly one nonnegative finite real even though the source reader accepts any real without range checking.", "TYPE is optional, unique, and uppercase-sensitive; unknown command-line options are rejected.", "Allocated defaults are PTOL=1e-6, ITOL=1e-8, FTOL=1e-10, and OTOL=0.", "PTOL has coordinate-length units; ITOL, FTOL, and OTOL are dimensionless parametric or shape-function tolerances."]}],
         "dependencies": ["PTOL affects proximity operations, ITOL affects parametric location, FTOL affects penalty-connection shape-function contributions, and OTOL extends accepted parametric element bounds."]
       }
     },

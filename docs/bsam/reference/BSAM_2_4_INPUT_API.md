@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.103.0`
-- Registry SHA-256: `E7CB8739A436F76A8B20241A96DB54E6E5AFB17BD7F0F609520AF820DA8FA452`
+- Registry version: `0.104.0`
+- Registry SHA-256: `3482C0F84F4486652258F010764440BAAF635D02C2FD89DED3B0C7B475312DAC`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1095,7 +1095,7 @@ Overrides one of the model tolerances used by geometry and crack operations.
 - Dispatch prefix: `*TOLE`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1107,7 +1107,8 @@ Termination: fixed-count. Dependencies: PTOL affects proximity operations, ITOL 
 
 - **tolerance-value** (always):
   - `value` [once]: `value`:nonnegative-real
-  - Constraint: The source reader accepts any real without range checking; Agent generation requires nonnegative values.
+  - Constraint: Static validation requires exactly one nonnegative finite real even though the source reader accepts any real without range checking.
+  - Constraint: TYPE is optional, unique, and uppercase-sensitive; unknown command-line options are rejected.
   - Constraint: Allocated defaults are PTOL=1e-6, ITOL=1e-8, FTOL=1e-10, and OTOL=0.
   - Constraint: PTOL has coordinate-length units; ITOL, FTOL, and OTOL are dimensionless parametric or shape-function tolerances.
 

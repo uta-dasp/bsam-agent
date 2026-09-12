@@ -145,6 +145,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("zero is valid", json.dumps(commands["*DIMENSIONS"]).lower())
         tolerance = {item["name"]: item for item in commands["*TOLERANCE"]["parameters"]}
         self.assertEqual("PTOL", tolerance["TYPE"]["default"])
+        self.assertEqual("verified", commands["*TOLERANCE"]["operations"]["static_validation"])
         exclusion = {item["name"]: item for item in commands["*EXCLUSION"]["parameters"]}
         self.assertEqual("BOX", exclusion["shape"]["default"])
         self.assertIn("xy=(-y,x,z)", json.dumps(commands["*FLIP"]).lower())

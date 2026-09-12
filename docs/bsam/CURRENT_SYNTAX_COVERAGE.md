@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.104.0` additionally verifies cluster `*TOLERANCE` optional uppercase TYPE selection, unknown-option rejection, exactly one value record, and a nonnegative finite real value.
+
 Registry `0.103.0` additionally verifies cluster `*SPACING` strict default, mutually exclusive STRICT/RELAXED/VALUE modes, positive finite VALUE, unknown-option rejection, and command-only shape.
 
 Registry `0.102.0` additionally verifies cluster `*TRANSFORM` command-line grammar: required INERTIA, optional finite-real FLATTEN, unknown-option rejection, and no attached data rows; FLATTEN remains explicitly ineffective and generation-blocked.

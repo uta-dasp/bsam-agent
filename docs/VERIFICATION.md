@@ -115,6 +115,8 @@ Registry 0.102.0 verifies cluster `*TRANSFORM` command-line structure: INERTIA i
 
 Registry 0.103.0 verifies cluster `*SPACING`: omission selects the strict zero default; explicit STRICT, RELAXED, or positive finite VALUE modes are mutually exclusive; unknown options and attached data records are rejected.
 
+Registry 0.104.0 verifies cluster `*TOLERANCE`: TYPE is optional but must select uppercase PTOL, ITOL, FTOL, or OTOL; exactly one data record is required; and its value must be one nonnegative finite real.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

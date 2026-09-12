@@ -492,7 +492,10 @@ def _registered_parameter_values(
             })
 
     parameters = construct.get("parameters", [])
-    if len(parameters) == 1 and not found:
+    if (
+        len(parameters) == 1 and not found
+        and construct.get("id") != "command.tolerance"
+    ):
         record = next((line for line in active_lines[1:] if "=" not in line.text), None)
         if record is not None:
             definition = parameters[0]
@@ -4467,6 +4470,33 @@ def build_semantic_index(
             elif command == "*TOLE" and cluster:
                 tolerance_type = str(options.get("TYPE") or "PTOL").upper()
                 value = _fields(records[0].text)[0] if records and _fields(records[0].text) else None
+                tolerance_tokens = [token for token in re.split(
+                    r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                ) if token]
+                tolerance_error: str | None = None
+                if not (
+                    len(tolerance_tokens) == 1
+                    or (
+                        len(tolerance_tokens) == 3
+                        and tolerance_tokens[1].casefold().startswith("ty")
+                        and tolerance_tokens[2] in {"PTOL", "ITOL", "FTOL", "OTOL"}
+                    )
+                ):
+                    tolerance_error = "TOLERANCE accepts only TYPE=PTOL|ITOL|FTOL|OTOL"
+                elif len(records) != 1 or len(_fields(records[0].text)) != 1:
+                    tolerance_error = "TOLERANCE requires exactly one real value record"
+                else:
+                    try:
+                        numeric_tolerance = _fortran_real(value or "")
+                        if not math.isfinite(numeric_tolerance) or numeric_tolerance < 0:
+                            raise ValueError
+                    except ValueError:
+                        tolerance_error = "TOLERANCE value must be a nonnegative finite real"
+                if tolerance_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=tolerance_error,
+                        line=command_line.number, source=source,
+                    ))
                 setting = _entity(
                     index, "cluster-setting", f"{source}:{command_line.number}",
                     source, command_line, cluster,

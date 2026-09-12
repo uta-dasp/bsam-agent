@@ -826,6 +826,27 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual(3, len(references))
             self.assertTrue(all(item["status"] == "resolved" for item in references))
 
+    def test_tolerance_type_and_value_record_are_validated(self) -> None:
+        valid = (b"*TOLERANCE\n0\n", b"*TOLERANCE,TYPE=FTOL\n1D-10\n")
+        invalid = (
+            b"*TOLERANCE,TYPE=ftol\n1e-10\n",
+            b"*TOLERANCE,OTHER=PTOL\n1e-6\n",
+            b"*TOLERANCE\n",
+            b"*TOLERANCE\n-1\n",
+            b"*TOLERANCE\nNaN\n",
+            b"*TOLERANCE\n1\n2\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, tolerance in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + tolerance))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, tolerance in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(b"*NAME\nply1\n" + tolerance))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_orientation_records_resolve_node_element_and_set_targets(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
