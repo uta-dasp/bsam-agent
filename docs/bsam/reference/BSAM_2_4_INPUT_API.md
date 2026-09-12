@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.110.0`
-- Registry SHA-256: `67B99A523BBC4D27B4BBED45655C4C74206DE505608C62B40B4951B7EB9C82B2`
+- Registry version: `0.111.0`
+- Registry SHA-256: `0A4B8768E8963AE81C4969E10C70671A9B814CB2284FCF3ED71DEFDB772B6B02`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -909,7 +909,7 @@ Generates elements from compact connectivity-generation records.
 - Dispatch prefix: `*ELGE`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-element-generation](#evidencefe-element-generation), [evidence.fe-element-types](#evidencefe-element-types)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -917,13 +917,15 @@ Known parameters:
 
 #### `*ELGEN` body
 
-Termination: next-command-or-eof. Dependencies: The seed element and every referenced/generated connectivity node must already exist.; DIMENSIONS element_capacity must cover row_count*column_count*layer_count minus the seed position.
+Termination: next-command-or-eof. Dependencies: The seed element and every referenced/generated connectivity node must already exist.; DIMENSIONS element_capacity must cover the number of nonzero-offset generated positions.
 
 - **structured-label-offset-grid** (always):
   - `generation` [repeated]: `seed_element`:existing-element-label, `row_count`:positive-integer, `column_count`:positive-integer, `layer_count`:positive-integer, `row_node_offset`:integer, `column_node_offset`:integer, `layer_node_offset`:integer
-  - Constraint: The seed occupies position 1,1,1; every other position creates one element whose label increments sequentially from seed_element.
-  - Constraint: TYPE must match the seed topology and determines whether 4, 8, or 10 connectivity labels are shifted.
-  - Constraint: Every shifted node label must already exist and every generated element label must be unique.
+  - Constraint: TYPE is the sole required option and each data row has exactly seven integer fields.
+  - Constraint: The three counts are positive and their product is bounded to 100001 grid positions per row.
+  - Constraint: The seed occupies position 1,1,1; each nonzero combined offset creates one element whose label increments sequentially from seed_element, while any zero combined offset is skipped.
+  - Constraint: TYPE must match the uniquely resolved seed topology and determines whether 4, 8, or 10 connectivity labels are shifted.
+  - Constraint: Every shifted node label must be positive and already exist; every generated element label must be positive and globally unique.
   - Constraint: ELGEN has no ELSET option and does not add generated elements to a set.
 
 ### `*NSET`

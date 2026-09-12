@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.110.0",
+  "registry_version": "0.111.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2346,13 +2346,13 @@
         "parse": "implemented", "semantic": "implemented", "inspect": "implemented",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "records",
         "termination": "next-command-or-eof",
-        "variants": [{"name": "structured-label-offset-grid", "when": "always", "rows": [{"name": "generation", "repetition": "repeated", "fields": [{"name": "seed_element", "value_type": "existing-element-label", "required": true, "summary": "Supplies the seed connectivity and first generated-label predecessor."}, {"name": "row_count", "value_type": "positive-integer", "required": true, "summary": "Number of row positions including the seed."}, {"name": "column_count", "value_type": "positive-integer", "required": true, "summary": "Number of column positions including the seed."}, {"name": "layer_count", "value_type": "positive-integer", "required": true, "summary": "Number of layer positions including the seed."}, {"name": "row_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per row position."}, {"name": "column_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per column position."}, {"name": "layer_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per layer position."}]}], "constraints": ["The seed occupies position 1,1,1; every other position creates one element whose label increments sequentially from seed_element.", "TYPE must match the seed topology and determines whether 4, 8, or 10 connectivity labels are shifted.", "Every shifted node label must already exist and every generated element label must be unique.", "ELGEN has no ELSET option and does not add generated elements to a set."]}],
-        "dependencies": ["The seed element and every referenced/generated connectivity node must already exist.", "DIMENSIONS element_capacity must cover row_count*column_count*layer_count minus the seed position."]
+        "variants": [{"name": "structured-label-offset-grid", "when": "always", "rows": [{"name": "generation", "repetition": "repeated", "fields": [{"name": "seed_element", "value_type": "existing-element-label", "required": true, "summary": "Supplies the seed connectivity and first generated-label predecessor."}, {"name": "row_count", "value_type": "positive-integer", "required": true, "summary": "Number of row positions including the seed."}, {"name": "column_count", "value_type": "positive-integer", "required": true, "summary": "Number of column positions including the seed."}, {"name": "layer_count", "value_type": "positive-integer", "required": true, "summary": "Number of layer positions including the seed."}, {"name": "row_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per row position."}, {"name": "column_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per column position."}, {"name": "layer_node_offset", "value_type": "integer", "required": true, "summary": "Connectivity-label offset per layer position."}]}], "constraints": ["TYPE is the sole required option and each data row has exactly seven integer fields.", "The three counts are positive and their product is bounded to 100001 grid positions per row.", "The seed occupies position 1,1,1; each nonzero combined offset creates one element whose label increments sequentially from seed_element, while any zero combined offset is skipped.", "TYPE must match the uniquely resolved seed topology and determines whether 4, 8, or 10 connectivity labels are shifted.", "Every shifted node label must be positive and already exist; every generated element label must be positive and globally unique.", "ELGEN has no ELSET option and does not add generated elements to a set."]}],
+        "dependencies": ["The seed element and every referenced/generated connectivity node must already exist.", "DIMENSIONS element_capacity must cover the number of nonzero-offset generated positions."]
       }
     },
     {

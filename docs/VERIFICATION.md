@@ -129,6 +129,8 @@ Registry 0.109.0 verifies cluster `*ORIENTATION`: NAME selects nodal or elementa
 
 Registry 0.110.0 verifies `*NCOPY`: only optional NSET targeting is accepted; rows have exactly source set, count, offset, and three finite translations; source sets must exist and contain nodes; copy expansion is bounded; offsets are nonzero; and generated labels remain positive and unique.
 
+Registry 0.111.0 verifies `*ELGEN`: TYPE is the sole required option; rows contain exactly seven integers; seeds resolve uniquely with matching topology; grid expansion is positive and bounded; shifted connectivity resolves to positive nodes; and generated element labels remain positive and unique. Zero combined offsets retain the source's skip behavior.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

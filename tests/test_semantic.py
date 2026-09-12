@@ -1180,6 +1180,36 @@ class SemanticIndexTests(unittest.TestCase):
                 item["code"] for item in inspection["diagnostics"]
             ].count("BSAM-E301"))
 
+    def test_elgen_header_rows_seed_grid_and_connectivity_are_validated(self) -> None:
+        mesh = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+            b"11,2,0,0\n12,3,0,0\n13,2,1,0\n14,2,0,1\n"
+            b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n"
+        )
+        valid = b"*ELGEN,TYPE=C3D4\n1,2,1,1,10,0,0\n"
+        invalid = (
+            b"*ELGEN\n1,2,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=B3D10\n1,2,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=C3D4,ELSET=made\n1,2,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=C3D4\n1,2,1,1,10,0\n",
+            b"*ELGEN,TYPE=C3D4\n1,0,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=C3D4\n1,100002,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=C3D4\n99,2,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=C3D8\n1,2,1,1,10,0,0\n",
+            b"*ELGEN,TYPE=C3D4\n1,2,1,1,100,0,0\n",
+            b"*ELEMENT,TYPE=C3D4\n2,11,12,13,14\n"
+            b"*ELGEN,TYPE=C3D4\n1,2,1,1,10,0,0\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "valid.in"
+            root.write_bytes(deck(mesh + valid))
+            self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, command in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(mesh + command))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_missing_ngen_and_ncopy_sources_are_errors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.111.0` additionally verifies `*ELGEN`'s sole required TYPE option, exact seven-integer rows, uniquely resolved topology-compatible seeds, bounded positive grids, positive existing shifted connectivity, and positive unique generated labels.
+
 Registry `0.110.0` additionally verifies `*NCOPY` optional output-set shape, exact six-field rows, existing nonempty source sets, bounded positive copy counts, nonzero offsets, finite translations, and positive generated labels.
 
 Registry `0.109.0` additionally resolves cluster `*ORIENTATION` nodal/elemental behavior and verifies NAME selection, eight-field finite rows, source-bounded targets, references, and elemental nonzero orthogonal V1/V3 geometry without inventing nodal restrictions.

@@ -169,6 +169,7 @@ class RegistryToolsTests(unittest.TestCase):
             ngen_variants,
         )
         self.assertEqual("verified", commands["*NCOPY"]["operations"]["static_validation"])
+        self.assertEqual("verified", commands["*ELGEN"]["operations"]["static_validation"])
         element_types = commands["*ELEMENT"]["parameters"][0]["allowed_values"]
         self.assertEqual(["C3D8", "Y3D8", "X3D8", "LC3D8", "C3D4", "C3D10", "B3D10"], element_types)
         self.assertNotIn("B3D10", commands["*ELGEN"]["parameters"][0]["allowed_values"])

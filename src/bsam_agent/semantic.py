@@ -4065,67 +4065,155 @@ def build_semantic_index(
                                 )
 
             elif command == "*ELGE" and cluster:
-                requested_type = str(options.get("TYPE") or "").upper()
+                elgen_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                requested_type = ""
+                header_error: str | None = None
+                if len(elgen_options) != 1 or "=" not in elgen_options[0]:
+                    header_error = "ELGEN requires exactly one TYPE=<element-type> option"
+                else:
+                    option_name, option_value = elgen_options[0].split("=", 1)
+                    requested_type = option_value.strip().upper()
+                    if (
+                        option_name.strip().upper() != "TYPE"
+                        or requested_type not in {
+                            "C3D8", "Y3D8", "X3D8", "LC3D8", "C3D4", "C3D10",
+                        }
+                    ):
+                        header_error = (
+                            "ELGEN TYPE must select C3D8, Y3D8, X3D8, LC3D8, "
+                            "C3D4, or C3D10"
+                        )
+                if header_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=header_error,
+                        line=command_line.number, source=source,
+                    ))
                 generation = _entity(
                     index, "element-generation", f"{source}:{command_line.number}",
                     source, command_line, cluster, {"element_type": requested_type},
                 )
                 for line in records:
                     values = _fields(line.text)
-                    if len(values) < 7 or not values[0].isdigit():
-                        continue
-                    seed_key = _key("element", values[0], cluster)
-                    _reference(
-                        index, generation, "uses-seed-element", seed_key, source, line,
-                    )
-                    seeds = [item for item in index.entities if item.key == seed_key]
-                    if len(seeds) != 1:
-                        continue
-                    seed = seeds[0]
-                    if str(seed.attributes.get("element_type") or "").upper() != requested_type:
-                        continue
+                    row_error: str | None = None
+                    if len(values) != 7:
+                        row_error = (
+                            "ELGEN rows require seed, three counts, and three node offsets"
+                        )
                     try:
                         seed_label = int(values[0])
                         rows, columns, layers = (int(item) for item in values[1:4])
                         row_offset, column_offset, layer_offset = (
                             int(item) for item in values[4:7]
                         )
+                    except (IndexError, ValueError):
+                        row_error = "ELGEN rows require exactly seven integers"
+                    if row_error is None and (
+                        seed_label <= 0 or rows < 1 or columns < 1 or layers < 1
+                        or rows * columns * layers > 100_001
+                    ):
+                        row_error = (
+                            "ELGEN requires a positive seed, positive counts, and at most "
+                            "100001 grid positions per row"
+                        )
+                    if row_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=row_error,
+                            line=line.number, source=source,
+                        ))
+                        continue
+                    seed_key = _key("element", str(seed_label), cluster)
+                    _reference(
+                        index, generation, "uses-seed-element", seed_key, source, line,
+                    )
+                    seeds = [item for item in index.entities if item.key == seed_key]
+                    if len(seeds) != 1:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message="ELGEN seed element must resolve uniquely before generation",
+                            line=line.number, source=source,
+                        ))
+                        continue
+                    seed = seeds[0]
+                    if str(seed.attributes.get("element_type") or "").upper() != requested_type:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message="ELGEN TYPE must match the seed element topology",
+                            line=line.number, source=source,
+                        ))
+                        continue
+                    try:
                         seed_connectivity = [
                             int(item) for item in seed.attributes.get("connectivity", [])
                         ]
                     except (TypeError, ValueError):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message="ELGEN seed connectivity must contain integer node labels",
+                            line=line.number, source=source,
+                        ))
                         continue
-                    positions = rows * columns * layers
-                    if rows < 1 or columns < 1 or layers < 1 or positions > 100_001:
-                        continue
+                    generated_offsets = [
+                        layer * layer_offset + column * column_offset + row * row_offset
+                        for layer in range(layers)
+                        for column in range(columns)
+                        for row in range(rows)
+                        if layer * layer_offset + column * column_offset + row * row_offset != 0
+                    ]
+                    generated_labels = range(
+                        seed_label + 1, seed_label + len(generated_offsets) + 1,
+                    )
+                    existing_element_keys = {
+                        item.key for item in index.entities if item.kind == "element"
+                    }
+                    if any(
+                        label <= 0
+                        or _key("element", str(label), cluster) in existing_element_keys
+                        for label in generated_labels
+                    ):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message="ELGEN generated element labels must be positive and unique",
+                            line=line.number, source=source,
+                        ))
+                    known_node_keys = {
+                        item.key for item in index.entities if item.kind == "node"
+                    }
+                    if any(
+                        node_label + offset <= 0
+                        or _key("node", str(node_label + offset), cluster) not in known_node_keys
+                        for offset in generated_offsets
+                        for node_label in seed_connectivity
+                    ):
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error",
+                            message=(
+                                "ELGEN shifted connectivity must contain positive existing nodes"
+                            ),
+                            line=line.number, source=source,
+                        ))
                     generated_label = seed_label
-                    for layer in range(layers):
-                        for column in range(columns):
-                            for row in range(rows):
-                                offset = (
-                                    layer * layer_offset
-                                    + column * column_offset
-                                    + row * row_offset
-                                )
-                                if offset == 0:
-                                    continue
-                                generated_label += 1
-                                connectivity = [label + offset for label in seed_connectivity]
-                                element = _entity(
-                                    index, "element", str(generated_label), source, line,
-                                    cluster,
-                                    {
-                                        "element_type": requested_type,
-                                        "connectivity": [str(item) for item in connectivity],
-                                        "generated_by": "elgen", "seed_element": seed_label,
-                                    },
-                                )
-                                for position, node_label in enumerate(connectivity, start=1):
-                                    _reference(
-                                        index, element, "connectivity",
-                                        _key("node", str(node_label), cluster), source, line,
-                                        {"position": position},
-                                    )
+                    for offset in generated_offsets:
+                        generated_label += 1
+                        connectivity = [label + offset for label in seed_connectivity]
+                        element = _entity(
+                            index, "element", str(generated_label), source, line,
+                            cluster,
+                            {
+                                "element_type": requested_type,
+                                "connectivity": [str(item) for item in connectivity],
+                                "generated_by": "elgen", "seed_element": seed_label,
+                            },
+                        )
+                        for position, node_label in enumerate(connectivity, start=1):
+                            _reference(
+                                index, element, "connectivity",
+                                _key("node", str(node_label), cluster), source, line,
+                                {"position": position},
+                            )
 
             elif command in {"*NSET", "*ELSE"}:
                 entity_kind = "node-set" if command == "*NSET" else "element-set"
