@@ -96,6 +96,8 @@ class LocalApiTests(unittest.TestCase):
             self.assertTrue(transformations[0]["applicability"])
             dependency = capabilities["capabilities"]["dependency_contract"]
             self.assertEqual(3, len(dependency["classes"]))
+            entity_contract = capabilities["capabilities"]["entity_contract"]
+            self.assertEqual(10, len(entity_contract["no_primary_entity_capabilities"]))
             self.assertEqual(5, len(capabilities["capabilities"]["obsolete_tokens"]))
 
             validation = api.dispatch("validate_model", {"source": "model.in"})

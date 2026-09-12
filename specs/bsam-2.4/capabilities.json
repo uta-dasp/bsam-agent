@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.6.0",
-  "registry_version": "0.128.0",
+  "schema_version": "1.7.0",
+  "registry_version": "0.129.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3772,6 +3772,50 @@
       "evidence_ids": ["evidence.current-vtms-deck-notch", "evidence.baseline-syntax-transition"]
     }
   ],
+  "entity_contract": {
+    "schema_version": "1.0.0",
+    "capability_record_policy": "Every occurrence of each active top-level block, cluster command, and nested construct exposes a source-located RegisteredConstruct; entity_kind identifies its primary queryable entity when one exists.",
+    "primary_entity_field": "entity_kind",
+    "no_primary_entity_capabilities": ["block.input", "block.clusters", "block.boundary", "construct.boundary-type", "construct.boundary-g-control", "construct.boundary-geometric-nonlinearity", "construct.boundary-name", "construct.boundary-status", "construct.boundary-loading-sequence", "construct.boundary-convergence"],
+    "additional_entity_outputs": [
+      {
+        "capability_ids": ["command.type"],
+        "entity_kind": "cluster",
+        "cardinality": "zero-or-one",
+        "condition": "The TYPE declaration creates the implicit noname<declaration-index> cluster identity only when no following NAME command establishes it."
+      },
+      {
+        "capability_ids": ["command.ngen", "command.ncopy"],
+        "entity_kind": "node",
+        "cardinality": "zero-or-more",
+        "condition": "Validated bounded generation rows derive concrete node identities and coordinates in addition to the generation-operation entity."
+      },
+      {
+        "capability_ids": ["command.elgen"],
+        "entity_kind": "element",
+        "cardinality": "zero-or-more",
+        "condition": "Validated bounded generation rows derive concrete element identities and shifted connectivity in addition to the generation-operation entity."
+      },
+      {
+        "capability_ids": ["command.include"],
+        "entity_kind": "source-file",
+        "cardinality": "zero-or-one",
+        "condition": "A resolved contained include target is represented by one workspace-stable source-file entity; the root source-file entity is source-set-owned."
+      },
+      {
+        "capability_ids": ["block.materials"],
+        "entity_kind": "material-parameter",
+        "cardinality": "zero-or-more",
+        "condition": "A structured type-998 or type-999 parameter becomes a source-located entity when it owns a TABLES, STATISTICAL, or UFUNCTIONS reference."
+      },
+      {
+        "capability_ids": ["construct.boundary-loading-sequence"],
+        "entity_kind": "load-change",
+        "cardinality": "zero-or-more",
+        "condition": "Each loading-sequence CHANGE record creates one entity referencing the named boundary condition."
+      }
+    ]
+  },
   "dependency_contract": {
     "schema_version": "1.0.0",
     "classes": [

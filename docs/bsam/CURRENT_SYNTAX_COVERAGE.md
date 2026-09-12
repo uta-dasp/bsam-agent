@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.129.0` closes the active entity-output inventory. All 54 active capabilities are machine-classified as producing a primary queryable entity or intentionally producing only a source-located capability record; conditional cluster, generated node/element, included source-file, structured material-parameter, and loading-change entities are registered separately. Registry validation rejects omissions, overlaps, and unknown capability ownership.
+
 Registry `0.128.0` introduces the shared dependency contract. Every emitted semantic edge is classified as a deterministic structural reference or a pinned-source BSAM semantic constraint; engineering decisions are represented separately as required choices with explicit user-approved or source-derived provenance. The semantic model now exposes this classification on each reference, and unknown reference kinds fail closed.
 
 Registry `0.127.0` closes grammar completion with consumer-required structured-material contracts. Types 50, 998, and 999 now record required property groups, conditional data, dimensional units, source defaults, and HUGE missing-value sentinels. Creation remains fail-closed where analysis/failure selection changes the required fields or the source overloads type-999 density as both mass density and ply thickness.

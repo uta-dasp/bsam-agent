@@ -81,10 +81,11 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "obsolete_tokens",
             "execution_contract",
             "dependency_contract",
+            "entity_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "1.6.0":
+    if data["schema_version"] != "1.7.0":
         raise RegistryError("unsupported schema_version")
 
     dependency = data["dependency_contract"]
@@ -299,6 +300,46 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
     capability_ids = set(block_ids) | set(command_ids) | {
         item["id"] for item in constructs
     }
+    entity_contract = data["entity_contract"]
+    _require_keys(
+        entity_contract,
+        {
+            "schema_version", "capability_record_policy", "primary_entity_field",
+            "no_primary_entity_capabilities", "additional_entity_outputs",
+        },
+        "entity_contract",
+    )
+    if entity_contract["schema_version"] != "1.0.0":
+        raise RegistryError("unsupported entity_contract schema_version")
+    if entity_contract["primary_entity_field"] != "entity_kind":
+        raise RegistryError("entity_contract primary field must be entity_kind")
+    no_primary = entity_contract["no_primary_entity_capabilities"]
+    _unique(no_primary, "capability without a primary entity")
+    actual_no_primary = {
+        item["id"] for _, item in records if not item.get("entity_kind")
+    }
+    if set(no_primary) != actual_no_primary:
+        raise RegistryError(
+            "entity_contract no-primary list must exactly cover capabilities without entity_kind"
+        )
+    additional_outputs = entity_contract["additional_entity_outputs"]
+    output_keys: list[str] = []
+    for item in additional_outputs:
+        _require_keys(
+            item, {"capability_ids", "entity_kind", "cardinality", "condition"},
+            "additional entity output",
+        )
+        missing_capabilities = sorted(set(item["capability_ids"]) - capability_ids)
+        if missing_capabilities:
+            raise RegistryError(
+                "additional entity output references missing capabilities: "
+                + ", ".join(missing_capabilities)
+            )
+        output_keys.extend(
+            f"{capability_id}:{item['entity_kind']}"
+            for capability_id in item["capability_ids"]
+        )
+    _unique(output_keys, "additional entity output")
     generation_profiles = data["generation_profiles"]
     _unique([item["id"] for item in generation_profiles], "generation profile id")
     _unique(
@@ -409,6 +450,8 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "generation_profiles": len(generation_profiles),
         "transformations": len(transformations),
         "dependency_classes": len(dependency_classes),
+        "primary_entity_capabilities": len(records) - len(no_primary),
+        "additional_entity_outputs": len(output_keys),
         "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
             item["coverage"] in {"documented", "runtime-verified"}
@@ -496,7 +539,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, and {counts['dependency_classes']} dependency classes",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -637,6 +680,30 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         lines.append("")
         if construct.get("body"):
             _render_body(lines, construct["canonical"], construct["body"])
+
+    entity_contract = data["entity_contract"]
+    lines.extend([
+        "", "## Entity output contract", "",
+        entity_contract["capability_record_policy"], "",
+        "| Capability | Primary semantic output |",
+        "|---|---|",
+    ])
+    for item in [
+        *data["top_level_blocks"], *data["cluster_commands"],
+        *data["nested_constructs"],
+    ]:
+        output = (
+            f"`{item['entity_kind']}`"
+            if item.get("entity_kind") else "capability record only"
+        )
+        lines.append(f"| `{item['id']}` | {output} |")
+    lines.extend(["", "Additional conditional outputs:", ""])
+    for item in entity_contract["additional_entity_outputs"]:
+        capabilities = ", ".join(f"`{value}`" for value in item["capability_ids"])
+        lines.append(
+            f"- {capabilities} -> `{item['entity_kind']}` ({item['cardinality']}): "
+            f"{item['condition']}"
+        )
 
     dependency = data["dependency_contract"]
     lines.extend(["", "## Dependency and decision contract", ""])

@@ -38,8 +38,35 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(1, counts["generation_profiles"])
         self.assertEqual(2, counts["transformations"])
         self.assertEqual(3, counts["dependency_classes"])
+        self.assertEqual(44, counts["primary_entity_capabilities"])
+        self.assertEqual(7, counts["additional_entity_outputs"])
         self.assertEqual(5, counts["obsolete_tokens"])
         self.assertEqual(82, counts["evidence"])
+
+    def test_every_capability_has_an_explicit_entity_output(self) -> None:
+        active = [
+            *self.registry["top_level_blocks"],
+            *self.registry["cluster_commands"],
+            *self.registry["nested_constructs"],
+        ]
+        contract = self.registry["entity_contract"]
+        no_primary = set(contract["no_primary_entity_capabilities"])
+        self.assertEqual(
+            no_primary,
+            {item["id"] for item in active if not item.get("entity_kind")},
+        )
+        self.assertEqual(44, sum(bool(item.get("entity_kind")) for item in active))
+        additional = {
+            (capability_id, item["entity_kind"])
+            for item in contract["additional_entity_outputs"]
+            for capability_id in item["capability_ids"]
+        }
+        self.assertIn(("command.ngen", "node"), additional)
+        self.assertIn(("command.elgen", "element"), additional)
+        self.assertIn(("block.materials", "material-parameter"), additional)
+        self.assertIn(
+            ("construct.boundary-loading-sequence", "load-change"), additional,
+        )
 
     def test_dependency_and_decision_classes_are_disjoint(self) -> None:
         contract = self.registry["dependency_contract"]

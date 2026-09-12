@@ -17,11 +17,12 @@
     "transformations",
     "obsolete_tokens",
     "execution_contract",
-    "dependency_contract"
+    "dependency_contract",
+    "entity_contract"
   ],
   "properties": {
     "schema_version": {
-      "const": "1.6.0"
+      "const": "1.7.0"
     },
     "registry_version": {
       "type": "string",
@@ -74,6 +75,9 @@
     },
     "dependency_contract": {
       "$ref": "#/$defs/dependencyContract"
+    },
+    "entity_contract": {
+      "$ref": "#/$defs/entityContract"
     }
   },
   "$defs": {
@@ -130,6 +134,41 @@
         "id": { "enum": ["user-approved", "source-derived"] },
         "requires_user_input": { "type": "boolean" },
         "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "entityContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "capability_record_policy", "primary_entity_field", "no_primary_entity_capabilities", "additional_entity_outputs"],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "capability_record_policy": { "type": "string", "minLength": 1 },
+        "primary_entity_field": { "const": "entity_kind" },
+        "no_primary_entity_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^(block|command|construct)\\.[a-z0-9-]+$" }
+        },
+        "additional_entity_outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/additionalEntityOutput" }
+        }
+      }
+    },
+    "additionalEntityOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_ids", "entity_kind", "cardinality", "condition"],
+      "properties": {
+        "capability_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^(block|command|construct)\\.[a-z0-9-]+$" }
+        },
+        "entity_kind": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "cardinality": { "enum": ["zero-or-one", "zero-or-more"] },
+        "condition": { "type": "string", "minLength": 1 }
       }
     },
     "generationProfile": {

@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.128.0`
-- Registry SHA-256: `8CB2F66AD8CCDD0A1F9A8C26216286A6BE653A6EA48DB7B713AAFEE89619EB5F`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, and 3 dependency classes
+- Registry version: `0.129.0`
+- Registry SHA-256: `19104447F6E406AB99E62896CA72A33AF327FE399A939D1A21DC11205A41933F`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -1856,6 +1856,76 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
   - Constraint: The execution path stores c_system but volume-average and CFV calculations do not consume it; the Agent preserves material-coordinate requests but blocks generating them as an effective transformation claim.
   - Constraint: CFV requires every retained cluster to use compatible constitutive/failure data and the same mode/level dimensions.
 
+
+## Entity output contract
+
+Every occurrence of each active top-level block, cluster command, and nested construct exposes a source-located RegisteredConstruct; entity_kind identifies its primary queryable entity when one exists.
+
+| Capability | Primary semantic output |
+|---|---|
+| `block.input` | capability record only |
+| `block.solver` | `solver` |
+| `block.ufunctions` | `user-function` |
+| `block.moisture` | `moisture-workflow` |
+| `block.clusters` | capability record only |
+| `block.boundary` | capability record only |
+| `block.constitutive` | `constitutive` |
+| `block.tables` | `table` |
+| `block.statistical-distributions` | `statistical-distribution` |
+| `block.materials` | `material` |
+| `block.failure` | `failure` |
+| `block.user` | `numeric-user-function` |
+| `block.crack` | `crack` |
+| `command.type` | `cluster-declaration` |
+| `command.dimensions` | `cluster-dimensions` |
+| `command.name` | `cluster` |
+| `command.constitutive` | `cluster-constitutive` |
+| `command.node` | `node` |
+| `command.ngen` | `node-generation` |
+| `command.ncopy` | `node-generation` |
+| `command.element` | `element` |
+| `command.elgen` | `element-generation` |
+| `command.nset` | `node-set` |
+| `command.elset` | `element-set` |
+| `command.boundary` | `nodal-boundary` |
+| `command.load` | `nodal-load` |
+| `command.field` | `nodal-field` |
+| `command.selection` | `selection` |
+| `command.tolerance` | `cluster-setting` |
+| `command.integration` | `integration-scheme` |
+| `command.orientation` | `orientation-record` |
+| `command.build` | `topology-operation` |
+| `command.stop` | `topology-operation` |
+| `command.include` | `include-operation` |
+| `command.shift` | `coordinate-operation` |
+| `command.scale` | `coordinate-operation` |
+| `command.exclusion` | `exclusion-region` |
+| `command.flip` | `coordinate-operation` |
+| `command.spacing` | `cluster-setting` |
+| `command.section` | `section` |
+| `command.crack` | `crack-region` |
+| `command.transform` | `coordinate-operation` |
+| `construct.boundary-type` | capability record only |
+| `construct.boundary-g-control` | capability record only |
+| `construct.boundary-geometric-nonlinearity` | capability record only |
+| `construct.boundary-solver-schedule` | `solver-schedule` |
+| `construct.boundary-name` | capability record only |
+| `construct.boundary-status` | capability record only |
+| `construct.boundary-clusters` | `cluster-selection` |
+| `construct.boundary-conditions` | `boundary-condition` |
+| `construct.boundary-connections` | `connection` |
+| `construct.boundary-loading-sequence` | capability record only |
+| `construct.boundary-convergence` | capability record only |
+| `construct.boundary-output` | `output-selection` |
+
+Additional conditional outputs:
+
+- `command.type` -> `cluster` (zero-or-one): The TYPE declaration creates the implicit noname<declaration-index> cluster identity only when no following NAME command establishes it.
+- `command.ngen`, `command.ncopy` -> `node` (zero-or-more): Validated bounded generation rows derive concrete node identities and coordinates in addition to the generation-operation entity.
+- `command.elgen` -> `element` (zero-or-more): Validated bounded generation rows derive concrete element identities and shifted connectivity in addition to the generation-operation entity.
+- `command.include` -> `source-file` (zero-or-one): A resolved contained include target is represented by one workspace-stable source-file entity; the root source-file entity is source-set-owned.
+- `block.materials` -> `material-parameter` (zero-or-more): A structured type-998 or type-999 parameter becomes a source-located entity when it owns a TABLES, STATISTICAL, or UFUNCTIONS reference.
+- `construct.boundary-loading-sequence` -> `load-change` (zero-or-more): Each loading-sequence CHANGE record creates one entity referencing the named boundary condition.
 
 ## Dependency and decision contract
 
