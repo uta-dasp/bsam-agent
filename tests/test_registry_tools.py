@@ -37,8 +37,26 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["generation_profiles"])
         self.assertEqual(2, counts["transformations"])
+        self.assertEqual(3, counts["dependency_classes"])
         self.assertEqual(5, counts["obsolete_tokens"])
         self.assertEqual(82, counts["evidence"])
+
+    def test_dependency_and_decision_classes_are_disjoint(self) -> None:
+        contract = self.registry["dependency_contract"]
+        classes = {item["id"]: item for item in contract["classes"]}
+        self.assertEqual({
+            "structural-reference", "bsam-semantic-constraint", "engineering-decision",
+        }, set(classes))
+        structural = set(classes["structural-reference"]["reference_kinds"])
+        semantic = set(classes["bsam-semantic-constraint"]["reference_kinds"])
+        self.assertEqual(set(), structural & semantic)
+        self.assertEqual(36, len(structural | semantic))
+        self.assertEqual([], classes["engineering-decision"]["reference_kinds"])
+        sources = {
+            item["id"]: item["requires_user_input"]
+            for item in contract["decision_sources"]
+        }
+        self.assertEqual({"user-approved": True, "source-derived": False}, sources)
 
     def test_pinned_baseline(self) -> None:
         target = self.registry["target"]

@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from typing import Any, Iterable
 
-from .capabilities import canonical_parameter, match_nested_construct, nested_constructs, operational_support
+from .capabilities import canonical_parameter, dependency_class, match_nested_construct, nested_constructs, operational_support
 from .document import Diagnostic, SourceLine
 from .registry import load_registry
 
@@ -55,6 +55,7 @@ class SemanticEntity:
 class SemanticReference:
     id: str
     kind: str
+    classification: str
     source_entity_id: str
     target_key: str
     location: SourceLocation
@@ -66,6 +67,7 @@ class SemanticReference:
         result = {
             "id": self.id,
             "kind": self.kind,
+            "classification": self.classification,
             "source_entity_id": self.source_entity_id,
             "target_key": self.target_key,
             "location": self.location.as_dict(),
@@ -140,7 +142,7 @@ class SemanticIndex:
         for entity in self.entities:
             counts[entity.kind] = counts.get(entity.kind, 0) + 1
         return {
-            "schema_version": "0.5.0",
+            "schema_version": "0.6.0",
             "coverage": "documented-fe-control-named-data-and-declaration-references",
             "entities": [item.as_dict() for item in self.entities],
             "references": [item.as_dict() for item in self.references],
@@ -285,6 +287,7 @@ def _reference(index: SemanticIndex, source_entity: SemanticEntity, kind: str,
             source_entity.id, kind, target_key, source, line.number,
         ),
         kind=kind,
+        classification=dependency_class(kind),
         source_entity_id=source_entity.id,
         target_key=target_key,
         location=_location(source, line),
@@ -369,6 +372,7 @@ def augment_include_graph_semantics(
                     operation.location.source, operation.location.line,
                 ),
                 kind="includes-file",
+                classification=dependency_class("includes-file"),
                 source_entity_id=operation.id,
                 target_key=target_key,
                 location=operation.location,

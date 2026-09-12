@@ -94,6 +94,8 @@ class LocalApiTests(unittest.TestCase):
             transformations = capabilities["capabilities"]["transformations"]
             self.assertEqual("transformation.notch-expand-plies", transformations[0]["id"])
             self.assertTrue(transformations[0]["applicability"])
+            dependency = capabilities["capabilities"]["dependency_contract"]
+            self.assertEqual(3, len(dependency["classes"]))
             self.assertEqual(5, len(capabilities["capabilities"]["obsolete_tokens"]))
 
             validation = api.dispatch("validate_model", {"source": "model.in"})

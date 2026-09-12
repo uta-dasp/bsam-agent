@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.127.0`
-- Registry SHA-256: `6CE57D6B74E96CC697BD4C3ADA7EA94FE92F9C7586622FB51936F16CE3CDAF03`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
+- Registry version: `0.128.0`
+- Registry SHA-256: `8CB2F66AD8CCDD0A1F9A8C26216286A6BE653A6EA48DB7B713AAFEE89619EB5F`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, and 3 dependency classes
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -1856,6 +1856,37 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
   - Constraint: The execution path stores c_system but volume-average and CFV calculations do not consume it; the Agent preserves material-coordinate requests but blocks generating them as an effective transformation claim.
   - Constraint: CFV requires every retained cluster to use compatible constitutive/failure data and the same mode/level dimensions.
 
+
+## Dependency and decision contract
+
+### `structural-reference`
+
+A source/include, mesh-topology, membership, assignment, or concrete selection edge whose target and reverse impact are determined from model structure without an engineering choice.
+
+- Representation: `semantic-reference`
+- Semantic reference kinds: `includes-file`, `connectivity`, `member-of`, `contains`, `copies-node-set`, `uses-node-endpoint`, `uses-node-set-endpoint`, `uses-seed-element`, `assigns-to`, `targets-node`, `targets-node-set`, `targets-element`, `targets-element-set`, `selects-node`, `selects-node-set`, `selects-element`, `selects-element-set`, `mset`, `sset`
+- Change policy: Resolve the edge exactly and block deletion or rename when the reviewed operation cannot update every reverse reference atomically.
+
+### `bsam-semantic-constraint`
+
+A BSAM declaration, analysis, configuration, or consumer relationship whose validity follows pinned parser/consumer behavior rather than user preference.
+
+- Representation: `semantic-reference-and-validator`
+- Semantic reference kinds: `uses-table`, `uses-user-function`, `uses-statistical-distribution`, `uses-numeric-user-function`, `uses-material`, `uses-failure`, `uses-constitutive`, `uses-solver`, `uses-cluster`, `uses-seed-cluster`, `uses-seed-section`, `declares-cluster`, `configures-cluster`, `selects-cluster`, `targets-cluster`, `terminal-cluster`, `changes-boundary-condition`
+- Change policy: Re-resolve the edge and rerun every registered compatibility, declaration-order, scope, and consumer constraint before a change can be applied.
+
+### `engineering-decision`
+
+A value or policy that cannot be selected from BSAM structure or semantics and therefore is never represented as a semantic reference.
+
+- Representation: `required-choice`
+- Semantic reference kinds: none
+- Change policy: Require an explicit user-approved value unless a registered transformation records the decision as source-derived under a verified algorithm.
+
+Decision provenance:
+
+- `user-approved` (user input required): The value or policy comes from explicit user intent and may not be guessed from examples or defaults.
+- `source-derived` (user input not required): A verified deterministic algorithm derives the value from the bound source set and records the derivation.
 
 ## Registered generation profiles
 

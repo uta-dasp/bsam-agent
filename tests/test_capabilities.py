@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
-from bsam_agent.capabilities import capability_manifest
+from bsam_agent.capabilities import capability_manifest, dependency_class
 from bsam_agent.provider import ProviderConfig
 from bsam_agent.orchestrator import ChatOrchestrator, capability_applicability, relevant_tools
 from bsam_agent.source_set import SourceSet
@@ -51,6 +51,14 @@ def provider_config() -> ProviderConfig:
 
 
 class CapabilitySliceTests(unittest.TestCase):
+    def test_reference_kinds_have_one_registry_dependency_class(self) -> None:
+        self.assertEqual("structural-reference", dependency_class("connectivity"))
+        self.assertEqual(
+            "bsam-semantic-constraint", dependency_class("uses-material"),
+        )
+        with self.assertRaisesRegex(ValueError, "must have one dependency class"):
+            dependency_class("unregistered-reference")
+
     def test_cluster_and_boundary_containers_are_registered_records(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "model.in"

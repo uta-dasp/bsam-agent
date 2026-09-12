@@ -343,7 +343,7 @@ class SemanticIndexTests(unittest.TestCase):
 
             semantic = SourceSet.read(root).inspection()["semantic_model"]
 
-            self.assertEqual("0.5.0", semantic["schema_version"])
+            self.assertEqual("0.6.0", semantic["schema_version"])
             self.assertEqual(
                 {
                     "cluster": 1, "cluster-declaration": 1,
@@ -1319,6 +1319,13 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual(1, semantic["summary"]["entities_by_kind"]["integration-scheme"])
             reference_kinds = {item["kind"] for item in semantic["references"]}
             self.assertTrue({"targets-node-set", "targets-element"} <= reference_kinds)
+            self.assertEqual(
+                {"structural-reference"},
+                {
+                    item["classification"] for item in semantic["references"]
+                    if item["kind"] in {"targets-node-set", "targets-element"}
+                },
+            )
 
     def test_missing_coordinate_and_integration_targets_are_errors(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

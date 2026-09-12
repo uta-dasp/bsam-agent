@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.128.0` introduces the shared dependency contract. Every emitted semantic edge is classified as a deterministic structural reference or a pinned-source BSAM semantic constraint; engineering decisions are represented separately as required choices with explicit user-approved or source-derived provenance. The semantic model now exposes this classification on each reference, and unknown reference kinds fail closed.
+
 Registry `0.127.0` closes grammar completion with consumer-required structured-material contracts. Types 50, 998, and 999 now record required property groups, conditional data, dimensional units, source defaults, and HUGE missing-value sentinels. Creation remains fail-closed where analysis/failure selection changes the required fields or the source overloads type-999 density as both mass density and ply thickness.
 
 Registry `0.126.0` maps the active material/constitutive/element compatibility boundary. Direct constitutive types 1-8 and 10 route the same material identity into the solid path; C3D8, Y3D8, X3D8, C3D4, C3D10/B3D10, and layered LC3D8 assignments require a material with an active stiffness branch. Parsed types 15, 300, 500, and structured interface type 998 are rejected from solid cluster and section assignments; type 998 remains available to interface failure consumers.

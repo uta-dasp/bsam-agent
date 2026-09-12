@@ -80,11 +80,58 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "transformations",
             "obsolete_tokens",
             "execution_contract",
+            "dependency_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "1.5.0":
+    if data["schema_version"] != "1.6.0":
         raise RegistryError("unsupported schema_version")
+
+    dependency = data["dependency_contract"]
+    _require_keys(
+        dependency, {"schema_version", "classes", "decision_sources"},
+        "dependency_contract",
+    )
+    if dependency["schema_version"] != "1.0.0":
+        raise RegistryError("unsupported dependency_contract schema_version")
+    dependency_classes = dependency["classes"]
+    for item in dependency_classes:
+        _require_keys(
+            item,
+            {"id", "representation", "summary", "reference_kinds", "change_policy"},
+            "dependency class",
+        )
+    _unique([item["id"] for item in dependency_classes], "dependency class")
+    if {item["id"] for item in dependency_classes} != {
+        "structural-reference", "bsam-semantic-constraint", "engineering-decision",
+    }:
+        raise RegistryError("dependency_contract must define the three dependency classes")
+    reference_kinds = [
+        kind for item in dependency_classes for kind in item["reference_kinds"]
+    ]
+    _unique(reference_kinds, "classified semantic reference kind")
+    engineering = next(
+        item for item in dependency_classes if item["id"] == "engineering-decision"
+    )
+    if engineering["reference_kinds"]:
+        raise RegistryError("engineering decisions cannot be semantic references")
+    if any(
+        not item["reference_kinds"]
+        for item in dependency_classes if item["id"] != "engineering-decision"
+    ):
+        raise RegistryError("semantic dependency classes require reference kinds")
+    decision_sources = dependency["decision_sources"]
+    for item in decision_sources:
+        _require_keys(
+            item, {"id", "requires_user_input", "summary"},
+            "engineering decision source",
+        )
+    _unique([item["id"] for item in decision_sources], "engineering decision source")
+    source_policy = {
+        item["id"]: item["requires_user_input"] for item in decision_sources
+    }
+    if source_policy != {"user-approved": True, "source-derived": False}:
+        raise RegistryError("dependency_contract has invalid engineering decision sources")
 
     target = data["target"]
     _require_keys(
@@ -361,6 +408,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "constructs": len(constructs),
         "generation_profiles": len(generation_profiles),
         "transformations": len(transformations),
+        "dependency_classes": len(dependency_classes),
         "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
             item["coverage"] in {"documented", "runtime-verified"}
@@ -448,7 +496,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, and {counts['transformations']} registered transformations",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, and {counts['dependency_classes']} dependency classes",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -589,6 +637,26 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         lines.append("")
         if construct.get("body"):
             _render_body(lines, construct["canonical"], construct["body"])
+
+    dependency = data["dependency_contract"]
+    lines.extend(["", "## Dependency and decision contract", ""])
+    for item in dependency["classes"]:
+        kinds = ", ".join(f"`{value}`" for value in item["reference_kinds"]) or "none"
+        lines.extend([
+            f"### `{item['id']}`",
+            "",
+            item["summary"],
+            "",
+            f"- Representation: `{item['representation']}`",
+            f"- Semantic reference kinds: {kinds}",
+            f"- Change policy: {item['change_policy']}",
+            "",
+        ])
+    lines.extend(["Decision provenance:", ""])
+    lines.extend(
+        f"- `{item['id']}` (user input {'required' if item['requires_user_input'] else 'not required'}): {item['summary']}"
+        for item in dependency["decision_sources"]
+    )
 
     lines.extend(["", "## Registered generation profiles", ""])
     for item in data["generation_profiles"]:

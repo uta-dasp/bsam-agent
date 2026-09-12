@@ -52,7 +52,8 @@ class SourceSetTests(unittest.TestCase):
             )
 
         self.assertEqual(include_link(baseline)["id"], include_link(expanded)["id"])
-        self.assertEqual("0.5.0", expanded["schema_version"])
+        self.assertEqual("0.6.0", expanded["schema_version"])
+        self.assertEqual("structural-reference", include_link(expanded)["classification"])
         connectivity = [
             item for item in expanded["references"]
             if item["kind"] == "connectivity"

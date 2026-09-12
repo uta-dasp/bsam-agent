@@ -50,6 +50,23 @@ def intent_support(record: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def dependency_class(
+    reference_kind: str, registry: dict[str, Any] | None = None,
+) -> str:
+    """Return the single registry class for an emitted semantic-reference kind."""
+    registry = registry or load_registry()
+    matches = [
+        str(item["id"])
+        for item in registry["dependency_contract"]["classes"]
+        if reference_kind in item["reference_kinds"]
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"semantic reference kind {reference_kind!r} must have one dependency class"
+        )
+    return matches[0]
+
+
 def capability_manifest(registry: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Build the compact contract consumed by API queries and agent routing."""
     registry = registry or load_registry()

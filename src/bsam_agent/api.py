@@ -145,6 +145,7 @@ class LocalAgentApi:
                     "generation_profiles": registry["generation_profiles"],
                     "transformations": registry["transformations"],
                     "obsolete_tokens": registry["obsolete_tokens"],
+                    "dependency_contract": registry["dependency_contract"],
                     "operational_manifest": capability_manifest(registry),
                 },
                 "tools": list(self.tools),

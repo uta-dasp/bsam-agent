@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.5.0",
-  "registry_version": "0.127.0",
+  "schema_version": "1.6.0",
+  "registry_version": "0.128.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3772,6 +3772,44 @@
       "evidence_ids": ["evidence.current-vtms-deck-notch", "evidence.baseline-syntax-transition"]
     }
   ],
+  "dependency_contract": {
+    "schema_version": "1.0.0",
+    "classes": [
+      {
+        "id": "structural-reference",
+        "representation": "semantic-reference",
+        "summary": "A source/include, mesh-topology, membership, assignment, or concrete selection edge whose target and reverse impact are determined from model structure without an engineering choice.",
+        "reference_kinds": ["includes-file", "connectivity", "member-of", "contains", "copies-node-set", "uses-node-endpoint", "uses-node-set-endpoint", "uses-seed-element", "assigns-to", "targets-node", "targets-node-set", "targets-element", "targets-element-set", "selects-node", "selects-node-set", "selects-element", "selects-element-set", "mset", "sset"],
+        "change_policy": "Resolve the edge exactly and block deletion or rename when the reviewed operation cannot update every reverse reference atomically."
+      },
+      {
+        "id": "bsam-semantic-constraint",
+        "representation": "semantic-reference-and-validator",
+        "summary": "A BSAM declaration, analysis, configuration, or consumer relationship whose validity follows pinned parser/consumer behavior rather than user preference.",
+        "reference_kinds": ["uses-table", "uses-user-function", "uses-statistical-distribution", "uses-numeric-user-function", "uses-material", "uses-failure", "uses-constitutive", "uses-solver", "uses-cluster", "uses-seed-cluster", "uses-seed-section", "declares-cluster", "configures-cluster", "selects-cluster", "targets-cluster", "terminal-cluster", "changes-boundary-condition"],
+        "change_policy": "Re-resolve the edge and rerun every registered compatibility, declaration-order, scope, and consumer constraint before a change can be applied."
+      },
+      {
+        "id": "engineering-decision",
+        "representation": "required-choice",
+        "summary": "A value or policy that cannot be selected from BSAM structure or semantics and therefore is never represented as a semantic reference.",
+        "reference_kinds": [],
+        "change_policy": "Require an explicit user-approved value unless a registered transformation records the decision as source-derived under a verified algorithm."
+      }
+    ],
+    "decision_sources": [
+      {
+        "id": "user-approved",
+        "requires_user_input": true,
+        "summary": "The value or policy comes from explicit user intent and may not be guessed from examples or defaults."
+      },
+      {
+        "id": "source-derived",
+        "requires_user_input": false,
+        "summary": "A verified deterministic algorithm derives the value from the bound source set and records the derivation."
+      }
+    ]
+  },
   "execution_contract": {
     "invocation": "bsam20.exe -I <input-directory> -O <unique-output-directory> <deck-basename>",
     "input_extension": ".in",

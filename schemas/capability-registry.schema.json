@@ -16,11 +16,12 @@
     "generation_profiles",
     "transformations",
     "obsolete_tokens",
-    "execution_contract"
+    "execution_contract",
+    "dependency_contract"
   ],
   "properties": {
     "schema_version": {
-      "const": "1.5.0"
+      "const": "1.6.0"
     },
     "registry_version": {
       "type": "string",
@@ -70,6 +71,9 @@
     },
     "execution_contract": {
       "$ref": "#/$defs/executionContract"
+    },
+    "dependency_contract": {
+      "$ref": "#/$defs/dependencyContract"
     }
   },
   "$defs": {
@@ -83,6 +87,50 @@
     },
     "operationStatus": {
       "enum": ["unassessed", "unsupported", "implemented", "verified"]
+    },
+    "dependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "classes", "decision_sources"],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "classes": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "$ref": "#/$defs/dependencyClass" }
+        },
+        "decision_sources": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/decisionSource" }
+        }
+      }
+    },
+    "dependencyClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "representation", "summary", "reference_kinds", "change_policy"],
+      "properties": {
+        "id": { "enum": ["structural-reference", "bsam-semantic-constraint", "engineering-decision"] },
+        "representation": { "enum": ["semantic-reference", "semantic-reference-and-validator", "required-choice"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "reference_kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+        },
+        "change_policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "decisionSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "requires_user_input", "summary"],
+      "properties": {
+        "id": { "enum": ["user-approved", "source-derived"] },
+        "requires_user_input": { "type": "boolean" },
+        "summary": { "type": "string", "minLength": 1 }
+      }
     },
     "generationProfile": {
       "type": "object",
