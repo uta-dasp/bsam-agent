@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.115.0`
-- Registry SHA-256: `BCBA1D8ECCDD11D3F46496232A47759017E5FDB3BDFA2BBE4AF403E2DC99C830`
+- Registry version: `0.116.0`
+- Registry SHA-256: `F2C9CE4057A330F3360B172DA7C800160A562E428486A7AAA4781D3BF2A5216E`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1404,7 +1404,7 @@ Dispatches cluster crack definition, region, spacing, initiation, and function v
 - Dispatch prefix: `*CRAC`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-crack-controls](#evidencefe-crack-controls)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1412,33 +1412,38 @@ Known parameters:
 
 #### `*CRACK` body
 
-Termination: next-command-or-eof. Dependencies: REGION set and geometry targets act only on elements already created in the current cluster.; Crack region and initiation state is consumed by subsequent crack insertion and analysis operations.; DEFINITION is preservation-only until its active record-advance defect is corrected.
+Termination: next-command-or-eof. Dependencies: REGION requires exactly one set or geometry selector and acts only on elements already created in the current cluster.; Crack region, spacing, initiation, and function state is consumed by subsequent crack insertion and analysis operations.; DEFINITION is preservation-only until its active record-advance defect is corrected.
 
 - **blocked-definition** (operation is DEFINITION):
   - `plane-or-cylinder` [repeated]: `point`:three-reals, `normal`:three-reals, `radius`:optional-real-for-cylinder
   - Constraint: The intended command-line TYPE values are PLANE and CYLINDER, with PLANE as the local default.
-  - Constraint: The active reader tests the already-parsed command/value buffer before advancing to the first data row: without TYPE it consumes no definitions, while with TYPE it attempts to parse the TYPE value as numeric data. This operation is blocked from Agent generation.
+  - Constraint: The active reader tests the already-parsed command/value buffer before advancing to the first data row: without TYPE it consumes no definitions, while with TYPE it attempts to parse the TYPE value as numeric data. Agent static validation and generation reject every DEFINITION occurrence.
 - **region-by-element-set** (operation is REGION and ELSET is supplied):
   - `command` [once]: `action`:enum(REPLACE,ADD,REMOVE), `ELSET`:existing-element-set-name
-  - Constraint: REPLACE first disables cracking for every element, then enables the selected set; ADD enables it and REMOVE disables it.
+  - Constraint: Exactly one existing ELSET is required, its name respects the 20-character source buffer, and no data row follows.
+  - Constraint: At most one action is accepted; REPLACE first disables cracking for every element, then enables the selected set, ADD enables it, and REMOVE disables it.
 - **region-by-box** (operation is REGION and COORDINATES or BOX is supplied):
   - `bounds` [once]: `xmin`:real, `ymin`:real, `zmin`:real, `xmax`:real, `ymax`:real, `zmax`:real
-  - Constraint: The action is REPLACE by default; bounds must be ordered.
+  - Constraint: Exactly one immediate six-finite-real row is required; direct-read leading blanks/comments are rejected and bounds must be ordered.
+  - Constraint: The action is REPLACE by default and is mutually exclusive with ADD and REMOVE.
 - **region-by-sphere** (operation is REGION and SPHERE is supplied):
   - `sphere` [once]: `center_x`:real, `center_y`:real, `center_z`:real, `radius`:positive-real
-  - Constraint: The action is REPLACE by default.
+  - Constraint: Exactly one immediate four-finite-real row with positive radius is required; the action is REPLACE by default.
 - **region-by-cylinder** (operation is REGION and CYLINDER is supplied):
   - `cylinder` [once]: `start_x`:real, `start_y`:real, `start_z`:real, `end_x`:real, `end_y`:real, `end_z`:real, `radius`:positive-real
-  - Constraint: Axis endpoints must differ; the action is REPLACE by default.
+  - Constraint: Exactly one immediate seven-finite-real row is required; the radius is positive and axis endpoints differ.
+  - Constraint: The action is REPLACE by default.
 - **spacing** (operation is SPACING):
   - `command` [once]: `mode`:STRICT-or-VALUE=<positive-real>-or-RELAXED
-  - Constraint: STRICT is the allocated default.
+  - Constraint: STRICT is the allocated default; exactly one STRICT/RELAXED flag or finite positive VALUE may appear, and no data row follows.
 - **initiation** (operation is INITIATION):
   - `command` [once]: `LOCATION`:enum-prefix(INTEGRATION POINTS,NODES,CENTER)
+  - Constraint: Canonical LOCATION is the sole required option, its value must begin INTEGRATION POINTS, NODES, or CENTER, and no data row follows.
   - Constraint: LOCATION is required because the allocated cluster state has no visible initializer.
 - **function** (operation is FUNCTION):
   - `command` [once]: `TYPE`:enum-prefix(SIMPLE,WEIGHTED)
-  - Constraint: The final TYPE option must supply the residual parsed value used by this branch; canonical generation places it last.
+  - Constraint: The command accepts no option for the WEIGHTED default or exactly one canonical TYPE whose value begins SIMPLE or WEIGHTED; no data row follows.
+  - Constraint: TYPE must be the sole and therefore final option because this branch reads the residual parsed command value.
 
 ### `*TRANSFORM`
 

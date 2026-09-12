@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.116.0` additionally verifies every cluster `*CRACK` suffix: REGION selectors/actions and finite geometry, SPACING modes, required INITIATION location, residual-buffer-safe FUNCTION type, unknown suffix rejection, and fail-closed DEFINITION preservation. All 29 cluster commands and all 12 nested BOUNDARY constructs now have verified static validation.
+
 Registry `0.115.0` additionally verifies `*NGEN` headers and direct, paired-set, and source-safe single-row arc variants, including bounded unique labels, finite biased coordinates, endpoint geometry, output membership, and chained use of NGEN/NCOPY-derived coordinates.
 
 Registry `0.114.0` additionally verifies cluster-local `*BOUNDARY` FORMAT selection and exact finite ABAQUS, LIST, and POLYNOMIAL rows, including ordered component ranges, source-buffer-safe targets, polynomial cardinality, and rejection of the source's unsafe polynomial individual-node branch.

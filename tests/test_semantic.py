@@ -832,6 +832,58 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in references
             ))
 
+    def test_cluster_crack_variants_and_blocked_definition_are_validated(self) -> None:
+        prefix = (
+            b"*NAME\nply1\n*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+            b"*ELEMENT,TYPE=C3D4\n1,1,2,3,4\n*ELSET,ELSET=region\n1\n"
+        )
+        valid = (
+            b"*CRACK REGION,ELSET=region\n",
+            b"*CRACK REGION,ADD,BOX\n-1,-1,-1,1,1,1\n",
+            b"*CRACK REGION,REMOVE,SPHERE\n0,0,0,1D0\n",
+            b"*CRACK REGION,CYLINDER\n0,0,0,0,0,1,1\n",
+            b"*CRACK SPACING,STRICT\n",
+            b"*CRACK SPACING,VALUE=0.1\n",
+            b"*CRACK INITIATION,LOCATION=INTEGRATION POINTS\n",
+            b"*CRACK INITIATION,LOCATION=NODES\n",
+            b"*CRACK INITIATION,LOCATION=CENTER\n",
+            b"*CRACK FUNCTION\n",
+            b"*CRACK FUNCTION,TYPE=SIMPLE\n",
+            b"*CRACK FUNCTION,TYPE=WEIGHTED\n",
+        )
+        invalid = (
+            b"*CRACK DEFINITION,TYPE=PLANE\n0,0,0,0,0,1\n",
+            b"*CRACK\n",
+            b"*CRACK INITIATION\n",
+            b"*CRACK INITIATION,LOCATION=OTHER\n",
+            b"*CRACK INITIATION,LOCATION=NODES\nunexpected\n",
+            b"*CRACK FUNCTION,TYPE=OTHER\n",
+            b"*CRACK FUNCTION,OTHER\n",
+            b"*CRACK FUNCTION\nunexpected\n",
+            b"*CRACK REGION\n",
+            b"*CRACK REGION,ADD,REMOVE,ELSET=region\n",
+            b"*CRACK REGION,ELSET=region,BOX\n0,0,0,1,1,1\n",
+            b"*CRACK REGION,ELSET=abcdefghijklmnopqrstu\n",
+            b"*CRACK REGION,ELSET=region\nunexpected\n",
+            b"*CRACK REGION,BOX\n",
+            b"*CRACK REGION,BOX\n** unsafe direct-read row\n0,0,0,1,1,1\n",
+            b"*CRACK REGION,BOX\n0,0,0,NaN,1,1\n",
+            b"*CRACK REGION,BOX\n1,0,0,0,1,1\n",
+            b"*CRACK REGION,SPHERE\n0,0,0,0\n",
+            b"*CRACK REGION,CYLINDER\n0,0,0,0,0,0,1\n",
+            b"*CRACK REGION,CYLINDER\n0,0,0,0,0,1,-1\n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, crack in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(prefix + crack))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, crack in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + crack))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_exclusion_variants_and_geometry_are_validated(self) -> None:
         valid = (
             b"*EXCLUSION\n0,0,0,1,1,1\n",

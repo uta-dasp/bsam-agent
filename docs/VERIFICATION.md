@@ -139,6 +139,8 @@ Registry 0.114.0 verifies cluster-local `*BOUNDARY`: FORMAT is limited to source
 
 Registry 0.115.0 verifies `*NGEN`: canonical options, finite positive bias, exact direct/paired rows, nonempty equal-size endpoint sets, progressing increments, bounded unique positive labels, and finite derived coordinates are enforced. Arc mode requires finite noncollinear geometry and one generation row because the source's double record advance makes additional rows unsafe. NGEN and NCOPY now retain derived coordinates for validated chained generation.
 
+Registry 0.116.0 verifies every cluster `*CRACK` branch. REGION requires one bounded existing ELSET or one immediate finite box/sphere/cylinder row with valid geometry; SPACING, INITIATION, and FUNCTION enforce their command-only state contracts and source parsing limits; unknown suffixes fail closed. DEFINITION is always rejected because its active reader consumes the residual command buffer as data. This closes static validation for all 29 cluster commands and all 12 nested BOUNDARY constructs.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

@@ -507,7 +507,9 @@ def _registered_parameter_values(
     parameters = construct.get("parameters", [])
     if (
         len(parameters) == 1 and not found
-        and construct.get("id") not in {"command.tolerance", "command.boundary"}
+        and construct.get("id") not in {
+            "command.tolerance", "command.boundary", "command.crack",
+        }
     ):
         record = next((line for line in active_lines[1:] if "=" not in line.text), None)
         if record is not None:
@@ -5342,6 +5344,17 @@ def build_semantic_index(
                     index, setting, "targets-cluster",
                     _key("cluster", cluster, None), source, command_line,
                 )
+            elif command == "*CRAC" and cluster and command_line.text.lstrip().upper().startswith(
+                "*CRACK DEFINITION"
+            ):
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message=(
+                        "CRACK DEFINITION is preservation-only because its reader uses the "
+                        "residual command buffer before advancing to data"
+                    ),
+                    line=command_line.number, source=source,
+                ))
             elif (
                 command == "*SPAC"
                 or command == "*CRAC" and command_line.text.lstrip().upper().startswith("*CRACK SPACING")
@@ -5374,8 +5387,8 @@ def build_semantic_index(
                         line=command_line.number, source=source,
                     ))
                 mode = (
-                    "relaxed" if "RELAXED" in options else
-                    "value" if "VALUE" in options else
+                    "relaxed" if prefixes and prefixes[0] == "rel" else
+                    "value" if prefixes and prefixes[0] == "val" else
                     "strict"
                 )
                 setting = _entity(
@@ -5385,6 +5398,97 @@ def build_semantic_index(
                         "setting": "crack-spacing", "mode": mode,
                         "value": options.get("VALUE"),
                     },
+                )
+                _reference(
+                    index, setting, "targets-cluster",
+                    _key("cluster", cluster, None), source, command_line,
+                )
+            elif command == "*CRAC" and cluster and command_line.text.lstrip().upper().startswith(
+                "*CRACK INITIATION"
+            ):
+                crack_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                initiation_error: str | None = None
+                initiation_mode = ""
+                if len(crack_options) != 1 or "=" not in crack_options[0]:
+                    initiation_error = (
+                        "CRACK INITIATION requires exactly LOCATION=<integration points|nodes|center>"
+                    )
+                else:
+                    option_name, option_value = crack_options[0].split("=", 1)
+                    prefix = option_value.strip().casefold()[:3]
+                    if (
+                        option_name.strip().upper() != "LOCATION"
+                        or len(option_value.strip()) < 3
+                        or prefix not in {"int", "nod", "cen"}
+                    ):
+                        initiation_error = (
+                            "CRACK INITIATION LOCATION must begin integration points, nodes, or center"
+                        )
+                    else:
+                        initiation_mode = {
+                            "int": "integration-points", "nod": "nodes", "cen": "center",
+                        }[prefix]
+                if records:
+                    initiation_error = initiation_error or (
+                        "CRACK INITIATION is command-line-only"
+                    )
+                if initiation_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=initiation_error,
+                        line=command_line.number, source=source,
+                    ))
+                setting = _entity(
+                    index, "cluster-setting", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {"setting": "crack-initiation", "mode": initiation_mode},
+                )
+                _reference(
+                    index, setting, "targets-cluster",
+                    _key("cluster", cluster, None), source, command_line,
+                )
+            elif command == "*CRAC" and cluster and command_line.text.lstrip().upper().startswith(
+                "*CRACK FUNCTION"
+            ):
+                crack_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                function_error: str | None = None
+                function_mode = "weighted"
+                if crack_options:
+                    if len(crack_options) != 1 or "=" not in crack_options[0]:
+                        function_error = (
+                            "CRACK FUNCTION accepts only optional final TYPE=<SIMPLE|WEIGHTED>"
+                        )
+                    else:
+                        option_name, option_value = crack_options[0].split("=", 1)
+                        prefix = option_value.strip().casefold()[:5]
+                        if (
+                            option_name.strip().upper() != "TYPE"
+                            or len(option_value.strip()) < 5
+                            or prefix not in {"simpl", "weigh"}
+                        ):
+                            function_error = (
+                                "CRACK FUNCTION TYPE must begin SIMPLE or WEIGHTED"
+                            )
+                        else:
+                            function_mode = "simple" if prefix == "simpl" else "weighted"
+                if records:
+                    function_error = function_error or "CRACK FUNCTION is command-line-only"
+                if function_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=function_error,
+                        line=command_line.number, source=source,
+                    ))
+                setting = _entity(
+                    index, "cluster-setting", f"{source}:{command_line.number}",
+                    source, command_line, cluster,
+                    {"setting": "crack-function", "mode": function_mode},
                 )
                 _reference(
                     index, setting, "targets-cluster",
@@ -5449,12 +5553,98 @@ def build_semantic_index(
             elif command == "*CRAC" and cluster and command_line.text.lstrip().upper().startswith(
                 "*CRACK REGION"
             ):
-                elset = options.get("ELSET")
-                action = (
-                    "ADD" if "ADD" in options else
-                    "REMOVE" if "REMOVE" in options else "REPLACE"
-                )
-                if elset:
+                region_options = [
+                    field.strip()
+                    for field in command_line.text.split("#", 1)[0][:240].split(",")[1:]
+                    if field.strip()
+                ]
+                actions: list[str] = []
+                selectors: list[tuple[str, str | None]] = []
+                region_error: str | None = None
+                for field in region_options:
+                    if "=" in field:
+                        option_name, option_value = field.split("=", 1)
+                        name = option_name.strip().upper()
+                        value = option_value.strip()
+                    else:
+                        name, value = field.strip().upper(), None
+                    if name in {"REPLACE", "ADD", "REMOVE"} and value is None:
+                        actions.append(name)
+                    elif name == "ELSET" and value:
+                        selectors.append(("element-set", value))
+                    elif name in {"COORDINATES", "BOX", "SPHERE", "CYLINDER"} and value is None:
+                        selectors.append((
+                            "box" if name in {"COORDINATES", "BOX"} else name.casefold(),
+                            None,
+                        ))
+                    else:
+                        region_error = f"invalid CRACK REGION option {field}"
+                        break
+                if len(actions) > 1:
+                    region_error = region_error or (
+                        "CRACK REGION accepts at most one of REPLACE, ADD, or REMOVE"
+                    )
+                if len(selectors) != 1:
+                    region_error = region_error or (
+                        "CRACK REGION requires exactly one ELSET, BOX/COORDINATES, SPHERE, or CYLINDER selector"
+                    )
+                action = actions[0] if actions else "REPLACE"
+                selector, elset = selectors[0] if len(selectors) == 1 else ("", None)
+                numeric_values: list[float] = []
+                if selector == "element-set":
+                    if len(elset or "") > 20:
+                        region_error = region_error or (
+                            "CRACK REGION ELSET names may contain at most 20 characters"
+                        )
+                    if records:
+                        region_error = region_error or (
+                            "ELSET CRACK REGION is command-line-only"
+                        )
+                elif selector:
+                    expected = {"box": 6, "sphere": 4, "cylinder": 7}[selector]
+                    if (
+                        len(records) != 1 or not body
+                        or body[0] is not records[0]
+                        or len(_record_fields(records[0])) != expected
+                    ):
+                        region_error = region_error or (
+                            f"{selector.upper()} CRACK REGION requires one immediate {expected}-real row"
+                        )
+                    else:
+                        try:
+                            numeric_values = [
+                                _fortran_real(item) for item in _record_fields(records[0])
+                            ]
+                            if not all(math.isfinite(item) for item in numeric_values):
+                                raise ValueError
+                        except ValueError:
+                            region_error = region_error or (
+                                "CRACK REGION geometry values must be finite reals"
+                            )
+                    if (
+                        region_error is None and selector == "box"
+                        and any(numeric_values[index] > numeric_values[index + 3] for index in range(3))
+                    ):
+                        region_error = "CRACK REGION box bounds must be ordered"
+                    if (
+                        region_error is None and selector == "sphere"
+                        and numeric_values[3] <= 0
+                    ):
+                        region_error = "CRACK REGION sphere radius must be positive"
+                    if region_error is None and selector == "cylinder":
+                        if numeric_values[6] <= 0:
+                            region_error = "CRACK REGION cylinder radius must be positive"
+                        elif not any(
+                            numeric_values[index] != numeric_values[index + 3]
+                            for index in range(3)
+                        ):
+                            region_error = "CRACK REGION cylinder axis endpoints must differ"
+                if region_error is not None:
+                    index.diagnostics.append(Diagnostic(
+                        code="BSAM-E310", severity="error", message=region_error,
+                        line=command_line.number, source=source,
+                    ))
+                if selector == "element-set" and elset:
                     region = _entity(
                         index, "crack-region", f"{source}:{command_line.number}",
                         source, command_line, cluster,
@@ -5464,23 +5654,28 @@ def build_semantic_index(
                         index, region, "targets-element-set",
                         _key("element-set", elset, cluster), source, command_line,
                     )
-                else:
-                    selector = (
-                        "sphere" if "SPHERE" in options else
-                        "cylinder" if "CYLINDER" in options else
-                        "box" if "BOX" in options or "COORDINATES" in options else None
+                elif selector:
+                    region = _entity(
+                        index, "crack-region", f"{source}:{command_line.number}",
+                        source, command_line, cluster,
+                        {
+                            "action": action, "selector": selector,
+                            "values": numeric_values,
+                        },
                     )
-                    if selector is not None:
-                        values = _fields(records[0].text) if records else []
-                        region = _entity(
-                            index, "crack-region", f"{source}:{command_line.number}",
-                            source, command_line, cluster,
-                            {"action": action, "selector": selector, "values": values},
-                        )
-                        _reference(
-                            index, region, "targets-cluster",
-                            _key("cluster", cluster, None), source, command_line,
-                        )
+                    _reference(
+                        index, region, "targets-cluster",
+                        _key("cluster", cluster, None), source, command_line,
+                    )
+            elif command == "*CRAC" and cluster:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message=(
+                        "CRACK command must be DEFINITION, REGION, SPACING, "
+                        "INITIATION, or FUNCTION"
+                    ),
+                    line=command_line.number, source=source,
+                ))
     if cluster_open:
         last_source = source_entries[-1][1] if source_entries else "<root>"
         last_lines = source_entries[-1][2] if source_entries else ()
