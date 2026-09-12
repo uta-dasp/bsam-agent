@@ -601,6 +601,61 @@ def _validate_registered_values(
                 ))
 
 
+def _validate_clusters_container(
+    index: SemanticIndex, definition: dict[str, Any], source: str,
+    lines: tuple[SourceLine, ...],
+) -> None:
+    """Validate the root CLUSTERS envelope around the FE command stream."""
+    canonical = str(definition["canonical"])
+    headers = [line for line in lines if line.stripped == canonical]
+    if len(headers) != 1:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message=f"{canonical} must occur exactly once; found {len(headers)}",
+            line=headers[0].number if headers else None, source=source,
+        ))
+    if not headers:
+        return
+
+    header = headers[0]
+    header_index = lines.index(header)
+    top_level_tokens = {
+        str(item["canonical"]) for item in load_registry()["top_level_blocks"]
+    }
+    next_block = next(
+        (
+            position for position in range(header_index + 1, len(lines))
+            if lines[position].first_field in top_level_tokens
+        ),
+        len(lines),
+    )
+    accepted_ends = {"END CLUSTERS", "END APPROXIMATION"}
+    end_index = next(
+        (
+            position for position in range(header_index + 1, next_block)
+            if lines[position].stripped in accepted_ends
+        ),
+        None,
+    )
+    if end_index is None:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="CLUSTERS is missing END CLUSTERS or its registered compatibility terminator",
+            line=header.number, source=source,
+        ))
+        end_index = next_block
+
+    active = [
+        line for line in lines[header_index + 1:end_index]
+        if line.stripped and not line.stripped.startswith("**")
+    ]
+    if not active or not active[0].text.lstrip().casefold().startswith("*type"):
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="CLUSTERS requires at least one cluster and its first active record must be *TYPE",
+            line=active[0].number if active else header.number, source=source,
+        ))
+
 def augment_registered_boundary_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
@@ -720,6 +775,12 @@ def augment_registered_top_level_semantics(
                 {"record_role": "container"} if is_container else attributes
             ),
         ))
+        if (
+            is_container
+            and capability_id == "block.clusters"
+            and operational_support(definition)["static_validation"] == "verified"
+        ):
+            _validate_clusters_container(index, definition, source, all_lines)
         if (
             is_single_record
             and operational_support(definition)["static_validation"] == "verified"
@@ -3673,6 +3734,12 @@ def build_semantic_index(
                     str(item["dispatch_prefix"]).casefold()
                 )
             ]
+            if not matched_commands:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E390", severity="error",
+                    message=f"unregistered command in CLUSTERS: {command_line.stripped}",
+                    line=command_line.number, source=source,
+                ))
             if len(matched_commands) == 1:
                 registered = matched_commands[0]
                 capability_id = str(registered["id"])

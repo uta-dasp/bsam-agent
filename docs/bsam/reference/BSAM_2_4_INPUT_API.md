@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.116.0`
-- Registry SHA-256: `F2C9CE4057A330F3360B172DA7C800160A562E428486A7AAA4781D3BF2A5216E`
+- Registry version: `0.117.0`
+- Registry SHA-256: `CE7AA8E837F35049E5D225AB9837A7DCA425B2BCE6AC29ABEA34ACF0A67F801E`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -189,7 +189,7 @@ Defines one or more solid finite-element clusters and their mesh, sets, orientat
 - Termination: `*STOP per cluster`, `END CLUSTERS` (canonical)
 - Coverage: documented
 - Evidence: [evidence.cluster-parser](#evidencecluster-parser), [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=implemented, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=implemented, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Remaining specification work:
 

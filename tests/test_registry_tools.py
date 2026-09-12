@@ -182,6 +182,12 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual({"abaqus-style", "list-directed", "polynomial"}, boundary_variants)
         self.assertIn("stale loop variable", json.dumps(commands["*BOUNDARY"]).lower())
 
+        clusters = next(
+            item for item in self.registry["top_level_blocks"]
+            if item["id"] == "block.clusters"
+        )
+        self.assertEqual("verified", clusters["operations"]["static_validation"])
+
     def test_every_cluster_command_has_a_documented_grammar(self) -> None:
         self.assertEqual(
             [],

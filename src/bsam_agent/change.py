@@ -1022,6 +1022,10 @@ def _mesh_import_patch(
     mesh = import_ele(mesh_path)
     if expected_sha256 is not None and mesh.sha256 != expected_sha256:
         raise ChangeError("mesh input changed after planning; create a new import plan")
+    if mesh.surfaces:
+        raise ChangeError(
+            "mesh import cannot emit SURFACE records because BSAM has no active cluster dispatch"
+        )
     prefix = f"cluster:{cluster.casefold()}/"
     existing = [
         item for item in source_set.semantic_index().entities

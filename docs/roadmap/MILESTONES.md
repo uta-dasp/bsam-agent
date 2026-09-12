@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.116.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 29 cluster commands and all 12 nested BOUNDARY constructs.
+Status: in progress. Registry `0.117.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for the CLUSTERS container, all 29 cluster commands, and all 12 nested BOUNDARY constructs.
 
 ### M1.1 Reachable-dispatch audit
 

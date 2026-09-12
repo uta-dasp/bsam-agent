@@ -261,7 +261,9 @@ class ChangePlanTests(unittest.TestCase):
             ))
             include.write_bytes(b"*NAME\r\nply1\r\n")
             mesh.write_bytes(
-                (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes()
+                (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes().replace(
+                    b"*Surface, name=outer, type=Element\nsolid, S1\n", b"",
+                )
             )
 
             plan = plan_import_mesh(source, mesh, "ply1")
@@ -523,9 +525,13 @@ class ChangePlanTests(unittest.TestCase):
             template.write_bytes(DECK.replace(
                 b"*STOP\r\n", b"*NAME\r\nmesh_cluster\r\n*STOP\r\n"
             ))
-            mesh.write_bytes(
-                (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes()
-            )
+            fixture = (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes()
+            mesh.write_bytes(fixture)
+            with self.assertRaisesRegex(ChangeError, "no active cluster dispatch"):
+                plan_import_mesh(template, mesh, "mesh_cluster")
+            mesh.write_bytes(fixture.replace(
+                b"*Surface, name=outer, type=Element\nsolid, S1\n", b"",
+            ))
 
             plan = plan_import_mesh(template, mesh, "mesh_cluster")
             self.assertEqual("import-mesh", plan["operation"])
@@ -550,6 +556,9 @@ class ChangePlanTests(unittest.TestCase):
                 b"*STOP\r\n", b"*NAME\r\nmesh_cluster\r\n*STOP\r\n"
             ))
             fixture = (Path(__file__).parent / "fixtures" / "abaqus_style_mesh.ele").read_bytes()
+            fixture = fixture.replace(
+                b"*Surface, name=outer, type=Element\nsolid, S1\n", b"",
+            )
             mesh.write_bytes(fixture)
             write_plan(plan_import_mesh(template, mesh, "mesh_cluster"), plan_path)
             mesh.write_bytes(fixture + b"** changed\n")

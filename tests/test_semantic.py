@@ -391,6 +391,31 @@ class SemanticIndexTests(unittest.TestCase):
             for item in inspection["diagnostics"]
         ))
 
+    def test_clusters_container_enforces_envelope_and_registered_dispatch(self) -> None:
+        base = deck(b"")
+        invalid = {
+            "empty": base.replace(b"*type\nsolid\n*STOP\n", b"", 1),
+            "leading-record": base.replace(
+                b"CLUSTERS\n*type\n", b"CLUSTERS\nunexpected\n*type\n", 1,
+            ),
+            "missing-end": base.replace(b"END CLUSTERS\n", b"", 1),
+            "duplicate": base + b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n",
+            "unknown-command": base.replace(b"*STOP\n", b"*MYSTERY\n*STOP\n", 1),
+        }
+        for name, raw in invalid.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(raw)
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+            self.assertIn("BSAM-E390", {item["code"] for item in diagnostics})
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "model.in"
+            root.write_bytes(base.replace(b"END CLUSTERS", b"END APPROXIMATION"))
+            inspection = SourceSet.read(root).inspection()
+        self.assertEqual(0, inspection["summary"]["errors"])
+        self.assertIn("BSAM-W111", {item["code"] for item in inspection["diagnostics"]})
+
     def test_cluster_name_shape_reservation_and_uniqueness_are_validated(self) -> None:
         cases = {
             "empty": b"*NAME\n",
