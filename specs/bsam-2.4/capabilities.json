@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.124.0",
+  "registry_version": "0.125.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -971,9 +971,7 @@
         "evidence.current-vtms-deck-tric",
         "evidence.current-vtms-deck-notch"
       ],
-      "remaining_work": [
-        "Complete the node/element/set/orientation reverse-dependency model required for general structural edits."
-      ],
+      "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "implemented", "inspect": "verified",
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",

@@ -716,6 +716,26 @@ class ChangePlanTests(unittest.TestCase):
             with self.assertRaisesRegex(ChangeError, "targets-element-set"):
                 plan_delete_set(source, "ply1", "element", "solid")
 
+    def test_generated_and_box_set_memberships_block_structural_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "model.in"
+            source.write_bytes(DECK.replace(
+                b"*STOP\r\n",
+                b"*NAME\r\nply1\r\n*NODE\r\n1,0,0,0\r\n2,1,0,0\r\n"
+                b"3,2,0,0\r\n4,0,1,0\r\n*ELEMENT,TYPE=C3D4\r\n"
+                b"1,1,2,3,4\r\n2,1,2,3,4\r\n"
+                b"*NSET,NSET=generated,GENERATE\r\n1,2,1\r\n"
+                b"*NSET,NSET=boxed,BOX\r\n2,-1,-1,2,1,1\r\n"
+                b"*ELSET,ELSET=generated,GENERATE\r\n1,2,1\r\n*STOP\r\n",
+            ))
+
+            with self.assertRaisesRegex(ChangeError, "contains"):
+                plan_delete_node(source, "ply1", 1)
+            with self.assertRaisesRegex(ChangeError, "contains"):
+                plan_delete_node(source, "ply1", 3)
+            with self.assertRaisesRegex(ChangeError, "contains"):
+                plan_delete_element(source, "ply1", 2)
+
     def test_coordinate_and_integration_dependencies_block_deletion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "model.in"

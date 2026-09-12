@@ -366,6 +366,13 @@ class RegistryToolsTests(unittest.TestCase):
             self.assertIn("duplicate membership", contract)
             self.assertIn("100000", contract)
 
+    def test_cluster_reverse_dependency_gap_is_closed(self) -> None:
+        clusters = next(
+            item for item in self.registry["top_level_blocks"]
+            if item["id"] == "block.clusters"
+        )
+        self.assertEqual([], clusters["remaining_work"])
+
     def test_table_grid_and_interpolation_contract_is_registered(self) -> None:
         block = next(item for item in self.registry["top_level_blocks"] if item["canonical"] == "TABLES")
         self.assertEqual("documented", block["coverage"])

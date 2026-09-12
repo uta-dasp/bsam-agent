@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.124.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; remaining specification work concerns shared dependency/edit contracts and engineering-decision boundaries.
+Status: in progress. Registry `0.125.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; remaining specification work concerns material compatibility, shared edit contracts, and engineering-decision boundaries.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -171,6 +171,7 @@ Status: complete. Loss-preserving parsing, semantic identities/references, regis
 - [x] Copy a reviewed root edit plus unchanged relative include files to a separate source-set directory with preflight conflict checks, digest verification, and partial-write rollback.
 - [x] Delete an unreferenced node from an included FE fragment through a path-bound patch, and compose root/include changes into one reviewed source-set plan without touching originals.
 - [x] Compute dependent updates for verified renames and block verified destructive changes when semantic dependents are present or definitions are unresolved, ambiguous, implicit, or generated.
+- [x] Complete the node, element, set, generated-membership, and orientation reverse-dependency graph used by guarded structural deletion.
 - [x] Keep specialized transformations for the runtime-qualified notch expansion and legacy solver migration; route ordinary supported syntax edits through generic capability adapters.
 
 ### M2.4 Deterministic generation
