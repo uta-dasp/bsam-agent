@@ -656,6 +656,74 @@ def _validate_clusters_container(
             line=active[0].number if active else header.number, source=source,
         ))
 
+
+def _validate_boundary_container(
+    index: SemanticIndex, definition: dict[str, Any], source: str,
+    lines: tuple[SourceLine, ...],
+) -> None:
+    """Validate explicit problem boundaries and dispatch in BOUNDARY."""
+    canonical = str(definition["canonical"])
+    headers = [line for line in lines if line.stripped == canonical]
+    if len(headers) != 1:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message=f"{canonical} must occur exactly once; found {len(headers)}",
+            line=headers[0].number if headers else None, source=source,
+        ))
+    if not headers:
+        return
+
+    header = headers[0]
+    header_index = lines.index(header)
+    top_level_tokens = {
+        str(item["canonical"]) for item in load_registry()["top_level_blocks"]
+    }
+    next_block = next(
+        (
+            position for position in range(header_index + 1, len(lines))
+            if lines[position].first_field in top_level_tokens
+        ),
+        len(lines),
+    )
+    end_index = next(
+        (
+            position for position in range(header_index + 1, next_block)
+            if lines[position].stripped == "END BOUNDARY"
+        ),
+        None,
+    )
+    if end_index is None:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="BOUNDARY is missing its exact END BOUNDARY terminator",
+            line=header.number, source=source,
+        ))
+        end_index = next_block
+
+    active = [
+        line for line in lines[header_index + 1:end_index]
+        if line.stripped and not line.stripped.startswith("**")
+    ]
+    if not active or not active[0].text.lstrip().casefold().startswith("*type"):
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E390", severity="error",
+            message="BOUNDARY requires at least one explicitly *TYPE-started problem",
+            line=active[0].number if active else header.number, source=source,
+            provenance="agent-policy",
+        ))
+
+    constructs = nested_constructs("block.boundary")
+    for line in active:
+        stripped = line.text.lstrip()
+        if not stripped.startswith("*") or stripped.startswith("**"):
+            continue
+        if match_nested_construct(stripped, constructs) is None:
+            index.diagnostics.append(Diagnostic(
+                code="BSAM-E390", severity="error",
+                message=f"unregistered command in BOUNDARY: {line.stripped}",
+                line=line.number, source=source,
+            ))
+
 def augment_registered_boundary_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> None:
@@ -775,12 +843,11 @@ def augment_registered_top_level_semantics(
                 {"record_role": "container"} if is_container else attributes
             ),
         ))
-        if (
-            is_container
-            and capability_id == "block.clusters"
-            and operational_support(definition)["static_validation"] == "verified"
-        ):
-            _validate_clusters_container(index, definition, source, all_lines)
+        if is_container and operational_support(definition)["static_validation"] == "verified":
+            if capability_id == "block.clusters":
+                _validate_clusters_container(index, definition, source, all_lines)
+            elif capability_id == "block.boundary":
+                _validate_boundary_container(index, definition, source, all_lines)
         if (
             is_single_record
             and operational_support(definition)["static_validation"] == "verified"

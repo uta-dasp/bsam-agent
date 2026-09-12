@@ -187,6 +187,11 @@ class RegistryToolsTests(unittest.TestCase):
             if item["id"] == "block.clusters"
         )
         self.assertEqual("verified", clusters["operations"]["static_validation"])
+        boundary = next(
+            item for item in self.registry["top_level_blocks"]
+            if item["id"] == "block.boundary"
+        )
+        self.assertEqual("verified", boundary["operations"]["static_validation"])
 
     def test_every_cluster_command_has_a_documented_grammar(self) -> None:
         self.assertEqual(

@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.117.0`
-- Registry SHA-256: `CE7AA8E837F35049E5D225AB9837A7DCA425B2BCE6AC29ABEA34ACF0A67F801E`
+- Registry version: `0.118.0`
+- Registry SHA-256: `40F6650D06AB1B0624CDE5E59048CEC83F1E048AA6BC9EA752C678E4CDD829B8`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -205,7 +205,7 @@ Defines boundary problems, loads, connections, convergence, stepping, and output
 - Termination: `END BOUNDARY` (accepted-current)
 - Coverage: documented
 - Evidence: [evidence.boundary-parser](#evidenceboundary-parser), [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 ### `CONSTITUTIVE`
 

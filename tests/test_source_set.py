@@ -211,10 +211,13 @@ class SourceSetTests(unittest.TestCase):
 
             self.assertEqual(2, status)
             self.assertEqual(64, len(result["source_set_sha256"]))
-            self.assertEqual(1, result["summary"]["errors"])
-            self.assertEqual({"references": 1}, result["summary"]["by_level"])
-            self.assertEqual({"source-defined": 1}, result["summary"]["by_provenance"])
+            self.assertEqual(2, result["summary"]["errors"])
+            self.assertEqual(
+                {"references": 1, "structure": 1}, result["summary"]["by_level"],
+            )
+            self.assertEqual({"source-defined": 2}, result["summary"]["by_provenance"])
             self.assertEqual("BSAM-E203", result["diagnostics"][0]["code"])
+            self.assertEqual("BSAM-E390", result["diagnostics"][1]["code"])
             source_set = SourceSet.read(deck)
             self.assertEqual(1, len(source_set.references))
 

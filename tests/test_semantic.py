@@ -416,6 +416,24 @@ class SemanticIndexTests(unittest.TestCase):
         self.assertEqual(0, inspection["summary"]["errors"])
         self.assertIn("BSAM-W111", {item["code"] for item in inspection["diagnostics"]})
 
+    def test_boundary_container_enforces_envelope_and_registered_dispatch(self) -> None:
+        base = deck(b"")
+        invalid = {
+            "empty": base.replace(b"*type\nmechanical\n", b"", 1),
+            "implicit-type": base.replace(b"*type\nmechanical\n", b"mechanical\n", 1),
+            "missing-end": base.replace(b"END BOUNDARY\n", b"", 1),
+            "duplicate": base + b"BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n",
+            "unknown-command": base.replace(
+                b"END BOUNDARY\n", b"*MYSTERY\nEND BOUNDARY\n", 1,
+            ),
+        }
+        for name, raw in invalid.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "model.in"
+                root.write_bytes(raw)
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+            self.assertIn("BSAM-E390", {item["code"] for item in diagnostics})
+
     def test_cluster_name_shape_reservation_and_uniqueness_are_validated(self) -> None:
         cases = {
             "empty": b"*NAME\n",
