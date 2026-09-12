@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.131.0`
-- Registry SHA-256: `9FFBD518A24B99B1824FA70139F75DD29189FE981F0135FB8B4ED6A28D8B8F9F`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 11 supported change impacts, and 44 capabilities with primary entity output
+- Registry version: `0.132.0`
+- Registry SHA-256: `0F8EDB40419676C4D6FF3F8FDF99F56037AFDE2BF4E97EDFA00ADA70CAC779D2`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -1992,6 +1992,27 @@ Decision provenance:
 
 - `user-approved` (user input required): The value or policy comes from explicit user intent and may not be guessed from examples or defaults.
 - `source-derived` (user input not required): A verified deterministic algorithm derives the value from the bound source set and records the derivation.
+
+Engineering clarification triggers:
+
+- **clarification.net-new-mechanical-solid** (`generate`; `generation.mechanical-isotropic-solid-v1`): Before generating a new deck under the only verified creation profile.
+  - Required user-approved choices: `unit_system`, `analysis.name`, `analysis.status`, `cluster.name`, `solver.type`, `solver.n_threads`, `solver.matrix_type`, `convergence.relative_tolerance`, `convergence.absolute_tolerance`, `convergence.divergence_tolerance`, `convergence.max_iterations`, `loading.name`, `loading.step_count`, `loading.increment`, `material.youngs_modulus`, `material.poisson_ratio`, `material.thermal_expansion`, `material.tensile_strength`, `material.compressive_strength`, `material.shear_strength`, `constitutive.failure_type`, `constitutive.z_rotation_degrees`, `constraints`, `loads`
+- **clarification.notch-expand-plies** (`transform`; `transformation.notch-expand-plies`): Before applying the fixture-bounded laminate expansion transformation.
+  - Required user-approved choices: `total_thickness`, `layup_degrees`, `interface_constitutive`, `boundary_policy`
+- **clarification.legacy-solver-migration** (`transform`; `transformation.migrate-legacy-solver`): Before replacing a legacy numeric solver body with current PARDISO syntax.
+  - Required user-approved choices: `target_solver`
+- **clarification.structured-material-creation** (`create`, `generate`; `block.materials`, `block.failure`, `block.constitutive`): When proposing a new structured material type 50, 998, or 999 or changing the consumer profile that determines its required fields.
+  - Required user-approved choices: `material_type`, `unit_system`, `analysis_and_failure_consumers`, `complete_required_property_set`, `conditional_damage_fatigue_thermal_data`, `type_999_density_interpretation`
+- **clarification.boundary-load-definition** (`create`, `modify`, `generate`; `construct.boundary-type`, `construct.boundary-conditions`, `construct.boundary-loading-sequence`, `command.boundary`, `command.load`, `command.field`): When creating or materially changing analysis type, constraints, fields, loads, or their activation schedule rather than only retargeting an already approved value.
+  - Required user-approved choices: `analysis_type`, `target_entities_or_sets`, `degrees_of_freedom_or_field_slots`, `magnitudes_units_and_signs`, `loading_sequence_and_activation`
+- **clarification.geometry-operation** (`create`, `modify`, `generate`, `transform`; `command.orientation`, `command.shift`, `command.scale`, `command.flip`, `command.transform`): When adding, changing, or reordering an operation that alters coordinates, frames, or stored orientation relationships.
+  - Required user-approved choices: `reference_frame`, `operation_magnitude_or_mapping`, `operation_order`, `load_constraint_and_orientation_handling`
+- **clarification.failure-fatigue-model** (`create`, `modify`, `generate`; `block.failure`, `block.materials`, `block.constitutive`, `construct.boundary-loading-sequence`): When selecting a failure, damage, degradation, fracture, or fatigue model or supplying its engineering coefficients.
+  - Required user-approved choices: `criterion_or_model`, `compatible_material_strengths`, `fracture_or_degradation_parameters`, `fatigue_cycle_and_ratio_parameters`, `acceptance_basis`
+- **clarification.mesh-topology-creation** (`create`, `generate`, `transform`; `command.node`, `command.element`, `command.nset`, `command.elset`, `command.section`, `command.selection`): When mesh entities, membership, layer assignment, or selection meaning are not fully supplied by an approved import or transformation intent.
+  - Required user-approved choices: `coordinate_and_unit_basis`, `element_topology_and_connectivity`, `set_membership`, `section_layering_and_assignment`, `selection_purpose`
+- **clarification.external-coupled-workflow** (`create`, `modify`, `generate`, `run`; `block.moisture`, `block.materials`, `construct.boundary-connections`): When an operation depends on MOISTURE, heterogeneous or COMPRO material files, global/local connection files, or another external engineering toolchain.
+  - Required user-approved choices: `external_toolchain_and_version`, `trusted_input_files`, `coordinate_and_unit_mapping`, `atomic_output_plan`, `execution_authorization`
 
 ## Change impact contract
 

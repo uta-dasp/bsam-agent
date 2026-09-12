@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "1.9.0",
-  "registry_version": "0.131.0",
+  "schema_version": "2.0.0",
+  "registry_version": "0.132.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3903,7 +3903,7 @@
     ]
   },
   "dependency_contract": {
-    "schema_version": "1.1.0",
+    "schema_version": "1.2.0",
     "classes": [
       {
         "id": "structural-reference",
@@ -4139,6 +4139,80 @@
         "id": "source-derived",
         "requires_user_input": false,
         "summary": "A verified deterministic algorithm derives the value from the bound source set and records the derivation."
+      }
+    ],
+    "clarification_triggers": [
+      {
+        "id": "clarification.net-new-mechanical-solid",
+        "scope_ids": ["generation.mechanical-isotropic-solid-v1"],
+        "operations": ["generate"],
+        "condition": "Before generating a new deck under the only verified creation profile.",
+        "required_choices": ["unit_system", "analysis.name", "analysis.status", "cluster.name", "solver.type", "solver.n_threads", "solver.matrix_type", "convergence.relative_tolerance", "convergence.absolute_tolerance", "convergence.divergence_tolerance", "convergence.max_iterations", "loading.name", "loading.step_count", "loading.increment", "material.youngs_modulus", "material.poisson_ratio", "material.thermal_expansion", "material.tensile_strength", "material.compressive_strength", "material.shear_strength", "constitutive.failure_type", "constitutive.z_rotation_degrees", "constraints", "loads"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.notch-expand-plies",
+        "scope_ids": ["transformation.notch-expand-plies"],
+        "operations": ["transform"],
+        "condition": "Before applying the fixture-bounded laminate expansion transformation.",
+        "required_choices": ["total_thickness", "layup_degrees", "interface_constitutive", "boundary_policy"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.legacy-solver-migration",
+        "scope_ids": ["transformation.migrate-legacy-solver"],
+        "operations": ["transform"],
+        "condition": "Before replacing a legacy numeric solver body with current PARDISO syntax.",
+        "required_choices": ["target_solver"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.structured-material-creation",
+        "scope_ids": ["block.materials", "block.failure", "block.constitutive"],
+        "operations": ["create", "generate"],
+        "condition": "When proposing a new structured material type 50, 998, or 999 or changing the consumer profile that determines its required fields.",
+        "required_choices": ["material_type", "unit_system", "analysis_and_failure_consumers", "complete_required_property_set", "conditional_damage_fatigue_thermal_data", "type_999_density_interpretation"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.boundary-load-definition",
+        "scope_ids": ["construct.boundary-type", "construct.boundary-conditions", "construct.boundary-loading-sequence", "command.boundary", "command.load", "command.field"],
+        "operations": ["create", "modify", "generate"],
+        "condition": "When creating or materially changing analysis type, constraints, fields, loads, or their activation schedule rather than only retargeting an already approved value.",
+        "required_choices": ["analysis_type", "target_entities_or_sets", "degrees_of_freedom_or_field_slots", "magnitudes_units_and_signs", "loading_sequence_and_activation"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.geometry-operation",
+        "scope_ids": ["command.orientation", "command.shift", "command.scale", "command.flip", "command.transform"],
+        "operations": ["create", "modify", "generate", "transform"],
+        "condition": "When adding, changing, or reordering an operation that alters coordinates, frames, or stored orientation relationships.",
+        "required_choices": ["reference_frame", "operation_magnitude_or_mapping", "operation_order", "load_constraint_and_orientation_handling"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.failure-fatigue-model",
+        "scope_ids": ["block.failure", "block.materials", "block.constitutive", "construct.boundary-loading-sequence"],
+        "operations": ["create", "modify", "generate"],
+        "condition": "When selecting a failure, damage, degradation, fracture, or fatigue model or supplying its engineering coefficients.",
+        "required_choices": ["criterion_or_model", "compatible_material_strengths", "fracture_or_degradation_parameters", "fatigue_cycle_and_ratio_parameters", "acceptance_basis"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.mesh-topology-creation",
+        "scope_ids": ["command.node", "command.element", "command.nset", "command.elset", "command.section", "command.selection"],
+        "operations": ["create", "generate", "transform"],
+        "condition": "When mesh entities, membership, layer assignment, or selection meaning are not fully supplied by an approved import or transformation intent.",
+        "required_choices": ["coordinate_and_unit_basis", "element_topology_and_connectivity", "set_membership", "section_layering_and_assignment", "selection_purpose"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.external-coupled-workflow",
+        "scope_ids": ["block.moisture", "block.materials", "construct.boundary-connections"],
+        "operations": ["create", "modify", "generate", "run"],
+        "condition": "When an operation depends on MOISTURE, heterogeneous or COMPRO material files, global/local connection files, or another external engineering toolchain.",
+        "required_choices": ["external_toolchain_and_version", "trusted_input_files", "coordinate_and_unit_mapping", "atomic_output_plan", "execution_authorization"],
+        "decision_source": "user-approved"
       }
     ]
   },

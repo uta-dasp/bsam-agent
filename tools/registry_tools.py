@@ -86,16 +86,19 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         },
         "registry",
     )
-    if data["schema_version"] != "1.9.0":
+    if data["schema_version"] != "2.0.0":
         raise RegistryError("unsupported schema_version")
 
     dependency = data["dependency_contract"]
     _require_keys(
         dependency,
-        {"schema_version", "classes", "reference_contracts", "decision_sources"},
+        {
+            "schema_version", "classes", "reference_contracts", "decision_sources",
+            "clarification_triggers",
+        },
         "dependency_contract",
     )
-    if dependency["schema_version"] != "1.1.0":
+    if dependency["schema_version"] != "1.2.0":
         raise RegistryError("unsupported dependency_contract schema_version")
     dependency_classes = dependency["classes"]
     for item in dependency_classes:
@@ -494,6 +497,62 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
     if set(transformation_ids) != {item["id"] for item in transformations}:
         raise RegistryError("change_contract must reference every registered transformation")
 
+    clarification_triggers = dependency["clarification_triggers"]
+    for item in clarification_triggers:
+        _require_keys(
+            item,
+            {
+                "id", "scope_ids", "operations", "condition", "required_choices",
+                "decision_source",
+            },
+            "clarification trigger",
+        )
+        _unique(item["scope_ids"], f"scope in {item['id']}")
+        _unique(item["operations"], f"operation in {item['id']}")
+        _unique(item["required_choices"], f"required choice in {item['id']}")
+        if item["decision_source"] != "user-approved":
+            raise RegistryError(f"{item['id']} must require user-approved decisions")
+    _unique([item["id"] for item in clarification_triggers], "clarification trigger")
+    known_scopes = capability_ids | {
+        item["id"] for item in generation_profiles
+    } | {item["id"] for item in transformations}
+    unknown_scopes = sorted({
+        scope for item in clarification_triggers for scope in item["scope_ids"]
+        if scope not in known_scopes
+    })
+    if unknown_scopes:
+        raise RegistryError(
+            "clarification triggers reference missing scopes: "
+            + ", ".join(unknown_scopes)
+        )
+    for profile in generation_profiles:
+        profile_triggers = [
+            item for item in clarification_triggers
+            if profile["id"] in item["scope_ids"] and "generate" in item["operations"]
+        ]
+        choices = {
+            choice for item in profile_triggers for choice in item["required_choices"]
+        }
+        if choices != set(profile["required_choices"]):
+            raise RegistryError(
+                f"clarification triggers must exactly cover {profile['id']} required choices"
+            )
+    for transformation in transformations:
+        approved = {
+            item["name"] for item in transformation["decisions"]
+            if item["source"] == "user-approved"
+        }
+        triggers = [
+            item for item in clarification_triggers
+            if transformation["id"] in item["scope_ids"]
+            and "transform" in item["operations"]
+        ]
+        choices = {choice for item in triggers for choice in item["required_choices"]}
+        if choices != approved:
+            raise RegistryError(
+                f"clarification triggers must exactly cover {transformation['id']} user decisions"
+            )
+
     obsolete_tokens = data["obsolete_tokens"]
     _unique([item["token"] for item in obsolete_tokens], "obsolete token")
     for item in obsolete_tokens:
@@ -540,6 +599,7 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "additional_entity_outputs": len(output_keys),
         "reference_contracts": len(reference_contracts),
         "operation_impacts": len(impact_pairs),
+        "clarification_triggers": len(clarification_triggers),
         "obsolete_tokens": len(obsolete_tokens),
         "documented_records": sum(
             item["coverage"] in {"documented", "runtime-verified"}
@@ -627,7 +687,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['operation_impacts']} supported change impacts, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['operation_impacts']} supported change impacts, {counts['clarification_triggers']} engineering-clarification triggers, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -826,6 +886,15 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- `{item['id']}` (user input {'required' if item['requires_user_input'] else 'not required'}): {item['summary']}"
         for item in dependency["decision_sources"]
     )
+    lines.extend(["", "Engineering clarification triggers:", ""])
+    for item in dependency["clarification_triggers"]:
+        scopes = ", ".join(f"`{value}`" for value in item["scope_ids"])
+        operations = ", ".join(f"`{value}`" for value in item["operations"])
+        choices = ", ".join(f"`{value}`" for value in item["required_choices"])
+        lines.extend([
+            f"- **{item['id']}** ({operations}; {scopes}): {item['condition']}",
+            f"  - Required user-approved choices: {choices}",
+        ])
 
     change_contract = data["change_contract"]
     lines.extend(["", "## Change impact contract", ""])

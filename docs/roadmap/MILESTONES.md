@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.131.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, and 11 supported entity-operation impacts. Static validation is verified for all 54 active constructs. Remaining specification work concerns engineering-clarification triggers.
+Status: in progress. Registry `0.132.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, 11 supported entity-operation impacts, and nine engineering-clarification triggers. Static validation is verified for all 54 active constructs; M1.3 entity and dependency specification is complete. Remaining specification work is the M1.4 shared generated-contract closure.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -62,7 +62,7 @@ Status: in progress. Registry `0.131.0` currently inventories 13 top-level block
 - [x] Define entities created by every active construct.
 - [x] Define forward and reverse references across analysis controls, clusters, mesh, sets, sections, orientations, materials, constitutives, failures, cracks, boundary conditions, loads, connections, tables, statistics, moisture, and user functions.
 - [x] Record rename, deletion, creation, and transformation impacts.
-- [ ] Identify decisions that require engineering clarification.
+- [x] Identify decisions that require engineering clarification.
 
 ### M1.4 Generated contracts
 

@@ -96,6 +96,7 @@ class LocalApiTests(unittest.TestCase):
             self.assertTrue(transformations[0]["applicability"])
             dependency = capabilities["capabilities"]["dependency_contract"]
             self.assertEqual(3, len(dependency["classes"]))
+            self.assertEqual(9, len(dependency["clarification_triggers"]))
             entity_contract = capabilities["capabilities"]["entity_contract"]
             self.assertEqual(10, len(entity_contract["no_primary_entity_capabilities"]))
             change_contract = capabilities["capabilities"]["change_contract"]

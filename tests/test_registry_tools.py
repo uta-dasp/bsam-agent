@@ -42,6 +42,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(13, counts["additional_entity_outputs"])
         self.assertEqual(25, counts["reference_contracts"])
         self.assertEqual(11, counts["operation_impacts"])
+        self.assertEqual(9, counts["clarification_triggers"])
         self.assertEqual(5, counts["obsolete_tokens"])
         self.assertEqual(82, counts["evidence"])
 
@@ -95,6 +96,34 @@ class RegistryToolsTests(unittest.TestCase):
             for item in contract["decision_sources"]
         }
         self.assertEqual({"user-approved": True, "source-derived": False}, sources)
+
+    def test_engineering_clarifications_cover_registered_user_choices(self) -> None:
+        triggers = self.registry["dependency_contract"]["clarification_triggers"]
+        self.assertEqual(9, len(triggers))
+        self.assertTrue(all(
+            item["decision_source"] == "user-approved"
+            and item["condition"] and item["required_choices"]
+            for item in triggers
+        ))
+        profile = self.registry["generation_profiles"][0]
+        profile_choices = {
+            choice for item in triggers
+            if profile["id"] in item["scope_ids"] and "generate" in item["operations"]
+            for choice in item["required_choices"]
+        }
+        self.assertEqual(set(profile["required_choices"]), profile_choices)
+        for transformation in self.registry["transformations"]:
+            expected = {
+                item["name"] for item in transformation["decisions"]
+                if item["source"] == "user-approved"
+            }
+            actual = {
+                choice for item in triggers
+                if transformation["id"] in item["scope_ids"]
+                and "transform" in item["operations"]
+                for choice in item["required_choices"]
+            }
+            self.assertEqual(expected, actual, transformation["id"])
 
     def test_change_impacts_cover_every_supported_entity_operation(self) -> None:
         active = [

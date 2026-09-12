@@ -23,7 +23,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.9.0"
+      "const": "2.0.0"
     },
     "registry_version": {
       "type": "string",
@@ -99,9 +99,9 @@
     "dependencyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "classes", "reference_contracts", "decision_sources"],
+      "required": ["schema_version", "classes", "reference_contracts", "decision_sources", "clarification_triggers"],
       "properties": {
-        "schema_version": { "const": "1.1.0" },
+        "schema_version": { "const": "1.2.0" },
         "classes": {
           "type": "array",
           "minItems": 3,
@@ -116,6 +116,11 @@
           "type": "array",
           "minItems": 2,
           "items": { "$ref": "#/$defs/decisionSource" }
+        },
+        "clarification_triggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/clarificationTrigger" }
         }
       }
     },
@@ -171,6 +176,34 @@
         "id": { "enum": ["user-approved", "source-derived"] },
         "requires_user_input": { "type": "boolean" },
         "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "clarificationTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "scope_ids", "operations", "condition", "required_choices", "decision_source"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^clarification\\.[a-z0-9-]+$" },
+        "scope_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["create", "modify", "generate", "transform", "run"] }
+        },
+        "condition": { "type": "string", "minLength": 1 },
+        "required_choices": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "decision_source": { "const": "user-approved" }
       }
     },
     "entityContract": {
