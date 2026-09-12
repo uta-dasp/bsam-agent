@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "1.5.0",
-  "registry_version": "0.104.0",
+  "registry_version": "0.105.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -2796,12 +2796,12 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "verified", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
-        "variants": [{"name": "translation-vector", "when": "always", "rows": [{"name": "translation", "repetition": "once", "fields": [{"name": "dx", "value_type": "real", "required": true, "summary": "Adds this value to X."}, {"name": "dy", "value_type": "real", "required": true, "summary": "Adds this value to Y."}, {"name": "dz", "value_type": "real", "required": true, "summary": "Adds this value to Z."}]}], "constraints": ["Exactly one non-comment vector row is consumed.", "ALL and NSET are mutually exclusive and omission selects ALL."]}],
+        "variants": [{"name": "translation-vector", "when": "always", "rows": [{"name": "translation", "repetition": "once", "fields": [{"name": "dx", "value_type": "real", "required": true, "summary": "Adds this value to X."}, {"name": "dy", "value_type": "real", "required": true, "summary": "Adds this value to Y."}, {"name": "dz", "value_type": "real", "required": true, "summary": "Adds this value to Z."}]}], "constraints": ["Exactly one non-comment vector row containing three finite reals is required.", "ALL and NSET are mutually exclusive and omission selects ALL.", "Unknown targeting options and node-set names longer than the source's 20-character buffer are rejected."]}],
         "dependencies": ["NSET must resolve in the current cluster and selects its existing member nodes.", "Only nodes created before the command are translated.", "The operation marks cached element coordinates stale for the next BUILD or STOP update."]
       }
     },
@@ -2834,12 +2834,12 @@
         "parse": "verified", "semantic": "verified", "inspect": "verified",
         "modify": "verified", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
-        "static_validation": "implemented", "execute": "unassessed"
+        "static_validation": "verified", "execute": "unassessed"
       },
       "body": {
         "style": "single-record",
         "termination": "fixed-count",
-        "variants": [{"name": "axis-scale-factors", "when": "always", "rows": [{"name": "scales", "repetition": "once", "fields": [{"name": "sx", "value_type": "nonzero-real", "required": true, "summary": "Multiplies X about the global origin."}, {"name": "sy", "value_type": "nonzero-real", "required": true, "summary": "Multiplies Y about the global origin."}, {"name": "sz", "value_type": "nonzero-real", "required": true, "summary": "Multiplies Z about the global origin."}]}], "constraints": ["Exactly one non-comment factor row is consumed.", "ALL and NSET are mutually exclusive and omission selects ALL.", "The source accepts zero factors, but Agent generation rejects them because they collapse the mesh; negative factors intentionally reflect an axis."]}],
+        "variants": [{"name": "axis-scale-factors", "when": "always", "rows": [{"name": "scales", "repetition": "once", "fields": [{"name": "sx", "value_type": "nonzero-real", "required": true, "summary": "Multiplies X about the global origin."}, {"name": "sy", "value_type": "nonzero-real", "required": true, "summary": "Multiplies Y about the global origin."}, {"name": "sz", "value_type": "nonzero-real", "required": true, "summary": "Multiplies Z about the global origin."}]}], "constraints": ["Exactly one non-comment factor row containing three finite reals is required.", "ALL and NSET are mutually exclusive and omission selects ALL.", "Static validation rejects zero factors because they collapse the mesh; negative factors intentionally reflect an axis.", "Unknown targeting options and node-set names longer than the source's 20-character buffer are rejected."]}],
         "dependencies": ["NSET must resolve in the current cluster and selects its existing member nodes.", "At least one previously created node must be selected or BSAM stops.", "The operation marks cached element coordinates stale for the next BUILD or STOP update."]
       }
     },

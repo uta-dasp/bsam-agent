@@ -117,6 +117,8 @@ Registry 0.103.0 verifies cluster `*SPACING`: omission selects the strict zero d
 
 Registry 0.104.0 verifies cluster `*TOLERANCE`: TYPE is optional but must select uppercase PTOL, ITOL, FTOL, or OTOL; exactly one data record is required; and its value must be one nonnegative finite real.
 
+Registry 0.105.0 verifies cluster `*SHIFT` and `*SCALE`: omission or ALL targets existing nodes, NSET selects one bounded name, targeting options are mutually exclusive, and exactly one three-finite-real vector is required. SCALE additionally rejects zero factors that would collapse an axis.
+
 ## Planned user-facing audit path
 
 The current deterministic slice provides `inspect`, `plan-change`, `diff`, `apply-change`, `validate`, `run`, `status`, and `stop` without a language model. Every applied change audit carries the source and output digests, plan digest, changed model paths, affected file, validation result, registered executable fingerprint, and a null run directory. Linking an edit audit to a subsequent run remains future work. This deterministic path is the reference against which local or hosted model behavior is checked.

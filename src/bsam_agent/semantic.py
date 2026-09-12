@@ -4328,6 +4328,44 @@ def build_semantic_index(
                 attributes: dict[str, Any] = {
                     "operation": operation_name, "target": nset or "ALL",
                 }
+                if command in {"*SHIF", "*SCAL"}:
+                    coordinate_tokens = [token for token in re.split(
+                        r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),
+                    ) if token][1:]
+                    coordinate_error: str | None = None
+                    if not coordinate_tokens:
+                        pass
+                    elif len(coordinate_tokens) == 1 and coordinate_tokens[0].casefold()[:3] == "all":
+                        pass
+                    elif (
+                        len(coordinate_tokens) == 2
+                        and coordinate_tokens[0].casefold()[:3] == "nse"
+                        and 0 < len(coordinate_tokens[1]) <= 20
+                    ):
+                        pass
+                    else:
+                        coordinate_error = (
+                            f"{operation_name.upper()} accepts only mutually exclusive "
+                            "ALL or NSET=<name> command-line targeting"
+                        )
+                    vector: list[float] = []
+                    if coordinate_error is None:
+                        if len(records) != 1 or len(_fields(records[0].text)) != 3:
+                            coordinate_error = f"{operation_name.upper()} requires exactly one three-real vector record"
+                        else:
+                            try:
+                                vector = [_fortran_real(item) for item in _fields(records[0].text)]
+                                if not all(math.isfinite(item) for item in vector):
+                                    raise ValueError
+                            except ValueError:
+                                coordinate_error = f"{operation_name.upper()} vector values must be finite reals"
+                    if coordinate_error is None and command == "*SCAL" and any(item == 0 for item in vector):
+                        coordinate_error = "SCALE factors must be nonzero to avoid collapsing the mesh"
+                    if coordinate_error is not None:
+                        index.diagnostics.append(Diagnostic(
+                            code="BSAM-E310", severity="error", message=coordinate_error,
+                            line=command_line.number, source=source,
+                        ))
                 if command == "*FLIP":
                     flip_tokens = [token for token in re.split(
                         r"[\s,=]+", command_line.text.split("#", 1)[0].strip(),

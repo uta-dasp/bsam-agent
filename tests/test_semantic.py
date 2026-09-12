@@ -942,6 +942,31 @@ class SemanticIndexTests(unittest.TestCase):
                 for item in targets
             ))
 
+    def test_shift_and_scale_targeting_and_vectors_are_validated(self) -> None:
+        valid = (
+            b"*SHIFT\n1,2D0,-3\n", b"*SHIFT,ALL\n0,0,0\n",
+            b"*SCALE,NSET=edge\n-1,2,3\n",
+        )
+        invalid = (
+            b"*SHIFT,ALL,NSET=edge\n1,2,3\n",
+            b"*SHIFT,OTHER\n1,2,3\n",
+            b"*SHIFT\n1,2\n",
+            b"*SHIFT\n1,2,NaN\n",
+            b"*SHIFT\n1,2,3\n4,5,6\n",
+            b"*SCALE\n1,0,1\n",
+        )
+        prefix = b"*NAME\nply1\n*NODE\n1,0,0,0\n*NSET,NSET=edge\n1\n"
+        with tempfile.TemporaryDirectory() as directory:
+            for index, operation in enumerate(valid):
+                root = Path(directory) / f"valid-{index}.in"
+                root.write_bytes(deck(prefix + operation))
+                self.assertEqual(0, SourceSet.read(root).inspection()["summary"]["errors"])
+            for index, operation in enumerate(invalid):
+                root = Path(directory) / f"invalid-{index}.in"
+                root.write_bytes(deck(prefix + operation))
+                diagnostics = SourceSet.read(root).inspection()["diagnostics"]
+                self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_ngen_and_ncopy_dependencies_and_output_sets_resolve(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"

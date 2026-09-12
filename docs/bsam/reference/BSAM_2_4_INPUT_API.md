@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.104.0`
-- Registry SHA-256: `3482C0F84F4486652258F010764440BAAF635D02C2FD89DED3B0C7B475312DAC`
+- Registry version: `0.105.0`
+- Registry SHA-256: `7E1342FC32489F6AD812B989D90AD04702F6BD584F7CAF18951D72A9FFC952A0`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1237,7 +1237,7 @@ Translates all nodes or nodes in a named node set.
 - Dispatch prefix: `*SHIF`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1250,8 +1250,9 @@ Termination: fixed-count. Dependencies: NSET must resolve in the current cluster
 
 - **translation-vector** (always):
   - `translation` [once]: `dx`:real, `dy`:real, `dz`:real
-  - Constraint: Exactly one non-comment vector row is consumed.
+  - Constraint: Exactly one non-comment vector row containing three finite reals is required.
   - Constraint: ALL and NSET are mutually exclusive and omission selects ALL.
+  - Constraint: Unknown targeting options and node-set names longer than the source's 20-character buffer are rejected.
 
 ### `*SCALE`
 
@@ -1261,7 +1262,7 @@ Scales all nodes or nodes in a named node set.
 - Dispatch prefix: `*SCAL`
 - Coverage: documented
 - Evidence: [evidence.fe-command-dispatch](#evidencefe-command-dispatch), [evidence.fe-coordinate-operations](#evidencefe-coordinate-operations)
-- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=verified, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 
@@ -1274,9 +1275,10 @@ Termination: fixed-count. Dependencies: NSET must resolve in the current cluster
 
 - **axis-scale-factors** (always):
   - `scales` [once]: `sx`:nonzero-real, `sy`:nonzero-real, `sz`:nonzero-real
-  - Constraint: Exactly one non-comment factor row is consumed.
+  - Constraint: Exactly one non-comment factor row containing three finite reals is required.
   - Constraint: ALL and NSET are mutually exclusive and omission selects ALL.
-  - Constraint: The source accepts zero factors, but Agent generation rejects them because they collapse the mesh; negative factors intentionally reflect an axis.
+  - Constraint: Static validation rejects zero factors because they collapse the mesh; negative factors intentionally reflect an axis.
+  - Constraint: Unknown targeting options and node-set names longer than the source's 20-character buffer are rejected.
 
 ### `*EXCLUSION`
 
