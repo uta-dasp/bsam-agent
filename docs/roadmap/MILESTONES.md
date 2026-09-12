@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.121.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for MOISTURE, USER, global CRACK, the CLUSTERS and BOUNDARY containers, all 29 cluster commands, and all 12 nested BOUNDARY constructs.
+Status: in progress. Registry `0.122.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, and two transformations. Static validation is verified for all 54 active constructs; remaining specification work concerns shared dependency/edit contracts and engineering-decision boundaries.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -217,7 +217,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Validate cluster `*BOUNDARY` FORMAT selection, exact ABAQUS/LIST/POLYNOMIAL rows, finite values, indices, and safe targets.
 - [x] Validate `*NGEN` direct, paired-set, and source-safe arc forms with bounded labels, finite derived coordinates, and chained generation.
 - [x] Validate all cluster `*CRACK` variants, selectors, records, finite geometry, state options, and explicit DEFINITION rejection.
-- [ ] Validate structure, types, ranges, cardinality, and required records for every supported construct.
+- [x] Validate structure, types, ranges, cardinality, and required records for every supported construct.
 - [ ] Validate references, dependency rules, mesh connectivity, sets, topology, and cross-feature constraints.
 - [ ] Add golden no-op and minimal-patch tests for every syntax family.
 - [ ] Add invalid, ambiguous, and dependency-breaking test cases.

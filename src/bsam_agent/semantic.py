@@ -3166,7 +3166,7 @@ def _consume_material_statistics(
     for _entry in range(5):
         if cursor >= len(records):
             return None
-        if _material_dispatch(records[cursor]) == "*end":
+        if records[cursor].text.strip()[:3].casefold() == "*en":
             return cursor + 1
         fields = _record_fields(records[cursor])
         try:
@@ -3362,11 +3362,425 @@ def _material_spans(
     return spans
 
 
+def _material_finite_prefix(line: SourceLine, width: int) -> bool:
+    """Return whether a list-directed material row starts with finite reals."""
+    fields = _record_fields(line)
+    if len(fields) < width:
+        return False
+    try:
+        return all(math.isfinite(_fortran_real(value)) for value in fields[:width])
+    except ValueError:
+        return False
+
+
+def _material_safe_relative_path(line: SourceLine, *, limit: int = 80) -> bool:
+    value = line.text.split("#", 1)[0].strip()
+    return _material_safe_relative_value(value, limit=limit)
+
+
+def _material_safe_relative_value(value: str, *, limit: int = 80) -> bool:
+    return bool(value) and len(value) <= limit and not (
+        re.match(r"^(?:[A-Za-z]:|[\\/])", value)
+        or re.search(r"(?:^|[\\/])\.\.(?:[\\/]|$)", value)
+        or any(mark in value for mark in ('"', "'"))
+    )
+
+
+def _material_structured_rows_valid(
+    material_type: int, body: tuple[SourceLine, ...],
+) -> bool:
+    if not body or body[-1].text.strip() != "*end":
+        return False
+    bulk_keys = {
+        "e11", "e22", "e33", "g13", "g23", "g12", "nu13", "nu23", "nu12",
+        "xt", "xc", "yt", "yc", "s", "s13", "s12", "s23", "fxt", "fxc",
+        "fgt", "fgc", "gxt", "gxc", "rho", "density", "a11", "a22", "a33",
+        "b11", "b22", "b33", "lv1", "lv2", "lv3", "lv4", "lv5", "lv6",
+        "s1", "s2", "eta1", "*fiber", "*max_crack_angle", "cure_temp", "tcure",
+        "amp", "test_temp", "*cdm", "e", "nu", "y0", "yinf", "pbeta", "hiso",
+        "hkin",
+    }
+    interface_keys = {
+        "k", "penalty", "penalty_stiffness", "tol", "tolerance", "fric",
+        "friction", "initval", "yt", "yc", "s", "gic", "g1c", "giic", "g11c",
+        "giiic", "g111c", "s1", "s2", "eta1", "m1", "m2", "c1", "c2", "eta2",
+        "cure_temp", "tcure", "amp", "test_temp", "davila", "tangent", "rel_t",
+    }
+    allowed = (
+        {"e", "nu", "y0", "yinf", "pbeta", "hiso", "hkin"}
+        if material_type == 50 else interface_keys if material_type == 998 else bulk_keys
+    )
+    direct_real = {
+        "*fiber", "*max_crack_angle", "cure_temp", "tcure", "amp", "test_temp",
+        "davila", "tangent", "rel_t",
+    }
+    for line in body[:-1]:
+        text = line.text.split("#", 1)[0].strip().casefold()
+        if not text or text.count("=") != 1:
+            return False
+        left, right = text.split("=", 1)
+        keys = _fields(left)
+        values = _fields(right)
+        if not keys or len(values) < len(keys) or any(key not in allowed for key in keys):
+            return False
+        for position, key in enumerate(keys):
+            value = values[position] if position < len(keys) - 1 else " ".join(values[position:])
+            if key == "*cdm":
+                if not value:
+                    return False
+                continue
+            if key in direct_real:
+                try:
+                    if not math.isfinite(_fortran_real(value)):
+                        return False
+                except ValueError:
+                    return False
+                continue
+            try:
+                if math.isfinite(_fortran_real(value)):
+                    continue
+            except ValueError:
+                pass
+            lowered = value.casefold()
+            if re.search(
+                r"(?:^|_)(?:table|stat|ufunc|poly)_[a-z0-9][a-z0-9_.+\-]*",
+                lowered,
+            ) is None:
+                return False
+    return True
+
+
+def _material_statistics_rows_valid(
+    records: tuple[SourceLine, ...], cursor: int, *, type_three: bool,
+) -> tuple[int, bool]:
+    """Validate a source-bounded inline *statistics list and return its end cursor."""
+    for _entry in range(5):
+        if cursor >= len(records):
+            return cursor, False
+        if records[cursor].text.strip()[:3].casefold() == "*en":
+            return cursor + 1, True
+        header_fields = _record_fields(records[cursor])
+        try:
+            stat_type = int(header_fields[0])
+        except (IndexError, ValueError):
+            return cursor, False
+        if len(header_fields) > 2 or (len(header_fields) == 2 and header_fields[1].casefold() != "ele"):
+            return cursor, False
+        cursor += 1
+        if type_three and stat_type != 1:
+            return cursor, False
+        if stat_type == 3:
+            if cursor + 4 > len(records):
+                return cursor, False
+            approx = _fields(records[cursor].text)
+            seed = _fields(records[cursor + 1].text)
+            if len(approx) < 2 or approx[0].casefold() != "#approximation":
+                return cursor, False
+            try:
+                if int(approx[1]) <= 0:
+                    return cursor, False
+            except ValueError:
+                return cursor, False
+            if len(seed) < 2 or seed[0].casefold() != "#seed":
+                return cursor, False
+            mode = seed[1].casefold()
+            if mode == "coord":
+                try:
+                    xyz = next(i for i, value in enumerate(seed[2:], start=2) if value.casefold() == "xyz")
+                    if len(seed) < xyz + 4 or not all(
+                        math.isfinite(_fortran_real(value)) for value in seed[xyz + 1:xyz + 4]
+                    ):
+                        return cursor, False
+                except (StopIteration, ValueError):
+                    return cursor, False
+            elif mode == "file":
+                options = {seed[i].casefold(): seed[i + 1] for i in range(2, len(seed) - 1, 2)}
+                try:
+                    if (
+                        not options.get("name") or len(options["name"]) > 20
+                        or int(options.get("maxseed", "0")) <= 0
+                        or int(options.get("maxelem", "0")) <= 0
+                    ):
+                        return cursor, False
+                except ValueError:
+                    return cursor, False
+            elif mode != "elem":
+                return cursor, False
+            cursor += 2
+        if cursor + 2 > len(records):
+            return cursor, False
+        control = _record_fields(records[cursor])
+        try:
+            count = int(control[0])
+            if count <= 0 or count > 100_000:
+                return cursor, False
+            if stat_type in {1, 3}:
+                if len(control) < 3 or not all(
+                    math.isfinite(_fortran_real(value)) for value in control[1:3]
+                ):
+                    return cursor, False
+            elif stat_type == 2:
+                if len(control) < 2 or not _material_safe_relative_value(control[1]):
+                    return cursor, False
+            else:
+                return cursor, False
+            indices = [int(value) for value in _record_fields(records[cursor + 1])[:count]]
+            if len(indices) != count or any(value <= 0 for value in indices):
+                return cursor, False
+        except (IndexError, ValueError):
+            return cursor, False
+        cursor += 2
+        if cursor < len(records) and _material_dispatch(records[cursor]) == "#gene":
+            fields = _fields(records[cursor].text)
+            try:
+                if len(fields) < 2 or int(fields[1]) < 0:
+                    return cursor, False
+            except ValueError:
+                return cursor, False
+            cursor += 1
+    if cursor < len(records) and records[cursor].text.strip()[:3].casefold() == "*en":
+        return cursor + 1, True
+    return cursor, False
+
+
+def _material_legacy_rows_valid(
+    material_type: int, body: tuple[SourceLine, ...],
+) -> bool:
+    """Validate list-directed row shapes after the declaration cursor is proven."""
+    def widths_valid(rows: tuple[SourceLine, ...], widths: list[int]) -> bool:
+        return len(rows) >= len(widths) and all(
+            _material_finite_prefix(line, width) for line, width in zip(rows, widths)
+        )
+
+    base_widths = [3, 3, 1, 4, 1, 1, 1, 1, 3, 1, 1, 1]
+    if material_type == 10:
+        return widths_valid(body, [3, 3]) and _fortran_real(_record_fields(body[0])[0]) > 0
+    if material_type == 15:
+        return widths_valid(body, [3, 2, 1, 1, 1])
+    if material_type in {2, 3}:
+        matrix = [6] * 6 if material_type == 2 else [6, 6, 6, 3]
+        return widths_valid(body, base_widths + matrix)
+    if material_type == 4:
+        return widths_valid(body, base_widths)
+    if material_type == 11:
+        return len(body) == 1 and len(_record_fields(body[0])) >= 4
+    if material_type in {40, 41}:
+        return len(body) == 2 and _material_finite_prefix(body[1], 3)
+    if material_type == 200:
+        try:
+            valid = int(_record_fields(body[0])[0]) >= 0 and _material_safe_relative_path(body[1])
+        except (IndexError, ValueError):
+            return False
+        return valid and (len(body) == 2 or (
+            len(body) == 4 and _material_dispatch(body[2]) == "*delt"
+            and _material_finite_prefix(body[3], 1)
+        ))
+    if material_type == 210:
+        cursor = 0
+        alternate = _material_dispatch(body[0]) == "*stre"
+        if alternate:
+            cursor += 1
+        widths = base_widths[:-1] + [6] + ([6, 6] if alternate else [])
+        if not widths_valid(body[cursor:], widths):
+            return False
+        cursor += len(widths)
+        if cursor < len(body) and _material_dispatch(body[cursor]) == "*stat":
+            cursor, valid = _material_statistics_rows_valid(body, cursor + 1, type_three=True)
+            if not valid:
+                return False
+        if cursor + 2 > len(body):
+            return False
+        try:
+            if int(_record_fields(body[cursor])[0]) < 0:
+                return False
+        except (IndexError, ValueError):
+            return False
+        if not _material_safe_relative_path(body[cursor + 1]):
+            return False
+        cursor += 2
+        if cursor == len(body):
+            return True
+        return (
+            cursor + 2 == len(body) and _material_dispatch(body[cursor]) == "*delt"
+            and _material_finite_prefix(body[cursor + 1], 1)
+        )
+    if material_type == 300:
+        return all(
+            _material_finite_prefix(line, 2) for line in body[1:-1]
+        ) and _material_finite_prefix(body[-1], 1)
+    if material_type == 500:
+        return _material_finite_prefix(body[0], 2) and all(
+            _material_finite_prefix(line, 2) for line in body[1:]
+        )
+    if material_type == 800:
+        return (
+            _material_finite_prefix(body[0], 1)
+            and _material_safe_relative_path(body[1])
+            and _material_finite_prefix(body[2], 6)
+        )
+    if material_type == 12:
+        if not widths_valid(body, [2, 3, 2]):
+            return False
+        first = [_fortran_real(value) for value in _record_fields(body[0])[:2]]
+        toughness = [_fortran_real(value) for value in _record_fields(body[2])[:2]]
+        if first[0] <= 0 or first[1] < 0 or any(value <= 0 for value in toughness):
+            return False
+        cursor = 3
+        while cursor < len(body):
+            marker = _material_dispatch(body[cursor])
+            if marker == "*dama":
+                cursor += 1
+            elif marker in {"*maxg", "*fric"}:
+                fields = _record_fields(body[cursor])
+                try:
+                    if len(fields) < 2 or not math.isfinite(_fortran_real(fields[1])):
+                        return False
+                except ValueError:
+                    return False
+                cursor += 1
+            elif marker == "*pari":
+                if cursor + 2 >= len(body) or not widths_valid(body[cursor + 1:], [4, 1]):
+                    return False
+                cursor += 3
+            elif marker == "*s-n":
+                if cursor + 1 >= len(body) or not _material_finite_prefix(body[cursor + 1], 3):
+                    return False
+                cursor += 2
+            else:
+                return False
+        return True
+    if material_type in _MATERIAL_ORTHOTROPIC_TYPES:
+        cursor = 0
+        while cursor < len(body) and _material_dispatch(body[cursor]) in {
+            "*fibe", "*cfv_", "*shea", "*tens", "*bimo",
+        }:
+            marker = _material_dispatch(body[cursor])
+            fields = _record_fields(body[cursor])
+            try:
+                required = 2 if marker == "*fibe" else 3 if marker == "*bimo" else 1
+                if len(fields) < required or any(
+                    not math.isfinite(_fortran_real(value)) for value in fields[1:required]
+                ):
+                    return False
+            except ValueError:
+                return False
+            cursor += 1
+        alternate = cursor < len(body) and _material_dispatch(body[cursor]) == "*stre"
+        if alternate:
+            cursor += 1
+            widths = [1] * 11
+            if material_type in {1, 5, 6, 7, 100}:
+                widths.append(6 if material_type == 100 else 1)
+            widths += [2, 1, 2, 1, 2, 1, 3]
+        else:
+            widths = base_widths.copy()
+            if material_type in {103, 104, 106}:
+                widths[4] = 4
+            if material_type == 100:
+                widths[-1] = 6
+            nonlinear = material_type == 105 or any(
+                _material_dispatch(line) == "*shea" for line in body[:cursor]
+            )
+            if nonlinear:
+                widths[6] = 0
+                widths[8] = 0
+        if not widths_valid(body[cursor:], widths):
+            return False
+        cursor += len(widths)
+        if not alternate and cursor < len(body) and _material_dispatch(body[cursor]) == "*s-n":
+            if cursor + 1 >= len(body) or not _material_finite_prefix(body[cursor + 1], 3):
+                return False
+            cursor += 2
+        if cursor < len(body) and _material_dispatch(body[cursor]) == "*stat":
+            cursor, valid = _material_statistics_rows_valid(body, cursor + 1, type_three=False)
+            if not valid:
+                return False
+        return cursor == len(body)
+    return False
+
+
+def _validate_material_block(
+    index: SemanticIndex, source: str, lines: tuple[SourceLine, ...],
+    spans: list[tuple[int, SourceLine, SourceLine, tuple[SourceLine, ...]]] | None,
+) -> None:
+    """Validate the required MATERIALS envelope and every source-dispatched declaration."""
+    headers = [line for line in lines if line.stripped == "MATERIALS"]
+    if len(headers) != 1:
+        index.diagnostics.append(Diagnostic(
+            code="BSAM-E350", severity="error",
+            message=f"MATERIALS must occur exactly once; found {len(headers)}",
+            line=headers[0].number if headers else None, source=source,
+        ))
+    if not headers:
+        return
+    header = headers[0]
+    start = lines.index(header)
+    top_level_tokens = {
+        str(item["canonical"]) for item in load_registry()["top_level_blocks"]
+    }
+    next_block = next((
+        position for position in range(start + 1, len(lines))
+        if lines[position].first_field in top_level_tokens
+    ), len(lines))
+    end = next((
+        position for position in range(start + 1, next_block)
+        if lines[position].stripped == "END MATERIALS"
+    ), None)
+    if end is None:
+        _table_error(
+            index, "BSAM-E350", "MATERIALS is missing its exact END MATERIALS terminator",
+            source, header,
+        )
+    if spans is None:
+        _table_error(
+            index, "BSAM-E350",
+            "MATERIALS contains an unsupported, incomplete, or unconsumed declaration",
+            source, header,
+        )
+        return
+    if len(spans) > 1500:
+        _table_error(
+            index, "BSAM-E350", "MATERIALS exceeds the source capacity of 1500 declarations",
+            source, spans[1500][1],
+        )
+    for material_type, declaration, _end_line, body in spans:
+        text = declaration.text.split("#", 1)[0].strip()
+        numeric = _record_fields(declaration)[:1]
+        if not numeric or not numeric[0].lstrip("+-").isdigit():
+            tokens = [value for value in re.split(r"[\s,=]+", text.casefold()) if value]
+            if tokens not in (["type", "mises"], ["type", "50"]) and not (
+                len(tokens) == 4 and tokens[:2] in (["type", "mises"], ["type", "50"])
+                and tokens[2] == "name" and bool(tokens[3])
+            ):
+                _table_error(
+                    index, "BSAM-E350", "named MATERIALS headers require type=mises|50 and optional name",
+                    source, declaration,
+                )
+        valid = (
+            _material_structured_rows_valid(material_type, body)
+            if material_type in {50, 998, 999}
+            else _material_legacy_rows_valid(material_type, body)
+        )
+        if not valid:
+            _table_error(
+                index, "BSAM-E350",
+                f"MATERIALS type {material_type} has invalid record types, widths, values, or options",
+                source, declaration,
+            )
+
+
 def augment_material_declaration_semantics(
     index: SemanticIndex, source: str, lines: Iterable[SourceLine],
 ) -> bool:
     """Add ordinal material identities only after the complete block is cursor-proven."""
-    spans = _material_spans(_top_block_body(tuple(lines), "MATERIALS"))
+    all_lines = tuple(lines)
+    spans = _material_spans(_top_block_body(all_lines, "MATERIALS"))
+    definition = next(
+        item for item in load_registry()["top_level_blocks"]
+        if item["id"] == "block.materials"
+    )
+    if operational_support(definition)["static_validation"] == "verified":
+        _validate_material_block(index, source, all_lines, spans)
     if spans is None:
         return False
     structured_by_line = {

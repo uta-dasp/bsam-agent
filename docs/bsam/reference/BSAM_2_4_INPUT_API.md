@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.121.0`
-- Registry SHA-256: `70D3FFBB9FD57041897723CD052F96DBE3B24B670A13CCE3D80EEB5713F9D928`
+- Registry version: `0.122.0`
+- Registry SHA-256: `13DCB0479A6230F39FE1EE1DBE7E2C3750E0E88E9CCF1EEF722D1956324FAD58`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, and 2 registered transformations
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -378,7 +378,7 @@ Defines bulk and interface material records, including current structured materi
 - Termination: `*end for structured material entries`, `END MATERIALS` (accepted-current)
 - Coverage: partially-documented
 - Evidence: [evidence.material-parser](#evidencematerial-parser), [evidence.material-structured-bulk](#evidencematerial-structured-bulk), [evidence.material-structured-interface](#evidencematerial-structured-interface), [evidence.table-material-reference](#evidencetable-material-reference), [evidence.ufunction-interface-material-reference](#evidenceufunction-interface-material-reference), [evidence.user-active-consumer](#evidenceuser-active-consumer), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric)
-- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=implemented, `execute`=unassessed
+- Operational support: `parse`=implemented, `semantic`=implemented, `inspect`=implemented, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
 

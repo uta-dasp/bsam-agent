@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.122.0` additionally verifies the required MATERIALS block: exact single-block termination, all 28 active numeric dispatches and the named type-50 header, source-bounded declaration capacity, complete per-type cursor consumption, structured key/value dispatch, legacy row types and widths, finite numeric values, source-defined ranges, order-sensitive options, and traversal-free external paths. Static validation is now verified for all 54 active constructs.
+
 Registry `0.121.0` additionally verifies the optional USER block: exact envelope and disabled sentinel, bounded analytic coefficients, increasing piecewise segments, monotonic inline splines, traversal-free external-file preservation, bounded sparse-matrix structure, complete cursor consumption, and declaration capacity.
 
 Registry `0.120.0` additionally verifies global CRACK declarations: exact optional-block termination, active types 101/201/301, bounded leading counts and spacing, populated cluster targets, up to eight recognized option rows, finite orientation/threshold/length values, exact predefined-point consumption, and the source's declaration-capacity boundary.

@@ -23,7 +23,6 @@ def material_deck() -> bytes:
         "MATERIALS\n"
         "999 bulk-note\nE11=table_modulus\nNu12=0.3\n*end\n"
         "998 interface-note\nK=100\ntol=0.01\n*end\n"
-        "1 legacy-preserved\n 1 2 3\n"
         "END MATERIALS\n"
         "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
     ).encode("latin-1")
@@ -258,26 +257,32 @@ class StructuredMaterialCapabilityTests(unittest.TestCase):
 
     def test_complete_material_block_receives_declaration_order_identities(self) -> None:
         rows = lambda count: "".join("1\n" for _ in range(count))
+        engineering = (
+            "1 2 3\n1 2 3\n1\n1 2 3 4\n1\n1\n1\n1\n1 2 3\n1\n1\n1\n"
+        )
+        selector_engineering = (
+            "1 2 3\n1 2 3\n1\n1 2 3 4\n1\n1\n1\n1\n1 2 3\n1\n1\n1\n"
+        )
         material_body = (
             "999 bulk\nE=1\n*end\n"
             "type=mises, name=plastic\nE=1\n*end\n"
-            "10\n" + rows(2) +
-            "15\n" + rows(5) +
-            "2\n" + rows(18) +
-            "3\n" + rows(16) +
-            "4\n" + rows(12) +
+            "10\n1 0.3 0\n1 1 1\n"
+            "15\n1 2 3\n0.1 0.2\n1\n1\n1\n"
+            "2\n" + engineering + "1 1 1 1 1 1\n" * 6 +
+            "3\n" + engineering + "1 1 1 1 1 1\n" * 3 + "1 1 1\n" +
+            "4\n" + selector_engineering +
             "11\n1 2 0.5 0.5\n"
             "40\n1 1 1\n1 1 1\n"
             "41\n1 1 1 1\n1 1 1\n"
             "200\n" + rows(2) + "*delta\n1\n" +
             "300\n2\n1 0\n2 1\n0.5\n"
             "500\n2 1\n1 1\n2 2\n"
-            "800\n" + rows(3) +
-            "1\n" + rows(12) +
+            "800\n1\ncompro.out\n1 1 1 1 1 1\n"
+            "1\n" + engineering +
             "*S-N\n1 1 1\n"
             "*statistics\n1\n1 1 1\n1 2 3\n#generation 9\n*end\n" +
-            "12\n" + rows(3) +
-            "210\n" + rows(12) + "1\nuc-file\n" +
+            "12\n1 0\n1 1 1\n1 1\n"
+            "210\n" + engineering[:-2] + "1 1 1 1 1 1\n1\nuc-file\n" +
             "998 interface\nK=1\n*end\n"
         )
         raw = (
@@ -305,6 +310,66 @@ class StructuredMaterialCapabilityTests(unittest.TestCase):
             item["attributes"]["declaration_ordinal"] for item in materials
         ])
         self.assertEqual(0, inspection["summary"]["errors"])
+
+    def test_every_remaining_orthotropic_type_has_a_proven_cursor(self) -> None:
+        ordinary = (
+            "1 2 3\n1 2 3\n1\n1 2 3 4\n1\n1\n1\n1\n1 2 3\n1\n1\n1\n"
+        )
+        compression = ordinary.replace("1\n1\n1\n1\n1 2 3", "1 2 3 4\n1\n1\n1\n1 2 3", 1)
+        type_100 = ordinary.rsplit("1\n", 1)[0] + "1 2 3 4 5 6\n"
+        body = "".join(
+            f"{material_type}\n{rows}"
+            for material_type, rows in (
+                (5, ordinary), (6, ordinary), (7, ordinary), (100, type_100),
+                (101, ordinary), (102, ordinary), (103, compression),
+                (104, compression), (106, compression),
+            )
+        )
+        raw = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+            f"MATERIALS\n{body}END MATERIALS\n"
+            "CLUSTERS\n*type\nsolid\n*NAME\nply1\n*STOP\nEND CLUSTERS\n"
+        ).encode("latin-1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.in"
+            path.write_bytes(raw)
+            inspection = SourceSet.read(path).inspection()
+
+        materials = [
+            item for item in inspection["semantic_model"]["entities"]
+            if item["kind"] == "material"
+        ]
+        self.assertEqual([5, 6, 7, 100, 101, 102, 103, 104, 106], [
+            item["attributes"]["type"] for item in materials
+        ])
+        self.assertEqual(0, inspection["summary"]["errors"])
+
+    def test_material_envelope_cursor_and_values_fail_closed(self) -> None:
+        prefix = (
+            "INPUT\n3\nEND INPUT\n"
+            "BOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            "CONSTITUTIVE\n0\nEND CONSTITUTIVE\n"
+        )
+        suffix = "CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        invalid_bodies = (
+            "MATERIALS\n13\nEND MATERIALS\n",
+            "MATERIALS\n10\n1 2 3\nEND MATERIALS\n",
+            "MATERIALS\n10\nnot-a-real 2 3\n1 2 3\nEND MATERIALS\n",
+            "MATERIALS\n999\nunknown_key=1\n*end\nEND MATERIALS\n",
+            "MATERIALS\n800\n1\n../escape.out\n1 2 3 4 5 6\nEND MATERIALS\n",
+            "MATERIALS\n10\n1 2 3\n1 2 3\n" + suffix,
+        )
+        for ordinal, material in enumerate(invalid_bodies):
+            with self.subTest(ordinal=ordinal), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "invalid.in"
+                raw = prefix + material
+                if not raw.endswith(suffix):
+                    raw += suffix
+                path.write_bytes(raw.encode("latin-1"))
+                diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+            self.assertIn("BSAM-E350", {item["code"] for item in diagnostics})
 
     def test_only_structured_groups_receive_declaration_identities(self) -> None:
         raw = material_deck()
