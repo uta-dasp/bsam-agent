@@ -2,7 +2,14 @@
 
 This extension is a thin client for the loopback-only deterministic BSAM Agent API. It does not parse, modify, validate, or execute BSAM models itself.
 
-Initial commands manage an extension-owned API process, validate or inspect the active model, browse registry-derived capability status, and show the extension log. `.ele` files route through the strict mesh importer rather than deck validation. The client verifies that an existing API owns the same resolved workspace root before sending any model path.
+The client manages an extension-owned API process, validates or inspects the active model, browses registry-derived capability status, previews registered parameter changes, applies reviewed plans, and controls isolated BSAM runs. `.ele` files route through the strict mesh importer rather than deck validation. The client verifies that an existing API owns the same resolved workspace root before sending any model path.
+
+## Guarded workflows
+
+- `BSAM Agent: Preview Parameter Change` collects an exact block, construct, parameter, value, and occurrence. The core validates them, writes a revision-bound plan, and returns a unified diff for review.
+- `BSAM Agent: Apply Last Reviewed Change` revalidates the stored plan identity and source revision, displays the diff again, and requires modal confirmation before writing a new deck and audit sidecar.
+- `BSAM Agent: Run Current Model` publishes validation diagnostics first, requires a workspace-local executable and modal confirmation, and reserves a new isolated output directory.
+- `BSAM Agent: Show Last Run Status` and `BSAM Agent: Stop Last Run` read durable status or request BSAM's controlled stop path. The extension never directly kills a BSAM run.
 
 ## Development
 
@@ -20,7 +27,9 @@ Press F5 from this folder to launch an Extension Development Host after compilat
 Install the packaged client into VS Code with:
 
 ```powershell
-code --install-extension .\bsam-agent-0.1.0.vsix
+code --install-extension .\bsam-agent-0.2.0.vsix
 ```
 
 Open the Command Palette and run `BSAM Agent: Start Local API`. The extension defaults the API workspace to the first open folder; set `bsamAgent.workspaceRoot` to an absolute path when a broader include boundary is required.
+
+Set `bsamAgent.executablePath` to an executable inside that workspace boundary to avoid selecting it for each run. The configured BSAM timeout and controlled-stop grace period are passed to the deterministic supervisor.

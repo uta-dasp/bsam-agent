@@ -2,7 +2,7 @@
   "name": "bsam-agent",
   "displayName": "BSAM Agent",
   "description": "Thin VS Code client for the deterministic BSAM Agent loopback API.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "uta-dasp",
   "license": "UNLICENSED",
   "repository": {
@@ -55,6 +55,26 @@
       {
         "command": "bsamAgent.inspectCurrentFile",
         "title": "BSAM Agent: Inspect Current Model"
+      },
+      {
+        "command": "bsamAgent.previewParameterChange",
+        "title": "BSAM Agent: Preview Parameter Change"
+      },
+      {
+        "command": "bsamAgent.applyReviewedChange",
+        "title": "BSAM Agent: Apply Last Reviewed Change"
+      },
+      {
+        "command": "bsamAgent.runCurrentFile",
+        "title": "BSAM Agent: Run Current Model"
+      },
+      {
+        "command": "bsamAgent.showRunStatus",
+        "title": "BSAM Agent: Show Last Run Status"
+      },
+      {
+        "command": "bsamAgent.stopRun",
+        "title": "BSAM Agent: Stop Last Run"
       },
       {
         "command": "bsamAgent.refreshCapabilities",
@@ -124,6 +144,23 @@
           "type": "boolean",
           "default": true,
           "description": "Validate saved .in, .bsam, and .ele files when the API is already available."
+        },
+        "bsamAgent.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the workspace-local BSAM executable. Empty prompts when a run starts."
+        },
+        "bsamAgent.runTimeoutSeconds": {
+          "type": "number",
+          "default": 3600,
+          "minimum": 0,
+          "description": "Run timeout in seconds. Zero disables the timeout."
+        },
+        "bsamAgent.stopGraceSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 0,
+          "description": "Grace period for controlled BSAM stopping before the supervisor escalates."
         }
       }
     }

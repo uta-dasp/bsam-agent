@@ -99,10 +99,10 @@ cd clients\vscode
 npm ci
 npm test
 npm run package
-code --install-extension .\bsam-agent-0.1.0.vsix
+code --install-extension .\bsam-agent-0.2.0.vsix
 ```
 
-The extension does not send model data to a hosted provider. Hosted providers remain optional and deferred.
+The extension does not send model data to a hosted provider. Hosted providers remain optional and deferred. Reviewed parameter diffs and confirmation-gated apply/run/stop controls are available; schema-derived forms and integrated chat remain the active M6 work.
 
 `inspect`, `validate`, `plan-change`, and `run` recursively load `*INCLUDE, FILE=...` commands from CLUSTERS and included FE fragments. Nested targets follow BSAM behavior and resolve from the original deck's input directory, not from the including file. Missing files, malformed or quoted paths, include cycles, and targets outside the configured workspace are blocking diagnostics. The default workspace is the deck directory; `--workspace-root` can explicitly select a broader local boundary. Every imported file retains its own digest, bytes, line endings, and file boundary. New change plans are bound to the complete source-set digest and become stale if any included file changes. Applying to another directory preflights and copies the complete relative source set, refuses overwrites, verifies the resulting digest, and rolls back partial output on failure. Included FE edits additionally require that separate destination directory so originals are never modified.
 

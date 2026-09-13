@@ -79,3 +79,41 @@ export interface CapabilitiesResponse {
   tools: string[];
   tool_contracts: Record<string, unknown>;
 }
+
+export interface ChangePlanResponse {
+  plan_id: string;
+  plan_digest: string;
+  source_diff: string;
+  validation: ValidationResponse;
+  changed_model_paths?: string[];
+  preview?: string;
+  [key: string]: unknown;
+}
+
+export interface ApplyChangeResponse {
+  plan_id: string;
+  plan_digest: string;
+  destination: string;
+  output_sha256: string;
+  output_files: string[];
+  audit: string;
+  validation: ValidationResponse;
+  [key: string]: unknown;
+}
+
+export interface RunStatusResponse {
+  state: string;
+  classification: string;
+  output_directory: string;
+  source_set_sha256?: string;
+  error?: string;
+  artifacts?: string[];
+  [key: string]: unknown;
+}
+
+export interface ReviewedPlan {
+  source: string;
+  planPath: string;
+  planId: string;
+  planDigest: string;
+}
