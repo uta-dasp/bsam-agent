@@ -49,7 +49,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(11, counts["operation_impacts"])
         self.assertEqual(9, counts["clarification_triggers"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(82, counts["evidence"])
+        self.assertEqual(83, counts["evidence"])
 
     def test_every_capability_has_an_explicit_entity_output(self) -> None:
         active = [
@@ -492,6 +492,10 @@ class RegistryToolsTests(unittest.TestCase):
         output_text = json.dumps(constructs["*OUTPUT"]).lower()
         self.assertIn("enum-prefix(tecplot,vtk,para)", output_text)
         self.assertIn("do not consume it", output_text)
+        self.assertIn("evidence.runtime-vtk-data-file", constructs["*OUTPUT"]["evidence_ids"])
+        self.assertIn("single-cluster mechanical-isotropic", output_text)
+        self.assertIn("paraview/sheff", output_text)
+        self.assertEqual("unassessed", constructs["*OUTPUT"]["operations"]["execute"])
 
     def test_every_boundary_construct_has_a_documented_grammar(self) -> None:
         self.assertEqual(

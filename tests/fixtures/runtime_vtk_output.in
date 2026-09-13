@@ -1,0 +1,78 @@
+** CONTROLLED VTK OUTPUT PROBE DERIVED FROM generated-profile-0.91-v5.in
+INPUT
+3
+END INPUT
+SOLVER
+*type=pardiso
+n_threads=2
+matrix_type=indefinite
+end solver
+END SOLVER
+BOUNDARY
+*type
+mechanical
+*solver
+1
+*status
+no restart
+*name
+coupon_analysis
+*clusters
+coupon
+*boundary condition
+type=disp,comp=xyz,name=constraint1,value=0,nset=coupon.bottom
+type=force,comp=z,name=load1,value=100,nset=coupon.top
+*loading sequence
+type=Static,name=static_load,nstep=1,incr=1
+*convergence
+relative=9.9999999999999995e-07,absolute=1e-08,divergence=1000000
+maxiterations=20
+*OUTPUT
+type=data_file,clusters=all,format=vtk,intermediate=0
+END BOUNDARY
+CONSTITUTIVE
+1
+1 1 0
+END CONSTITUTIVE
+FAILURE
+4
+END FAILURE
+MATERIALS
+10
+70000 0.29999999999999999 2.3e-05
+300 250 150
+END MATERIALS
+CLUSTERS
+*TYPE
+solid
+*NAME
+coupon
+*DIMENSIONS
+8,1,2,0
+*NODE
+1,0,0,0
+2,1,0,0
+3,1,1,0
+4,0,1,0
+5,0,0,1
+6,1,0,1
+7,1,1,1
+8,0,1,1
+*ELEMENT,TYPE=C3D8
+1,1,2,3,4,5,6,7,8
+*NSET,NSET=bottom
+1,2,3,4
+*NSET,NSET=top
+5,6,7,8
+*ELSET,ELSET=solid
+1
+*ORIENTATION,NAME=ORI-ELE
+1,1,0,0,0,0,1,0.5
+*SELECTION,ID=1,TYPE=NODE
+bottom
+*SELECTION,ID=2,TYPE=NODE
+top
+*CONSTITUTIVE
+1
+*STOP
+END CLUSTERS

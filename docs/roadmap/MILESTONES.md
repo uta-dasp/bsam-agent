@@ -184,6 +184,8 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 
 ## M3 — Comprehensive validation and evidence
 
+Status: complete. Registry `0.136.0` closes the remaining controlled-probe gate with digest-bound successful VTK data-file output from the pinned executable. The narrower runtime claim leaves ParaView/SHEFF, aggregate-output, alternate-selector, and intermediate-output execution unassessed.
+
 - [x] Add end-to-end parser, semantic, query, edit, invalid-value, no-op, and natural-language tests for the initial BOUNDARY/CONVERGENCE operational slice.
 - [x] Add SOLVER parser, schedule-reference, missing-second-solver, safe-option, legacy-preservation, edit, and natural-language trajectory tests.
 - [x] Add TABLES grid, monotonicity, duplicate/missing-reference, query, no-op, and natural-language tests.
@@ -228,7 +230,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Add golden no-op and minimal-patch tests for every syntax family; byte preservation is a source-set invariant across all active families, and every family with a registered mutation route has a direct successful exact-patch regression.
 - [x] Add invalid, ambiguous, and dependency-breaking test cases; every classified diagnostic code is named by a regression and mutation tests cover ambiguity, stale state, unresolved dependencies, and guarded destructive failures.
 - [x] Add small representative fixtures across capability families; compact current controls, named-data dependencies, two-cluster semantics, and neutral mesh fixtures complement the notch regression.
-- [ ] Add controlled executable probes where static source evidence is insufficient.
+- [x] Add controlled executable probes where static source evidence is insufficient; the final VTK data-file probe succeeded with a checked-in input and digest-bound output evidence.
 - [x] Executable-test the bounded mechanical-isotropic generation profile against its pinned solver and boundary-assembly paths.
 - [x] Round-trip and executable-test a representative imported `.ele` model after an appropriate analysis template is available.
 

@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.135.0`
-- Registry SHA-256: `25D15B7ACC493A641826F7C1EAF8020E5A3BBFFFA5B40A316EDB833F2F1A8826`
+- Registry version: `0.136.0`
+- Registry SHA-256: `98169A3107908D8F42A4D3D583F5433145158B0B9FF6A9CDABB330171265D479`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 5 repository drift checks, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1831,7 +1831,7 @@ Defines output types and their target, coordinate-system, and intermediate-outpu
 - Registry ID: `construct.boundary-output`
 - Match prefix: `*outp`
 - Coverage: documented
-- Evidence: [evidence.boundary-output](#evidenceboundary-output), [evidence.boundary-output-execution](#evidenceboundary-output-execution), [evidence.boundary-data-formats](#evidenceboundary-data-formats), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch)
+- Evidence: [evidence.boundary-output](#evidenceboundary-output), [evidence.boundary-output-execution](#evidenceboundary-output-execution), [evidence.boundary-data-formats](#evidenceboundary-data-formats), [evidence.boundary-selectors](#evidenceboundary-selectors), [evidence.current-vtms-deck-tric](#evidencecurrent-vtms-deck-tric), [evidence.current-vtms-deck-notch](#evidencecurrent-vtms-deck-notch), [evidence.runtime-vtk-data-file](#evidenceruntime-vtk-data-file)
 - Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
 
 Known parameters:
@@ -1849,7 +1849,8 @@ Termination: next-command. Dependencies: All selected clusters and sets must bel
   - `cluster-list` [repeated]: `cluster_names`:cluster-name-list
   - Constraint: Exactly one type key may appear in a header row.
   - Constraint: A header accepts at most five key/value pairs.
-  - Constraint: The parser stores arbitrary format text, but the writer dispatches only lower-case prefixes tec and vtk; exact para sets a process-global SHEFF/ParaView flag. The Agent emits only tecplot or a separately runtime-verified vtk/para profile.
+  - Constraint: The parser stores arbitrary format text, but the writer dispatches only lower-case prefixes tec and vtk; exact para sets a process-global SHEFF/ParaView flag.
+  - Constraint: VTK output is runtime-verified only for the synthetic single-cluster mechanical-isotropic profile with clusters=all and intermediate=0. ParaView/SHEFF, other selectors, and intermediate output require separate runtime verification before generation.
   - Constraint: intermediate=0 disables iteration output, a positive value requests every nth iteration, and a negative value only participates in converged-step cleanup/output behavior.
   - Constraint: Every selected cluster must be an active finite-element cluster in the current boundary problem.
 - **node-set-aggregate** (type begins sum or tra):
@@ -2438,6 +2439,8 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.runtime-current-pardiso-definite-rejection` — runtime: `local-probe/2026-09-10/generated-isotropic-solid-current-pardiso-definite` — A digest-bound generated deck using matrix_type=definite reached complete input parsing, then the pinned executable reported internal system type 0 as unimplemented and terminated with exit code 157; source inspection confirms the current parser assigns only indefinite and unsymmetric values.
 <a id="evidenceruntime-generated-isotropic-solid-success"></a>
 - `evidence.runtime-generated-isotropic-solid-success` — runtime: `local-probe/2026-09-11/generated-isotropic-solid-profile-1.3.0` — A digest-bound profile 1.3.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; derived DIMENSIONS selection/section slots and explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly.
+<a id="evidenceruntime-vtk-data-file"></a>
+- `evidence.runtime-vtk-data-file` — runtime: `docs/bsam/VTK_OUTPUT_PROBE_2026-09-12.md` — The checked-in synthetic single-cluster mechanical-isotropic probe added only BOUNDARY data-file output with clusters=all, format=vtk, and intermediate=0; the pinned executable reached its success sentinel without fatal markers and emitted a digest-bound VTK 3.0 unstructured-grid artifact.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>

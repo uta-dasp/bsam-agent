@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "2.2.0",
-  "registry_version": "0.135.0",
+  "registry_version": "0.136.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -615,6 +615,12 @@
       "kind": "runtime",
       "locator": "local-probe/2026-09-11/generated-isotropic-solid-profile-1.3.0",
       "claim": "A digest-bound profile 1.3.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; derived DIMENSIONS selection/section slots and explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly."
+    },
+    {
+      "id": "evidence.runtime-vtk-data-file",
+      "kind": "runtime",
+      "locator": "docs/bsam/VTK_OUTPUT_PROBE_2026-09-12.md",
+      "claim": "The checked-in synthetic single-cluster mechanical-isotropic probe added only BOUNDARY data-file output with clusters=all, format=vtk, and intermediate=0; the pinned executable reached its success sentinel without fatal markers and emitted a digest-bound VTK 3.0 unstructured-grid artifact."
     },
     {
       "id": "evidence.invocation-parser",
@@ -3519,7 +3525,7 @@
         {"name": "c_system", "value_type": "enum", "required": false, "allowed_values": ["global", "material"], "default": "global", "summary": "Selects the coordinate system; only the mate prefix changes the default."},
         {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Controls intermediate output frequency/selection."}
       ],
-      "evidence_ids": ["evidence.boundary-output", "evidence.boundary-output-execution", "evidence.boundary-data-formats", "evidence.boundary-selectors", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch"],
+      "evidence_ids": ["evidence.boundary-output", "evidence.boundary-output-execution", "evidence.boundary-data-formats", "evidence.boundary-selectors", "evidence.current-vtms-deck-tric", "evidence.current-vtms-deck-notch", "evidence.runtime-vtk-data-file"],
       "remaining_work": [],
       "operations": {
         "parse": "verified", "semantic": "verified", "inspect": "verified",
@@ -3538,7 +3544,7 @@
               {"name": "output-header", "repetition": "once", "fields": [{"name": "type", "value_type": "const(data_file)", "required": true, "summary": "Data-file output."}, {"name": "clusters", "value_type": "selector(all|list|cluster-name)", "required": true, "summary": "Target clusters."}, {"name": "format", "value_type": "enum-prefix(tecplot,vtk,para)", "required": false, "summary": "tec selects Tecplot text, vtk selects legacy VTK, and exact para enables the ParaView/SHEFF path; defaults to tecplot."}, {"name": "intermediate", "value_type": "integer", "required": false, "summary": "Intermediate iteration interval; defaults to 10."}, {"name": "c_system", "value_type": "enum(global,material)", "required": false, "summary": "Coordinate system."}]},
               {"name": "cluster-list", "repetition": "repeated", "fields": [{"name": "cluster_names", "value_type": "cluster-name-list", "required": true, "summary": "Continuation values when clusters=list."}]}
             ],
-            "constraints": ["Exactly one type key may appear in a header row.", "A header accepts at most five key/value pairs.", "The parser stores arbitrary format text, but the writer dispatches only lower-case prefixes tec and vtk; exact para sets a process-global SHEFF/ParaView flag. The Agent emits only tecplot or a separately runtime-verified vtk/para profile.", "intermediate=0 disables iteration output, a positive value requests every nth iteration, and a negative value only participates in converged-step cleanup/output behavior.", "Every selected cluster must be an active finite-element cluster in the current boundary problem."]
+            "constraints": ["Exactly one type key may appear in a header row.", "A header accepts at most five key/value pairs.", "The parser stores arbitrary format text, but the writer dispatches only lower-case prefixes tec and vtk; exact para sets a process-global SHEFF/ParaView flag.", "VTK output is runtime-verified only for the synthetic single-cluster mechanical-isotropic profile with clusters=all and intermediate=0. ParaView/SHEFF, other selectors, and intermediate output require separate runtime verification before generation.", "intermediate=0 disables iteration output, a positive value requests every nth iteration, and a negative value only participates in converged-step cleanup/output behavior.", "Every selected cluster must be an active finite-element cluster in the current boundary problem."]
           },
           {
             "name": "node-set-aggregate",

@@ -2,6 +2,8 @@
 
 ## What is runnable now
 
+Registry 0.136.0 completes M3 with a controlled VTK data-file output probe. The checked-in synthetic single-cluster input completed against the pinned executable in 0.31 seconds, emitted the explicit success sentinel with no fatal marker, and produced a 3,257-byte VTK 3.0 unstructured-grid artifact. This verifies only `clusters=all`, `format=vtk`, and `intermediate=0` on the existing mechanical-isotropic profile; ParaView/SHEFF, aggregate-output, alternate-selector, and intermediate-output execution remain unassessed. Full digests and reproduction steps are recorded in [the probe report](bsam/VTK_OUTPUT_PROBE_2026-09-12.md).
+
 M3 now has compact checked-in representatives beyond the notch project. `representative_controls.in` covers current PARDISO plus eleven BOUNDARY/control families; `representative_named_data.in` resolves TABLES, UFUNCTIONS, STATISTICAL, structured MATERIALS, and cluster ownership together. Both are zero-error and byte-lossless, complementing the existing two-cluster semantic and neutral `.ele` mesh fixtures.
 
 The M3 negative-case audit now covers every classified diagnostic code and fails on future code/test drift. The final missing assertions exercise duplicate top-level-block warning `BSAM-W120` and nonnumeric/out-of-range BOUNDARY solver schedule `BSAM-E312`, including their level and provenance. Existing suites cover invalid syntax/value/cardinality variants, ambiguous definitions and selectors, unresolved/type-mismatched dependencies, stale plans, and dependency-blocked destructive edits.
