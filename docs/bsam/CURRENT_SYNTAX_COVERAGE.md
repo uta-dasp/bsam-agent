@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+M3 golden/no-op and minimal-patch coverage is complete. The source-set renderer preserves bound bytes independently of syntax specialization, with behavioral coverage naming all 54 active families. Every family exposed through the 23-pair mutation contract now has a successful exact-span, insertion, removal, or dependency-aware multi-span regression; final direct additions cover G-CONTROL, boundary-condition values, BOUNDARY/SCALE retargeting, and all supported ELSET mutations.
+
 Registry `0.135.0` closes the first golden-coverage gap. BOUNDARY `*GEO_NL` is now explicitly command-only, and `*STATUS` accepts no command options plus at most one optional canonical status record. Both families have byte-identical no-op assertions and positive/default/invalid structure coverage; registry tests now fail when an active canonical family is absent from the behavioral test corpus.
 
 M3 reference/dependency validation now has named behavioral coverage for all 36 registered edge kinds. This spans include graphs, explicit and generated mesh connectivity, set membership, selections, section assignment, topology ownership, and cross-feature solver/material/constitutive/failure/statistical/function dependencies. Statistical fiber seeding directly proves a resolved section window and classified rejection of an out-of-range section ordinal.

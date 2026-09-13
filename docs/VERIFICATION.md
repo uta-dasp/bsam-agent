@@ -2,6 +2,8 @@
 
 ## What is runnable now
 
+The M3 golden/minimal-patch audit is complete. SourceSet rendering returns each bound file's original bytes and is exercised across every named active syntax family, mixed newlines, nested includes, and unknown preserved records. Direct successful generic-route tests now cover each mutable family; the final gaps add exact boundary-condition value and G-CONTROL flag spans, BOUNDARY and SCALE target spans, plus ELSET create/member-removal/delete/rename plans.
+
 Registry 0.135.0 directly qualifies the previously implicit BOUNDARY `*GEO_NL` and `*STATUS` families. Golden tests prove byte-identical preservation, typed records, and the canonical `no restart` value; negative tests reject GEO_NL options/data, STATUS command options, multiple status rows, and unregistered status values. A registry meta-regression requires every active canonical syntax family to be named in the behavioral suite.
 
 The first M3 closure audits all 36 registered semantic edge kinds against behavioral regression tests spanning includes, mesh connectivity, explicit/generated/derived set membership, topology, selections, assignments, and cross-feature consumers. Direct assertions now cover SECTION-to-ELSET assignment and statistical fiber-seeding-to-SECTION resolution; an out-of-range section produces the classified unresolved-reference diagnostic. A meta-regression fails if any future registered edge kind lacks a named test assertion.

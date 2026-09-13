@@ -350,6 +350,37 @@ class CapabilitySliceTests(unittest.TestCase):
         self.assertEqual("0.4", plan["patch"]["new"])
         self.assertEqual(0, plan["validation"]["summary"]["errors"])
 
+    def test_generic_parameter_routes_make_exact_g_control_and_condition_patches(self) -> None:
+        raw = structural_deck().replace(
+            b"type=off, name=idle",
+            b"type=displacement, component=x, name=idle, value=0, nset=ply1.corner",
+        ).replace(
+            b"*loading sequence", b"*g-control\n*loading sequence",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(raw)
+            api = LocalAgentApi(root)
+            condition = api.dispatch("preview_parameter_change", {
+                "source": "model.in", "block": "BOUNDARY",
+                "construct": "construct.boundary-conditions",
+                "parameter": "value", "value": "1", "plan_path": "condition.json",
+            })
+            control = api.dispatch("preview_parameter_change", {
+                "source": "model.in", "block": "BOUNDARY",
+                "construct": "construct.boundary-g-control",
+                "parameter": "DAMP", "value": "true", "plan_path": "control.json",
+            })
+
+        self.assertEqual({"old": "0", "new": "1"}, {
+            key: condition["patch"][key] for key in ("old", "new")
+        })
+        self.assertEqual({"old": "", "new": ",DAMP"}, {
+            key: control["patch"][key] for key in ("old", "new")
+        })
+        self.assertEqual(0, condition["validation"]["summary"]["errors"])
+        self.assertEqual(0, control["validation"]["summary"]["errors"])
+
     def test_generic_rename_refuses_unverified_capability(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -420,6 +451,12 @@ class CapabilitySliceTests(unittest.TestCase):
                 "changes": {"cluster": "ply1", "new_target": "corner"},
                 "plan_path": "retarget.json",
             })
+            retarget_boundary = api.dispatch("preview_modify_entity", {
+                "source": "nodal.in", "capability": "command.boundary",
+                "entity_name": "1",
+                "changes": {"cluster": "ply1", "new_target": "corner"},
+                "plan_path": "retarget-boundary.json",
+            })
             coordinate_source = structural_deck().replace(
                 b"*STOP",
                 b"*NSET,NSET=other\n3\n*SHIFT,NSET=corner\n1,0,0\n*STOP",
@@ -430,6 +467,17 @@ class CapabilitySliceTests(unittest.TestCase):
                 "entity_name": "corner",
                 "changes": {"cluster": "ply1", "new_target": "other"},
                 "plan_path": "coordinate.json",
+            })
+            scale_source = structural_deck().replace(
+                b"*STOP",
+                b"*NSET,NSET=other\n3\n*SCALE,NSET=corner\n2,2,2\n*STOP",
+            )
+            (root / "scale.in").write_bytes(scale_source)
+            scale = api.dispatch("preview_modify_entity", {
+                "source": "scale.in", "capability": "command.scale",
+                "entity_name": "corner",
+                "changes": {"cluster": "ply1", "new_target": "other"},
+                "plan_path": "scale.json",
             })
             section_source = structural_deck().replace(
                 b"*STOP",
@@ -445,6 +493,33 @@ class CapabilitySliceTests(unittest.TestCase):
                 "entity_name": "first",
                 "changes": {"cluster": "ply1", "new_target": "second"},
                 "plan_path": "retarget-section.json",
+            })
+            element_set_source = structural_deck().replace(
+                b"*STOP",
+                b"*ELEMENT,TYPE=C3D4\n2,1,2,3,4\n"
+                b"*ELSET,ELSET=region\n1,2\n*STOP",
+            )
+            (root / "element-set.in").write_bytes(element_set_source)
+            element_set_create = api.dispatch("preview_create_entity", {
+                "source": "model.in", "capability": "command.elset",
+                "attributes": {"cluster": "ply1", "name": "region", "members": [1]},
+                "plan_path": "create-element-set.json",
+            })
+            element_set_modify = api.dispatch("preview_modify_entity", {
+                "source": "element-set.in", "capability": "command.elset",
+                "entity_name": "region",
+                "changes": {"cluster": "ply1", "remove_member": 2},
+                "plan_path": "modify-element-set.json",
+            })
+            element_set_delete = api.dispatch("preview_delete_entity", {
+                "source": "element-set.in", "capability": "command.elset",
+                "entity_name": "region", "context": {"cluster": "ply1"},
+                "plan_path": "delete-element-set.json",
+            })
+            element_set_rename = api.dispatch("preview_rename_entity", {
+                "source": "element-set.in", "capability": "command.elset",
+                "entity_name": "region", "new_name": "renamed",
+                "context": {"cluster": "ply1"}, "plan_path": "rename-element-set.json",
             })
             delete = api.dispatch("preview_delete_entity", {
                 "source": "model.in", "capability": "command.node", "entity_name": "5",
@@ -473,13 +548,23 @@ class CapabilitySliceTests(unittest.TestCase):
         self.assertEqual("add-set-members", extend["operation"])
         self.assertEqual("remove-set-member", remove_member["operation"])
         self.assertEqual("retarget-nodal-record", retarget["operation"])
+        self.assertEqual("retarget-nodal-record", retarget_boundary["operation"])
         self.assertEqual("retarget-coordinate-operation", coordinate["operation"])
+        self.assertEqual("retarget-coordinate-operation", scale["operation"])
         self.assertIn("+corner,1,5", retarget["source_diff"])
+        self.assertIn("+corner,1,1,0", retarget_boundary["source_diff"])
+        self.assertIn("NSET=other", scale["source_diff"])
         self.assertEqual("retarget-section", retarget_section["operation"])
         self.assertIn("ELSET=second", retarget_section["source_diff"])
         self.assertEqual("delete-node", delete["operation"])
         self.assertEqual("delete-element", delete_element["operation"])
         self.assertEqual("delete-set", delete_set["operation"])
+        self.assertEqual("create-set", element_set_create["operation"])
+        self.assertEqual("remove-set-member", element_set_modify["operation"])
+        self.assertEqual("delete-set", element_set_delete["operation"])
+        self.assertEqual("rename-set", element_set_rename["operation"])
+        self.assertIn("*ELSET,ELSET=region", element_set_create["source_diff"])
+        self.assertIn("region -> renamed", element_set_rename["preview"])
         self.assertIn("*NSET,NSET=edge", node_set["source_diff"])
 
     def test_plan_refresh_requires_a_stale_matching_source(self) -> None:
