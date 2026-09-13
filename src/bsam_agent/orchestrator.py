@@ -916,20 +916,30 @@ class ChatOrchestrator:
         elif tool == "validate_model":
             task.status = "verify"
             task.validation_state = result.get("summary")
-        elif tool == "run_bsam":
+        elif tool in {"run_bsam", "get_run_status"}:
             task.run_state = {
                 key: result.get(key) for key in ("state", "classification", "output_directory")
             }
             classification = str(result.get("classification", "unknown")).casefold()
             if classification in {"failed", "disrupted"}:
                 category = str(result.get("failure_category") or "execution_failure")
-                task.failures.append({
-                    "category": category,
-                    "tool": tool,
-                    "message": str(result.get("diagnostic") or f"run classified {classification}"),
-                })
-                task.failed_fingerprints.append(fingerprint)
+                if fingerprint not in task.failed_fingerprints:
+                    task.failures.append({
+                        "category": category,
+                        "tool": tool,
+                        "message": str(
+                            result.get("diagnostic") or f"run classified {classification}"
+                        ),
+                    })
+                    task.failed_fingerprints.append(fingerprint)
                 task.status = "failed"
+            elif (
+                str(result.get("state", "unknown")).casefold() == "terminal"
+                and classification in {"succeeded", "stopped"}
+            ):
+                task.status = "complete"
+            elif str(result.get("state", "unknown")).casefold() == "terminal":
+                task.status = "verify"
             else:
                 task.status = "execute"
 

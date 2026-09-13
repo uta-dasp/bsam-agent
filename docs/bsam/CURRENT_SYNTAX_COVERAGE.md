@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.137.0` completes the general guarded-workflow milestone with live Scout routing and controlled pinned-executable acceptance on the trusted non-notch TriC model. Exact pending-run and status routes crossed the separate confirmation boundary correctly; the run reached PARDISO solution and a converged step before a clean timeout stop. Terminal status results now persist into bounded task state, with a save/restore trajectory regression.
+
 Registry `0.136.0` completes M3 evidence with a controlled VTK data-file output run. The digest-bound synthetic single-cluster mechanical-isotropic input reached the success sentinel without fatal markers and produced a structurally recognizable VTK 3.0 unstructured-grid artifact. The claim remains profile-specific; ParaView/SHEFF, aggregate outputs, alternate selectors, and intermediate output are still unassessed.
 
 M3 representative coverage now includes compact checked-in current-control and named-data decks. They prove zero-error, byte-lossless integration of PARDISO and eleven BOUNDARY/control families, plus resolved TABLES, UFUNCTIONS, STATISTICAL, structured MATERIALS, and cluster dependencies. Existing small two-cluster and neutral-mesh fixtures retain independent semantic and import coverage; notch remains a separate large regression.

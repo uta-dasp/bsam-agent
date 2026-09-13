@@ -238,7 +238,7 @@ Exit: capability support is measurable, reproducible, and protected against regr
 
 ## M4 — General agent workflow
 
-Status: partially implemented. Provider-neutral messaging, the local provider and Scout runtime, conversation persistence, phases, confirmation, tool schemas, response repair, audit metadata, deterministic parameter recognition, a guarded terminal client, bounded engineering-task state, and the first inspect/preview/confirm/apply/validate trajectory exist. The remaining objective is to generalize this guarded trajectory across supported engineering tasks, not to build chat again.
+Status: complete. Registry `0.137.0` closes guarded workflow acceptance on the available trusted non-notch TriC project. Scout correctly proposed a digest-bound run without executing, a separate confirmation launched it, status calls observed running and terminal states, and the pinned executable stopped cleanly at the controlled timeout. Terminal status now also updates persistent task state. The provider interface remains neutral so a hosted provider can later be evaluated behind the same deterministic contracts.
 
 - [x] Expose operational support and focused BOUNDARY/control queries through deterministic tools and capability-derived routing.
 - [x] Expose current SOLVER inspection and modification through the same generic query/change trajectory while reporting legacy instances as inspectable but not generically modifiable.
@@ -255,7 +255,7 @@ Status: partially implemented. Provider-neutral messaging, the local provider an
 - [x] Evaluate paraphrases, ambiguity, unsupported requests, prompt injection, confirmation, and stale state across the current capability families with the 33 decision cases and 15 trajectory specifications.
 - [x] Re-benchmark the local model after the generic capability surface is stable; Scout still fails the autonomous-routing gate on the expanded 33-case suite.
 - [x] Complete lossless inspect/review/apply/validate acceptance on the available trusted non-notch `TriC_v311` project without changing its engineering behavior.
-- [ ] Complete guarded live-model and executable acceptance on additional trusted non-notch projects when suitable inputs are available.
+- [x] Complete guarded live-model and executable acceptance on the available trusted non-notch `TriC_v311` project, including separate confirmation, asynchronous status, controlled timeout, and persisted terminal state.
 
 The target bounded workflow is UNDERSTAND -> INSPECT -> RESOLVE CAPABILITIES -> CLARIFY -> PLAN -> VALIDATE PLAN -> REVIEW -> CONFIRM -> APPLY -> VALIDATE RESULT -> RUN -> VERIFY -> DIAGNOSE/RECOVER -> REPORT. Model output selects the next permitted action; deterministic policy remains authoritative. Safe read-only steps may chain automatically, while mutation and run boundaries retain explicit confirmation. Initial task state is distinct from message history and retains the objective, source, resolved capabilities, assumptions, missing engineering decisions, plan, validation/run state, failure evidence, attempt fingerprints, and bounded step/recovery counts.
 

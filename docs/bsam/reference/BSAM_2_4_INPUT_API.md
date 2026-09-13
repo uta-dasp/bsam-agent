@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.136.0`
-- Registry SHA-256: `98169A3107908D8F42A4D3D583F5433145158B0B9FF6A9CDABB330171265D479`
+- Registry version: `0.137.0`
+- Registry SHA-256: `9E61A62C084737C6D6132FDDFEE603860BD012D3876D6E88B97914DD9FF43479`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 5 repository drift checks, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -2441,6 +2441,8 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.runtime-generated-isotropic-solid-success` — runtime: `local-probe/2026-09-11/generated-isotropic-solid-profile-1.3.0` — A digest-bound profile 1.3.0 deck generated from the synthetic eight-node C3D8 mesh and complete explicit intent ran through the pinned executable with exit code zero, the end-of-program sentinel, and no fatal marker; derived DIMENSIONS selection/section slots and explicit node SELECTION records resolved the bottom constraint and top force targets during boundary assembly.
 <a id="evidenceruntime-vtk-data-file"></a>
 - `evidence.runtime-vtk-data-file` — runtime: `docs/bsam/VTK_OUTPUT_PROBE_2026-09-12.md` — The checked-in synthetic single-cluster mechanical-isotropic probe added only BOUNDARY data-file output with clusters=all, format=vtk, and intermediate=0; the pinned executable reached its success sentinel without fatal markers and emitted a digest-bound VTK 3.0 unstructured-grid artifact.
+<a id="evidenceruntime-tric-guarded-execution"></a>
+- `evidence.runtime-tric-guarded-execution` — runtime: `docs/bsam/TRIC_GUARDED_ACCEPTANCE_2026-09-12.md` — A live Scout conversation proposed the exact trusted TriC run without executing, a separate confirmation launched the pinned executable, and status calls observed running then terminal/stopped state; BSAM completed input, matrix formation, PARDISO solution, and one converged step before a clean controlled timeout with no fatal marker or escalation.
 <a id="evidenceinvocation-parser"></a>
 - `evidence.invocation-parser` — source: `source/libbsam/varnam.f90:40-235` — Defines -I/-O directory flags, optional .in removal, basename handling, and output artifact stems.
 <a id="evidencesuccess-sentinel"></a>

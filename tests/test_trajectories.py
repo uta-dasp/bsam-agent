@@ -80,7 +80,64 @@ class FailedRunApi:
         }
 
 
+class RunLifecycleApi:
+    def __init__(self) -> None:
+        self.status_calls = 0
+
+    def dispatch(self, tool, arguments):
+        if tool == "run_bsam":
+            return {
+                "state": "accepted",
+                "classification": "pending",
+                "output_directory": "runs/case",
+            }
+        if tool == "get_run_status":
+            self.status_calls += 1
+            if self.status_calls == 1:
+                return {
+                    "state": "running",
+                    "classification": "pending",
+                    "output_directory": "runs/case",
+                }
+            return {
+                "state": "terminal",
+                "classification": "stopped",
+                "output_directory": "runs/case",
+            }
+        raise AssertionError(f"unexpected tool {tool}")
+
+
 class TaskTrajectoryTests(unittest.TestCase):
+    def test_run_status_updates_persisted_task_through_terminal_state(self) -> None:
+        provider = ScriptedProvider(
+            decision("run_bsam", {
+                "source": "model.in", "output_dir": "runs/case",
+                "executable": "bsam20.exe", "confirm": False, "timeout": 30,
+            }),
+            decision("get_run_status", {"output_dir": "runs/case"}),
+            decision("get_run_status", {"output_dir": "runs/case"}),
+        )
+        api = RunLifecycleApi()
+        agent = ChatOrchestrator(provider, config(), api)  # type: ignore[arg-type]
+
+        pending = agent.turn("Run model.in in runs/case with a 30 second timeout.")
+        accepted = agent.turn("/confirm")
+        running = agent.turn("Check status for runs/case.")
+        terminal = agent.turn("Check status for runs/case again.")
+        restored = ConversationState.from_dict(agent.state.as_dict())
+
+        self.assertTrue(pending.requires_confirmation)
+        self.assertEqual("pending", accepted.tool_result["classification"])
+        self.assertEqual("running", running.tool_result["state"])
+        self.assertEqual("stopped", terminal.tool_result["classification"])
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual({
+            "state": "terminal",
+            "classification": "stopped",
+            "output_directory": "runs/case",
+        }, agent.state.task.run_state)
+        self.assertEqual(agent.state.task.run_state, restored.task.run_state)
+
     def test_composite_plan_has_one_confirmation_and_post_apply_validation(self) -> None:
         provider = ScriptedProvider(decision("preview_compose_changes", {
             "source": "model.in",

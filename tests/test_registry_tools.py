@@ -49,7 +49,11 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(11, counts["operation_impacts"])
         self.assertEqual(9, counts["clarification_triggers"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(83, counts["evidence"])
+        self.assertEqual(84, counts["evidence"])
+
+    def test_execution_contract_includes_guarded_tric_evidence(self) -> None:
+        execution = self.registry["execution_contract"]
+        self.assertIn("evidence.runtime-tric-guarded-execution", execution["evidence_ids"])
 
     def test_every_capability_has_an_explicit_entity_output(self) -> None:
         active = [

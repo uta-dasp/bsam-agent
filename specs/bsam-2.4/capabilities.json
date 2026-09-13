@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "2.2.0",
-  "registry_version": "0.136.0",
+  "registry_version": "0.137.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -621,6 +621,12 @@
       "kind": "runtime",
       "locator": "docs/bsam/VTK_OUTPUT_PROBE_2026-09-12.md",
       "claim": "The checked-in synthetic single-cluster mechanical-isotropic probe added only BOUNDARY data-file output with clusters=all, format=vtk, and intermediate=0; the pinned executable reached its success sentinel without fatal markers and emitted a digest-bound VTK 3.0 unstructured-grid artifact."
+    },
+    {
+      "id": "evidence.runtime-tric-guarded-execution",
+      "kind": "runtime",
+      "locator": "docs/bsam/TRIC_GUARDED_ACCEPTANCE_2026-09-12.md",
+      "claim": "A live Scout conversation proposed the exact trusted TriC run without executing, a separate confirmation launched the pinned executable, and status calls observed running then terminal/stopped state; BSAM completed input, matrix formation, PARDISO solution, and one converged step before a clean controlled timeout with no fatal marker or escalation."
     },
     {
       "id": "evidence.invocation-parser",
@@ -4367,7 +4373,8 @@
       "evidence.success-sentinel",
       "evidence.exit-control",
       "evidence.runtime-zero-on-fatal",
-      "evidence.runtime-current-deck-success"
+      "evidence.runtime-current-deck-success",
+      "evidence.runtime-tric-guarded-execution"
     ]
   }
 }
