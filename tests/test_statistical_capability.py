@@ -37,7 +37,43 @@ def statistical_deck(reference: str = "stat_strength_1.0") -> bytes:
     ).encode("latin-1")
 
 
+def fiber_statistical_deck(section: int = 1) -> bytes:
+    return statistical_deck().replace(
+        b"seeding=coordinates\ncoordinates=1,2,3\n",
+        b"seeding=fiber\nfiber=1,2,3\n"
+        + f"seed_window_section={section}\n".encode("ascii"),
+    ).replace(
+        b"*type\nsolid\n*NAME\nply1\n*STOP",
+        b"*type\nsolid\n*NAME\nply1\n*DIMENSIONS\n4,1,0,1\n"
+        b"*NODE\n1,0,0,0\n2,1,0,0\n3,0,1,0\n4,0,0,1\n"
+        b"*ELEMENT,TYPE=C3D4,ELSET=solid\n1,1,2,3,4\n"
+        b"*SECTION,ELSET=solid,LAYERS=1\n1,1\n*STOP",
+    )
+
+
 class StatisticalCapabilityTests(unittest.TestCase):
+    def test_fiber_seeding_resolves_and_bounds_its_section_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            valid = Path(directory) / "valid.in"
+            invalid = Path(directory) / "invalid.in"
+            valid.write_bytes(fiber_statistical_deck())
+            invalid.write_bytes(fiber_statistical_deck(section=2))
+
+            valid_inspection = SourceSet.read(valid).inspection()
+            invalid_inspection = SourceSet.read(invalid).inspection()
+
+        reference = next(
+            item for item in valid_inspection["semantic_model"]["references"]
+            if item["kind"] == "uses-seed-section"
+        )
+        self.assertEqual("resolved", reference["status"])
+        self.assertEqual("cluster:ply1/section:solid", reference["target_key"])
+        self.assertEqual(0, valid_inspection["summary"]["errors"])
+        self.assertIn(
+            "BSAM-E301",
+            {item["code"] for item in invalid_inspection["diagnostics"]},
+        )
+
     def test_distribution_cluster_and_material_references_resolve(self) -> None:
         raw = statistical_deck()
         with tempfile.TemporaryDirectory() as directory:

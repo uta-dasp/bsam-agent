@@ -361,8 +361,10 @@ class SemanticIndexTests(unittest.TestCase):
             self.assertEqual("<root>", node["location"]["source"])
             self.assertGreater(node["location"]["byte_end"], node["location"]["byte_start"])
             targets = {item["target_key"] for item in semantic["references"]}
+            reference_kinds = {item["kind"] for item in semantic["references"]}
             self.assertIn("cluster:noname1/node-set:all_nodes", targets)
             self.assertIn("cluster:noname1/element-set:solid", targets)
+            self.assertIn("assigns-to", reference_kinds)
             self.assertEqual(15, semantic["summary"]["resolved_references"])
 
     def test_cluster_type_and_dimensions_bind_to_the_following_name(self) -> None:

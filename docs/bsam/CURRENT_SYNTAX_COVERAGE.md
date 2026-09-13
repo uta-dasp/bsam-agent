@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+M3 reference/dependency validation now has named behavioral coverage for all 36 registered edge kinds. This spans include graphs, explicit and generated mesh connectivity, set membership, selections, section assignment, topology ownership, and cross-feature solver/material/constitutive/failure/statistical/function dependencies. Statistical fiber seeding directly proves a resolved section window and classified rejection of an out-of-range section ordinal.
+
 Registry `0.134.0` completes M1 with one checked-in repository command and Windows CI workflow. Five required checks bind registry invariants, the JSON Schema version/root, exact reference regeneration, committed dispatch tokens and zero-gap status, and the CI commands. The private pinned source tree is not required in CI; when available locally, the same command also requires byte-exact live dispatch-audit regeneration. The existing reference and dispatch audit meet all concrete coverage consumers, so no redundant ledger is added.
 
 Registry `0.133.0` closes the shared parser/editor/validator consumer contract. Four read operations cover every active capability, while six grouped mutation routes exactly cover all 23 supported capability-operation pairs and bind them to their public parameter or entity adapter. Runtime mutation dispatch now rejects an operation without that exact route; generic parameter editing also rejects unsupported constructs and boundary-condition identity changes that require reverse-reference-aware rename.

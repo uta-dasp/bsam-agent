@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -100,6 +101,24 @@ class RegistryToolsTests(unittest.TestCase):
             for item in contract["decision_sources"]
         }
         self.assertEqual({"user-approved": True, "source-derived": False}, sources)
+
+    def test_every_reference_kind_is_named_by_a_regression_test(self) -> None:
+        test_root = Path(__file__).parent
+        test_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in test_root.glob("test_*.py")
+            if path.name != Path(__file__).name
+        )
+        kinds = {
+            kind
+            for item in self.registry["dependency_contract"]["reference_contracts"]
+            for kind in item["kinds"]
+        }
+        missing = sorted(
+            kind for kind in kinds
+            if re.search(rf"['\"]{re.escape(kind)}['\"]", test_text) is None
+        )
+        self.assertEqual([], missing)
 
     def test_engineering_clarifications_cover_registered_user_choices(self) -> None:
         triggers = self.registry["dependency_contract"]["clarification_triggers"]
