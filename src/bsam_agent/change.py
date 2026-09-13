@@ -1677,6 +1677,7 @@ def plan_rename_entity(
         raise ChangeError(
             f"rename is {status} for {record['id']}; no structural change was planned"
         )
+    _require_mutation_route(record, "rename", "preview_rename_entity")
     adapters = {
         "construct.boundary-conditions": plan_rename_boundary_condition,
     }
@@ -1693,7 +1694,21 @@ def plan_rename_entity(
     return adapter(source, entity_name, new_name, workspace_root)
 
 
-def _verified_operation_record(capability: str, operation: str) -> dict[str, Any]:
+def _require_mutation_route(record: dict[str, Any], operation: str, tool: str) -> None:
+    routes = [
+        item for item in load_registry()["consumer_contract"]["mutation_routes"]
+        if item["operation"] == operation and record["id"] in item["capability_ids"]
+    ]
+    if len(routes) != 1 or tool not in routes[0]["tools"]:
+        raise ChangeError(
+            f"{operation} has no registered {tool} route for {record['id']}; "
+            "no structural change was planned"
+        )
+
+
+def _verified_operation_record(
+    capability: str, operation: str, tool: str,
+) -> dict[str, Any]:
     registry = load_registry()
     matches = [
         item for item in [
@@ -1711,6 +1726,7 @@ def _verified_operation_record(capability: str, operation: str) -> dict[str, Any
         raise ChangeError(
             f"{operation} is {status} for {record['id']}; no structural change was planned"
         )
+    _require_mutation_route(record, operation, tool)
     return record
 
 
@@ -1744,7 +1760,9 @@ def plan_create_entity(
     workspace_root: Path | None = None,
 ) -> dict[str, Any]:
     """Create an entity through an explicitly verified capability adapter."""
-    record = _verified_operation_record(capability, "create")
+    record = _verified_operation_record(
+        capability, "create", "preview_create_entity",
+    )
     if record["id"] == "command.node":
         data = _structural_payload(attributes, {"cluster", "label", "x", "y", "z"})
         if not isinstance(data["label"], int) or isinstance(data["label"], bool):
@@ -1888,7 +1906,9 @@ def plan_modify_entity(
     workspace_root: Path | None = None,
 ) -> dict[str, Any]:
     """Modify an entity through an explicitly verified capability adapter."""
-    record = _verified_operation_record(capability, "modify")
+    record = _verified_operation_record(
+        capability, "modify", "preview_modify_entity",
+    )
     if record["id"] == "block.tables":
         data = _structural_payload(changes, {"row", "column", "value"})
         if any(
@@ -1968,7 +1988,9 @@ def plan_delete_entity(
     workspace_root: Path | None = None,
 ) -> dict[str, Any]:
     """Delete an entity through an explicitly verified capability adapter."""
-    record = _verified_operation_record(capability, "delete")
+    record = _verified_operation_record(
+        capability, "delete", "preview_delete_entity",
+    )
     if record["id"] == "command.node":
         data = _structural_payload(context, {"cluster"})
         try:
@@ -2389,6 +2411,21 @@ def plan_parameter_change(
     source_set = SourceSet.read(source, workspace_root)
     document = source_set.documents[source]
     construct = _construct_record(block, construct_name)
+    modify_status = construct.get("operations", {}).get("modify", "unassessed")
+    if modify_status not in {"implemented", "verified"}:
+        raise ChangeError(
+            f"modify is {modify_status} for {construct['id']}; parameter change is blocked",
+            "parameter_edit_unsupported",
+        )
+    _require_mutation_route(construct, "modify", "preview_parameter_change")
+    if (
+        construct["id"] == "construct.boundary-conditions"
+        and parameter.casefold() == "name"
+    ):
+        raise ChangeError(
+            "boundary-condition identity changes require the rename adapter",
+            "parameter_edit_unsupported",
+        )
     _validate_replacement(construct, parameter, value)
     definition = _parameter_definition(construct, parameter)
     start_line, end_line = _find_construct_lines(document, block, construct, occurrence)
@@ -2550,6 +2587,13 @@ def plan_parameter_removal(
     source_set = SourceSet.read(source, workspace_root)
     document = source_set.documents[source]
     construct = _construct_record(block, construct_name)
+    modify_status = construct.get("operations", {}).get("modify", "unassessed")
+    if modify_status not in {"implemented", "verified"}:
+        raise ChangeError(
+            f"modify is {modify_status} for {construct['id']}; parameter removal is blocked",
+            "parameter_edit_unsupported",
+        )
+    _require_mutation_route(construct, "modify", "preview_parameter_removal")
     definition = _parameter_definition(construct, parameter)
     if definition.get("edit_operations", {}).get("remove") != "verified":
         raise ChangeError(

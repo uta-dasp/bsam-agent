@@ -147,6 +147,7 @@ class LocalAgentApi:
                     "obsolete_tokens": registry["obsolete_tokens"],
                     "entity_contract": registry["entity_contract"],
                     "dependency_contract": registry["dependency_contract"],
+                    "consumer_contract": registry["consumer_contract"],
                     "change_contract": registry["change_contract"],
                     "operational_manifest": capability_manifest(registry),
                 },

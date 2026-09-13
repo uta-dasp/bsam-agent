@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.132.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, 11 supported entity-operation impacts, and nine engineering-clarification triggers. Static validation is verified for all 54 active constructs; M1.3 entity and dependency specification is complete. Remaining specification work is the M1.4 shared generated-contract closure.
+Status: in progress. Registry `0.133.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, four read consumer routes, 23 mutation consumer routes, 11 supported entity-operation impacts, and nine engineering-clarification triggers. Static validation is verified for all 54 active constructs; M1.3 entity/dependency specification and the M1.4 shared consumer-contract closure are complete. Remaining specification work is generated-contract drift enforcement.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -70,7 +70,7 @@ Status: in progress. Registry `0.132.0` currently inventories 13 top-level block
 - [x] Generate the human BSAM input reference from the registry.
 - [x] Detect stale generated input-reference output in repository checks.
 - [x] Expose a machine-consumable operational manifest and strict tool contracts consumed by parser/editor/query/agent paths for the verified subset.
-- [ ] Complete shared machine-consumable capability contracts for the remaining parser, editor, and validator paths.
+- [x] Complete shared machine-consumable capability contracts for the remaining parser, editor, and validator paths.
 - [x] Expose registry-derived operational-support and intent metadata through `get_capabilities` for the agent consumer.
 - [ ] Generate additional coverage ledgers only when a concrete repository or CI consumer requires them.
 - [ ] Enforce all generated-contract and coverage drift in CI/repository checks.

@@ -101,6 +101,9 @@ class LocalApiTests(unittest.TestCase):
             self.assertEqual(10, len(entity_contract["no_primary_entity_capabilities"]))
             change_contract = capabilities["capabilities"]["change_contract"]
             self.assertEqual(7, len(change_contract["operation_impacts"]))
+            consumer_contract = capabilities["capabilities"]["consumer_contract"]
+            self.assertEqual(3, len(consumer_contract["read_routes"]))
+            self.assertEqual(6, len(consumer_contract["mutation_routes"]))
             self.assertEqual(5, len(capabilities["capabilities"]["obsolete_tokens"]))
 
             validation = api.dispatch("validate_model", {"source": "model.in"})

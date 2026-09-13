@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "2.0.0",
-  "registry_version": "0.132.0",
+  "schema_version": "2.1.0",
+  "registry_version": "0.133.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3772,6 +3772,73 @@
       "evidence_ids": ["evidence.current-vtms-deck-notch", "evidence.baseline-syntax-transition"]
     }
   ],
+  "consumer_contract": {
+    "schema_version": "1.0.0",
+    "read_routes": [
+      {
+        "operations": ["parse", "semantic"],
+        "scope": "all-active-capabilities",
+        "consumers": ["SourceSet.read", "SourceSet.semantic_index"],
+        "policy": "Every active occurrence is loss-preserved and exposed through its registry-derived typed capability record before specialized entities and references are added."
+      },
+      {
+        "operations": ["inspect"],
+        "scope": "all-active-capabilities",
+        "consumers": ["inspect_model", "query_model", "get_capabilities"],
+        "policy": "Inspection and query return source-located capability, entity, reference, operation, dependency, decision, and support metadata without rewriting input."
+      },
+      {
+        "operations": ["static_validation"],
+        "scope": "all-active-capabilities",
+        "consumers": ["SourceSet.inspection", "validate_model"],
+        "policy": "Every active construct runs its verified grammar and cross-feature checks; diagnostics retain level and evidence provenance."
+      }
+    ],
+    "mutation_routes": [
+      {
+        "operation": "modify",
+        "capability_ids": ["block.solver", "construct.boundary-g-control", "construct.boundary-convergence"],
+        "tools": ["preview_parameter_change", "preview_parameter_removal"],
+        "adapter_kind": "parameter",
+        "policy": "Replace existing registered values; insert or remove only parameters whose edit_operations explicitly verify that action and omission default."
+      },
+      {
+        "operation": "modify",
+        "capability_ids": ["construct.boundary-conditions"],
+        "tools": ["preview_parameter_change"],
+        "adapter_kind": "parameter",
+        "policy": "Replace an existing non-identity boundary-condition parameter and validate the complete source set; identity changes use the rename adapter."
+      },
+      {
+        "operation": "modify",
+        "capability_ids": ["block.tables", "command.nset", "command.elset", "command.boundary", "command.load", "command.shift", "command.scale", "command.section"],
+        "tools": ["preview_modify_entity"],
+        "adapter_kind": "entity",
+        "policy": "Dispatch only the registered exact table-cell, set-membership, or dependency-target adapter and validate the complete source set."
+      },
+      {
+        "operation": "create",
+        "capability_ids": ["command.node", "command.element", "command.nset", "command.elset"],
+        "tools": ["preview_create_entity"],
+        "adapter_kind": "entity",
+        "policy": "Dispatch only the registered explicit structural insertion adapter and preserve non-overwriting reviewed output."
+      },
+      {
+        "operation": "delete",
+        "capability_ids": ["command.node", "command.element", "command.nset", "command.elset"],
+        "tools": ["preview_delete_entity"],
+        "adapter_kind": "entity",
+        "policy": "Dispatch only guarded explicit-record deletion after the reverse-reference graph proves isolation."
+      },
+      {
+        "operation": "rename",
+        "capability_ids": ["command.nset", "command.elset", "construct.boundary-conditions"],
+        "tools": ["preview_rename_entity"],
+        "adapter_kind": "entity",
+        "policy": "Rewrite one identity and every exact resolved reverse reference in a single source-set plan."
+      }
+    ]
+  },
   "change_contract": {
     "schema_version": "1.0.0",
     "operation_impacts": [

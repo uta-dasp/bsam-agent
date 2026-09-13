@@ -51,6 +51,28 @@ DECK = (
 
 
 class ChangePlanTests(unittest.TestCase):
+    def test_parameter_edits_require_registered_consumer_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "model.in"
+            source.write_bytes(DECK)
+
+            with self.assertRaisesRegex(
+                ChangeError, "modify is unsupported for construct.boundary-type"
+            ):
+                plan_parameter_change(
+                    source, "BOUNDARY", "TYPE", "problem_type", "thermal"
+                )
+
+            source.write_bytes(DECK.replace(
+                b"*convergence\r\n",
+                b"*boundary condition\r\n"
+                b"type=off, name=idle\r\n*convergence\r\n",
+            ))
+            with self.assertRaisesRegex(ChangeError, "require the rename adapter"):
+                plan_parameter_change(
+                    source, "BOUNDARY", "BOUNDARY CONDITION", "name", "active"
+                )
+
     def test_remove_one_member_from_included_set(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

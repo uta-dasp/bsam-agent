@@ -82,11 +82,12 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "execution_contract",
             "dependency_contract",
             "entity_contract",
+            "consumer_contract",
             "change_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "2.0.0":
+    if data["schema_version"] != "2.1.0":
         raise RegistryError("unsupported schema_version")
 
     dependency = data["dependency_contract"]
@@ -305,6 +306,72 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
     capability_ids = set(block_ids) | set(command_ids) | {
         item["id"] for item in constructs
     }
+    consumer_contract = data["consumer_contract"]
+    _require_keys(
+        consumer_contract,
+        {"schema_version", "read_routes", "mutation_routes"},
+        "consumer_contract",
+    )
+    if consumer_contract["schema_version"] != "1.0.0":
+        raise RegistryError("unsupported consumer_contract schema_version")
+    read_operations: list[str] = []
+    for item in consumer_contract["read_routes"]:
+        _require_keys(
+            item, {"operations", "scope", "consumers", "policy"},
+            "consumer read route",
+        )
+        if item["scope"] != "all-active-capabilities":
+            raise RegistryError("consumer read routes must cover all active capabilities")
+        read_operations.extend(item["operations"])
+    _unique(read_operations, "consumer read operation")
+    required_read_operations = {"parse", "semantic", "inspect", "static_validation"}
+    if set(read_operations) != required_read_operations:
+        raise RegistryError("consumer read routes must exactly cover required read operations")
+    if any(
+        item.get("operations", {}).get(operation) not in {"implemented", "verified"}
+        for _, item in records for operation in required_read_operations
+    ):
+        raise RegistryError("consumer read routes require supported operations on every capability")
+
+    known_mutation_tools = {
+        "preview_parameter_change", "preview_parameter_removal",
+        "preview_modify_entity", "preview_create_entity",
+        "preview_delete_entity", "preview_rename_entity",
+    }
+    mutation_pairs: list[str] = []
+    for item in consumer_contract["mutation_routes"]:
+        _require_keys(
+            item,
+            {"operation", "capability_ids", "tools", "adapter_kind", "policy"},
+            "consumer mutation route",
+        )
+        missing_capabilities = sorted(set(item["capability_ids"]) - capability_ids)
+        if missing_capabilities:
+            raise RegistryError(
+                "consumer mutation route references missing capabilities: "
+                + ", ".join(missing_capabilities)
+            )
+        unknown_tools = sorted(set(item["tools"]) - known_mutation_tools)
+        if unknown_tools:
+            raise RegistryError(
+                "consumer mutation route references unknown tools: "
+                + ", ".join(unknown_tools)
+            )
+        mutation_pairs.extend(
+            f"{item['operation']}:{capability_id}"
+            for capability_id in item["capability_ids"]
+        )
+    _unique(mutation_pairs, "consumer mutation route")
+    expected_mutation_pairs = {
+        f"{operation}:{item['id']}"
+        for _, item in records
+        for operation in ("modify", "create", "delete", "rename")
+        if item.get("operations", {}).get(operation) in {"implemented", "verified"}
+    }
+    if set(mutation_pairs) != expected_mutation_pairs:
+        raise RegistryError(
+            "consumer mutation routes must exactly cover supported capability operations"
+        )
     entity_contract = data["entity_contract"]
     _require_keys(
         entity_contract,
@@ -598,6 +665,8 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "primary_entity_capabilities": len(records) - len(no_primary),
         "additional_entity_outputs": len(output_keys),
         "reference_contracts": len(reference_contracts),
+        "read_routes": len(read_operations),
+        "mutation_routes": len(mutation_pairs),
         "operation_impacts": len(impact_pairs),
         "clarification_triggers": len(clarification_triggers),
         "obsolete_tokens": len(obsolete_tokens),
@@ -687,7 +756,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['operation_impacts']} supported change impacts, {counts['clarification_triggers']} engineering-clarification triggers, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['read_routes']} read consumer routes, {counts['mutation_routes']} mutation consumer routes, {counts['operation_impacts']} supported change impacts, {counts['clarification_triggers']} engineering-clarification triggers, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -918,6 +987,27 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Transformation policy: {change_contract['transformation_policy']}",
         "",
     ])
+
+    consumer_contract = data["consumer_contract"]
+    lines.extend(["", "## Consumer route contract", "", "Read routes:", ""])
+    for item in consumer_contract["read_routes"]:
+        operations = ", ".join(f"`{value}`" for value in item["operations"])
+        consumers = ", ".join(f"`{value}`" for value in item["consumers"])
+        lines.append(
+            f"- {operations} ({item['scope']}) via {consumers}: {item['policy']}"
+        )
+    lines.extend([
+        "", "Mutation routes:", "",
+        "| Operation | Capabilities | Tools | Adapter | Policy |",
+        "|---|---|---|---|---|",
+    ])
+    for item in consumer_contract["mutation_routes"]:
+        capabilities = ", ".join(f"`{value}`" for value in item["capability_ids"])
+        tools = ", ".join(f"`{value}`" for value in item["tools"])
+        lines.append(
+            f"| `{item['operation']}` | {capabilities} | {tools} | "
+            f"`{item['adapter_kind']}` | {_escape_cell(item['policy'])} |"
+        )
 
     lines.extend(["", "## Registered generation profiles", ""])
     for item in data["generation_profiles"]:

@@ -2,6 +2,8 @@
 
 ## What is runnable now
 
+Registry 0.133.0 closes the shared consumer-route contract. Registry validation proves that parse, semantic indexing, inspection, and static validation cover all 54 active capabilities and that six grouped mutation routes exactly cover all 23 supported modify/create/delete/rename capability pairs. Runtime generic adapters require their exact route; parameter editing now fails closed for constructs whose modify operation is unsupported and directs boundary-condition identity changes to the dependency-aware rename adapter.
+
 The deterministic CLI and loopback HTTP API are runnable now. They support lossless source-set inspection, semantic validation, revision-bound parameter and typed FE edits, composite reviewed plans, `.ele` template assembly, the approved notch 2-to-8-ply transformation, legacy type-9 to current PARDISO solver migration, non-overwriting audit sidecars, isolated execution, concurrent run status, and controlled stopping. A bounded guarded chat orchestrator, validated llama.cpp loopback adapter, and model benchmark harness are also present. Complete syntax coverage, fully general structural and included-file editing, and Gmsh generation are not implemented yet.
 
 ```powershell

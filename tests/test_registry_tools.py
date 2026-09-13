@@ -41,6 +41,8 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(44, counts["primary_entity_capabilities"])
         self.assertEqual(13, counts["additional_entity_outputs"])
         self.assertEqual(25, counts["reference_contracts"])
+        self.assertEqual(4, counts["read_routes"])
+        self.assertEqual(23, counts["mutation_routes"])
         self.assertEqual(11, counts["operation_impacts"])
         self.assertEqual(9, counts["clarification_triggers"])
         self.assertEqual(5, counts["obsolete_tokens"])
@@ -152,6 +154,43 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(
             {item["id"] for item in self.registry["transformations"]},
             set(contract["transformation_ids"]),
+        )
+
+    def test_consumer_routes_cover_every_supported_capability_operation(self) -> None:
+        active = [
+            *self.registry["top_level_blocks"],
+            *self.registry["cluster_commands"],
+            *self.registry["nested_constructs"],
+        ]
+        contract = self.registry["consumer_contract"]
+        self.assertEqual(
+            {"parse", "semantic", "inspect", "static_validation"},
+            {
+                operation
+                for item in contract["read_routes"]
+                for operation in item["operations"]
+            },
+        )
+        expected = {
+            (operation, item["id"])
+            for item in active
+            for operation in ("modify", "create", "delete", "rename")
+            if item.get("operations", {}).get(operation) in {"implemented", "verified"}
+        }
+        actual = {
+            (item["operation"], capability_id)
+            for item in contract["mutation_routes"]
+            for capability_id in item["capability_ids"]
+        }
+        self.assertEqual(expected, actual)
+        self.assertEqual(23, len(actual))
+        self.assertEqual(
+            {
+                "preview_parameter_change", "preview_parameter_removal",
+                "preview_modify_entity", "preview_create_entity",
+                "preview_delete_entity", "preview_rename_entity",
+            },
+            {tool for item in contract["mutation_routes"] for tool in item["tools"]},
         )
 
     def test_pinned_baseline(self) -> None:

@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.133.0` closes the shared parser/editor/validator consumer contract. Four read operations cover every active capability, while six grouped mutation routes exactly cover all 23 supported capability-operation pairs and bind them to their public parameter or entity adapter. Runtime mutation dispatch now rejects an operation without that exact route; generic parameter editing also rejects unsupported constructs and boundary-condition identity changes that require reverse-reference-aware rename.
+
 Registry `0.132.0` completes M1.3 entity and dependency specification with nine explicit engineering-clarification triggers. The verified net-new profile and both transformations have exact coverage of every user-approved choice; structured materials, boundary/load definitions, geometry operations, failure/fatigue models, mesh topology, and external coupled workflows now identify the decisions that may not be guessed. Source-derived transformation decisions remain separately recorded and require no new user input.
 
 Registry `0.131.0` closes change-impact specification. Eleven verified create, delete, and rename capability-operation pairs now declare their exact adapter, direct source-set effects, and required dependent checks; both versioned transformations remain linked to their explicit applicability, decisions, impacts, and dependencies. Standalone SELECTION creation is corrected to unsupported because selection generation is verified only inside the complete deck profile, not through the generic entity-create adapter.

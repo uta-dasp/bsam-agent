@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.132.0`
-- Registry SHA-256: `0F8EDB40419676C4D6FF3F8FDF99F56037AFDE2BF4E97EDFA00ADA70CAC779D2`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
+- Registry version: `0.133.0`
+- Registry SHA-256: `D2498BBDAD1950A80C296120F5DAF038B4BD0A70F0BA0DE646125B3207A42FD3`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -2075,6 +2075,25 @@ Engineering clarification triggers:
 - Registered transformation impacts: `transformation.notch-expand-plies`, `transformation.migrate-legacy-solver`
 - Transformation policy: Each transformation owns explicit applicability, approved or source-derived decisions, direct impacts, dependencies, validation, revision binding, and non-overwriting apply behavior in its registered versioned contract.
 
+
+## Consumer route contract
+
+Read routes:
+
+- `parse`, `semantic` (all-active-capabilities) via `SourceSet.read`, `SourceSet.semantic_index`: Every active occurrence is loss-preserved and exposed through its registry-derived typed capability record before specialized entities and references are added.
+- `inspect` (all-active-capabilities) via `inspect_model`, `query_model`, `get_capabilities`: Inspection and query return source-located capability, entity, reference, operation, dependency, decision, and support metadata without rewriting input.
+- `static_validation` (all-active-capabilities) via `SourceSet.inspection`, `validate_model`: Every active construct runs its verified grammar and cross-feature checks; diagnostics retain level and evidence provenance.
+
+Mutation routes:
+
+| Operation | Capabilities | Tools | Adapter | Policy |
+|---|---|---|---|---|
+| `modify` | `block.solver`, `construct.boundary-g-control`, `construct.boundary-convergence` | `preview_parameter_change`, `preview_parameter_removal` | `parameter` | Replace existing registered values; insert or remove only parameters whose edit_operations explicitly verify that action and omission default. |
+| `modify` | `construct.boundary-conditions` | `preview_parameter_change` | `parameter` | Replace an existing non-identity boundary-condition parameter and validate the complete source set; identity changes use the rename adapter. |
+| `modify` | `block.tables`, `command.nset`, `command.elset`, `command.boundary`, `command.load`, `command.shift`, `command.scale`, `command.section` | `preview_modify_entity` | `entity` | Dispatch only the registered exact table-cell, set-membership, or dependency-target adapter and validate the complete source set. |
+| `create` | `command.node`, `command.element`, `command.nset`, `command.elset` | `preview_create_entity` | `entity` | Dispatch only the registered explicit structural insertion adapter and preserve non-overwriting reviewed output. |
+| `delete` | `command.node`, `command.element`, `command.nset`, `command.elset` | `preview_delete_entity` | `entity` | Dispatch only guarded explicit-record deletion after the reverse-reference graph proves isolation. |
+| `rename` | `command.nset`, `command.elset`, `construct.boundary-conditions` | `preview_rename_entity` | `entity` | Rewrite one identity and every exact resolved reverse reference in a single source-set plan. |
 
 ## Registered generation profiles
 
