@@ -2,7 +2,7 @@ import { ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { BsamApiClient, BsamApiError } from "./apiClient";
-import { sameWorkspaceRoot } from "./pathing";
+import { resolveRepositoryRoot, sameWorkspaceRoot } from "./pathing";
 import { HealthResponse } from "./types";
 
 export class ServerManager implements vscode.Disposable {
@@ -34,6 +34,24 @@ export class ServerManager implements vscode.Disposable {
       configuration.get<number>("apiPort", 8765),
       configuration.get<number>("requestTimeoutMs", 120000),
     );
+  }
+
+  repositoryRoot(): string {
+    const configured = vscode.workspace.getConfiguration("bsamAgent").get<string>("repositoryRoot", "");
+    return resolveRepositoryRoot(this.workspaceRoot(), this.context.extensionPath, configured);
+  }
+
+  pythonExecutable(): string {
+    return vscode.workspace.getConfiguration("bsamAgent").get<string>("pythonPath", "python");
+  }
+
+  pythonEnvironment(): NodeJS.ProcessEnv {
+    const sourceRoot = path.join(this.repositoryRoot(), "src");
+    const delimiter = process.platform === "win32" ? ";" : ":";
+    return {
+      ...process.env,
+      PYTHONPATH: [sourceRoot, process.env.PYTHONPATH].filter(Boolean).join(delimiter),
+    };
   }
 
   async connect(): Promise<{ client: BsamApiClient; health: HealthResponse }> {
@@ -71,13 +89,10 @@ export class ServerManager implements vscode.Disposable {
     }
 
     const configuration = vscode.workspace.getConfiguration("bsamAgent");
-    const python = configuration.get<string>("pythonPath", "python");
+    const python = this.pythonExecutable();
     const port = configuration.get<number>("apiPort", 8765);
     const workspaceRoot = this.workspaceRoot();
-    const repositoryRoot = path.resolve(this.context.extensionPath, "..", "..");
-    const sourceRoot = path.join(repositoryRoot, "src");
-    const delimiter = process.platform === "win32" ? ";" : ":";
-    const pythonPath = [sourceRoot, process.env.PYTHONPATH].filter(Boolean).join(delimiter);
+    const repositoryRoot = this.repositoryRoot();
 
     this.output.appendLine(`Starting BSAM Agent API for ${workspaceRoot}`);
     this.process = spawn(
@@ -85,7 +100,7 @@ export class ServerManager implements vscode.Disposable {
       ["-m", "bsam_agent", "serve", "--workspace-root", workspaceRoot, "--port", String(port)],
       {
         cwd: repositoryRoot,
-        env: { ...process.env, PYTHONPATH: pythonPath },
+        env: this.pythonEnvironment(),
         windowsHide: true,
       },
     );

@@ -276,9 +276,9 @@ Input gate: user selection of the first geometry families and trusted acceptance
 
 - [ ] Add hosted providers only behind explicit data policy and the same conformance suite.
 - [x] Build a thin VS Code client over the stable local API.
-- [ ] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
+- [x] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
 
-Current M6 client coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, and run/status/controlled-stop controls are implemented. Integrated local chat remains.
+Current M6 client coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, run/status/controlled-stop controls, and persistent guarded local chat are implemented.
 
 ## Deferred
 
@@ -289,7 +289,7 @@ Current M6 client coverage: schema-aware source diagnostics, registry-derived pa
 
 ## Next execution sessions
 
-1. Continue M6 with reviewed change diffs and guarded apply/run controls in the thin VS Code client.
-2. Integrate the existing local chat boundary without enabling a hosted provider.
+1. Exercise the installed VS Code client on the next real project workflow and retain any resulting acceptance evidence.
+2. Keep hosted providers deferred until local-model performance justifies adding one behind the existing policy and conformance boundary.
 
 No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

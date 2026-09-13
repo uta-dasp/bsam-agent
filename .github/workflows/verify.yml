@@ -21,3 +21,22 @@ jobs:
         run: python tools/repository_checks.py
       - name: Run complete test suite
         run: python -m pytest -q
+
+  vscode-client:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: clients/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: clients/vscode/package-lock.json
+      - name: Install pinned client dependencies
+        run: npm ci
+      - name: Compile and test VS Code client
+        run: npm test
+      - name: Package VS Code client
+        run: npm run package

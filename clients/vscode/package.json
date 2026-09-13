@@ -2,7 +2,7 @@
   "name": "bsam-agent",
   "displayName": "BSAM Agent",
   "description": "Thin VS Code client for the deterministic BSAM Agent loopback API.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "uta-dasp",
   "license": "UNLICENSED",
   "repository": {
@@ -77,6 +77,10 @@
         "title": "BSAM Agent: Stop Last Run"
       },
       {
+        "command": "bsamAgent.openLocalChat",
+        "title": "BSAM Agent: Open Local Chat"
+      },
+      {
         "command": "bsamAgent.refreshCapabilities",
         "title": "BSAM Agent: Refresh Capabilities"
       },
@@ -118,6 +122,11 @@
           "type": "string",
           "default": "",
           "description": "Absolute API workspace root. Empty uses the first open workspace folder."
+        },
+        "bsamAgent.repositoryRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute BSAM Agent repository root. Empty auto-detects the open repository or a 'bsam agent' child folder."
         },
         "bsamAgent.apiPort": {
           "type": "integer",
@@ -161,6 +170,26 @@
           "default": 30,
           "minimum": 0,
           "description": "Grace period for controlled BSAM stopping before the supervisor escalates."
+        },
+        "bsamAgent.chat.providerConfigPath": {
+          "type": "string",
+          "default": "config/provider.local.json",
+          "description": "Provider configuration path, relative to the repository root or absolute."
+        },
+        "bsamAgent.chat.sessionPath": {
+          "type": "string",
+          "default": ".bsam-agent/conversations/vscode.json",
+          "description": "Workspace-relative persistent local chat transcript path."
+        },
+        "bsamAgent.chat.credentialEnvironment": {
+          "type": "string",
+          "default": "BSAM_LOCAL_API_KEY",
+          "description": "Environment variable passed to local chat for its loopback provider credential."
+        },
+        "bsamAgent.chat.auditEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write privacy-safe digest audit metadata for local chat actions."
         }
       }
     }

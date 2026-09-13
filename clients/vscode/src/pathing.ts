@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { existsSync } from "node:fs";
 
 function comparable(value: string): string {
   const resolved = path.resolve(value).replace(/[\\/]+$/, "");
@@ -33,4 +34,27 @@ export function resolveDiagnosticSource(
     return path.resolve(workspaceRoot, relative);
   }
   return path.resolve(workspaceRoot, source);
+}
+
+export function resolveRepositoryRoot(
+  workspaceRoot: string,
+  extensionPath: string,
+  configured: string,
+  exists: (candidate: string) => boolean = existsSync,
+): string {
+  if (configured.trim() && !path.isAbsolute(configured.trim())) {
+    throw new Error("bsamAgent.repositoryRoot must be an absolute path");
+  }
+  const candidates = configured.trim()
+    ? [path.resolve(configured.trim())]
+    : [
+      path.resolve(workspaceRoot),
+      path.resolve(workspaceRoot, "bsam agent"),
+      path.resolve(extensionPath, "..", ".."),
+    ];
+  const selected = candidates.find((candidate) => exists(path.join(candidate, "src", "bsam_agent")));
+  if (!selected) {
+    throw new Error("Cannot locate the BSAM Agent repository; configure bsamAgent.repositoryRoot");
+  }
+  return selected;
 }
