@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: BSAM Agent Local API
-  version: 0.1.0-draft
+  version: 0.4.0
   description: >-
     Documentation-first contract for current-syntax BSAM model import,
     loss-preserving modification, validation, rendering, and supervised serial
@@ -318,12 +318,18 @@ components:
     Health:
       type: object
       additionalProperties: false
-      required: [status, api_version]
+      required: [status, api_version, workspace_root, max_request_bytes]
       properties:
         status:
           const: ok
         api_version:
           type: string
+        workspace_root:
+          type: string
+          description: Resolved workspace boundary owned by this server process
+        max_request_bytes:
+          type: integer
+          minimum: 1
     CapabilityManifest:
       type: object
       additionalProperties: false

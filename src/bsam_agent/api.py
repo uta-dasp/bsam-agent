@@ -48,7 +48,7 @@ from .tool_contracts import (
 )
 
 
-API_VERSION = "0.3.0"
+API_VERSION = "0.4.0"
 MAX_REQUEST_BYTES = 1_048_576
 
 
@@ -513,7 +513,12 @@ def build_server(api: LocalAgentApi, port: int = 8765) -> ThreadingHTTPServer:
 
         def do_GET(self) -> None:  # noqa: N802
             if self.path == "/api/v1/health":
-                self._send(200, {"status": "ok", "api_version": API_VERSION})
+                self._send(200, {
+                    "status": "ok",
+                    "api_version": API_VERSION,
+                    "workspace_root": str(api.workspace_root),
+                    "max_request_bytes": MAX_REQUEST_BYTES,
+                })
             elif self.path == "/api/v1/capabilities":
                 self._send(200, api.dispatch("get_capabilities", {}))
             else:

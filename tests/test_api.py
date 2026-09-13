@@ -254,6 +254,8 @@ class LocalApiTests(unittest.TestCase):
                 with urlopen(f"http://127.0.0.1:{port}/api/v1/health") as response:
                     health = json.load(response)
                 self.assertEqual("ok", health["status"])
+                self.assertEqual(str(root.resolve()), health["workspace_root"])
+                self.assertEqual(1_048_576, health["max_request_bytes"])
                 self.assertEqual("127.0.0.1", server.server_address[0])
 
                 request = Request(

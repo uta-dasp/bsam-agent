@@ -2,7 +2,7 @@
 
 ## Initial local service
 
-Run `python -m bsam_agent serve --workspace-root <path> --port 8765`. The server binds only to `127.0.0.1`. Health and capabilities are available at `/api/v1/health` and `/api/v1/capabilities`; deterministic tools use `POST /api/v1/tools/{tool}` with strict tool-specific JSON arguments. Paths must be relative to the configured workspace, request bodies are bounded, responses disable caching, and generate/apply/run/stop require `confirm: true`.
+Run `python -m bsam_agent serve --workspace-root <path> --port 8765`. The server binds only to `127.0.0.1`. Health and capabilities are available at `/api/v1/health` and `/api/v1/capabilities`; deterministic tools use `POST /api/v1/tools/{tool}` with strict tool-specific JSON arguments. Health reports the resolved workspace root and request-size bound so a client can reject a server attached to the wrong workspace. Paths must be relative to the configured workspace, request bodies are bounded, responses disable caching, and generate/apply/run/stop require `confirm: true`.
 
 The generic tool route is the first executable API used for model-tool integration. The resource-oriented routes in `openapi.yaml` remain the target once a persistent model-revision store is implemented.
 

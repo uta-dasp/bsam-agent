@@ -1,6 +1,6 @@
 # ADR 0003: Python-first core and local API
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-27
 
 ## Context
@@ -17,5 +17,5 @@ This remains proposed until G1 confirms there is no compelling dependency or dep
 
 - G1 specification work requires no new runtime installation.
 - G2 can begin with the installed Python runtime.
-- Node.js installation is deferred to the extension milestone.
+- The extension milestone uses a separately pinned portable Node.js toolchain; the Python core remains independently runnable.
 - API contract tests become important because the extension and core use different languages.
