@@ -36,3 +36,5 @@ Open the Command Palette and run `BSAM Agent: Start Local API`. The extension de
 Set `bsamAgent.executablePath` to an executable inside that workspace boundary to avoid selecting it for each run. The configured BSAM timeout and controlled-stop grace period are passed to the deterministic supervisor.
 
 An installed VSIX auto-detects the BSAM Agent repository when the open folder is either the repository itself or its parent. Set `bsamAgent.repositoryRoot` only when it is elsewhere. Local chat defaults to `config/provider.local.json` and `.bsam-agent/conversations/vscode.json`; start the configured loopback model server first. If VS Code did not inherit `BSAM_LOCAL_API_KEY`, the command requests it in a password field and passes it only to that terminal process.
+
+See the [complete VS Code chat tutorial](https://github.com/uta-dasp/bsam-agent/blob/main/docs/guides/VS_CODE_CHAT_TUTORIAL.md) for workstation setup, guarded examples, run control, persistence, security, and troubleshooting.

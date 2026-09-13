@@ -32,6 +32,7 @@
 - [Local model runtime](api/LOCAL_MODEL_RUNTIME.md)
 - [Terminal chat](api/CHAT_CLIENT.md)
 - [VS Code client](../clients/vscode/README.md)
+- [VS Code local chat tutorial](guides/VS_CODE_CHAT_TUTORIAL.md)
 
 ## Acceptance records
 

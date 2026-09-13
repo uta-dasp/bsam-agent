@@ -33,6 +33,7 @@ Status: the core vertical slice and guarded local chat are runnable. Current dev
 - [Local model runtime](docs/api/LOCAL_MODEL_RUNTIME.md)
 - [Terminal chat client](docs/api/CHAT_CLIENT.md)
 - [VS Code client](clients/vscode/README.md)
+- [VS Code local chat tutorial](docs/guides/VS_CODE_CHAT_TUTORIAL.md)
 - [BSAM syntax coverage ledger](docs/bsam/CURRENT_SYNTAX_COVERAGE.md)
 - [Generated BSAM 2.4 input API reference](docs/bsam/reference/BSAM_2_4_INPUT_API.md)
 - [Machine-readable BSAM 2.4 registry](specs/bsam-2.4/capabilities.json)
