@@ -83,11 +83,12 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
             "dependency_contract",
             "entity_contract",
             "consumer_contract",
+            "repository_check_contract",
             "change_contract",
         },
         "registry",
     )
-    if data["schema_version"] != "2.1.0":
+    if data["schema_version"] != "2.2.0":
         raise RegistryError("unsupported schema_version")
 
     dependency = data["dependency_contract"]
@@ -372,6 +373,51 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         raise RegistryError(
             "consumer mutation routes must exactly cover supported capability operations"
         )
+    repository_check = data["repository_check_contract"]
+    _require_keys(
+        repository_check,
+        {
+            "schema_version", "repository_command", "test_command", "ci_workflow",
+            "required_checks", "optional_checks", "generated_artifacts", "ledger_policy",
+        },
+        "repository_check_contract",
+    )
+    if repository_check["schema_version"] != "1.0.0":
+        raise RegistryError("unsupported repository_check_contract schema_version")
+    if repository_check["repository_command"] != "python tools/repository_checks.py":
+        raise RegistryError("repository check command must use the checked-in aggregator")
+    if repository_check["test_command"] != "python -m pytest -q":
+        raise RegistryError("repository test command must run the complete suite")
+    expected_checks = {
+        "registry-invariants", "schema-version-binding", "generated-reference",
+        "committed-dispatch-coverage", "ci-command-binding",
+    }
+    _unique(repository_check["required_checks"], "required repository check")
+    if set(repository_check["required_checks"]) != expected_checks:
+        raise RegistryError("repository checks must exactly cover generated-contract drift")
+    optional_check_ids: list[str] = []
+    for item in repository_check["optional_checks"]:
+        _require_keys(item, {"id", "condition", "command"}, "optional repository check")
+        optional_check_ids.append(item["id"])
+    _unique(optional_check_ids, "optional repository check")
+    if optional_check_ids != ["live-source-dispatch"]:
+        raise RegistryError("live source dispatch must be the sole optional repository check")
+    generated_paths: list[str] = []
+    for item in repository_check["generated_artifacts"]:
+        _require_keys(
+            item, {"path", "producer", "repository_check"},
+            "generated artifact",
+        )
+        path = (REPO_ROOT / item["path"]).resolve()
+        if not path.is_relative_to(REPO_ROOT) or Path(item["path"]).is_absolute():
+            raise RegistryError("generated artifact path must be repository-relative and contained")
+        generated_paths.append(item["path"])
+    _unique(generated_paths, "generated artifact path")
+    if set(generated_paths) != {
+        "docs/bsam/reference/BSAM_2_4_INPUT_API.md",
+        "docs/bsam/DISPATCH_AUDIT.md",
+    }:
+        raise RegistryError("repository checks must cover every generated specification artifact")
     entity_contract = data["entity_contract"]
     _require_keys(
         entity_contract,
@@ -667,6 +713,8 @@ def validate_registry(data: dict[str, Any]) -> dict[str, int]:
         "reference_contracts": len(reference_contracts),
         "read_routes": len(read_operations),
         "mutation_routes": len(mutation_pairs),
+        "repository_checks": len(repository_check["required_checks"]),
+        "generated_artifacts": len(generated_paths),
         "operation_impacts": len(impact_pairs),
         "clarification_triggers": len(clarification_triggers),
         "obsolete_tokens": len(obsolete_tokens),
@@ -756,7 +804,7 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         f"- Platform/mode: {target['platform']} {target['execution_mode']}",
         f"- Registry version: `{data['registry_version']}`",
         f"- Registry SHA-256: `{registry_digest}`",
-        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['read_routes']} read consumer routes, {counts['mutation_routes']} mutation consumer routes, {counts['operation_impacts']} supported change impacts, {counts['clarification_triggers']} engineering-clarification triggers, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
+        f"- Current inventory: {counts['blocks']} top-level blocks, {counts['commands']} cluster commands, {counts['constructs']} nested constructs, {counts['generation_profiles']} generation profiles, {counts['transformations']} registered transformations, {counts['dependency_classes']} dependency classes, {counts['reference_contracts']} forward/reverse reference contracts, {counts['read_routes']} read consumer routes, {counts['mutation_routes']} mutation consumer routes, {counts['repository_checks']} repository drift checks, {counts['operation_impacts']} supported change impacts, {counts['clarification_triggers']} engineering-clarification triggers, and {counts['primary_entity_capabilities']} capabilities with primary entity output",
         "",
         "Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.",
         "",
@@ -1007,6 +1055,27 @@ def render_reference(data: dict[str, Any], registry_path: Path) -> str:
         lines.append(
             f"| `{item['operation']}` | {capabilities} | {tools} | "
             f"`{item['adapter_kind']}` | {_escape_cell(item['policy'])} |"
+        )
+
+    repository_check = data["repository_check_contract"]
+    lines.extend([
+        "", "## Repository drift checks", "",
+        f"- Repository command: `{repository_check['repository_command']}`",
+        f"- Complete test command: `{repository_check['test_command']}`",
+        f"- CI workflow: `{repository_check['ci_workflow']}`",
+        "- Required checks: "
+        + ", ".join(f"`{value}`" for value in repository_check["required_checks"]),
+        f"- Coverage-ledger policy: {repository_check['ledger_policy']}",
+        "", "Generated artifacts:", "",
+    ])
+    for item in repository_check["generated_artifacts"]:
+        lines.append(
+            f"- `{item['path']}` via `{item['producer']}`: {item['repository_check']}"
+        )
+    lines.extend(["", "Conditional checks:", ""])
+    for item in repository_check["optional_checks"]:
+        lines.append(
+            f"- `{item['id']}` via `{item['command']}` when {item['condition']}"
         )
 
     lines.extend(["", "## Registered generation profiles", ""])

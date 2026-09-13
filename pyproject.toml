@@ -9,6 +9,9 @@ description = "Local deterministic tooling for current-syntax BSAM input decks"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
 [project.scripts]
 bsam-agent = "bsam_agent.cli:main"
 

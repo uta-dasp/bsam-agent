@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "$schema",
     "schema_version",
     "registry_version",
     "target",
@@ -20,11 +21,15 @@
     "dependency_contract",
     "entity_contract",
     "change_contract",
-    "consumer_contract"
+    "consumer_contract",
+    "repository_check_contract"
   ],
   "properties": {
+    "$schema": {
+      "const": "../../schemas/capability-registry.schema.json"
+    },
     "schema_version": {
-      "const": "2.1.0"
+      "const": "2.2.0"
     },
     "registry_version": {
       "type": "string",
@@ -86,6 +91,9 @@
     },
     "consumer_contract": {
       "$ref": "#/$defs/consumerContract"
+    },
+    "repository_check_contract": {
+      "$ref": "#/$defs/repositoryCheckContract"
     }
   },
   "$defs": {
@@ -349,6 +357,56 @@
         },
         "adapter_kind": { "enum": ["parameter", "entity"] },
         "policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "repositoryCheckContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "repository_command", "test_command", "ci_workflow",
+        "required_checks", "optional_checks", "generated_artifacts", "ledger_policy"
+      ],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "repository_command": { "const": "python tools/repository_checks.py" },
+        "test_command": { "const": "python -m pytest -q" },
+        "ci_workflow": { "const": ".github/workflows/verify.yml" },
+        "required_checks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "optional_checks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/optionalRepositoryCheck" }
+        },
+        "generated_artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/generatedArtifact" }
+        },
+        "ledger_policy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "optionalRepositoryCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "condition", "command"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "condition": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 }
+      }
+    },
+    "generatedArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "producer", "repository_check"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "producer": { "type": "string", "minLength": 1 },
+        "repository_check": { "type": "string", "minLength": 1 }
       }
     },
     "generationProfile": {

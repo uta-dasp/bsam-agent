@@ -43,6 +43,8 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(25, counts["reference_contracts"])
         self.assertEqual(4, counts["read_routes"])
         self.assertEqual(23, counts["mutation_routes"])
+        self.assertEqual(5, counts["repository_checks"])
+        self.assertEqual(2, counts["generated_artifacts"])
         self.assertEqual(11, counts["operation_impacts"])
         self.assertEqual(9, counts["clarification_triggers"])
         self.assertEqual(5, counts["obsolete_tokens"])
@@ -191,6 +193,21 @@ class RegistryToolsTests(unittest.TestCase):
                 "preview_delete_entity", "preview_rename_entity",
             },
             {tool for item in contract["mutation_routes"] for tool in item["tools"]},
+        )
+
+    def test_repository_checks_cover_generated_specification_artifacts(self) -> None:
+        contract = self.registry["repository_check_contract"]
+        self.assertEqual({
+            "registry-invariants", "schema-version-binding", "generated-reference",
+            "committed-dispatch-coverage", "ci-command-binding",
+        }, set(contract["required_checks"]))
+        self.assertEqual({
+            "docs/bsam/reference/BSAM_2_4_INPUT_API.md",
+            "docs/bsam/DISPATCH_AUDIT.md",
+        }, {item["path"] for item in contract["generated_artifacts"]})
+        self.assertEqual(
+            ["live-source-dispatch"],
+            [item["id"] for item in contract["optional_checks"]],
         )
 
     def test_pinned_baseline(self) -> None:

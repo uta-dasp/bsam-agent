@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.133.0`
-- Registry SHA-256: `D2498BBDAD1950A80C296120F5DAF038B4BD0A70F0BA0DE646125B3207A42FD3`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
+- Registry version: `0.134.0`
+- Registry SHA-256: `BD49A81F2F20AA81AD987909813B6D4DEAE1865D71785461DB4DEDD4A03F02CE`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 5 repository drift checks, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -2094,6 +2094,23 @@ Mutation routes:
 | `create` | `command.node`, `command.element`, `command.nset`, `command.elset` | `preview_create_entity` | `entity` | Dispatch only the registered explicit structural insertion adapter and preserve non-overwriting reviewed output. |
 | `delete` | `command.node`, `command.element`, `command.nset`, `command.elset` | `preview_delete_entity` | `entity` | Dispatch only guarded explicit-record deletion after the reverse-reference graph proves isolation. |
 | `rename` | `command.nset`, `command.elset`, `construct.boundary-conditions` | `preview_rename_entity` | `entity` | Rewrite one identity and every exact resolved reverse reference in a single source-set plan. |
+
+## Repository drift checks
+
+- Repository command: `python tools/repository_checks.py`
+- Complete test command: `python -m pytest -q`
+- CI workflow: `.github/workflows/verify.yml`
+- Required checks: `registry-invariants`, `schema-version-binding`, `generated-reference`, `committed-dispatch-coverage`, `ci-command-binding`
+- Coverage-ledger policy: Do not add another coverage ledger unless a concrete repository or CI consumer requires a distinct machine-readable projection.
+
+Generated artifacts:
+
+- `docs/bsam/reference/BSAM_2_4_INPUT_API.md` via `python tools/registry_tools.py generate`: Exact deterministic regeneration from the registry.
+- `docs/bsam/DISPATCH_AUDIT.md` via `python tools/dispatch_audit.py generate --source-root ../bsam20`: Committed source commit, dispatch tokens, and zero-gap reconciliation must match the registry; exact live regeneration runs when the pinned source tree is available.
+
+Conditional checks:
+
+- `live-source-dispatch` via `python tools/dispatch_audit.py check --source-root ../bsam20` when The pinned adjacent BSAM source tree is available.
 
 ## Registered generation profiles
 

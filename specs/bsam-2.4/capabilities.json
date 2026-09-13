@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
-  "schema_version": "2.1.0",
-  "registry_version": "0.133.0",
+  "schema_version": "2.2.0",
+  "registry_version": "0.134.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3838,6 +3838,39 @@
         "policy": "Rewrite one identity and every exact resolved reverse reference in a single source-set plan."
       }
     ]
+  },
+  "repository_check_contract": {
+    "schema_version": "1.0.0",
+    "repository_command": "python tools/repository_checks.py",
+    "test_command": "python -m pytest -q",
+    "ci_workflow": ".github/workflows/verify.yml",
+    "required_checks": [
+      "registry-invariants",
+      "schema-version-binding",
+      "generated-reference",
+      "committed-dispatch-coverage",
+      "ci-command-binding"
+    ],
+    "optional_checks": [
+      {
+        "id": "live-source-dispatch",
+        "condition": "The pinned adjacent BSAM source tree is available.",
+        "command": "python tools/dispatch_audit.py check --source-root ../bsam20"
+      }
+    ],
+    "generated_artifacts": [
+      {
+        "path": "docs/bsam/reference/BSAM_2_4_INPUT_API.md",
+        "producer": "python tools/registry_tools.py generate",
+        "repository_check": "Exact deterministic regeneration from the registry."
+      },
+      {
+        "path": "docs/bsam/DISPATCH_AUDIT.md",
+        "producer": "python tools/dispatch_audit.py generate --source-root ../bsam20",
+        "repository_check": "Committed source commit, dispatch tokens, and zero-gap reconciliation must match the registry; exact live regeneration runs when the pinned source tree is available."
+      }
+    ],
+    "ledger_policy": "Do not add another coverage ledger unless a concrete repository or CI consumer requires a distinct machine-readable projection."
   },
   "change_contract": {
     "schema_version": "1.0.0",

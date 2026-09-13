@@ -36,7 +36,7 @@ Exit: the full architecture works for a bounded vertical slice without trusting 
 
 ## M1 — Complete active BSAM 2.4 specification
 
-Status: in progress. Registry `0.133.0` currently inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, four read consumer routes, 23 mutation consumer routes, 11 supported entity-operation impacts, and nine engineering-clarification triggers. Static validation is verified for all 54 active constructs; M1.3 entity/dependency specification and the M1.4 shared consumer-contract closure are complete. Remaining specification work is generated-contract drift enforcement.
+Status: complete. Registry `0.134.0` inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, four read consumer routes, 23 mutation consumer routes, five repository drift checks, 11 supported entity-operation impacts, and nine engineering-clarification triggers. Static validation is verified for all 54 active constructs. The generated reference and committed source-dispatch coverage are enforced by one repository command and Windows CI; exact live dispatch regeneration additionally runs wherever the pinned private source tree is available.
 
 ### M1.1 Reachable-dispatch audit
 
@@ -72,8 +72,8 @@ Status: in progress. Registry `0.133.0` currently inventories 13 top-level block
 - [x] Expose a machine-consumable operational manifest and strict tool contracts consumed by parser/editor/query/agent paths for the verified subset.
 - [x] Complete shared machine-consumable capability contracts for the remaining parser, editor, and validator paths.
 - [x] Expose registry-derived operational-support and intent metadata through `get_capabilities` for the agent consumer.
-- [ ] Generate additional coverage ledgers only when a concrete repository or CI consumer requires them.
-- [ ] Enforce all generated-contract and coverage drift in CI/repository checks.
+- [x] Generate additional coverage ledgers only when a concrete repository or CI consumer requires them; the current registry reference and dispatch audit satisfy all present consumers, so no redundant ledger is generated.
+- [x] Enforce all generated-contract and coverage drift in CI/repository checks.
 
 Exit: every reachable active input path is fully specified or explicitly blocked with evidence.
 
