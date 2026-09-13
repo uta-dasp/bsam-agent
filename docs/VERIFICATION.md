@@ -2,6 +2,8 @@
 
 ## What is runnable now
 
+Registry 0.135.0 directly qualifies the previously implicit BOUNDARY `*GEO_NL` and `*STATUS` families. Golden tests prove byte-identical preservation, typed records, and the canonical `no restart` value; negative tests reject GEO_NL options/data, STATUS command options, multiple status rows, and unregistered status values. A registry meta-regression requires every active canonical syntax family to be named in the behavioral suite.
+
 The first M3 closure audits all 36 registered semantic edge kinds against behavioral regression tests spanning includes, mesh connectivity, explicit/generated/derived set membership, topology, selections, assignments, and cross-feature consumers. Direct assertions now cover SECTION-to-ELSET assignment and statistical fiber-seeding-to-SECTION resolution; an out-of-range section produces the classified unresolved-reference diagnostic. A meta-regression fails if any future registered edge kind lacks a named test assertion.
 
 Registry 0.134.0 completes M1 generated-contract enforcement. `python tools/repository_checks.py` now fails on registry invariant drift, registry/JSON-Schema root or version mismatch, stale generated reference output, committed dispatch token/source-commit/gap drift, or missing CI command binding. Windows CI runs that aggregator and the complete test suite. An available pinned adjacent source tree additionally activates exact live dispatch-audit regeneration; its absence in an isolated CI checkout is explicit rather than silently weakening committed token and zero-gap checks.

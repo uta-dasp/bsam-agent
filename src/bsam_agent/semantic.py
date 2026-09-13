@@ -4311,6 +4311,14 @@ def augment_root_semantics(
                     code="BSAM-E310", severity="error", message=control_error,
                     line=command_line.number, source=source,
                 ))
+        elif command.startswith("*geo_"):
+            command_tokens = _fields(command_line.text.split("#", 1)[0])
+            if len(command_tokens) != 1 or records:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message="BOUNDARY GEO_NL accepts no options or data records",
+                    line=command_line.number, source=source,
+                ))
         elif command.startswith("*name"):
             if not records:
                 continue
@@ -4346,6 +4354,17 @@ def augment_root_semantics(
                 ))
             else:
                 boundary_names[normalized_name] = boundary_problem_ordinal
+        elif command.startswith("*stat"):
+            command_tokens = _fields(command_line.text.split("#", 1)[0])
+            if len(command_tokens) != 1 or len(records) > 1:
+                index.diagnostics.append(Diagnostic(
+                    code="BSAM-E310", severity="error",
+                    message=(
+                        "BOUNDARY STATUS accepts no command-line options and at most "
+                        "one status record"
+                    ),
+                    line=command_line.number, source=source,
+                ))
         elif command.startswith("*clusters"):
             named_clusters = [
                 (name, line)

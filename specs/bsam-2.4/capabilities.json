@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "2.2.0",
-  "registry_version": "0.134.0",
+  "registry_version": "0.135.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -3198,6 +3198,12 @@
         "modify": "unsupported", "create": "unsupported", "delete": "unsupported",
         "rename": "unsupported", "generate": "unsupported",
         "static_validation": "verified", "execute": "unassessed"
+      },
+      "body": {
+        "style": "single-record",
+        "termination": "fixed-count",
+        "variants": [{"name": "command-only-enable", "when": "always", "rows": [{"name": "command", "repetition": "once", "fields": [{"name": "*GEO_NL", "value_type": "command-only-no-options-or-data-row", "required": true, "summary": "Sets the current boundary problem's geometric-nonlinearity flag without consuming a following record."}]}], "constraints": ["The active dispatch sets the flag immediately and consumes no data row.", "Canonical current syntax uses the exact option-free *GEO_NL command."]}],
+        "dependencies": ["The flag changes the current mechanical or thermal problem's kinematic formulation."]
       }
     },
     {

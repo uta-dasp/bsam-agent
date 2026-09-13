@@ -8,8 +8,8 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.134.0`
-- Registry SHA-256: `BD49A81F2F20AA81AD987909813B6D4DEAE1865D71785461DB4DEDD4A03F02CE`
+- Registry version: `0.135.0`
+- Registry SHA-256: `25D15B7ACC493A641826F7C1EAF8020E5A3BBFFFA5B40A316EDB833F2F1A8826`
 - Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 5 repository drift checks, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
@@ -1561,6 +1561,15 @@ Enables geometric nonlinearity for the current mechanical or thermal problem.
 - Coverage: documented
 - Evidence: [evidence.boundary-active-dispatch](#evidenceboundary-active-dispatch)
 - Operational support: `parse`=verified, `semantic`=verified, `inspect`=verified, `modify`=unsupported, `create`=unsupported, `delete`=unsupported, `rename`=unsupported, `generate`=unsupported, `static_validation`=verified, `execute`=unassessed
+
+#### `*GEO_NL` body
+
+Termination: fixed-count. Dependencies: The flag changes the current mechanical or thermal problem's kinematic formulation.
+
+- **command-only-enable** (always):
+  - `command` [once]: `*GEO_NL`:command-only-no-options-or-data-row
+  - Constraint: The active dispatch sets the flag immediately and consumes no data row.
+  - Constraint: Canonical current syntax uses the exact option-free *GEO_NL command.
 
 ### `*SOLVER`
 

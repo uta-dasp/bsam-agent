@@ -120,6 +120,23 @@ class RegistryToolsTests(unittest.TestCase):
         )
         self.assertEqual([], missing)
 
+    def test_every_active_canonical_family_is_named_by_a_regression_test(self) -> None:
+        test_root = Path(__file__).parent
+        test_text = "\n".join(
+            path.read_text(encoding="utf-8").casefold()
+            for path in test_root.glob("test_*.py")
+            if path.name != Path(__file__).name
+        )
+        active = [
+            *self.registry["top_level_blocks"],
+            *self.registry["cluster_commands"],
+            *self.registry["nested_constructs"],
+        ]
+        self.assertEqual([], [
+            item["id"] for item in active
+            if item["canonical"].casefold() not in test_text
+        ])
+
     def test_engineering_clarifications_cover_registered_user_choices(self) -> None:
         triggers = self.registry["dependency_contract"]["clarification_triggers"]
         self.assertEqual(9, len(triggers))

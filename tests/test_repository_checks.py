@@ -9,7 +9,8 @@ from tools import registry_tools, repository_checks
 class RepositoryChecksTests(unittest.TestCase):
     def test_repository_contracts_are_current_without_private_source(self) -> None:
         result = repository_checks.check_repository(source_root=None)
-        self.assertEqual("0.134.0", result["registry_version"])
+        registry = registry_tools.load_registry(registry_tools.DEFAULT_REGISTRY)
+        self.assertEqual(registry["registry_version"], result["registry_version"])
         self.assertEqual(2, result["generated_artifacts"])
         self.assertEqual("skipped-source-unavailable", result["live_source_dispatch"])
         self.assertEqual(5, len(result["required_checks"]))

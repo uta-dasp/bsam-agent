@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+Registry `0.135.0` closes the first golden-coverage gap. BOUNDARY `*GEO_NL` is now explicitly command-only, and `*STATUS` accepts no command options plus at most one optional canonical status record. Both families have byte-identical no-op assertions and positive/default/invalid structure coverage; registry tests now fail when an active canonical family is absent from the behavioral test corpus.
+
 M3 reference/dependency validation now has named behavioral coverage for all 36 registered edge kinds. This spans include graphs, explicit and generated mesh connectivity, set membership, selections, section assignment, topology ownership, and cross-feature solver/material/constitutive/failure/statistical/function dependencies. Statistical fiber seeding directly proves a resolved section window and classified rejection of an out-of-range section ordinal.
 
 Registry `0.134.0` completes M1 with one checked-in repository command and Windows CI workflow. Five required checks bind registry invariants, the JSON Schema version/root, exact reference regeneration, committed dispatch tokens and zero-gap status, and the CI commands. The private pinned source tree is not required in CI; when available locally, the same command also requires byte-exact live dispatch-audit regeneration. The existing reference and dispatch audit meet all concrete coverage consumers, so no redundant ledger is added.

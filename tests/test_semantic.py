@@ -21,6 +21,48 @@ def deck(cluster_lines: bytes) -> bytes:
 
 
 class SemanticIndexTests(unittest.TestCase):
+    def test_boundary_geo_nl_and_status_are_golden_and_cardinality_checked(self) -> None:
+        base = deck(b"")
+        valid = base.replace(
+            b"mechanical\nEND BOUNDARY",
+            b"mechanical\n*GEO_NL\n*STATUS\nno restart\nEND BOUNDARY",
+        )
+        invalid_constructs = {
+            "geo-option": b"*GEO_NL,OTHER\n",
+            "geo-data": b"*GEO_NL\nunexpected\n",
+            "status-option": b"*STATUS,OTHER\n",
+            "status-extra": b"*STATUS\nrestart\nnew\n",
+            "status-value": b"*STATUS\nunknown\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            valid_path = Path(directory) / "valid.in"
+            valid_path.write_bytes(valid)
+            source_set = SourceSet.read(valid_path)
+            inspection = source_set.inspection()
+
+            self.assertEqual(0, inspection["summary"]["errors"])
+            self.assertTrue(inspection["no_op_round_trip"])
+            self.assertEqual(valid, source_set.render_files()[valid_path.resolve()])
+            records = {
+                item["capability_id"]: item
+                for item in inspection["semantic_model"]["capability_records"]
+            }
+            self.assertIn("construct.boundary-geometric-nonlinearity", records)
+            self.assertEqual(
+                "no restart",
+                records["construct.boundary-status"]["parameters"]["status"][0]["value"],
+            )
+
+            for name, construct in invalid_constructs.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"{name}.in"
+                    path.write_bytes(base.replace(
+                        b"mechanical\nEND BOUNDARY",
+                        b"mechanical\n" + construct + b"END BOUNDARY",
+                    ))
+                    diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+                    self.assertIn("BSAM-E310", {item["code"] for item in diagnostics})
+
     def test_unnamed_cluster_uses_source_defined_fallback_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "model.in"
