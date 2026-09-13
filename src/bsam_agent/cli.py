@@ -9,7 +9,7 @@ from typing import Sequence
 
 from . import __version__
 from .api import serve
-from .chat import run_terminal_chat
+from .chat import run_jsonl_chat, run_terminal_chat
 from .change import (
     ChangeError,
     apply_plan,
@@ -180,6 +180,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--session",
         help="relative local transcript path to save and resume; contains raw chat text",
     )
+    chat_parser.add_argument(
+        "--jsonl", action="store_true", help="serve newline-delimited JSON for a local UI client"
+    )
 
     import_parser = subparsers.add_parser(
         "import-mesh", help="import a manually prepared Abaqus-style .ele mesh"
@@ -257,7 +260,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 session_path = (root / supplied).resolve()
                 if not session_path.is_relative_to(root):
                     raise ValueError("chat session path escapes the workspace")
-            return run_terminal_chat(
+            runner = run_jsonl_chat if args.jsonl else run_terminal_chat
+            return runner(
                 Path(args.config), root, audit_enabled=not args.no_audit,
                 session_path=session_path,
             )

@@ -14,6 +14,7 @@ export function chatArguments(
     configPath,
     "--session",
     sessionPath,
+    "--jsonl",
   ];
   if (!auditEnabled) result.push("--no-audit");
   return result;

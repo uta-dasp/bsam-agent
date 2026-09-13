@@ -8,6 +8,7 @@ test("builds an audited persistent local chat launch", () => {
     "--workspace-root", "D:\\work",
     "--config", "config/provider.local.json",
     "--session", ".bsam-agent/chat.json",
+    "--jsonl",
   ]);
 });
 

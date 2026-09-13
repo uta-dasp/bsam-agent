@@ -2,7 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { BsamApiError } from "./apiClient";
 import { CapabilitiesTree } from "./capabilitiesTree";
-import { chatArguments } from "./chatLaunch";
+import { ChatPanel } from "./chatPanel";
 import { diagnosticEntries } from "./diagnosticModel";
 import { editableCapabilities } from "./formModel";
 import { relativeWorkspacePath } from "./pathing";
@@ -25,7 +25,6 @@ import {
 } from "./workflow";
 
 let server: ServerManager | undefined;
-let chatTerminal: vscode.Terminal | undefined;
 const LAST_PLAN_KEY = "bsamAgent.lastReviewedPlan";
 const LAST_RUN_KEY = "bsamAgent.lastRunDirectory";
 
@@ -434,56 +433,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("bsamAgent.openLocalChat", async () => {
       try {
-        if (chatTerminal) {
-          chatTerminal.show();
-          return;
-        }
-        const manager = server!;
-        const workspaceRoot = manager.workspaceRoot();
-        const configuration = vscode.workspace.getConfiguration("bsamAgent");
-        const sessionSetting = configuration.get<string>(
-          "chat.sessionPath", ".bsam-agent/conversations/vscode.json",
-        ).trim();
-        if (!sessionSetting || path.isAbsolute(sessionSetting)) {
-          throw new Error("bsamAgent.chat.sessionPath must be a non-empty workspace-relative path");
-        }
-        const sessionPath = workspaceArgument(workspaceRoot, sessionSetting);
-        const configPath = configuration.get<string>(
-          "chat.providerConfigPath", "config/provider.local.json",
-        ).trim();
-        if (!configPath) throw new Error("bsamAgent.chat.providerConfigPath cannot be empty");
-        const credentialEnvironment = configuration.get<string>(
-          "chat.credentialEnvironment", "BSAM_LOCAL_API_KEY",
-        ).trim();
-        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(credentialEnvironment)) {
-          throw new Error("bsamAgent.chat.credentialEnvironment is not a valid environment variable name");
-        }
-        const environment = manager.pythonEnvironment();
-        if (!environment[credentialEnvironment]) {
-          const credential = await vscode.window.showInputBox({
-            title: "Local model session credential",
-            prompt: `Enter ${credentialEnvironment}; it is passed only to the local chat terminal and is not stored`,
-            password: true,
-            ignoreFocusOut: true,
-          });
-          if (!credential) return;
-          environment[credentialEnvironment] = credential;
-        }
-        chatTerminal = vscode.window.createTerminal({
-          name: "BSAM Agent Local Chat",
-          shellPath: manager.pythonExecutable(),
-          shellArgs: chatArguments(
-            workspaceRoot,
-            configPath,
-            sessionPath,
-            configuration.get<boolean>("chat.auditEnabled", true),
-          ),
-          cwd: manager.repositoryRoot(),
-          env: environment as Record<string, string | null | undefined>,
-          isTransient: false,
-        });
-        chatTerminal.show();
-        output.appendLine(`Opened persistent local chat at ${sessionPath}.`);
+        await ChatPanel.open(server!, output);
       } catch (error) {
         report(error, output);
       }
@@ -504,9 +454,6 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
     vscode.commands.registerCommand("bsamAgent.openOutput", () => output.show(true)),
-    vscode.window.onDidCloseTerminal((terminal) => {
-      if (terminal === chatTerminal) chatTerminal = undefined;
-    }),
     vscode.workspace.onDidSaveTextDocument(async (document) => {
       if (!supportedDocument(document)
           || !vscode.workspace.getConfiguration("bsamAgent").get<boolean>("validation.onSave", true)) {
@@ -524,7 +471,7 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
+  ChatPanel.close();
   server?.dispose();
   server = undefined;
-  chatTerminal = undefined;
 }

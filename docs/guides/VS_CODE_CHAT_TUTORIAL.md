@@ -1,6 +1,6 @@
 # Using BSAM Agent chat in VS Code
 
-This tutorial covers the local-model chat included with BSAM Agent for VS Code 0.4.0. The command opens a persistent chat terminal inside VS Code; it is not a native VS Code Chat side panel. The terminal uses the same guarded orchestrator as `python -m bsam_agent chat`.
+This tutorial covers the dedicated local-model chat window included with BSAM Agent for VS Code 0.5.0. The command opens a theme-aware panel beside the editor. A private local process uses the same guarded orchestrator as `python -m bsam_agent chat`; users do not interact with its command line.
 
 The language model only interprets requests. Deterministic BSAM Agent code resolves registry capabilities, validates paths and values, creates review plans, and performs tool calls. Applying a change, starting a run, or requesting a stop always requires a separate confirmation turn.
 
@@ -9,7 +9,7 @@ The language model only interprets requests. Deterministic BSAM Agent code resol
 The following paths are present on the current BSAM workstation:
 
 ```text
-VS Code extension: uta-dasp.bsam-agent 0.4.0
+VS Code extension: uta-dasp.bsam-agent 0.5.0
 Repository:        D:\Partha\BSAM\bsam agent
 Python:            C:\Program Files\Python310\python.exe
 llama.cpp server:  D:\Partha\BSAM\runtimes\llama.cpp\b10621\llama-server.exe
@@ -27,13 +27,13 @@ code --list-extensions --show-versions | Select-String "uta-dasp.bsam-agent"
 Expected result:
 
 ```text
-uta-dasp.bsam-agent@0.4.0
+uta-dasp.bsam-agent@0.5.0
 ```
 
 If it is missing, install the already-built package:
 
 ```powershell
-code --install-extension "D:\Partha\BSAM\bsam agent\clients\vscode\bsam-agent-0.4.0.vsix" --force
+code --install-extension "D:\Partha\BSAM\bsam agent\clients\vscode\bsam-agent-0.5.0.vsix" --force
 ```
 
 Then run `Developer: Reload Window` from the VS Code Command Palette.
@@ -120,26 +120,20 @@ Security rules:
 - Never save the key in provider JSON, workspace settings, source files, or chat messages.
 - Clear the clipboard after the VS Code credential prompt with `Set-Clipboard -Value ""`.
 
-## 5. Open BSAM Agent chat
+## 5. Open the BSAM Agent chat window
 
 In VS Code:
 
 1. Press `Ctrl+Shift+P`.
-2. Run `BSAM Agent: Open Local Chat`.
-3. If prompted for `BSAM_LOCAL_API_KEY`, paste the 64-character value copied from the server terminal and press Enter. The password field hides it and the extension passes it only to the new terminal process.
+2. Run `BSAM Agent: Open Chat Window`.
+3. If prompted for `BSAM_LOCAL_API_KEY`, paste the 64-character value copied from the server terminal and press Enter. The password field hides it and the extension passes it only to the private local chat process.
 4. Clear the clipboard in the server PowerShell.
 
-The integrated terminal should show text similar to:
+The chat panel opens beside the editor. Its header shows the connected local model and conversation phase. The lower area contains a multiline prompt box, Send button, and confirmation controls that appear only when a guarded action is pending. Use `Ctrl+Enter` to send.
 
-```text
-BSAM Agent chat (Llama-4-Scout-17B-16E-Instruct-Q4_K_M). Workspace: D:\Partha\BSAM
-Commands: /confirm, /cancel, /quit
-bsam>
-```
+Running `BSAM Agent: Open Chat Window` again focuses the existing panel. Close that panel before reopening it with a different credential or configuration.
 
-Running `BSAM Agent: Open Local Chat` again focuses the existing chat terminal. Close that terminal before reopening it with a different credential or configuration.
-
-The chat command does not require `BSAM Agent: Start Local API`; chat constructs its guarded local API in the chat process. The Start Local API command is used by editor diagnostics, forms, diffs, and direct run commands.
+The chat command does not require `BSAM Agent: Start Local API`; chat constructs its guarded local API in its private process. The Start Local API command is used by editor diagnostics, forms, diffs, and direct run commands.
 
 ## 6. Start with read-only requests
 
@@ -286,7 +280,7 @@ Digest-only chat audit records are stored beneath:
 D:\Partha\BSAM\.bsam-agent\audit
 ```
 
-The session file contains raw chat text and pending-action state. Both locations remain local and are ignored by this repository. To begin an independent conversation without replacing the old state, change `bsamAgent.chat.sessionPath` to a new relative filename and reopen the chat terminal.
+The session file contains raw chat text and pending-action state. Both locations remain local and are ignored by this repository. To begin an independent conversation without replacing the old state, change `bsamAgent.chat.sessionPath` to a new relative filename and reopen the chat panel.
 
 No OpenAI or other hosted provider is enabled by this workflow. The provider endpoint is loopback-only and the model file is local.
 
@@ -294,7 +288,7 @@ No OpenAI or other hosted provider is enabled by this workflow. The provider end
 
 ### The command is missing
 
-Confirm `uta-dasp.bsam-agent@0.4.0` is installed, then run `Developer: Reload Window`. Ensure the Command Palette entry begins with `BSAM Agent:`.
+Confirm `uta-dasp.bsam-agent@0.5.0` is installed, then run `Developer: Reload Window`. Ensure the Command Palette entry begins with `BSAM Agent:`.
 
 ### Cannot locate the BSAM Agent repository
 
@@ -308,11 +302,11 @@ The selected directory must contain `src\bsam_agent`.
 
 ### Credential environment variable is not set
 
-Close the existing BSAM chat terminal and run `BSAM Agent: Open Local Chat` again. Paste the exact key used to start llama.cpp when the password prompt appears. The variable name is `BSAM_LOCAL_API_KEY` with no added slashes.
+Close the existing BSAM chat panel and run `BSAM Agent: Open Chat Window` again. Paste the exact key used to start llama.cpp when the password prompt appears. The variable name is `BSAM_LOCAL_API_KEY` with no added slashes.
 
 ### HTTP 401 or unauthorized
 
-The client and server keys differ. Generate a fresh key, restart llama.cpp with it, close the chat terminal, and reopen chat using that same value.
+The client and server keys differ. Generate a fresh key, restart llama.cpp with it, close the chat panel, and reopen chat using that same value.
 
 ### Connection refused at port 18080
 
@@ -328,7 +322,7 @@ Open `D:\Partha\BSAM` as the workspace or set `bsamAgent.workspaceRoot` to that 
 
 ### Port 8765 serves a different workspace
 
-This affects direct extension commands, not the chat terminal. Stop the other BSAM Agent API or make its workspace root match the current VS Code setting, then rerun `BSAM Agent: Start Local API`.
+This affects direct extension commands, not the chat panel. Stop the other BSAM Agent API or make its workspace root match the current VS Code setting, then rerun `BSAM Agent: Start Local API`.
 
 ### Destination or run directory already exists
 
@@ -344,10 +338,10 @@ Run `BSAM Agent: Show Output` from the Command Palette. Also inspect the local-m
 
 ## 13. End the session
 
-At the `bsam>` prompt, type:
+Send this from the chat window:
 
 ```text
 /quit
 ```
 
-This ends the chat process while preserving the configured session file. Stop llama.cpp in its separate PowerShell with `Ctrl+C`, then clear any remaining clipboard copy of the session key.
+This ends the private chat process while preserving the configured session file. Closing the chat panel does the same. Stop llama.cpp in its separate PowerShell with `Ctrl+C`, then clear any remaining clipboard copy of the session key.

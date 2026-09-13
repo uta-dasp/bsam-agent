@@ -2,7 +2,7 @@
   "name": "bsam-agent",
   "displayName": "BSAM Agent",
   "description": "Thin VS Code client for the deterministic BSAM Agent loopback API.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "uta-dasp",
   "license": "UNLICENSED",
   "repository": {
@@ -78,7 +78,7 @@
       },
       {
         "command": "bsamAgent.openLocalChat",
-        "title": "BSAM Agent: Open Local Chat"
+        "title": "BSAM Agent: Open Chat Window"
       },
       {
         "command": "bsamAgent.refreshCapabilities",
