@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+M3 representative coverage now includes compact checked-in current-control and named-data decks. They prove zero-error, byte-lossless integration of PARDISO and eleven BOUNDARY/control families, plus resolved TABLES, UFUNCTIONS, STATISTICAL, structured MATERIALS, and cluster dependencies. Existing small two-cluster and neutral-mesh fixtures retain independent semantic and import coverage; notch remains a separate large regression.
+
 M3 invalid, ambiguous, and dependency-breaking coverage now names every classified diagnostic code in a behavioral regression. Final additions directly assert the classified duplicate-block warning and invalid solver-schedule semantic constraint; the broader suite already exercises bad values and cardinality, ambiguous/unresolved/type-mismatched references, stale plans, and guarded destructive dependency failures.
 
 M3 golden/no-op and minimal-patch coverage is complete. The source-set renderer preserves bound bytes independently of syntax specialization, with behavioral coverage naming all 54 active families. Every family exposed through the 23-pair mutation contract now has a successful exact-span, insertion, removal, or dependency-aware multi-span regression; final direct additions cover G-CONTROL, boundary-condition values, BOUNDARY/SCALE retargeting, and all supported ELSET mutations.

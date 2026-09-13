@@ -2,6 +2,8 @@
 
 ## What is runnable now
 
+M3 now has compact checked-in representatives beyond the notch project. `representative_controls.in` covers current PARDISO plus eleven BOUNDARY/control families; `representative_named_data.in` resolves TABLES, UFUNCTIONS, STATISTICAL, structured MATERIALS, and cluster ownership together. Both are zero-error and byte-lossless, complementing the existing two-cluster semantic and neutral `.ele` mesh fixtures.
+
 The M3 negative-case audit now covers every classified diagnostic code and fails on future code/test drift. The final missing assertions exercise duplicate top-level-block warning `BSAM-W120` and nonnumeric/out-of-range BOUNDARY solver schedule `BSAM-E312`, including their level and provenance. Existing suites cover invalid syntax/value/cardinality variants, ambiguous definitions and selectors, unresolved/type-mismatched dependencies, stale plans, and dependency-blocked destructive edits.
 
 The M3 golden/minimal-patch audit is complete. SourceSet rendering returns each bound file's original bytes and is exercised across every named active syntax family, mixed newlines, nested includes, and unknown preserved records. Direct successful generic-route tests now cover each mutable family; the final gaps add exact boundary-condition value and G-CONTROL flag spans, BOUNDARY and SCALE target spans, plus ELSET create/member-removal/delete/rename plans.

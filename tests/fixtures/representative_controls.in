@@ -1,0 +1,42 @@
+INPUT
+3
+END INPUT
+SOLVER
+*type=pardiso
+n_threads=2
+matrix_type=indefinite
+end solver
+END SOLVER
+BOUNDARY
+*type
+mechanical
+*GEO_NL
+*G-CONTROL,DAMP,G_ITER=25,GMIN=0,GMAX=1,GTHR=0
+*NAME
+representative
+*STATUS
+new
+*BOUNDARY CONDITION
+type=off,name=idle
+*LOADING SEQUENCE
+type=Static,name=step1,nstep=1,incr=1
+*CONVERGENCE
+absolute=1,maxiterations=20
+*SOLVER
+1
+*OUTPUT
+type=data_file,clusters=all
+END BOUNDARY
+CONSTITUTIVE
+0
+END CONSTITUTIVE
+MATERIALS
+0
+END MATERIALS
+CLUSTERS
+*TYPE
+solid
+*NAME
+mesh
+*STOP
+END CLUSTERS

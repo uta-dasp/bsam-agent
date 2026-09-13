@@ -1,0 +1,48 @@
+INPUT
+3
+END INPUT
+UFUNCTIONS
+user-function-curve
+0 0
+1 1
+*end
+END UFUNCTIONS
+TABLES
+table-stiffness
+temp-moisture 0 1
+10 100 200
+20 150 250
+*end
+END TABLES
+STATISTICAL
+stat-strength
+type=3
+approx=1
+seeding=coordinates
+coordinates=1,2,3
+alpha=13
+v0=6250
+generation=7
+*end
+END STATISTICAL DISTRIBUTIONS
+BOUNDARY
+*type
+mechanical
+END BOUNDARY
+CONSTITUTIVE
+0
+END CONSTITUTIVE
+MATERIALS
+999
+E11=stat_strength_1.0
+E22=table_stiffness
+G12=ufunc_curve
+*end
+END MATERIALS
+CLUSTERS
+*type
+solid
+*NAME
+mesh
+*STOP
+END CLUSTERS
