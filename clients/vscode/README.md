@@ -6,7 +6,7 @@ The client manages an extension-owned API process, validates or inspects the act
 
 ## Guarded workflows
 
-- `BSAM Agent: Preview Parameter Change` collects an exact block, construct, parameter, value, and occurrence. The core validates them, writes a revision-bound plan, and returns a unified diff for review.
+- `BSAM Agent: Preview Parameter Change` derives editable root-deck occurrences and parameters from the semantic model plus registry operation status. The core validates the selected value, writes a revision-bound plan, and returns a unified diff for review. Verified repeated parameters offer explicit occurrence selection and append behavior.
 - `BSAM Agent: Apply Last Reviewed Change` revalidates the stored plan identity and source revision, displays the diff again, and requires modal confirmation before writing a new deck and audit sidecar.
 - `BSAM Agent: Run Current Model` publishes validation diagnostics first, requires a workspace-local executable and modal confirmation, and reserves a new isolated output directory.
 - `BSAM Agent: Show Last Run Status` and `BSAM Agent: Stop Last Run` read durable status or request BSAM's controlled stop path. The extension never directly kills a BSAM run.
@@ -27,7 +27,7 @@ Press F5 from this folder to launch an Extension Development Host after compilat
 Install the packaged client into VS Code with:
 
 ```powershell
-code --install-extension .\bsam-agent-0.2.0.vsix
+code --install-extension .\bsam-agent-0.3.0.vsix
 ```
 
 Open the Command Palette and run `BSAM Agent: Start Local API`. The extension defaults the API workspace to the first open folder; set `bsamAgent.workspaceRoot` to an absolute path when a broader include boundary is required.

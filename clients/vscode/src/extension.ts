@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { BsamApiError } from "./apiClient";
 import { CapabilitiesTree } from "./capabilitiesTree";
 import { diagnosticEntries } from "./diagnosticModel";
+import { editableCapabilities } from "./formModel";
 import { relativeWorkspacePath } from "./pathing";
 import { ServerManager } from "./serverManager";
 import {
@@ -10,6 +11,7 @@ import {
   CapabilitiesResponse,
   ChangePlanResponse,
   MeshImportResponse,
+  QueryCapabilitiesResponse,
   ReviewedPlan,
   RunStatusResponse,
   ValidationResponse,
@@ -196,51 +198,93 @@ export function activate(context: vscode.ExtensionContext): void {
         const manager = server!;
         const workspaceRoot = manager.workspaceRoot();
         const source = relativeWorkspacePath(workspaceRoot, document.uri.fsPath);
-        const block = nonEmpty(await vscode.window.showInputBox({
-          title: "BSAM block",
-          prompt: "Top-level block containing the construct (for example BOUNDARY)",
-          ignoreFocusOut: true,
-        }));
-        if (!block) return;
-        const construct = nonEmpty(await vscode.window.showInputBox({
-          title: "BSAM construct",
-          prompt: "Registered construct to edit (for example CONVERGENCE)",
-          ignoreFocusOut: true,
-        }));
-        if (!construct) return;
-        const parameter = nonEmpty(await vscode.window.showInputBox({
-          title: "BSAM parameter",
-          prompt: "Registered parameter name",
-          ignoreFocusOut: true,
-        }));
-        if (!parameter) return;
+        const { client } = await manager.ensureStarted();
+        const [capabilityContract, query] = await Promise.all([
+          client.capabilities(),
+          client.invoke<QueryCapabilitiesResponse>("query_model", {
+            source,
+            query: "list-capabilities",
+          }),
+        ]);
+        const formCapabilities = editableCapabilities(query.matches, capabilityContract);
+        if (!formCapabilities.length) {
+          throw new Error("No registry-verified parameter edits are available in the root deck");
+        }
+        const capabilityPick = await vscode.window.showQuickPick(
+          formCapabilities.map((item) => ({
+            label: `${item.block} / ${item.construct}`,
+            description: `occurrence ${item.occurrence}`,
+            detail: `${item.capabilityId} at root line ${item.line}`,
+            item,
+          })),
+          { title: "Choose a registry-verified construct", ignoreFocusOut: true },
+        );
+        if (!capabilityPick) return;
+        const parameterPick = await vscode.window.showQuickPick(
+          capabilityPick.item.parameters.map((item) => ({
+            label: item.name,
+            description: item.currentValues.length
+              ? `current: ${item.currentValues.join(", ")}`
+              : `registered default: ${item.defaultValue ?? "absent"}`,
+            detail: item.appendVerified ? "Verified repeated-value insertion is available" : undefined,
+            item,
+          })),
+          { title: `Choose a parameter in ${capabilityPick.item.construct}`, ignoreFocusOut: true },
+        );
+        if (!parameterPick) return;
+
+        let parameterOccurrence: number | undefined;
+        let insertRepeated = false;
+        let currentValue = parameterPick.item.currentValues.at(-1) ?? parameterPick.item.defaultValue ?? "";
+        if (parameterPick.item.currentValues.length > 1 || (
+          parameterPick.item.currentValues.length > 0 && parameterPick.item.appendVerified
+        )) {
+          const valueChoices = parameterPick.item.currentValues.map((item, index) => ({
+            label: `Occurrence ${index + 1}`,
+            description: item,
+            value: item,
+            occurrence: index + 1,
+            append: false,
+          }));
+          if (parameterPick.item.appendVerified) {
+            valueChoices.push({
+              label: "Append new occurrence",
+              description: "Preserves existing values and becomes the effective last value",
+              value: currentValue,
+              occurrence: 0,
+              append: true,
+            });
+          }
+          const valuePick = await vscode.window.showQuickPick(valueChoices, {
+            title: `Choose how to edit ${parameterPick.item.name}`,
+            ignoreFocusOut: true,
+          });
+          if (!valuePick) return;
+          currentValue = valuePick.value;
+          insertRepeated = valuePick.append;
+          parameterOccurrence = valuePick.occurrence || undefined;
+        }
         const value = nonEmpty(await vscode.window.showInputBox({
-          title: "New value",
-          prompt: "Exact BSAM value; the deterministic core validates its schema",
+          title: `New value for ${parameterPick.item.name}`,
+          prompt: "The deterministic core validates this value against the registered BSAM schema",
+          value: currentValue,
           ignoreFocusOut: true,
         }));
         if (value === undefined) return;
-        const occurrenceText = nonEmpty(await vscode.window.showInputBox({
-          title: "Construct occurrence",
-          prompt: "One-based occurrence",
-          value: "1",
-          validateInput: (candidate) => /^[1-9]\d*$/.test(candidate.trim())
-            ? undefined : "Enter a positive integer",
-          ignoreFocusOut: true,
-        }));
-        if (!occurrenceText) return;
         const planPath = defaultPlanPath(source);
         await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.join(workspaceRoot, path.dirname(planPath))));
-        const { client } = await manager.ensureStarted();
-        const plan = await client.invoke<ChangePlanResponse>("preview_parameter_change", {
+        const argumentsValue: Record<string, unknown> = {
           source,
-          block,
-          construct,
-          parameter,
+          block: capabilityPick.item.block,
+          construct: capabilityPick.item.construct,
+          parameter: parameterPick.item.name,
           value,
-          occurrence: Number(occurrenceText),
+          occurrence: capabilityPick.item.occurrence,
           plan_path: planPath,
-        });
+        };
+        if (parameterOccurrence !== undefined) argumentsValue.parameter_occurrence = parameterOccurrence;
+        if (insertRepeated) argumentsValue.insert_repeated = true;
+        const plan = await client.invoke<ChangePlanResponse>("preview_parameter_change", argumentsValue);
         const reviewed: ReviewedPlan = {
           source,
           planPath,

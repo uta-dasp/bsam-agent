@@ -278,7 +278,7 @@ Input gate: user selection of the first geometry families and trusted acceptance
 - [x] Build a thin VS Code client over the stable local API.
 - [ ] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
 
-Current M6 client coverage: schema-aware source diagnostics, reviewed parameter diffs, guarded apply, and run/status/controlled-stop controls are implemented. Schema-derived forms and integrated local chat remain.
+Current M6 client coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, and run/status/controlled-stop controls are implemented. Integrated local chat remains.
 
 ## Deferred
 
@@ -290,6 +290,6 @@ Current M6 client coverage: schema-aware source diagnostics, reviewed parameter 
 ## Next execution sessions
 
 1. Continue M6 with reviewed change diffs and guarded apply/run controls in the thin VS Code client.
-2. Add schema-derived parameter forms and integrate the existing local chat boundary without enabling a hosted provider.
+2. Integrate the existing local chat boundary without enabling a hosted provider.
 
 No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

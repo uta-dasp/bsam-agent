@@ -2,7 +2,7 @@
   "name": "bsam-agent",
   "displayName": "BSAM Agent",
   "description": "Thin VS Code client for the deterministic BSAM Agent loopback API.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "uta-dasp",
   "license": "UNLICENSED",
   "repository": {

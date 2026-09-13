@@ -66,6 +66,11 @@ export interface OperationalCapability {
   intents: Record<string, string>;
   parent?: string;
   entity_kind?: string;
+  parameter_edits?: Array<{
+    name: string;
+    cardinality: string;
+    operations: Record<string, string>;
+  }>;
 }
 
 export interface CapabilitiesResponse {
@@ -116,4 +121,28 @@ export interface ReviewedPlan {
   planPath: string;
   planId: string;
   planDigest: string;
+}
+
+export interface QueryCapabilityRecord {
+  id: string;
+  capability_id: string;
+  canonical: string;
+  occurrence: number;
+  location: {
+    source: string;
+    line: number;
+  };
+  parameters: Record<string, Array<{ value: string }>>;
+  defaults: Record<string, unknown>;
+  operations: Record<string, string>;
+}
+
+export interface QueryCapabilitiesResponse {
+  source_set_sha256: string;
+  query: string;
+  matches: QueryCapabilityRecord[];
+  summary: {
+    matches: number;
+    ambiguous: boolean;
+  };
 }
