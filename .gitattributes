@@ -5,3 +5,5 @@
 *.json text eol=lf
 *.py text eol=lf
 *.ts text eol=lf
+*.in text eol=lf
+*.ele text eol=lf
