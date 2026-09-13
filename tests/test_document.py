@@ -89,6 +89,14 @@ class SourceDocumentTests(unittest.TestCase):
             replacements,
         )
 
+    def test_repeated_top_level_block_warning_is_classified(self) -> None:
+        raw = CURRENT_DECK + b"SOLVER\r\nEND SOLVER\r\n"
+        diagnostics = SourceDocument.from_bytes(raw).inspection()["diagnostics"]
+        warning = next(item for item in diagnostics if item["code"] == "BSAM-W120")
+        self.assertEqual("warning", warning["severity"])
+        self.assertEqual("structure", warning["level"])
+        self.assertEqual("documentation-defined", warning["provenance"])
+
     def test_baseline_command_is_runnable(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

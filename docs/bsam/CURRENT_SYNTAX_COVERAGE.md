@@ -15,6 +15,8 @@ The updated block locator compares every requested token exactly and case-sensit
 
 ## Initial machine-readable inventory
 
+M3 invalid, ambiguous, and dependency-breaking coverage now names every classified diagnostic code in a behavioral regression. Final additions directly assert the classified duplicate-block warning and invalid solver-schedule semantic constraint; the broader suite already exercises bad values and cardinality, ambiguous/unresolved/type-mismatched references, stale plans, and guarded destructive dependency failures.
+
 M3 golden/no-op and minimal-patch coverage is complete. The source-set renderer preserves bound bytes independently of syntax specialization, with behavioral coverage naming all 54 active families. Every family exposed through the 23-pair mutation contract now has a successful exact-span, insertion, removal, or dependency-aware multi-span regression; final direct additions cover G-CONTROL, boundary-condition values, BOUNDARY/SCALE retargeting, and all supported ELSET mutations.
 
 Registry `0.135.0` closes the first golden-coverage gap. BOUNDARY `*GEO_NL` is now explicitly command-only, and `*STATUS` accepts no command options plus at most one optional canonical status record. Both families have byte-identical no-op assertions and positive/default/invalid structure coverage; registry tests now fail when an active canonical family is absent from the behavioral test corpus.

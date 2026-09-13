@@ -226,7 +226,7 @@ Exit: ordinary supported BSAM operations are driven by registry metadata, not pr
 - [x] Validate references, dependency rules, mesh connectivity, sets, topology, and cross-feature constraints; every registered edge kind is named by a behavioral regression, including explicit SECTION assignment and bounded statistical section seeding.
 - [x] Add direct golden no-op and invalid-cardinality coverage for the previously implicit BOUNDARY `*GEO_NL` and `*STATUS` families.
 - [x] Add golden no-op and minimal-patch tests for every syntax family; byte preservation is a source-set invariant across all active families, and every family with a registered mutation route has a direct successful exact-patch regression.
-- [ ] Add invalid, ambiguous, and dependency-breaking test cases.
+- [x] Add invalid, ambiguous, and dependency-breaking test cases; every classified diagnostic code is named by a regression and mutation tests cover ambiguity, stale state, unresolved dependencies, and guarded destructive failures.
 - [ ] Add small representative fixtures across capability families; keep notch as one regression fixture.
 - [ ] Add controlled executable probes where static source evidence is insufficient.
 - [x] Executable-test the bounded mechanical-isotropic generation profile against its pinned solver and boundary-assembly paths.

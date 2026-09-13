@@ -87,6 +87,16 @@ class SolverCapabilityTests(unittest.TestCase):
         self.assertEqual("solver:2", unresolved[0]["target_key"])
         self.assertIn("BSAM-E301", {item["code"] for item in inspection["diagnostics"]})
 
+    def test_invalid_schedule_values_have_the_semantic_constraint_diagnostic(self) -> None:
+        for schedule in (b"other", b"3"):
+            with self.subTest(schedule=schedule), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "model.in"
+                path.write_bytes(deck(schedule=schedule))
+                diagnostics = SourceSet.read(path).inspection()["diagnostics"]
+            diagnostic = next(item for item in diagnostics if item["code"] == "BSAM-E312")
+            self.assertEqual("bsam-semantic-constraints", diagnostic["level"])
+            self.assertEqual("source-defined", diagnostic["provenance"])
+
     def test_current_pardiso_requires_explicit_safe_options(self) -> None:
         incomplete = b"SOLVER\n*type=pardiso\nend solver\nEND SOLVER\n"
         with tempfile.TemporaryDirectory() as directory:

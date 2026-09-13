@@ -137,6 +137,21 @@ class RegistryToolsTests(unittest.TestCase):
             if item["canonical"].casefold() not in test_text
         ])
 
+    def test_every_classified_diagnostic_code_is_named_by_a_regression_test(self) -> None:
+        test_root = Path(__file__).parent
+        test_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in test_root.glob("test_*.py")
+            if path.name != Path(__file__).name
+        )
+        document_source = (
+            registry_tools.REPO_ROOT / "src" / "bsam_agent" / "document.py"
+        ).read_text(encoding="utf-8")
+        classified = set(re.findall(r'"(BSAM-[EWI][0-9]{3})":', document_source))
+        self.assertEqual([], sorted(
+            code for code in classified if code not in test_text
+        ))
+
     def test_engineering_clarifications_cover_registered_user_choices(self) -> None:
         triggers = self.registry["dependency_contract"]["clarification_triggers"]
         self.assertEqual(9, len(triggers))
