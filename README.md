@@ -32,6 +32,7 @@ Status: the core vertical slice and guarded local chat are runnable. Current dev
 - [Model-provider adapters](docs/api/PROVIDER_ADAPTERS.md)
 - [Local model runtime](docs/api/LOCAL_MODEL_RUNTIME.md)
 - [Terminal chat client](docs/api/CHAT_CLIENT.md)
+- [VS Code client](clients/vscode/README.md)
 - [BSAM syntax coverage ledger](docs/bsam/CURRENT_SYNTAX_COVERAGE.md)
 - [Generated BSAM 2.4 input API reference](docs/bsam/reference/BSAM_2_4_INPUT_API.md)
 - [Machine-readable BSAM 2.4 registry](specs/bsam-2.4/capabilities.json)
@@ -88,6 +89,20 @@ python -m bsam_agent stop runs\notch-v1-run
 ```
 
 Alternatively, `python -m pip install -e .` installs the local `bsam-agent` command. `validate` returns status 2 when it finds a blocking error. Typed edits remain deliberately bounded; dependency-aware support includes boundary-condition renaming with loading-reference updates, template-based mesh assembly, and the applicability-checked notch 2-to-8-ply transformation.
+
+## VS Code client
+
+The M6 client in `clients/vscode` starts or connects to the loopback API, checks its workspace identity, validates BSAM decks and `.ele` meshes, publishes source diagnostics, inspects models, and browses registry capabilities. Build and install its VSIX with:
+
+```powershell
+cd clients\vscode
+npm ci
+npm test
+npm run package
+code --install-extension .\bsam-agent-0.1.0.vsix
+```
+
+The extension does not send model data to a hosted provider. Hosted providers remain optional and deferred.
 
 `inspect`, `validate`, `plan-change`, and `run` recursively load `*INCLUDE, FILE=...` commands from CLUSTERS and included FE fragments. Nested targets follow BSAM behavior and resolve from the original deck's input directory, not from the including file. Missing files, malformed or quoted paths, include cycles, and targets outside the configured workspace are blocking diagnostics. The default workspace is the deck directory; `--workspace-root` can explicitly select a broader local boundary. Every imported file retains its own digest, bytes, line endings, and file boundary. New change plans are bound to the complete source-set digest and become stale if any included file changes. Applying to another directory preflights and copies the complete relative source set, refuses overwrites, verifies the resulting digest, and rolls back partial output on failure. Included FE edits additionally require that separate destination directory so originals are never modified.
 

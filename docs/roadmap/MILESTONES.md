@@ -275,7 +275,7 @@ Input gate: user selection of the first geometry families and trusted acceptance
 ## M6 — Product clients and optional providers
 
 - [ ] Add hosted providers only behind explicit data policy and the same conformance suite.
-- [ ] Build a thin VS Code client over the stable local API.
+- [x] Build a thin VS Code client over the stable local API.
 - [ ] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
 
 ## Deferred
@@ -287,7 +287,7 @@ Input gate: user selection of the first geometry families and trusted acceptance
 
 ## Next execution sessions
 
-1. Continue M3 cross-feature validation coverage for the registered generation profile and remaining capability families.
-2. Continue non-notch live acceptance when another trusted representative project is available; do not fabricate engineering fixtures.
+1. Continue M6 with reviewed change diffs and guarded apply/run controls in the thin VS Code client.
+2. Add schema-derived parameter forms and integrate the existing local chat boundary without enabling a hosted provider.
 
 No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

@@ -20,7 +20,7 @@ BSAM baseline re-audited on 2026-08-31: source `9954027f1c325c63d58aeb836e8fec41
 | Git | 2.36.1.windows.1 | Repository and version control |
 | Python | 3.10.11 | Preferred core/API implementation baseline |
 | .NET SDK | 5.0.416 | Present, not selected for the first implementation |
-| Node.js/npm | Not installed | Required later for the VS Code extension |
+| Node.js/npm | Portable Node.js 24.21.0 LTS / npm 11.19.0 | VS Code extension build and test toolchain |
 | Ollama | Not installed | Optional; not required for the deterministic core |
 | Rust/Cargo | Not installed | Not required |
 
@@ -39,4 +39,6 @@ No local model runtime should be installed until the provider contract and evalu
 
 ## Tooling decision
 
-Use Python for the first core and local HTTP API because it is already installed and supports process supervision, schema validation, parsing, and test tooling. Add Node.js only when the VS Code extension milestone begins. This is a reversible choice because the editor communicates through the documented Agent API.
+Use Python for the core and local HTTP API because it supports process supervision, schema validation, parsing, and test tooling. The M6 VS Code extension uses a separate portable Node.js toolchain and remains a thin TypeScript client over the documented Agent API.
+
+The M6 toolchain is stored outside the repository at `D:\Partha\BSAM\runtimes\node\node-v24.21.0-win-x64`. Its downloaded Windows x64 archive was verified before extraction with SHA-256 `158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541`. Extension dependencies are exactly pinned in `clients/vscode/package-lock.json`.

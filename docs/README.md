@@ -31,6 +31,7 @@
 - [Provider adapters](api/PROVIDER_ADAPTERS.md)
 - [Local model runtime](api/LOCAL_MODEL_RUNTIME.md)
 - [Terminal chat](api/CHAT_CLIENT.md)
+- [VS Code client](../clients/vscode/README.md)
 
 ## Acceptance records
 

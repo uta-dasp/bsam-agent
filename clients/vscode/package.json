@@ -1,0 +1,143 @@
+{
+  "name": "bsam-agent",
+  "displayName": "BSAM Agent",
+  "description": "Thin VS Code client for the deterministic BSAM Agent loopback API.",
+  "version": "0.1.0",
+  "publisher": "uta-dasp",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uta-dasp/bsam-agent.git"
+  },
+  "engines": {
+    "vscode": "^1.134.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:bsamAgent.startServer",
+    "onCommand:bsamAgent.validateCurrentFile",
+    "onLanguage:bsam"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "bsam",
+        "aliases": [
+          "BSAM",
+          "bsam"
+        ],
+        "extensions": [
+          ".bsam",
+          ".ele"
+        ],
+        "filenamePatterns": [
+          "*.bsam.in"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "bsamAgent.startServer",
+        "title": "BSAM Agent: Start Local API"
+      },
+      {
+        "command": "bsamAgent.stopServer",
+        "title": "BSAM Agent: Stop Local API"
+      },
+      {
+        "command": "bsamAgent.validateCurrentFile",
+        "title": "BSAM Agent: Validate Current Model"
+      },
+      {
+        "command": "bsamAgent.inspectCurrentFile",
+        "title": "BSAM Agent: Inspect Current Model"
+      },
+      {
+        "command": "bsamAgent.refreshCapabilities",
+        "title": "BSAM Agent: Refresh Capabilities"
+      },
+      {
+        "command": "bsamAgent.showCapabilitiesJson",
+        "title": "BSAM Agent: Show Capabilities JSON"
+      },
+      {
+        "command": "bsamAgent.openOutput",
+        "title": "BSAM Agent: Show Output"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "bsamAgent.validateCurrentFile",
+          "when": "resourceExtname == .in || resourceExtname == .bsam || resourceExtname == .ele",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "bsamAgent.capabilities",
+          "name": "BSAM Capabilities"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "BSAM Agent",
+      "properties": {
+        "bsamAgent.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python executable used to launch the local BSAM Agent API."
+        },
+        "bsamAgent.workspaceRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute API workspace root. Empty uses the first open workspace folder."
+        },
+        "bsamAgent.apiPort": {
+          "type": "integer",
+          "default": 8765,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "Loopback port for the local deterministic API."
+        },
+        "bsamAgent.requestTimeoutMs": {
+          "type": "integer",
+          "default": 120000,
+          "minimum": 1000,
+          "maximum": 600000,
+          "description": "Maximum duration for one local API request."
+        },
+        "bsamAgent.serverStartupTimeoutMs": {
+          "type": "integer",
+          "default": 15000,
+          "minimum": 1000,
+          "maximum": 120000,
+          "description": "Maximum wait for a newly launched local API."
+        },
+        "bsamAgent.validation.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate saved .in, .bsam, and .ele files when the API is already available."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/vscode": "1.134.0",
+    "@vscode/vsce": "3.9.2",
+    "typescript": "7.0.2"
+  }
+}
