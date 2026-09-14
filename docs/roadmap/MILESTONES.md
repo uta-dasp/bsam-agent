@@ -280,6 +280,14 @@ Input gate: user selection of the first geometry families and trusted acceptance
 
 Current M6 coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, run/status/controlled-stop controls, a dedicated guarded chat panel, and an optional routing-only OpenAI Responses adapter are implemented. Hosted requests cannot contain BSAM files or registry catalogs; user-typed text remains external-provider data.
 
+Status: complete. The installed VS Code client and `store: false` OpenAI routing
+adapter were exercised on the real notch workflow. Inspection, capability listing,
+reviewed parameter change, separate confirmation, validated apply, and unsupported
+syntax refusal crossed the expected boundaries. The acceptance exposed and closed
+absolute Windows-path parsing, editable-parameter discovery, default-output
+collision, and Responses request-contract defects. Evidence is retained in
+[the 2026-09-14 acceptance record](../bsam/VSCODE_OPENAI_ACCEPTANCE_2026-09-14.md).
+
 ## Deferred
 
 - MPI execution.
@@ -289,7 +297,10 @@ Current M6 coverage: schema-aware source diagnostics, registry-derived parameter
 
 ## Next execution sessions
 
-1. Exercise the installed VS Code client on the next real project workflow and retain any resulting acceptance evidence.
-2. Exercise the OpenAI routing adapter on non-sensitive prompts and retain acceptance evidence without recording the API key or raw hosted payloads.
+1. [x] Exercise the installed VS Code client on a real project workflow and retain sanitized acceptance evidence.
+2. [x] Exercise the OpenAI routing adapter on non-sensitive prompts and retain acceptance evidence without recording the API key or raw hosted payloads.
+
+M5 remains intentionally skipped pending the geometry-family and trusted-mesh
+decision. No later milestone is currently defined.
 
 No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

@@ -37,5 +37,6 @@
 ## Acceptance records
 
 - [Notch regression acceptance](bsam/NOTCH_ACCEPTANCE_2026-09-01.md) — one laminate transformation fixture, not the product scope.
+- [VS Code and OpenAI routing acceptance](bsam/VSCODE_OPENAI_ACCEPTANCE_2026-09-14.md) — privacy-bounded installed-client evidence on the real notch workflow.
 
 Architecture documents explain design. The capability registry defines BSAM grammar and semantics. The roadmap alone defines implementation order.
