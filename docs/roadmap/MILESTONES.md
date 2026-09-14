@@ -30,8 +30,51 @@ BSAM runtime            = empirical verification
 ```
 
 The LLM may choose what to inspect, retrieve, compare, plan, or explain. It may not write BSAM
-files directly, run arbitrary processes, waive validation, bypass workspace or confirmation
+files directly, run arbitrary processes, waive validation, bypass workspace or authorization
 policy, or silently change engineering physics to make a task succeed.
+
+## Grounded explanation policy
+
+Explanations must identify the authority behind each material claim:
+
+- general conceptual explanations may use the LLM's own knowledge and must be presented as general
+  background rather than verified BSAM-project facts;
+- claims about the active model, project, run, or result must come from deterministic inspection;
+- claims attributed to BSAM documentation or precedent must come from retrieval with provenance
+  when retrieval is available;
+- conclusions that combine evidence or extrapolate beyond it must be labeled as inferences;
+- missing deterministic or retrieved evidence must be stated, not filled with invented model facts.
+
+For example, “Explain the cracks” should permit inspect crack 1 → inspect crack 2 → optionally
+retrieve crack documentation → synthesize. It should not fail merely because no single deterministic
+query can author the final explanatory sentence.
+
+## Task-scoped authorization
+
+Authorization is durable task state, not a confirmation prompt attached independently to every
+tool call. Initial modes are:
+
+- `read_only`: autonomous bounded inspection and retrieval; no writes or execution;
+- `edits_with_confirmation`: autonomous planning, but every physics-changing or model-changing plan
+  must receive deterministic review and explicit confirmation before application;
+- `execution_when_explicitly_requested`: when the objective explicitly requests smoke and/or full
+  execution, that request authorizes those named executions after deterministic prerequisites pass
+  and after any requested model-changing plan is reviewed and confirmed;
+- `task_scoped_autonomy`: reserved for a later explicit opt-in policy; it may reduce operational
+  prompts but must never waive review of physics-changing edits.
+
+Authorization records the approved objective, operations, source/destination scope, run kinds,
+limits, and revocation state. Expanding that scope requires a new user decision. A bounded stop made
+necessary by timeout, cancellation, or safety policy is part of the authorized run lifecycle and
+does not require a redundant confirmation. The user may revoke authorization at any time.
+
+## Per-task engineering workspace
+
+Each agent task should receive a contained working area for plans, intermediate source sets,
+ephemeral smoke derivatives, run artifacts, retries, and compact evidence. Failed or superseded
+variants stay out of the user's project. Only an explicitly selected final artifact is promoted back
+through an atomic, collision-safe operation. Task cleanup must preserve required audit/provenance
+records and must never delete user-owned sources.
 
 ## Status and maturity rules
 
@@ -146,6 +189,9 @@ Remaining:
 - execute the complete inspect → cracks → ply2 → selected-crack dialogue as one acceptance case;
 - broaden plural and multi-entity reference resolution without guessing;
 - improve user-facing recovery whenever context exists but a narrow query cannot consume it.
+- add deterministic context compaction for 20–50-step tasks, preserving user decisions, active
+  source/digest, assumptions, unresolved questions, evidence references, failures, authorization,
+  and the current plan while reducing verbose historical observations.
 
 Exit: the specified multi-turn crack dialogue succeeds without repeating the filename and without
 leaking internal query/parser failures.
@@ -193,7 +239,8 @@ Implemented:
   recovery-limit outcomes;
 - maximum steps/recoveries, repeated-action detection, failed-action fingerprints, and no repeat of
   an identical failed action;
-- separate confirmation boundaries for applying changes, running BSAM, and stopping a run;
+- separate confirmation boundaries in the current baseline for applying changes, running BSAM, and
+  stopping a run;
 - deterministic evidence requirements for creation, validation, comparison, and terminal run state.
 
 Remaining:
@@ -203,6 +250,11 @@ Remaining:
 - add working hypotheses distinct from the working plan and retain evidence for hypothesis changes;
 - add an evidence-grounded final synthesis step that cannot override completion checks;
 - characterize model behavior when several equally safe investigation paths exist.
+- replace per-tool execution confirmations with audited task-scoped authorization while retaining
+  mandatory review/confirmation for every physics-changing or model-changing edit;
+- create a per-task engineering workspace and deterministic promotion/cleanup lifecycle;
+- compact long trajectories deterministically without losing decisions, failures, provenance,
+  authorization, or completion evidence.
 
 Exit: an unseen multi-step task is completed by composing registered primitives without a hard-coded
 workflow, while all terminal and safety boundaries remain deterministic.
@@ -217,6 +269,10 @@ Available composable reads include model inspection, canonical entity/reference 
 comparison, validation diagnostics, run status, and bounded known-log inspection. Boundary-condition
 investigation and failed-run diagnosis already demonstrate multi-call read-only trajectories without
 confirmation.
+
+All read-only synthesis follows the grounded explanation policy: current-model claims require
+deterministic observations, documentation claims require retrieved provenance when available,
+general background is labeled as such, and inferences identify their evidence.
 
 Next work:
 
@@ -249,6 +305,11 @@ Next work:
 
 - add generic duplicate/copy-structure and reference-retarget primitives where registry semantics
   can define them safely;
+- define a typed model-building intermediate representation and deterministic bulk/structured
+  construction primitives for repeated structures, transforms, orientations, and references;
+- allow compact requests such as “duplicate this ply structure six times with these transforms and
+  orientations” to expand deterministically into bounded validated model operations rather than
+  thousands of model-selected `create_entity` calls;
 - let the agent assemble and review a multi-operation structural plan before one confirmation;
 - distinguish safe structural assumptions from choices affecting materials, loading, thickness,
   stacking sequence, constitutive behavior, or other physics;
@@ -276,13 +337,25 @@ identity/version, input digest, command/configuration, working directory, bounde
 exit/timeout state, BSAM diagnostics, expected artifacts, and initialization/solver-stage evidence.
 Process launch or exit code alone must never count as success.
 
+A smoke test must not silently alter engineering physics merely to finish quickly. If BSAM requires
+a modified input for bounded verification, create an explicitly marked ephemeral smoke-only
+derivative inside the task workspace, record an exact source/semantic diff and provenance, and
+discard or retain it according to task policy. Passing that derivative proves initialization/runtime
+compatibility only; it does not prove that the original full simulation will converge.
+
 ### Level 3: full run
 
 `run_bsam`, `get_run_status`, `inspect_run_log`, and `stop_run` provide a guarded asynchronous
 foundation. Add explicit full-run intent, monitoring policy, and `inspect_run_outputs`.
 
+If the user explicitly requested smoke and full execution in the task objective, those named runs
+may proceed after prerequisite checks and confirmation of any requested model-changing plan under
+`execution_when_explicitly_requested`; they do not require repeated confirmations. New execution
+kinds, changed limits, changed inputs, or expanded scope require renewed authorization.
+
 Exit: “make sure the input is correct” defaults to static validation plus a successful deterministic
-smoke test, and requested full runs expose terminal and output evidence.
+smoke test, and explicitly requested full runs expose terminal and output evidence with auditable
+task-scoped authorization.
 
 ## M8 — Runtime diagnosis and agentic recovery
 
@@ -442,7 +515,8 @@ local acceptance, and opt-in-only telemetry. Apply the capability maturity ladde
 each operation.
 
 Exit: release gates cover safety, correctness, resilience, provenance, compatibility, performance,
-privacy, and both public and proprietary acceptance evidence.
+privacy, task-workspace lifecycle, authorization scope, deterministic context compaction, and both
+public and proprietary acceptance evidence.
 
 ## Long-term acceptance scenario
 
@@ -467,13 +541,13 @@ understand objective
 -> ask only when genuinely required
 -> formulate a working plan
 -> compose generic deterministic operations
--> produce a reviewed change and request confirmation
+-> produce a reviewed change and request one edit confirmation
 -> apply to a non-overwriting output
 -> run static validation
--> run a deterministic smoke test
+-> run the explicitly requested deterministic smoke test under task authorization
 -> inspect runtime evidence
 -> diagnose, recover, or replan within bounds
--> run the full simulation when authorized
+-> run the explicitly requested full simulation under the same bounded task authorization
 -> inspect outputs
 -> report assumptions, changes, validation, runtime evidence, and results
 ```
@@ -486,16 +560,12 @@ scenario.
 ```text
 M0 deterministic authority
 ├── M1 providers ──┐
-├── M2 context ────┼──> M4 agent loop ──> M5 exploration ──> M6 modification
-└── M3 actions ────┘                              │                 │
-                                                  └──────┬──────────┘
-                                                         v
-                                                   M7 execution
-                                                         |
-                                      M9 retrieval ──> M8 recovery
-                                           ├─────────> M10 examples
-                                           └─────────> M11 memory
-                                                   M7 ──> M12 results
+├── M2 context ────┼──> M4 agent loop ──> M5 exploration ──┬──> M6 modification ──> M7 execution
+└── M3 actions ────┘                                       └──> M9 retrieval
+                                                                    ├──> M10 examples
+                                                  M7 + M9 ──> M8 recovery
+                                                                    └──> M11 memory
+                                                        M7 ──> M12 results
 
 M13 VS Code consumes stable capabilities incrementally.
 M14 evaluation gates every milestone and release trajectory.
@@ -504,14 +574,16 @@ M15 hardening turns verified capabilities into production-qualified ones.
 
 Immediate prerequisite: close M4 with a genuinely model-composed unseen-task acceptance case.
 
-The next three recommended implementation milestones are:
+The next recommended implementation milestones are:
 
 1. **M5 — Autonomous read-only exploration:** add bounded workspace reads/search and broaden
    semantic investigations, using executable trajectories to retire remaining M4 special cases.
-2. **M6 — Goal-oriented modification and generation:** prove one substantial multi-operation
-   transformation through generic primitives, with focused engineering clarification.
+2. Begin **M6 — Goal-oriented modification and generation** and **M9 — BSAM Knowledge/RAG v1** in
+   parallel after M5 establishes safe general exploration. M6 proves structured transformation;
+   M9 improves grounded explanations without waiting for smoke-test work.
 3. **M7 — Static validation, smoke testing, and full execution:** define a first-class smoke-test
-   contract and acceptance evidence before expanding automatic runtime recovery.
+   contract, ephemeral-derivative semantics, and task-scoped execution evidence before expanding
+   automatic runtime recovery.
 
 M8 can begin with classification work during M7, but recovery cannot be accepted until the smoke
 test is deterministic. M10 and M11 depend on M9 provenance. M12 depends on stable M7 output
@@ -537,8 +609,16 @@ The following tactical conflicts or gaps must be retired:
   product-definition release;
 - remaining keyword-driven and deterministic special-case routing cannot be the main mechanism for
   unseen agent tasks;
+- per-tool confirmation is too granular for explicitly requested multi-step execution and must be
+  replaced by bounded, revocable task-scoped authorization;
+- project-root intermediate outputs need to move into a contained task workspace with explicit
+  final-artifact promotion;
+- long trajectories currently retain bounded recent observations but lack deterministic compaction
+  of decisions, evidence, hypotheses, failures, and plans;
 - specialized notch expansion may remain as a regression adapter but cannot satisfy generic M6 or
   the long-term acceptance scenario;
+- individual entity CRUD and small composed plans are insufficient for large construction without a
+  generic structured/bulk model-building representation;
 - `run_bsam` currently combines short and full execution concerns instead of exposing a deterministic
   smoke-test contract;
 - retrieval is not yet connected to an indexed, provenance-ranked knowledge service;

@@ -22,13 +22,56 @@ isolation. A vertical slice is complete only when its relevant path includes:
 3. versioned tool/API contracts and workspace/data policy;
 4. agent planning, observations, completion criteria, and safe terminal behavior;
 5. conversational continuity and persisted state where applicable;
-6. confirmation before every mutation, execution, or controlled stop;
+6. audited task-scoped authorization, with mandatory review/confirmation for model-changing edits
+   and no redundant prompt for explicitly requested bounded executions;
 7. user-visible VS Code behavior where the capability is interactive;
 8. executable trajectory evaluation, negative cases, and regression tests;
 9. documentation, provenance, and reproducible acceptance evidence.
 
 A JSON trajectory specification, isolated parser feature, UI mock, or successful process launch is
 not a complete vertical slice by itself.
+
+## Cross-cutting Version 2 policies
+
+### Authorization modes
+
+- `read_only` authorizes bounded inspection and retrieval only.
+- `edits_with_confirmation` authorizes autonomous investigation/planning, but every model-changing
+  or physics-changing plan requires deterministic review and explicit confirmation before apply.
+- `execution_when_explicitly_requested` carries the user's explicit request for named smoke/full
+  executions across the task. Once prerequisites pass and any requested model-changing plan is
+  reviewed and confirmed, those executions do not require separate repetitive confirmations.
+- `task_scoped_autonomy` is reserved for a later explicit opt-in policy and may never waive review
+  of physics-changing edits.
+
+Authorization must be persisted and audited with objective, operations, sources/destinations, run
+kinds, limits, and revocation state. Scope expansion requires a new user decision. Timeout, safety,
+or cancellation stops are part of an authorized run lifecycle. The user can revoke authorization at
+any time.
+
+### Grounded explanations
+
+- General concepts may come from model knowledge but must be labeled as general background.
+- Claims about the current model/project/run/result require deterministic evidence.
+- Documentation or precedent claims require retrieved provenance when retrieval is available.
+- Inferences must be identified as inferences and point to their supporting evidence.
+- Missing evidence is reported; it is never replaced with invented project facts.
+
+### Task workspace
+
+Each task receives a contained working area for plans, intermediate models, ephemeral smoke inputs,
+runs, retries, and evidence. Only a selected final artifact is promoted atomically and collision-
+safely into the user project. Cleanup cannot delete user-owned input and must preserve required audit
+and provenance records. Promotion must remain within the destination and edit scope covered by the
+reviewed plan/task authorization; otherwise it requires a new user decision.
+
+### Deterministic context compaction
+
+Long trajectories must compact context without changing task meaning. Compaction preserves user
+decisions, authorization, active source/digest, assumptions, unresolved questions, current plan and
+hypotheses, evidence references, failures/recoveries, selected outputs, and completion state. Verbose
+historical payloads may be summarized or dropped only when their immutable evidence references remain
+available locally.
 
 ## Permanent foundation gates — M0
 
@@ -44,6 +87,14 @@ These gates apply to every slice and are not optional feature work.
   `runtime_verified` or `production_qualified` from implementation alone.
 - [ ] **V2-G006** Retain sanitized acceptance evidence for controlled live-provider or BSAM-runtime
   checks without committing credentials, proprietary model contents, or raw hosted payloads.
+- [ ] **V2-G007** Test authorization grant, persistence, consumption, revocation, expiry, and scope-
+  expansion behavior; physics-changing edits always retain a review boundary.
+- [ ] **V2-G008** Keep intermediate artifacts inside the task workspace and test atomic promotion,
+  cleanup, retry, crash recovery, symlink rejection, and user-source preservation.
+- [ ] **V2-G009** Test context compaction equivalence: compacted and uncompacted state must produce
+  the same deterministic authorization, remaining criteria, and safe next-action set.
+- [ ] **V2-G010** Evaluate grounded explanations for source attribution, current-model evidence,
+  documentation provenance, inference labels, and unsupported claims.
 
 ## Slice V2-S1 — General autonomous engineering investigation
 
@@ -83,6 +134,20 @@ a grounded conclusion without the user prescribing tools.
   repetition, final usefulness, policy behavior, and provider parity in executable tests.
 - [ ] **V2-S1-015** Retain sanitized acceptance evidence for one previously unseen investigation;
   close M4 only if the trajectory is model-composed rather than hard-coded.
+- [ ] **V2-S1-016** Add task-scoped authorization state, mode transitions, audit events, revocation,
+  and backward-compatible conversation-state migration.
+- [ ] **V2-S1-017** Implement the grounded explanation policy in planning/synthesis prompts and
+  response evidence so current-model claims cannot come from model memory alone.
+- [ ] **V2-S1-018** Add the per-task workspace abstraction, manifest, contained path resolver,
+  lifecycle states, and safe final-artifact promotion contract.
+- [ ] **V2-S1-019** Route plans, intermediate variants, retry artifacts, and temporary observations
+  into the task workspace instead of collision-suffixed project files.
+- [ ] **V2-S1-020** Implement deterministic context compaction with immutable evidence IDs and a
+  compact state summary suitable for 20–50-step trajectories.
+- [ ] **V2-S1-021** Add save/resume and compaction-boundary trajectories proving preservation of user
+  decisions, authorization, assumptions, questions, hypotheses, failures, and completion evidence.
+- [ ] **V2-S1-022** Add “Explain the cracks” acceptance: inspect each relevant crack, optionally
+  retrieve general documentation, synthesize a grounded explanation, and label every inference.
 
 **Exit:** M1–M4 exit criteria are closed, and M5 has one general multi-tool read-only acceptance
 path spanning model semantics and allowed workspace evidence.
@@ -119,6 +184,18 @@ new source set.
   cancellation, and no-partial-write trajectories.
 - [ ] **V2-S2-012** Demonstrate one previously unseen substantial transformation composed by the
   agent with no workflow-specific transformation tool.
+- [ ] **V2-S2-013** Define a typed model-building intermediate representation for repeated structures,
+  transforms, orientations, set/reference policies, bounds, and required engineering decisions.
+- [ ] **V2-S2-014** Implement generic bulk/structured construction primitives that expand the typed
+  representation deterministically rather than issuing thousands of `create_entity` calls.
+- [ ] **V2-S2-015** Validate bulk expansion limits, label allocation, topology, dependencies,
+  orientation/stacking semantics, deterministic rendering, and minimal/canonical output policy.
+- [ ] **V2-S2-016** Produce a bounded semantic/source preview of bulk construction and retain one
+  review/confirmation boundary for the complete physics-changing plan.
+- [ ] **V2-S2-017** Create all intermediate construction variants inside the task workspace and
+  promote only the selected validated artifact to the user project.
+- [ ] **V2-S2-018** Add compact-plan and stress tests proving large structured construction does not
+  require model context or tool-call counts proportional to entity count.
 
 **Exit:** M6 is complete for one substantial generic transformation and the resulting model has
 deterministic static-validation evidence. Runtime proof is added in V2-S3.
@@ -128,7 +205,9 @@ deterministic static-validation evidence. Runtime proof is added in V2-S3.
 **Milestones advanced:** M4, M7, M13, M14, M15.
 
 **User outcome:** “make sure this input is correct” produces static-validation plus meaningful BSAM
-smoke-test evidence; a full run occurs only when requested and separately confirmed.
+smoke-test evidence. An explicitly requested smoke/full workflow proceeds under bounded task
+authorization after prerequisites and confirmation of any requested mutation, without repetitive
+execution prompts.
 
 - [ ] **V2-S3-001** Define a versioned smoke-test request/result schema and deterministic acceptance
   criteria beyond process launch or exit code.
@@ -144,8 +223,8 @@ smoke-test evidence; a full run occurs only when requested and separately confir
   current `run_bsam` compatibility contract where needed.
 - [ ] **V2-S3-007** Add completion criteria for static validation, terminal smoke evidence, and
   terminal full-run evidence.
-- [ ] **V2-S3-008** Require independent confirmation for smoke execution and later full execution;
-  confirmation for one may not authorize the other.
+- [ ] **V2-S3-008** Implement `execution_when_explicitly_requested`: persist and audit exactly which
+  smoke/full runs, inputs, limits, and promotion targets the objective authorizes after edit review.
 - [ ] **V2-S3-009** Add `inspect_run_outputs` inventory metadata needed for acceptance without yet
   claiming engineering interpretation.
 - [ ] **V2-S3-010** Add VS Code smoke/full-run status, evidence, cancellation, and generated-artifact
@@ -154,8 +233,18 @@ smoke-test evidence; a full run occurs only when requested and separately confir
   exit, missing artifact, timeout, stop, crash, stale input, and path/collision violations.
 - [ ] **V2-S3-012** Run a controlled non-proprietary smoke acceptance and retain executable version,
   digests, commands, bounded logs, artifacts, and terminal classification.
-- [ ] **V2-S3-013** Complete a change → static validate → smoke confirm/run → full-run confirm/run
-  trajectory with exact confirmation accounting.
+- [ ] **V2-S3-013** Complete a change → one reviewed-edit confirmation → static validation →
+  authorized smoke run → authorized full run trajectory with exact authorization accounting and no
+  redundant prompts.
+- [ ] **V2-S3-014** Forbid smoke-test shortening that silently changes loads, BCs, materials,
+  constitutive/damage choices, solver tolerances, mesh physics, or other engineering meaning.
+- [ ] **V2-S3-015** If bounded execution requires a modified deck, create an explicitly marked
+  ephemeral smoke-only derivative inside the task workspace with exact semantic/source diff,
+  provenance, purpose, and cleanup state.
+- [ ] **V2-S3-016** Report smoke-only derivative success as initialization/runtime compatibility,
+  never as proof that the original full simulation converges; test this wording and completion logic.
+- [ ] **V2-S3-017** Require renewed authorization for any execution kind, input, limit, destination,
+  or scope not present in the original objective, and stop promptly after revocation.
 
 **Exit:** M7 Levels 1–3 have distinct contracts and evidence; the selected generated/modified model
 passes static validation and a deterministic BSAM smoke test.
@@ -166,6 +255,10 @@ passes static validation and a deterministic BSAM smoke test.
 
 **User outcome:** the agent can explain a construct or diagnostic with provenance-ranked local
 documentation while deterministic model/registry state remains authoritative.
+
+**Scheduling:** V2-S4 may begin as soon as V2-S1 establishes general safe exploration. It proceeds
+in parallel with V2-S2 and V2-S3; precedent construction and troubleshooting still wait for their
+own deterministic prerequisites.
 
 - [ ] **V2-S4-001** Define versioned knowledge document, chunk, provenance, authority, and retrieval
   result schemas.
@@ -216,7 +309,8 @@ revalidates, and retests.
 - [ ] **V2-S5-007** Enforce failed-action fingerprints, maximum recoveries, no identical rerun after
   the same evidence, and concise safety-stop explanations.
 - [ ] **V2-S5-008** Require a reviewed plan and confirmation for recovery mutations, then static
-  validation and a new smoke confirmation before retest.
+  validation; a retest may consume existing task execution authorization only when its run kind,
+  input policy, and limits remain in scope.
 - [ ] **V2-S5-009** Persist the original failure, each attempt, new evidence, and terminal outcome
   across save/resume.
 - [ ] **V2-S5-010** Show diagnosis, evidence, proposed repair, decisions, attempts, and retest state
@@ -250,8 +344,8 @@ compatible pattern, and constructs a new validated model through generic determi
   retarget plan operations.
 - [ ] **V2-S6-007** Ask for incompatible or missing engineering choices and preserve the selected
   precedent across clarification.
-- [ ] **V2-S6-008** Preview, confirm, apply, statically validate, smoke-test, and compare the new model
-  with the source precedent.
+- [ ] **V2-S6-008** Preview, confirm the model-changing plan once, apply, statically validate, execute
+  any explicitly authorized smoke test, and compare the new model with the source precedent.
 - [ ] **V2-S6-009** Show precedent provenance, structural reuse, differences, and verification
   evidence in VS Code.
 - [ ] **V2-S6-010** Add executable relevant, misleading, obsolete-version, unverified, no-match,
@@ -354,6 +448,8 @@ recovery, full execution, and result inspection.
   proprietary acceptance suites from a clean checkout.
 - [ ] **V2-S9-014** Request explicit user verification of `developer`; merge/promote to `main` only
   after approval.
+- [ ] **V2-S9-015** Complete the scenario with one reviewed physics-edit confirmation and audited
+  task-scoped authorization for the explicitly requested smoke/full runs, including revocation tests.
 
 **Exit:** the long-term acceptance scenario passes without a special-purpose workflow, M13 and M14
 are complete, and each released capability meets its declared M15 maturity level.
@@ -362,21 +458,19 @@ are complete, and each released capability meets its declared M15 maturity level
 
 ```text
 V2-S1 general investigation
-  -> V2-S2 generic transformation
-       -> V2-S3 smoke/full execution
-            -> V2-S4 knowledge retrieval
-                 -> V2-S5 runtime recovery
-                      -> V2-S6 precedent construction
-                           -> V2-S7 troubleshooting memory
-            -> V2-S8 results inspection
+  ├──> V2-S2 generic transformation ──> V2-S3 smoke/full execution ──> V2-S8 results
+  └──> V2-S4 knowledge retrieval
 
-V2-S1..S8 -> V2-S9 long-term acceptance and production qualification
+V2-S3 + V2-S4 ──> V2-S5 runtime recovery
+V2-S2 + V2-S4 ──> V2-S6 precedent construction ──> V2-S7 troubleshooting memory
+V2-S1..S8 ──> V2-S9 long-term acceptance and production qualification
 ```
 
-V2-S4 intentionally precedes final M8 recovery acceptance even though the roadmap number is higher:
-retrieval is required for the target diagnosis loop. Initial deterministic failure classification
-may be developed during V2-S3. V2-S8 can proceed after V2-S3 while V2-S4–S7 are underway, provided
-shared schemas and manifests remain stable.
+V2-S2, V2-S3, and V2-S4 are not one serial chain: after V2-S1, knowledge retrieval can proceed in
+parallel with transformation and execution work. V2-S5 needs both deterministic runtime evidence
+from V2-S3 and grounded retrieval from V2-S4. V2-S6 needs generic construction from V2-S2 and
+provenance-ranked examples from V2-S4. V2-S8 can proceed after V2-S3 while recovery, precedent, and
+memory work continues, provided shared schemas and manifests remain stable.
 
 ## Progress accounting
 
@@ -386,7 +480,7 @@ At every checkpoint, update this file and report:
 - milestone exit criteria advanced;
 - deterministic capability/maturity changes;
 - tests and controlled evidence added;
-- confirmation, privacy, and workspace-safety impact;
+- authorization/review, privacy, task-workspace, compaction, and safety impact;
 - remaining slice blockers;
 - commit pushed to `origin/developer`.
 
