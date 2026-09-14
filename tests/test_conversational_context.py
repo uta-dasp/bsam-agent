@@ -50,7 +50,8 @@ class ConversationalContextTests(unittest.TestCase):
 
     def test_absolute_inspection_and_active_model_followups(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory) / "RUNNER~1" / "Temp"
+            root.mkdir(parents=True)
             source = root / "model.in"
             source.write_bytes(DECK)
             agent = self.agent(root)

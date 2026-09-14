@@ -2193,8 +2193,8 @@ def _normalize_arguments(
 def _input_paths_from_text(text: str) -> list[str]:
     matches = re.finditer(
         r'(?:"([^"\r\n]+\.in)"|\'([^\'\r\n]+\.in)\'|'
-        r'((?:[A-Za-z]:[\\/])?(?:[A-Za-z0-9_.-]+[\\/])+'
-        r'[A-Za-z0-9_.-]+\.in|[A-Za-z0-9_.-]+\.in))',
+        r'((?:[A-Za-z]:[\\/])?(?:[A-Za-z0-9_.~-]+[\\/])+'
+        r'[A-Za-z0-9_.~-]+\.in|[A-Za-z0-9_.~-]+\.in))',
         text, re.IGNORECASE,
     )
     return [
