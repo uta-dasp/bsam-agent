@@ -10,7 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
 from bsam_agent.orchestrator import (
-    ChatOrchestrator, ConversationState, _summarize_result, relevant_tools, routing_prompt,
+    ChatOrchestrator, ConversationState, _input_paths_from_text, _summarize_result,
+    relevant_tools, routing_prompt,
 )
 from bsam_agent.provider import ProviderConfig, ProviderRequest, ProviderResponse, Usage
 
@@ -70,6 +71,28 @@ class FakeApi:
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_unquoted_absolute_windows_input_path_is_preserved(self) -> None:
+        path = r"D:\Partha\BSAM\projects\notch_v1\notch_v1.in"
+        self.assertEqual(
+            ["D:/Partha/BSAM/projects/notch_v1/notch_v1.in"],
+            _input_paths_from_text(f"Go to {path} and inspect the boundary conditions"),
+        )
+
+    def test_absolute_input_inside_workspace_is_normalized_before_dispatch(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\nBOUNDARY\n*type\nmechanical\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            source = root / "model.in"
+            source.write_bytes(deck)
+            agent = ChatOrchestrator(FakeProvider(), config(), LocalAgentApi(root))
+            result = agent.turn(f"Go to {source} and inspect the boundary conditions")
+        self.assertEqual("inspect_model", result.tool)
+        self.assertIsNone(result.error_code)
+
     def test_hosted_routing_prompt_omits_registry_parameter_catalog(self) -> None:
         tools = ("preview_parameter_change",)
         self.assertIn("registered_parameters", routing_prompt(tools))
@@ -290,6 +313,47 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("model.changed.in", preview.message)
         self.assertEqual("verify", applied.phase)
         self.assertIn(b"d_reduction=0.5", output)
+
+    def test_default_changed_destination_advances_past_existing_output(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\nd_reduction=0.25\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            (root / "model.changed.in").write_bytes(b"existing")
+            agent = ChatOrchestrator(FakeProvider(), config(), LocalAgentApi(root))
+            preview = agent.turn(
+                "Change d_reduction in model.in to 0.5 and create a new file. "
+                "Do not overwrite the original."
+            )
+            applied = agent.turn("/confirm")
+            output = (root / "model.changed-2.in").read_bytes()
+        self.assertIn("model.changed-2.in", preview.message)
+        self.assertEqual("verify", applied.phase)
+        self.assertIn(b"d_reduction=0.5", output)
+
+    def test_lists_explicitly_present_editable_parameters(self) -> None:
+        deck = (
+            b"INPUT\n3\nEND INPUT\n"
+            b"BOUNDARY\n*type\nmechanical\n*convergence\n"
+            b"absolute=1\nmaxiterations=30\nd_reduction=0.25\nEND BOUNDARY\n"
+            b"CONSTITUTIVE\n0\nEND CONSTITUTIVE\nMATERIALS\n0\nEND MATERIALS\n"
+            b"CLUSTERS\n*type\nsolid\n*STOP\nEND CLUSTERS\n"
+        )
+        provider = FakeProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(deck)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Which parameters can be safely changed in model.in?")
+        self.assertEqual([], provider.requests)
+        self.assertEqual("query_model", result.tool)
+        self.assertEqual("list-editable-parameters", result.tool_result["query"])  # type: ignore[index]
+        self.assertIn("d_reduction", result.message)
 
     def test_natural_optional_parameter_removal_uses_registered_policy(self) -> None:
         deck = (

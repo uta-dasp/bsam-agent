@@ -76,6 +76,28 @@ def query_model(
                 "operations": record["operations"],
             })
         ambiguous = ambiguous or len({item["capability_id"] for item in matches}) > 1
+    elif normalized in {"list-editable-parameters", "editable-parameters"}:
+        matches = []
+        for record in records:
+            if record.get("operations", {}).get("modify") not in {"implemented", "verified"}:
+                continue
+            definitions = definitions_by_capability.get(record["capability_id"], {})
+            for canonical, values in record.get("parameters", {}).items():
+                definition = definitions.get(str(canonical).casefold())
+                if definition is None:
+                    continue
+                matches.append({
+                    "record_id": record["id"],
+                    "capability_id": record["capability_id"],
+                    "canonical": record["canonical"],
+                    "occurrence": record["occurrence"],
+                    "parameter": definition["name"],
+                    "value_type": definition.get("value_type"),
+                    "allowed_values": definition.get("allowed_values"),
+                    "values": values,
+                    "default": record.get("defaults", {}).get(definition["name"]),
+                    "operations": record["operations"],
+                })
     elif normalized == "list-entities":
         matches = list(entities)
         if entity_kind:

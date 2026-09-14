@@ -137,7 +137,9 @@ The chat command does not require `BSAM Agent: Start Local API`; chat constructs
 
 ## 6. Start with read-only requests
 
-Use workspace-relative paths. A safe first request is:
+Workspace-relative paths are recommended. An absolute path inside the configured
+workspace is accepted and normalized; unrelated absolute paths and `..` escapes
+remain rejected. A safe first request is:
 
 ```text
 Inspect projects/TriC_v311/TriC_v311.in and summarize its model, boundary conditions, mesh, errors, and warnings.
@@ -155,6 +157,10 @@ List the registered capabilities used by projects/notch_v1/notch_v1.in.
 
 ```text
 Show the effective d_reduction value in projects/notch_v1/notch_v1.in.
+```
+
+```text
+Which parameters can be safely changed in projects/notch_v1/notch_v1.in?
 ```
 
 Read-only inspection and validation do not require `/confirm`.
@@ -182,7 +188,7 @@ Expected workflow:
 /confirm
 ```
 
-The apply step writes a new deck plus an audit sidecar. It does not overwrite the original deck. If the default destination already exists, cancel and request another unique destination.
+The apply step writes a new deck plus an audit sidecar. It does not overwrite the original deck. If the default deck or audit sidecar already exists, the preview automatically selects the first available numbered destination, such as `notch_v1.changed-2.in`.
 
 To reject the pending operation, type:
 

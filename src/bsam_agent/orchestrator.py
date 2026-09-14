@@ -512,7 +512,14 @@ class ChatOrchestrator:
         self.state.phase = "understand"
         self._audit("user_turn", correlation_id=correlation_id, user_digest=_digest(text))
         task = _task_from_request(text)
+        workspace_root = getattr(self.api, "workspace_root", None)
         if task is not None:
+            if isinstance(workspace_root, Path):
+                task.source = _workspace_relative_path(task.source, workspace_root)
+            if task.destination is not None and isinstance(workspace_root, Path):
+                task.destination = _workspace_relative_path(
+                    task.destination, workspace_root,
+                )
             self.state.task = task
             self._audit(
                 "task_started", correlation_id=correlation_id,
@@ -581,6 +588,8 @@ class ChatOrchestrator:
         arguments = _normalize_arguments(tool, decision["arguments"], text)
         arguments = _add_safe_defaults(tool, arguments)
         arguments = _conversation_defaults(tool, arguments, text, self.state)
+        if isinstance(workspace_root, Path):
+            arguments = _workspace_relative_arguments(arguments, workspace_root)
         if tool in GUARDED_TOOLS:
             arguments["confirm"] = False
         try:
@@ -803,7 +812,13 @@ class ChatOrchestrator:
                     task.plan_path = plan_path
                     task.status = "propose"
                 message += f" Plan: {plan_path}."
-        pending = _preview_follow_up(tool, arguments, user_text)
+        pending = (
+            _preview_follow_up(
+                tool, arguments, user_text,
+                workspace_root=getattr(self.api, "workspace_root", None),
+            )
+            if tool in PREVIEW_TOOLS else None
+        )
         if pending is not None:
             self.state.pending_action = pending
             if task is not None:
@@ -1108,7 +1123,8 @@ def _normalize_arguments(
 def _input_paths_from_text(text: str) -> list[str]:
     matches = re.finditer(
         r'(?:"([^"\r\n]+\.in)"|\'([^\'\r\n]+\.in)\'|'
-        r'((?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+\.in|[A-Za-z0-9_.-]+\.in))',
+        r'((?:[A-Za-z]:[\\/])?(?:[A-Za-z0-9_.-]+[\\/])+'
+        r'[A-Za-z0-9_.-]+\.in|[A-Za-z0-9_.-]+\.in))',
         text, re.IGNORECASE,
     )
     return [
@@ -1120,6 +1136,40 @@ def _input_paths_from_text(text: str) -> list[str]:
 def _source_path_from_text(text: str) -> str | None:
     paths = _input_paths_from_text(text)
     return paths[0] if paths else None
+
+
+_PATH_ARGUMENTS = {
+    "audit_path", "destination", "executable", "manifest", "mesh", "plan_path",
+    "source", "stale_plan_path", "template",
+}
+
+
+def _workspace_relative_path(value: str, workspace_root: Path) -> str:
+    supplied = Path(value)
+    if not supplied.is_absolute():
+        return value
+    resolved = supplied.resolve()
+    if not resolved.is_relative_to(workspace_root):
+        return value
+    return str(resolved.relative_to(workspace_root)).replace("\\", "/")
+
+
+def _workspace_relative_arguments(
+    arguments: dict[str, Any], workspace_root: Path,
+) -> dict[str, Any]:
+    result = dict(arguments)
+    for name in _PATH_ARGUMENTS:
+        value = result.get(name)
+        if isinstance(value, str):
+            result[name] = _workspace_relative_path(value, workspace_root)
+    plan_paths = result.get("plan_paths")
+    if isinstance(plan_paths, list):
+        result["plan_paths"] = [
+            _workspace_relative_path(value, workspace_root)
+            if isinstance(value, str) else value
+            for value in plan_paths
+        ]
+    return result
 
 
 def _parameter_location(name: str) -> tuple[str, str, str] | None:
@@ -1341,6 +1391,16 @@ def _deterministic_parameter_removal_request(text: str) -> dict[str, Any] | None
 def _deterministic_query_request(text: str) -> dict[str, Any] | None:
     """Resolve focused read-only parameter queries from registry identities."""
     source = _source_path_from_text(text)
+    if source is not None and re.search(
+        r"\b(?:which|what|list|show)\b.*\bparameters?\b.*"
+        r"\b(?:safe|safely|change|changed|editable|edit|modify|modified)\b",
+        text, re.IGNORECASE,
+    ):
+        return {
+            "outcome": "dispatch", "tool": "query_model",
+            "arguments": {"source": source, "query": "list-editable-parameters"},
+            "error_code": None, "response": None,
+        }
     if source is None or not re.search(
         r"\b(?:what\s+is|show|get|inspect|query|list)\b", text, re.IGNORECASE,
     ):
@@ -1571,6 +1631,7 @@ def _conversation_defaults(
 
 def _preview_follow_up(
     tool: str, arguments: dict[str, Any], user_text: str,
+    *, workspace_root: Path | None,
 ) -> PendingAction | None:
     if tool not in PREVIEW_TOOLS:
         return None
@@ -1579,12 +1640,34 @@ def _preview_follow_up(
     if not isinstance(source, str) or not isinstance(plan_path, str):
         return None
     paths = _input_paths_from_text(user_text)
-    destination = paths[1] if len(paths) > 1 else _default_destination(source)
+    destination = (
+        paths[1] if len(paths) > 1
+        else _available_destination(_default_destination(source), workspace_root)
+        if workspace_root is not None
+        else _default_destination(source)
+    )
     return PendingAction("apply_change", {
         "plan_path": plan_path,
         "destination": destination,
         "confirm": False,
     })
+
+
+def _available_destination(destination: str, workspace_root: Path) -> str:
+    """Choose a fresh default deck/audit pair without weakening apply-time checks."""
+    supplied = Path(destination)
+    candidate = supplied if supplied.is_absolute() else workspace_root / supplied
+    if not candidate.exists() and not Path(str(candidate) + ".audit.json").exists():
+        return destination
+    for index in range(2, 1000):
+        alternative = candidate.with_name(f"{candidate.stem}-{index}{candidate.suffix}")
+        if not alternative.exists() and not Path(str(alternative) + ".audit.json").exists():
+            value = (
+                alternative if supplied.is_absolute()
+                else alternative.relative_to(workspace_root)
+            )
+            return str(value).replace("\\", "/")
+    raise ValueError("no available default destination below collision limit")
 
 
 def _unsupported_guidance(user_text: str) -> str | None:
@@ -1648,6 +1731,22 @@ def _summarize_result(tool: str, result: dict[str, Any]) -> str:
             return (
                 f"{item['canonical']} {item['parameter']} uses registered default "
                 f"{item.get('default')}."
+            )
+        if result.get("query") == "list-editable-parameters":
+            grouped: dict[str, set[str]] = {}
+            for item in matches:
+                grouped.setdefault(str(item.get("canonical", "?")), set()).add(
+                    str(item.get("parameter", "?"))
+                )
+            parts = [
+                f"{canonical}: {', '.join(sorted(parameters, key=str.casefold))}"
+                for canonical, parameters in sorted(grouped.items(), key=lambda item: item[0])
+            ]
+            shown = parts[:20]
+            suffix = f"; and {len(parts) - 20} more context(s)" if len(parts) > 20 else ""
+            return (
+                f"Found {summary.get('matches', 0)} explicitly present editable parameter "
+                f"occurrence(s): " + "; ".join(shown) + suffix
             )
         return f"Query completed with {summary.get('matches', 0)} match(es)."
     if tool in PREVIEW_TOOLS or tool == "review_change":

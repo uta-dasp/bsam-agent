@@ -23,13 +23,24 @@ Start with a deterministic inspection:
 Inspect projects/notch_v1/notch_v1.in and summarize its laminate, boundary conditions, mesh references, errors, and warnings.
 ```
 
+Chat also accepts an absolute path when it is inside the configured workspace and
+normalizes it to the workspace-relative path required by the guarded API. Absolute
+paths outside the workspace remain rejected.
+
+List only the explicitly present parameters backed by a verified or implemented
+registry edit contract:
+
+```text
+Which parameters can be safely changed in projects/notch_v1/notch_v1.in?
+```
+
 A uniquely registered parameter can be changed with safe plan and output defaults:
 
 ```text
 Change d_reduction in projects/notch_v1/notch_v1.in to 0.5 and create a new file. Do not overwrite the original.
 ```
 
-Every successful change preview creates a pending apply action and displays its destination. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file.
+Every successful change preview creates a pending apply action and displays its destination. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file. If that deck or its audit sidecar already exists, the preview selects the first fresh numbered pair, such as `notch_v1.changed-2.in`.
 
 A registered-parameter request can include validation:
 
