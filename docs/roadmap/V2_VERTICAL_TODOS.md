@@ -106,13 +106,13 @@ a grounded conclusion without the user prescribing tools.
 
 - [ ] **V2-S1-001** Add executable acceptance fixtures for the complete crack-coreference dialogue
   and at least one unseen open-ended model investigation.
-- [ ] **V2-S1-002** Define allowed project-file classes, ignored directories, symlink policy,
+- [x] **V2-S1-002** Define allowed project-file classes, ignored directories, symlink policy,
   maximum file/result sizes, binary detection, and hosted-provider disclosure policy.
-- [ ] **V2-S1-003** Implement `list_workspace_files` with workspace containment, bounded output,
+- [x] **V2-S1-003** Implement `list_workspace_files` with workspace containment, bounded output,
   deterministic ordering, and ignored/generated-directory handling.
-- [ ] **V2-S1-004** Implement `read_allowed_text_file` with byte/line windows, encoding reporting,
+- [x] **V2-S1-004** Implement `read_allowed_text_file` with byte/line windows, encoding reporting,
   truncation evidence, and rejection of binary, disallowed, or escaping paths.
-- [ ] **V2-S1-005** Implement `search_workspace` with bounded matches, file metadata, stable ordering,
+- [x] **V2-S1-005** Implement `search_workspace` with bounded matches, file metadata, stable ordering,
   and no unrestricted regex/resource consumption.
 - [ ] **V2-S1-006** Decide through tests whether general `compare_files` is needed; implement it only
   if `compare_models` plus bounded reads cannot satisfy an accepted investigation.

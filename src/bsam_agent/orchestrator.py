@@ -432,11 +432,26 @@ def _capability_derived_tools(user_text: str) -> tuple[str, ...]:
     return _INTENT_TOOLS[intent]
 
 
+def _requests_workspace_evidence(text: str) -> bool:
+    """Recognize general requests for bounded project-file evidence."""
+    return bool(re.search(
+        r"\b(?:workspace|project\s+files?|project\s+notes?|notes?|documentation|docs?|"
+        r"(?:search|find|list|read|review)\s+(?:the\s+)?(?:workspace|project|files?|"
+        r"notes?|documentation|docs?))\b",
+        text, re.IGNORECASE,
+    ))
+
+
 def relevant_tools(user_text: str) -> tuple[str, ...]:
     """Bound the router prompt to likely tools without authorizing any action."""
     text = user_text.casefold()
     if "without calling another tool" in text or "without another tool" in text:
         return ()
+    if _requests_workspace_evidence(text):
+        return (
+            "list_workspace_files", "read_allowed_text_file", "search_workspace",
+            "inspect_model", "query_model",
+        )
     if re.search(r"\b(?:why|diagnos\w*|explain)\b.*\b(?:run|fail\w*)\b", text):
         return ("get_run_status", "inspect_run_log", "validate_model", "query_model")
     if "compare" in text:
@@ -1118,7 +1133,10 @@ class ChatOrchestrator:
     def _execute(
         self, tool: str, arguments: dict[str, Any], *, user_text: str = "",
     ) -> ChatTurn:
-        if tool in {"inspect_model", "query_model", "validate_model", "import_mesh", "get_capabilities"}:
+        if tool in {
+            "inspect_model", "query_model", "validate_model", "import_mesh", "get_capabilities",
+            "list_workspace_files", "read_allowed_text_file", "search_workspace",
+        }:
             self.state.phase = "inspect"
         elif tool in PREVIEW_TOOLS or tool == "review_change":
             self.state.phase = "propose"
@@ -1217,7 +1235,10 @@ class ChatOrchestrator:
         self._update_model_context(tool, arguments, result)
         if tool in PREVIEW_TOOLS or tool == "review_change":
             phase = "propose"
-        elif tool in {"inspect_model", "query_model", "import_mesh", "get_capabilities"}:
+        elif tool in {
+            "inspect_model", "query_model", "import_mesh", "get_capabilities",
+            "list_workspace_files", "read_allowed_text_file", "search_workspace",
+        }:
             phase = "explain"
         else:
             phase = "verify"
@@ -1500,7 +1521,10 @@ class ChatOrchestrator:
         elif tool == "validate_model":
             task.status = "verify"
             task.validation_state = result.get("summary")
-        elif tool in {"compare_models", "inspect_run_log"}:
+        elif tool in {
+            "compare_models", "inspect_run_log", "list_workspace_files",
+            "read_allowed_text_file", "search_workspace",
+        }:
             task.status = "verify"
         elif tool in {"run_bsam", "get_run_status"}:
             task.run_state = {
@@ -1618,7 +1642,7 @@ def _bounded_observation(
         name: arguments[name]
         for name in (
             "source", "query", "capability", "parameter", "entity_id", "entity_kind",
-            "entity_name", "left", "right", "output_dir",
+            "entity_name", "left", "right", "output_dir", "path", "directory", "pattern",
         )
         if isinstance(arguments.get(name), (str, int, float, bool))
     }
@@ -1635,7 +1659,15 @@ def _bounded_observation(
     if isinstance(summary, dict):
         evidence["summary"] = deepcopy(summary)
     matches = result.get("matches")
-    if isinstance(matches, list):
+    if tool == "search_workspace" and isinstance(matches, list):
+        evidence["workspace_matches"] = [
+            {
+                name: item[name] for name in ("path", "line", "column", "text")
+                if isinstance(item, dict) and isinstance(item.get(name), (str, int))
+            }
+            for item in matches[:32] if isinstance(item, dict)
+        ]
+    elif isinstance(matches, list):
         evidence["match_count"] = len(matches)
         evidence["entities"] = [
             {
@@ -1645,6 +1677,17 @@ def _bounded_observation(
             for item in matches[:16]
             if isinstance(item, dict)
         ]
+    files = result.get("files")
+    if tool == "list_workspace_files" and isinstance(files, list):
+        evidence["workspace_files"] = [
+            {
+                name: item[name] for name in ("path", "bytes", "suffix")
+                if isinstance(item, dict) and isinstance(item.get(name), (str, int))
+            }
+            for item in files[:64] if isinstance(item, dict)
+        ]
+    if tool == "read_allowed_text_file" and isinstance(result.get("text"), str):
+        evidence["text_excerpt"] = result["text"][:4_000]
     differences = result.get("differences")
     if isinstance(differences, dict):
         evidence["differences"] = {
@@ -1749,15 +1792,16 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         r"\b(?:what\s+can\s+you\s+do|capabilit(?:y|ies)|supported operations?)\b",
         text, re.IGNORECASE,
     )
+    workspace_evidence = _requests_workspace_evidence(text)
     goal_language = re.search(
         r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg|which|what|show|list|"
         r"compare|change|changing|set|update|modify|rename|compose|combine|merge|add|create|"
-        r"insert|append|delete|remove|extend|validate|run|launch|fix)\b",
+        r"insert|append|delete|remove|extend|validate|run|launch|fix|find|search|read|review)\b",
         text, re.IGNORECASE,
     )
     if goal_language is None or is_capability_question:
         return None
-    if not source and not (
+    if not source and not workspace_evidence and not (
         re.search(r"\b(?:last run|why did (?:it|the run)|run fail)", text, re.IGNORECASE)
         and context.last_run is not None
     ):
@@ -1777,7 +1821,7 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         outcomes.append("modify")
     if re.search(r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg)\b", text, re.IGNORECASE):
         outcomes.append("inspect")
-    if re.search(r"\b(?:which|what|show|list)\b", text, re.IGNORECASE):
+    if re.search(r"\b(?:which|what|show|list|find|search|read|review)\b", text, re.IGNORECASE):
         outcomes.append("query")
     if re.search(r"\bcompare\b", text, re.IGNORECASE):
         outcomes.append("compare")
@@ -1797,10 +1841,12 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
     criteria: list[str] = []
     if "inspect" in outcomes and not run_diagnosis:
         criteria.append("model_inspected")
-    if "query" in outcomes:
+    if "query" in outcomes and not workspace_evidence:
         criteria.append("focused_evidence_collected")
-    if "diagnose" in outcomes:
+    if "diagnose" in outcomes and not workspace_evidence:
         criteria.append("focused_evidence_collected")
+    if workspace_evidence:
+        criteria.append("workspace_evidence_collected")
     if "diagnose" in outcomes and re.search(
         r"\b(?:BCs?|boundary conditions?|references?|dependencies)\b", text, re.IGNORECASE,
     ):
@@ -1815,6 +1861,8 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         criteria.append("run_terminal_evidence")
 
     plan: list[str] = []
+    if workspace_evidence:
+        plan.append("inspect bounded, allowed workspace evidence")
     if "diagnose" in outcomes or "modify" in outcomes:
         plan.append("inspect the active model and collect deterministic evidence")
     if "compare" in outcomes:
@@ -1868,6 +1916,12 @@ def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
         "model_inspected": "inspect_model" in tools or "validate_model" in tools,
         "focused_evidence_collected": (
             "query_model" in tools or "inspect_run_log" in tools or "compare_models" in tools
+            or "search_workspace" in tools or "read_allowed_text_file" in tools
+        ),
+        "workspace_evidence_collected": any(
+            tool in tools for tool in (
+                "list_workspace_files", "read_allowed_text_file", "search_workspace",
+            )
         ),
         "models_compared": "compare_models" in tools,
         "change_plan_reviewed": any(tool in PREVIEW_TOOLS for tool in tools),
@@ -1895,7 +1949,8 @@ def _agent_loop_tools(objective: str) -> tuple[str, ...]:
     ordered = [
         *relevant_tools(objective),
         "inspect_model", "query_model", "compare_models", "validate_model",
-        "get_run_status", "inspect_run_log", "get_capabilities",
+        "get_run_status", "inspect_run_log", "get_capabilities", "list_workspace_files",
+        "read_allowed_text_file", "search_workspace",
     ]
     return tuple(dict.fromkeys(name for name in ordered if name in TOOL_CONTRACTS))
 
@@ -1906,7 +1961,16 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
         for observation in observations:
             evidence = observation.get("evidence")
             if isinstance(evidence, dict):
+                if observation.get("tool") in {
+                    "list_workspace_files", "read_allowed_text_file", "search_workspace",
+                }:
+                    selectors = evidence.pop("arguments", None)
+                    if isinstance(selectors, dict):
+                        evidence["arguments_digest"] = _digest(selectors)
                 evidence.pop("entities", None)
+                evidence.pop("workspace_files", None)
+                evidence.pop("workspace_matches", None)
+                evidence.pop("text_excerpt", None)
                 selectors = evidence.get("arguments")
                 if isinstance(selectors, dict):
                     for name in ("entity_id", "entity_name"):
@@ -2210,7 +2274,8 @@ def _source_path_from_text(text: str) -> str | None:
 
 _PATH_ARGUMENTS = {
     "audit_path", "destination", "executable", "left", "manifest", "mesh",
-    "output_dir", "plan_path", "right", "source", "stale_plan_path", "template",
+    "output_dir", "path", "plan_path", "right", "source", "stale_plan_path", "template",
+    "directory",
 }
 
 
@@ -3031,6 +3096,25 @@ def _summarize_result(tool: str, result: dict[str, Any]) -> str:
         return (
             f"Run-log inspection found {len(result.get('excerpts', []))} bounded artifact(s); "
             f"classification is {result.get('classification', 'unknown')}; evidence: {evidence}."
+        )
+    if tool == "list_workspace_files":
+        summary = result.get("summary", {})
+        return (
+            f"Found {summary.get('files', 0)} allowed workspace file(s)"
+            + ("; results were truncated." if summary.get("truncated") else ".")
+        )
+    if tool == "read_allowed_text_file":
+        summary = result.get("summary", {})
+        return (
+            f"Read {summary.get('lines', 0)} line(s) from {result.get('path', 'the file')}"
+            + ("; the excerpt was truncated." if summary.get("truncated") else ".")
+        )
+    if tool == "search_workspace":
+        summary = result.get("summary", {})
+        return (
+            f"Found {summary.get('matches', 0)} literal workspace match(es) across "
+            f"{summary.get('files_scanned', 0)} allowed file(s)"
+            + ("; results were truncated." if summary.get("truncated") else ".")
         )
     if tool in PREVIEW_TOOLS or tool == "review_change":
         validation = result.get("validation", {})

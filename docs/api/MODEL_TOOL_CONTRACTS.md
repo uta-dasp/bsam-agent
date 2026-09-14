@@ -5,6 +5,9 @@ These are the only operations an optional language model should be allowed to re
 | Tool | Purpose | Mutates local state |
 |---|---|---:|
 | `get_capabilities` | List supported current BSAM features and required fields | No |
+| `list_workspace_files` | List bounded allowed engineering text files without traversing blocked directories or symlinks | No |
+| `read_allowed_text_file` | Read a bounded UTF-8 excerpt from one allowed engineering text file | No |
+| `search_workspace` | Search allowed engineering text files for bounded literal matches | No |
 | `inspect_model` | Return source, structure, semantic entities/references, and diagnostics | No |
 | `query_model` | Run focused registered-construct, parameter, entity, and reference queries | No |
 | `compare_models` | Compare two workspace-contained source sets with bounded deterministic diff evidence | No |
@@ -34,6 +37,12 @@ These are the only operations an optional language model should be allowed to re
 
 - Tool arguments are validated against strict schemas; unknown properties are rejected.
 - The provider receives summaries and enumerations by default, never full source files or unrestricted decks.
+- General workspace reads are limited to approved engineering/document text suffixes, bounded file
+  sizes and result counts, relative contained paths, and UTF-8/ASCII. Hidden/sensitive paths,
+  credentials, binary files, source code, blocked directories, and symbolic links fail closed.
+- `search_workspace` performs bounded literal matching, not arbitrary regular-expression or shell
+  search. Hosted providers receive only compact counts/digests from these tools, never paths,
+  matches, or text excerpts.
 - Model changes use stable capability/entity identifiers, never raw unrestricted text replacement.
 - `generate_deck` requires `confirm: true`, refuses existing outputs, validates every engineering field and mesh target, and rolls back both deck and provenance manifest if generated static validation fails.
 - Registry specification `coverage` and per-capability operational support are separate; `get_capabilities` exposes complete operation maturity plus derived inspect/query/create/modify/validate/run intent maturity, and omitted registry operations are reported as `unassessed`.

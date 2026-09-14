@@ -47,9 +47,15 @@ from .tool_contracts import (
     validate_arguments,
     validate_response,
 )
+from .workspace import (
+    WorkspaceReadError,
+    list_workspace_files,
+    read_allowed_text_file,
+    search_workspace,
+)
 
 
-API_VERSION = "0.5.0"
+API_VERSION = "0.6.0"
 MAX_REQUEST_BYTES = 1_048_576
 
 
@@ -119,6 +125,8 @@ class LocalAgentApi:
             raise ApiError(exc.code or "invalid_arguments", str(exc)) from exc
         except GenerationError as exc:
             raise ApiError(exc.code, str(exc)) from exc
+        except WorkspaceReadError as exc:
+            raise ApiError(exc.code, str(exc)) from exc
         except (TypeError, ValueError) as exc:
             raise ApiError("invalid_arguments", str(exc)) from exc
 
@@ -155,6 +163,30 @@ class LocalAgentApi:
                 "tools": list(self.tools),
                 "tool_contracts": contract_manifest(),
             }
+        if tool == "list_workspace_files":
+            return list_workspace_files(
+                self.workspace_root,
+                str(arguments.get("directory", ".")),
+                str(arguments.get("pattern", "*")),
+                int(arguments.get("max_files", 100)),
+            )
+        if tool == "read_allowed_text_file":
+            return read_allowed_text_file(
+                self.workspace_root,
+                str(arguments["path"]),
+                int(arguments.get("start_line", 1)),
+                int(arguments.get("max_lines", 200)),
+                int(arguments.get("max_characters", 16_000)),
+            )
+        if tool == "search_workspace":
+            return search_workspace(
+                self.workspace_root,
+                str(arguments["query"]),
+                str(arguments.get("directory", ".")),
+                str(arguments.get("pattern", "*")),
+                int(arguments.get("max_matches", 50)),
+                bool(arguments.get("case_sensitive", False)),
+            )
         if tool in {"inspect_model", "validate_model"}:
             args = self._args(arguments, {"source"})
             inspection = SourceSet.read(

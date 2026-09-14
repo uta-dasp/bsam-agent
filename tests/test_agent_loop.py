@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from bsam_agent.agent_benchmark import evaluate_trajectory
 from bsam_agent.api import LocalAgentApi
 from bsam_agent.knowledge import KnowledgeQuery, RetrievalUnavailable
-from bsam_agent.orchestrator import ChatOrchestrator, ConversationState
+from bsam_agent.orchestrator import ChatOrchestrator, ConversationState, _model_task_context
 from bsam_agent.provider import ProviderConfig, ProviderResponse
 
 
@@ -69,6 +69,54 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual(2, len(agent.state.task.observations))
         self.assertIn("Task context", provider.requests[0].messages[-1].content)
         self.assertEqual("query_model", result.tool)
+
+    def test_model_can_search_allowed_project_notes_after_model_inspection(self) -> None:
+        provider = ScriptedProvider(tool_decision("search_workspace", {
+            "query": "warning", "pattern": "*.md", "max_matches": 10,
+        }))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            (root / "engineering-notes.md").write_text(
+                "Boundary warning: verify the ply2 edge set.\n", encoding="utf-8",
+            )
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Inspect model.in and review project documentation for warnings.")
+
+        self.assertEqual(["inspect_model", "search_workspace"], agent.state.task.completed_steps)
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual("search_workspace", result.tool)
+        self.assertEqual(1, result.tool_result["summary"]["matches"])
+        evidence = agent.state.task.observations[-1]["evidence"]
+        self.assertEqual("engineering-notes.md", evidence["workspace_matches"][0]["path"])
+        local_context = _model_task_context(agent.state.task, hosted=False)
+        hosted_context = _model_task_context(agent.state.task, hosted=True)
+        self.assertIn("Boundary warning", local_context)
+        self.assertNotIn("Boundary warning", hosted_context)
+        self.assertNotIn("engineering-notes.md", hosted_context)
+        self.assertNotIn('"pattern"', hosted_context)
+        self.assertIn('"arguments_digest"', hosted_context)
+
+    def test_workspace_evidence_request_can_start_without_a_model_source(self) -> None:
+        provider = ScriptedProvider(tool_decision("search_workspace", {
+            "query": "convergence", "pattern": "*.md", "max_matches": 10,
+        }))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "engineering-notes.md").write_text(
+                "Investigate convergence after validating the boundary set.\n", encoding="utf-8",
+            )
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Find project documentation mentioning convergence.")
+
+        self.assertEqual("search_workspace", result.tool)
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual(["search_workspace"], agent.state.task.completed_steps)
+        offered = provider.requests[0].response_schema["properties"]["tool"]["enum"]
+        self.assertIn("list_workspace_files", offered)
+        self.assertIn("read_allowed_text_file", offered)
+        self.assertIn("search_workspace", offered)
+        self.assertEqual(["workspace_evidence_collected"], agent.state.task.completion_criteria)
 
     def test_boundary_investigation_chains_without_model_or_confirmation(self) -> None:
         provider = ScriptedProvider()

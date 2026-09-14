@@ -53,6 +53,24 @@ O = Field("object")
 
 TOOL_CONTRACTS: dict[str, ToolContract] = {
     "get_capabilities": ToolContract({}, ("api_version", "registry_version", "bsam", "tools")),
+    "list_workspace_files": ToolContract({
+        "directory": Field("string", required=False),
+        "pattern": Field("string", required=False),
+        "max_files": Field("integer", required=False),
+    }, ("directory", "pattern", "files", "truncated", "summary")),
+    "read_allowed_text_file": ToolContract({
+        "path": S,
+        "start_line": Field("integer", required=False),
+        "max_lines": Field("integer", required=False),
+        "max_characters": Field("integer", required=False),
+    }, ("path", "encoding", "sha256", "text", "truncated", "summary")),
+    "search_workspace": ToolContract({
+        "query": S,
+        "directory": Field("string", required=False),
+        "pattern": Field("string", required=False),
+        "max_matches": Field("integer", required=False),
+        "case_sensitive": Field("boolean", required=False),
+    }, ("query", "directory", "pattern", "matches", "truncated", "summary")),
     "inspect_model": ToolContract({"source": S}, ("source_set_sha256", "semantic_model", "summary")),
     "query_model": ToolContract({
         "source": S,
@@ -149,6 +167,9 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
 
 TOOL_DESCRIPTIONS: dict[str, str] = {
     "get_capabilities": "List supported BSAM capabilities and tool contracts before handling an unknown feature.",
+    "list_workspace_files": "List bounded allowed engineering text files inside the workspace without following symbolic links.",
+    "read_allowed_text_file": "Read a bounded UTF-8 excerpt from one allowed workspace engineering text file.",
+    "search_workspace": "Search allowed workspace engineering text files for bounded literal text matches.",
     "inspect_model": "Inspect an existing BSAM deck and return its structure, semantic entities, diagnostics, and summary.",
     "query_model": "Run a focused semantic query for registered constructs, parameters, entities, or references.",
     "validate_model": "Validate an existing BSAM deck without changing or running it.",

@@ -25,6 +25,12 @@ metadata: digests, counts, validation summaries, completed action names, and com
 The orchestrator excludes deck text, file diffs, log excerpts, and entity identities from that
 hosted planning context. Local-private source and artifacts remain in deterministic tools.
 
+General workspace discovery is restricted to an allowlist of engineering/document text suffixes
+and rejects hidden or credential-like files, blocked directories, binary/oversized content,
+workspace escapes, and symbolic links. Local providers may receive bounded excerpts and literal
+search matches. Hosted providers receive only counts and digests; file paths, text excerpts, and
+match contents are removed from replanning context.
+
 ## Local providers
 
 Allowed local model families are limited to providers approved by the project owner. The initial allowlist may include Google Gemma and Meta Llama families. Chinese-origin model families are excluded.
