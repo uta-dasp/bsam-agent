@@ -274,11 +274,11 @@ Input gate: user selection of the first geometry families and trusted acceptance
 
 ## M6 — Product clients and optional providers
 
-- [ ] Add hosted providers only behind explicit data policy and the same conformance suite.
+- [x] Add OpenAI Responses behind explicit data policy, `store: false`, payload minimization, and provider conformance tests.
 - [x] Build a thin VS Code client over the stable local API.
 - [x] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
 
-Current M6 client coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, run/status/controlled-stop controls, and a dedicated guarded local chat panel are implemented.
+Current M6 coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, run/status/controlled-stop controls, a dedicated guarded chat panel, and an optional routing-only OpenAI Responses adapter are implemented. Hosted requests cannot contain BSAM files or registry catalogs; user-typed text remains external-provider data.
 
 ## Deferred
 
@@ -290,6 +290,6 @@ Current M6 client coverage: schema-aware source diagnostics, registry-derived pa
 ## Next execution sessions
 
 1. Exercise the installed VS Code client on the next real project workflow and retain any resulting acceptance evidence.
-2. Keep hosted providers deferred until local-model performance justifies adding one behind the existing policy and conformance boundary.
+2. Exercise the OpenAI routing adapter on non-sensitive prompts and retain acceptance evidence without recording the API key or raw hosted payloads.
 
 No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.

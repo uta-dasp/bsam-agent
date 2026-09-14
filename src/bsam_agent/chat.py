@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Callable, TextIO
 
 from .api import LocalAgentApi
-from .local_provider import LlamaCppProvider
 from .orchestrator import ChatOrchestrator
 from .provider import load_provider_config
+from .provider_factory import create_provider
 
 
 def run_terminal_chat(
@@ -24,7 +24,7 @@ def run_terminal_chat(
 ) -> int:
     root = workspace_root.resolve()
     config = load_provider_config(config_path)
-    provider = LlamaCppProvider(config)
+    provider = create_provider(config)
     audit_directory = root / ".bsam-agent" / "audit" if audit_enabled else None
     state = ChatOrchestrator.load_state(session_path) if session_path and session_path.is_file() else None
     agent = ChatOrchestrator(
@@ -63,7 +63,7 @@ def run_jsonl_chat(
     """Serve one guarded chat session over newline-delimited JSON for local UI clients."""
     root = workspace_root.resolve()
     config = load_provider_config(config_path)
-    provider = LlamaCppProvider(config)
+    provider = create_provider(config)
     audit_directory = root / ".bsam-agent" / "audit" if audit_enabled else None
     state = ChatOrchestrator.load_state(session_path) if session_path and session_path.is_file() else None
     agent = ChatOrchestrator(

@@ -28,13 +28,15 @@ Press F5 from this folder to launch an Extension Development Host after compilat
 Install the packaged client into VS Code with:
 
 ```powershell
-code --install-extension .\bsam-agent-0.5.0.vsix
+code --install-extension .\bsam-agent-0.6.0.vsix
 ```
 
 Open the Command Palette and run `BSAM Agent: Start Local API`. The extension defaults the API workspace to the first open folder; set `bsamAgent.workspaceRoot` to an absolute path when a broader include boundary is required.
 
 Set `bsamAgent.executablePath` to an executable inside that workspace boundary to avoid selecting it for each run. The configured BSAM timeout and controlled-stop grace period are passed to the deterministic supervisor.
 
-An installed VSIX auto-detects the BSAM Agent repository when the open folder is either the repository itself or its parent. Set `bsamAgent.repositoryRoot` only when it is elsewhere. Local chat defaults to `config/provider.local.json` and `.bsam-agent/conversations/vscode.json`; start the configured loopback model server first. If VS Code did not inherit `BSAM_LOCAL_API_KEY`, the command requests it in a password field and passes it only to the private local chat process.
+An installed VSIX auto-detects the BSAM Agent repository when the open folder is either the repository itself or its parent. Set `bsamAgent.repositoryRoot` only when it is elsewhere. Chat defaults to the CPU-local configuration. The optional OpenAI Responses adapter is configured separately, always sends `store: false`, and never receives BSAM files or the registry parameter catalog. The command requests a missing provider credential in a password field and passes it only to the local chat subprocess.
 
 See the [complete VS Code chat tutorial](https://github.com/uta-dasp/bsam-agent/blob/main/docs/guides/VS_CODE_CHAT_TUTORIAL.md) for workstation setup, guarded examples, run control, persistence, security, and troubleshooting.
+
+See [OpenAI provider setup](https://github.com/uta-dasp/bsam-agent/blob/main/docs/guides/OPENAI_PROVIDER_SETUP.md) for the hosted-routing privacy boundary and exact configuration.

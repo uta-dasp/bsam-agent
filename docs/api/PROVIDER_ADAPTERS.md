@@ -26,7 +26,7 @@ Each adapter returns structured content, validated tool calls, or a normalized p
 |---|---|---|---|
 | CPU-local | Local loopback HTTP API | Real local project assistance after G4.2 and benchmarking | Preferred for private data; choose the smallest evaluated model that passes the acceptance thresholds |
 | Gemini | Native Gemini API | Free experimentation with synthetic/sanitized cases, later paid use | Adapter planned; free tier excluded for real BSAM/project data |
-| OpenAI | Responses API | Later paid structured output and tool calling | Adapter planned; explicit storage/data controls required |
+| OpenAI | Responses API | Optional hosted natural-language routing | Implemented with strict endpoint, `store: false`, minimized payload, and conformance tests |
 
 Chinese-origin model families are outside the project allowlist.
 
@@ -57,11 +57,13 @@ Official references:
 
 ## OpenAI adapter
 
-Use the Responses API with strict structured output/function schemas. Set data-storage behavior explicitly in configuration and keep payload minimization independent of provider retention promises.
+The implemented adapter uses the Responses API with strict structured output/function schemas. It accepts only `https://api.openai.com`, environment-referenced credentials, `synthetic-only` or `sanitized` payloads, and `store: false`. The hosted routing prompt omits the registry parameter catalog. Files, deck text, meshes, artifacts, local tool results, and BSAM source/library content are never added to provider requests.
+
+The provider does receive the user's typed chat text, a compact routing instruction, selected tool names/contracts, and bounded prior typed turns. Therefore, do not paste proprietary source or deck contents into chat. `store: false` disables Responses application-state storage, but is not a zero-retention promise for standard API abuse-monitoring logs. See [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md) for the exact boundary and workstation instructions.
 
 Official references:
 
-- [OpenAI Responses create API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create)
+- [OpenAI Responses create API](https://developers.openai.com/api/reference/resources/responses/methods/create)
 - [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data)
 
 ## Configuration boundary

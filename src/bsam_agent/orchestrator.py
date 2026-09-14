@@ -404,11 +404,15 @@ def decision_schema(tool_names: tuple[str, ...]) -> dict[str, Any]:
     }
 
 
-def routing_prompt(tool_names: tuple[str, ...]) -> str:
+def routing_prompt(
+    tool_names: tuple[str, ...], *, include_registry_catalog: bool = True,
+) -> str:
     contracts = {
         name: {
             "description": TOOL_DESCRIPTIONS[name],
-            "arguments": _routing_request_schema(name),
+            "arguments": _routing_request_schema(
+                name, include_registry_catalog=include_registry_catalog,
+            ),
         }
         for name in tool_names
     }
@@ -429,7 +433,9 @@ def routing_prompt(tool_names: tuple[str, ...]) -> str:
     )
 
 
-def _routing_request_schema(tool: str) -> dict[str, Any]:
+def _routing_request_schema(
+    tool: str, *, include_registry_catalog: bool = True,
+) -> dict[str, Any]:
     if tool not in {"preview_parameter_change", "preview_parameter_removal"}:
         return TOOL_CONTRACTS[tool].request_schema()
     required = ["source", "parameter"]
@@ -440,13 +446,15 @@ def _routing_request_schema(tool: str) -> dict[str, Any]:
     if tool == "preview_parameter_change":
         required.append("value")
         properties["value"] = {"type": "string"}
-    return {
+    schema = {
         "type": "object",
         "additionalProperties": False,
         "required": required,
         "properties": properties,
-        "registered_parameters": _parameter_catalog(),
     }
+    if include_registry_catalog:
+        schema["registered_parameters"] = _parameter_catalog()
+    return schema
 
 
 class ChatOrchestrator:
@@ -615,7 +623,10 @@ class ChatOrchestrator:
     def _route(
         self, user_text: str, tool_names: tuple[str, ...], correlation_id: str,
     ) -> tuple[dict[str, Any] | None, ProviderResponse]:
-        system = routing_prompt(tool_names)
+        system = routing_prompt(
+            tool_names,
+            include_registry_catalog=self.provider_config.provider != "openai",
+        )
         messages = (Message("system", system), *self.state.history, Message("user", user_text))
         last = ProviderResponse()
         last_decision: dict[str, Any] | None = None

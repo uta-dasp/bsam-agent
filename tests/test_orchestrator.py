@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import ApiError, LocalAgentApi
 from bsam_agent.orchestrator import (
-    ChatOrchestrator, ConversationState, _summarize_result, relevant_tools,
+    ChatOrchestrator, ConversationState, _summarize_result, relevant_tools, routing_prompt,
 )
 from bsam_agent.provider import ProviderConfig, ProviderRequest, ProviderResponse, Usage
 
@@ -70,6 +70,27 @@ class FakeApi:
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_hosted_routing_prompt_omits_registry_parameter_catalog(self) -> None:
+        tools = ("preview_parameter_change",)
+        self.assertIn("registered_parameters", routing_prompt(tools))
+        self.assertNotIn(
+            "registered_parameters",
+            routing_prompt(tools, include_registry_catalog=False),
+        )
+
+    def test_openai_outbound_route_omits_registry_parameter_catalog(self) -> None:
+        provider = FakeProvider(decision("answer", response="No action needed."))
+        hosted_config = ProviderConfig(
+            "openai", "test-model", "https://api.openai.com", "env:OPENAI_API_KEY",
+            2.0, 24000, 512, "sanitized", False,
+        )
+        agent = ChatOrchestrator(provider, hosted_config, FakeApi())  # type: ignore[arg-type]
+        agent._route("Help me choose a safe operation", ("preview_parameter_change",), "route-1")
+
+        outbound = "\n".join(message.content for message in provider.requests[0].messages)
+        self.assertNotIn("registered_parameters", outbound)
+        self.assertNotIn("d_reduction", outbound)
+
     def test_structural_language_exposes_generic_capability_tools(self) -> None:
         tools = relevant_tools("Add nodes 2 and 3 to node set corner")
         self.assertIn("preview_modify_entity", tools)

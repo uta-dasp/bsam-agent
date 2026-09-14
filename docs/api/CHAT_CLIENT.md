@@ -1,6 +1,6 @@
 # Terminal chat client
 
-The initial client uses Llama 4 Scout only to route language into bounded requests. Local deterministic code validates every argument, confines paths to the selected workspace, creates and reviews plans, requires a separate `/confirm` turn for apply/run/stop, and performs all authoritative work.
+The chat client routes language into bounded requests through the configured provider. Local deterministic code validates every argument, confines paths to the selected workspace, creates and reviews plans, requires a separate `/confirm` turn for apply/run/stop, and performs all authoritative work. CPU-local Scout remains the default; the optional OpenAI adapter is documented in [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md).
 
 ## Start and use
 

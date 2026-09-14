@@ -73,6 +73,7 @@ class ProviderConfig:
     max_input_characters: int
     max_output_tokens: int
     data_policy: str
+    store: bool = False
 
 
 def load_provider_config(path: Path) -> ProviderConfig:
@@ -81,7 +82,7 @@ def load_provider_config(path: Path) -> ProviderConfig:
         raise ProviderConfigError("provider configuration must be an object")
     allowed = {
         "provider", "model", "endpoint", "credential_reference", "timeout_seconds",
-        "max_input_characters", "max_output_tokens", "data_policy",
+        "max_input_characters", "max_output_tokens", "data_policy", "store",
     }
     extra = sorted(value.keys() - allowed)
     missing = sorted({"provider", "model", "endpoint"} - value.keys())
@@ -105,6 +106,19 @@ def load_provider_config(path: Path) -> ProviderConfig:
             raise ProviderConfigError("cpu-local provider endpoint cannot embed credentials or options")
         if parsed.path not in {"", "/"}:
             raise ProviderConfigError("cpu-local provider endpoint must not include an API path")
+    elif provider == "openai":
+        if parsed.scheme != "https" or parsed.hostname != "api.openai.com" or parsed.port is not None:
+            raise ProviderConfigError("openai provider endpoint must be https://api.openai.com")
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ProviderConfigError("openai provider endpoint cannot embed credentials or options")
+        if parsed.path not in {"", "/"}:
+            raise ProviderConfigError("openai provider endpoint must not include an API path")
+        if not value.get("credential_reference"):
+            raise ProviderConfigError("openai provider requires an environment credential reference")
+        if value.get("store", False) is not False:
+            raise ProviderConfigError("openai provider requires store=false")
+    else:
+        raise ProviderConfigError(f"unsupported provider: {provider}")
     timeout = float(value.get("timeout_seconds", 120.0))
     max_input = int(value.get("max_input_characters", 24000))
     maximum = int(value.get("max_output_tokens", 2048))
@@ -113,8 +127,10 @@ def load_provider_config(path: Path) -> ProviderConfig:
     policy = str(value.get("data_policy", "synthetic-only"))
     if policy not in {"local-private", "synthetic-only", "sanitized"}:
         raise ProviderConfigError("unsupported data policy")
+    if provider == "openai" and policy == "local-private":
+        raise ProviderConfigError("openai provider requires synthetic-only or sanitized data policy")
     return ProviderConfig(
         provider, str(value["model"]), endpoint,
         str(value["credential_reference"]) if value.get("credential_reference") else None,
-        timeout, max_input, maximum, policy,
+        timeout, max_input, maximum, policy, bool(value.get("store", False)),
     )

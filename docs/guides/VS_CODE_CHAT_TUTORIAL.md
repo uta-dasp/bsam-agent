@@ -1,6 +1,6 @@
 # Using BSAM Agent chat in VS Code
 
-This tutorial covers the dedicated local-model chat window included with BSAM Agent for VS Code 0.5.0. The command opens a theme-aware panel beside the editor. A private local process uses the same guarded orchestrator as `python -m bsam_agent chat`; users do not interact with its command line.
+This tutorial covers the CPU-local workflow in the dedicated chat window included with BSAM Agent for VS Code 0.6.0. The command opens a theme-aware panel beside the editor. A private local process uses the same guarded orchestrator as `python -m bsam_agent chat`; users do not interact with its command line.
 
 The language model only interprets requests. Deterministic BSAM Agent code resolves registry capabilities, validates paths and values, creates review plans, and performs tool calls. Applying a change, starting a run, or requesting a stop always requires a separate confirmation turn.
 
@@ -9,7 +9,7 @@ The language model only interprets requests. Deterministic BSAM Agent code resol
 The following paths are present on the current BSAM workstation:
 
 ```text
-VS Code extension: uta-dasp.bsam-agent 0.5.0
+VS Code extension: uta-dasp.bsam-agent 0.6.0
 Repository:        D:\Partha\BSAM\bsam agent
 Python:            C:\Program Files\Python310\python.exe
 llama.cpp server:  D:\Partha\BSAM\runtimes\llama.cpp\b10621\llama-server.exe
@@ -27,13 +27,13 @@ code --list-extensions --show-versions | Select-String "uta-dasp.bsam-agent"
 Expected result:
 
 ```text
-uta-dasp.bsam-agent@0.5.0
+uta-dasp.bsam-agent@0.6.0
 ```
 
 If it is missing, install the already-built package:
 
 ```powershell
-code --install-extension "D:\Partha\BSAM\bsam agent\clients\vscode\bsam-agent-0.5.0.vsix" --force
+code --install-extension "D:\Partha\BSAM\bsam agent\clients\vscode\bsam-agent-0.6.0.vsix" --force
 ```
 
 Then run `Developer: Reload Window` from the VS Code Command Palette.
@@ -282,13 +282,13 @@ D:\Partha\BSAM\.bsam-agent\audit
 
 The session file contains raw chat text and pending-action state. Both locations remain local and are ignored by this repository. To begin an independent conversation without replacing the old state, change `bsamAgent.chat.sessionPath` to a new relative filename and reopen the chat panel.
 
-No OpenAI or other hosted provider is enabled by this workflow. The provider endpoint is loopback-only and the model file is local.
+This workflow uses the CPU-local provider, so its endpoint is loopback-only and its model file is local. To opt into OpenAI routing while keeping BSAM files local, follow [OpenAI provider setup](OPENAI_PROVIDER_SETUP.md). The two modes use separate ignored configuration files and credential environment variables.
 
 ## 12. Troubleshooting
 
 ### The command is missing
 
-Confirm `uta-dasp.bsam-agent@0.5.0` is installed, then run `Developer: Reload Window`. Ensure the Command Palette entry begins with `BSAM Agent:`.
+Confirm `uta-dasp.bsam-agent@0.6.0` is installed, then run `Developer: Reload Window`. Ensure the Command Palette entry begins with `BSAM Agent:`.
 
 ### Cannot locate the BSAM Agent repository
 

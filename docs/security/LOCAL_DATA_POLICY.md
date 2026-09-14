@@ -16,6 +16,10 @@ API keys:
 - are never stored in model files, generated decks, logs, or Git;
 - are redacted from errors and diagnostics.
 
+The OpenAI adapter is routing-only. Its request builder has no filesystem or Agent API access and is passed only bounded chat messages. The orchestrator excludes the registry parameter catalog from hosted prompts; deterministic tools read and modify files locally after validating the returned routing decision. OpenAI configuration is restricted to the official HTTPS endpoint and `store: false`.
+
+Typed chat text is external-provider data. Users must not paste BSAM source code, library documentation, full decks, mesh rows, or proprietary result data into hosted chat. Standard OpenAI API abuse-monitoring retention may still apply even when response storage is disabled.
+
 ## Local providers
 
 Allowed local model families are limited to providers approved by the project owner. The initial allowlist may include Google Gemma and Meta Llama families. Chinese-origin model families are excluded.

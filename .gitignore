@@ -25,6 +25,7 @@ out/
 models/
 .ollama/
 config/provider.local.json
+config/provider.openai.json
 evals/results/*.json
 !evals/results/.gitkeep
 .bsam-agent/

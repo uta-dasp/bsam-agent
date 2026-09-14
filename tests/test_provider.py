@@ -59,6 +59,29 @@ class ProviderBoundaryTests(unittest.TestCase):
             with self.assertRaises(ProviderConfigError):
                 load_provider_config(path)
 
+    def test_openai_configuration_requires_official_endpoint_and_store_false(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "provider.json"
+            base = {
+                "provider": "openai", "model": "test",
+                "endpoint": "https://api.openai.com",
+                "credential_reference": "env:OPENAI_API_KEY",
+                "data_policy": "sanitized", "store": False,
+            }
+            path.write_text(json.dumps(base), encoding="utf-8")
+            loaded = load_provider_config(path)
+            self.assertFalse(loaded.store)
+
+            for changes in (
+                {"store": True},
+                {"endpoint": "https://example.com"},
+                {"data_policy": "local-private"},
+                {"credential_reference": None},
+            ):
+                path.write_text(json.dumps(base | changes), encoding="utf-8")
+                with self.subTest(changes=changes), self.assertRaises(ProviderConfigError):
+                    load_provider_config(path)
+
 
 if __name__ == "__main__":
     unittest.main()
