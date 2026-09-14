@@ -1,306 +1,556 @@
 # BSAM Agent development roadmap
 
-This is the single authoritative implementation roadmap. A checked item is implemented and verified. BSAM-specific behavior must come from the pinned local BSAM source, controlled executable probes, or trusted local documentation.
+This is the single authoritative implementation roadmap. It describes the target product, the
+order in which capabilities should mature, and the evidence required to claim each milestone.
+Checked-in code, tests, capability metadata, controlled executable probes, and acceptance records
+take precedence over assumptions about current behavior.
 
-## Product objective
+## Product end goal
 
-Build a dependable, general BSAM 2.4 agent that can inspect, create, modify, validate, render, and run models across the active current-syntax capability set. The language model interprets intent and conducts clarification; deterministic code owns BSAM syntax, semantics, changes, validation, and execution.
+> Build a Codex-like engineering agent for BSAM that can accept high-level natural-language
+> objectives, autonomously inspect models and project files, retrieve BSAM knowledge and
+> precedent, plan multi-step work, modify or generate input files through deterministic tools,
+> statically validate them, smoke-test them using BSAM, diagnose failures, safely recover or ask
+> for engineering decisions, run full simulations when requested, inspect results, and report
+> evidence.
 
-The notch project is one laminate regression fixture. It does not define the architecture or limit supported capabilities.
+The end product is not merely a natural-language wrapper around deterministic commands.
 
-## Current checkpoint
+> **BSAM Agent should be autonomous in reasoning, exploration, planning, and tool selection, but
+> deterministic in engineering execution and validation.**
 
-The repository has a loss-preserving source-set loader, an initial semantic/reference model, bounded editing operations, `.ele` import, isolated serial execution, a loopback Agent API, and a guarded local chat client. These establish the infrastructure but do not constitute broad BSAM capability coverage.
+```text
+LLM                     = planner and reasoner
+BSAM deterministic core = trusted execution environment
+RAG                     = domain knowledge and evidence
+BSAM runtime            = empirical verification
+```
 
-Current focus: develop one capability family at a time through authoritative grammar, loss-preserving semantics, dependencies, focused query, safe generic editing, validation, agent exposure, and natural-language evaluation. Cross-cutting specification work continues when a selected vertical slice requires it; horizontal registry coverage is not an execution gate for M2 or M4 work.
+The LLM may choose what to inspect, retrieve, compare, plan, or explain. It may not write BSAM
+files directly, run arbitrary processes, waive validation, bypass workspace or confirmation
+policy, or silently change engineering physics to make a task succeed.
 
-Specification maturity and operational maturity are separate. Registry `coverage` records how well grammar is documented. Per-capability `operations` records whether parse, semantic, inspect, modify, create, delete, rename, generate, static-validation, and execution behavior is unassessed, unsupported, implemented, or verified. A documented grammar must never be presented as editable merely because it is documented.
+## Status and maturity rules
 
-## M0 — Foundation and vertical slice
+Milestone status is one of:
 
-Status: complete.
+- **Complete**: all exit criteria are backed by repository or controlled-runtime evidence.
+- **Substantial**: the architecture and most required behavior exist, but an exit criterion is not
+  yet proven.
+- **Partial**: useful infrastructure exists, but major required behavior remains.
+- **Not started**: no implementation beyond incidental prerequisites.
+- **Gated**: progress requires a named external asset or engineering decision.
 
-- [x] Establish the independent repository, scope, security boundary, and architecture.
-- [x] Pin the BSAM 2.4 source/executable baseline and evidence method.
-- [x] Implement lossless root/include loading and byte-identical no-op rendering.
-- [x] Implement initial semantic entities and reference diagnostics.
-- [x] Implement revision-bound plans, diffs, non-overwriting apply, and audit records.
-- [x] Implement selected node, element, set, boundary, parameter, and transformation edits.
-- [x] Import manually prepared Abaqus-style `.ele` mesh data into a neutral model.
-- [x] Implement isolated serial run, status, timeout, and controlled stop.
-- [x] Expose deterministic tools through a loopback-only API.
-- [x] Establish provider-neutral and CPU-local guarded chat infrastructure.
-- [x] Verify the notch two-to-eight-ply transformation as one regression scenario.
+Capability maturity is independent of milestone status:
 
-Exit: the full architecture works for a bounded vertical slice without trusting an LLM.
+```text
+unsupported -> implemented -> verified -> runtime_verified -> production_qualified
+```
 
-## M1 — Complete active BSAM 2.4 specification
+Parsing or editing support alone is never evidence that a capability is runtime-verified or
+production-qualified. Full BSAM grammar coverage is not a gate for advancing the agent architecture;
+unsupported and ambiguous behavior must remain explicit and fail closed.
 
-Status: complete. Registry `0.134.0` inventories 13 top-level blocks, 29 cluster commands, 12 nested BOUNDARY constructs, one generation profile, two transformations, three dependency classes, 25 forward/reverse reference contracts, four read consumer routes, 23 mutation consumer routes, five repository drift checks, 11 supported entity-operation impacts, and nine engineering-clarification triggers. Static validation is verified for all 54 active constructs. The generated reference and committed source-dispatch coverage are enforced by one repository command and Windows CI; exact live dispatch regeneration additionally runs wherever the pinned private source tree is available.
+## Current repository position
 
-### M1.1 Reachable-dispatch audit
+As of 2026-09-14, the repository is transitioning from **M4 into M5**. The deterministic foundation
+is qualified, provider and conversational layers are substantial, and an initial bounded agent loop
+can complete selected multi-step trajectories. It has not yet demonstrated general open-ended
+engineering exploration or a substantial generic model transformation with smoke-test evidence.
 
-- [x] Enumerate every active top-level, BOUNDARY, and finite-element command dispatch.
-- [x] Link every primary dispatch to a pinned local source location and calling path.
-- [x] Classify active dispatches plus commented and deprecated initialization paths.
-- [x] Reconcile the primary audit with `capabilities.json` and produce a zero-omission report.
+| Milestone | Current status | Evidence summary |
+| --- | --- | --- |
+| M0 Deterministic foundation | Complete | Loss-preserving source sets, registry, semantics, guarded plans, validation, audit, execution supervision, and regression coverage |
+| M1 Provider-neutral LLM layer | Substantial | Local llama.cpp and OpenAI Responses adapters, shared contracts, configuration, mocked transport tests, hosted-data controls; cancellation parity remains |
+| M2 Conversational grounding | Substantial | Persistent active model/entity/query/output/run context and Windows/workspace path normalization; the full crack-coreference acceptance dialogue remains unproven |
+| M3 Canonical engineering actions | Substantial | Canonical query mapping, capability metadata, semantic queries, model comparison, and run inspection exist; some prompt-specific routing remains |
+| M4 Bounded agent loop | Substantial | Explicit bounded loop, evidence-based completion, confirmations, fingerprints, terminal states, and executable multi-step tests; general unseen-task acceptance remains |
+| M5 Autonomous read-only exploration | Partial | Model inspection, semantic query/reference traversal, comparison, validation, status, and bounded log inspection can chain; safe project-file search tools are absent |
+| M6 Goal-oriented modification | Partial | Generic create/modify/delete/rename and plan composition exist for verified capabilities; no qualifying substantial generic transformation has been demonstrated |
+| M7 Validation and execution levels | Partial | Strong static validation and controlled execution exist; a distinct deterministic smoke-test contract and output inspection do not |
+| M8 Runtime diagnosis and recovery | Partial | Run states, logs, failure classification, stale-plan recovery, and safety bounds exist; diagnosis-to-repair-to-rerun is not general |
+| M9 Knowledge/RAG v1 | Partial | Non-authoritative retrieval interface is defined and fails closed; no indexed corpus or retrieval backend exists |
+| M10 Trusted examples | Not started | Fixtures and acceptance projects are not indexed as provenance-ranked precedents |
+| M11 Troubleshooting memory | Not started | No structured verified troubleshooting store or retrieval workflow exists |
+| M12 Results interpretation | Not started | Runtime artifacts are classified, but engineering result quantities are not exposed or interpreted |
+| M13 VS Code interaction | Substantial | Chat, provider selection, diagnostics, forms, previews, confirmation, and run controls exist; task/evidence activity UX remains limited |
+| M14 Comprehensive evaluation | Partial | Decision, conversational, and trajectory assets exist; not all trajectory specifications execute end to end |
+| M15 Production hardening | Partial | Safety, audit, CI, reproducible manifests, and data controls exist; scale, compatibility, recovery, and production qualification remain |
 
-### M1.2 Grammar completion
+## M0 — Preserve and qualify the deterministic foundation
 
-- [x] Enumerate all 28 active MATERIALS types and document structured types 50, 998, and 999.
-- [x] Document exact positional grammars for all 25 legacy MATERIALS types and block unsafe external/fragile paths.
-- [x] Document all 29 finite-element CLUSTERS command grammars, explicitly blocking unsafe source paths.
-- [x] Document all 12 nested BOUNDARY construct grammars, defaults, dependencies, and unsafe source paths.
-- [x] Record exact command matching, record layouts, termination, and repetition.
-- [x] Complete parameter types, defaults, allowed values, ranges, and units.
-- [x] Record conditional variants and cross-parameter constraints.
-- [x] Mark unsupported ambiguity explicitly; never infer grammar from examples alone.
+**Status: Complete.**
 
-### M1.3 Entity and dependency specification
+Objective: maintain a reliable deterministic BSAM execution environment beneath every agent
+capability.
 
-- [x] Separate deterministic structural references from BSAM semantic constraints and from engineering decisions that require user intent.
-- [x] Define entities created by every active construct.
-- [x] Define forward and reverse references across analysis controls, clusters, mesh, sets, sections, orientations, materials, constitutives, failures, cracks, boundary conditions, loads, connections, tables, statistics, moisture, and user functions.
-- [x] Record rename, deletion, creation, and transformation impacts.
-- [x] Identify decisions that require engineering clarification.
+Implemented and verified:
 
-### M1.4 Generated contracts
+- lossless root/include source-set loading and byte-identical no-op rendering;
+- semantic entities, stable identities, forward/reverse references, and source locations;
+- registry/capability metadata for the active BSAM 2.4 baseline;
+- deterministic inspection, focused query, planning, preview, and validation;
+- supported dependency-aware create, modify, delete, rename, and composed changes;
+- revision-bound plans, digests, stale-plan detection, non-overwriting apply, and audit records;
+- isolated execution, durable status, timeout, and controlled stop;
+- bounded stale-plan recovery, explicit unsupported-capability refusal, and workspace containment;
+- representative non-trivial validation and controlled executable acceptance records.
 
-- [x] Validate registry invariants and evidence links with `tools/registry_tools.py`.
-- [x] Generate the human BSAM input reference from the registry.
-- [x] Detect stale generated input-reference output in repository checks.
-- [x] Expose a machine-consumable operational manifest and strict tool contracts consumed by parser/editor/query/agent paths for the verified subset.
-- [x] Complete shared machine-consumable capability contracts for the remaining parser, editor, and validator paths.
-- [x] Expose registry-derived operational-support and intent metadata through `get_capabilities` for the agent consumer.
-- [x] Generate additional coverage ledgers only when a concrete repository or CI consumer requires them; the current registry reference and dispatch audit satisfy all present consumers, so no redundant ledger is generated.
-- [x] Enforce all generated-contract and coverage drift in CI/repository checks.
+Exit criteria remain permanent regression gates: the deterministic suite passes, no-op round trips
+are preserved, includes remain source-set safe, representative models validate, and confirmation
+and change-safety behavior cannot regress.
 
-Exit: every reachable active input path is fully specified or explicitly blocked with evidence.
+## M1 — Provider-neutral LLM layer
 
-## M2 — Registry-driven deterministic engine
+**Status: Substantial.**
 
-Status: complete. Loss-preserving parsing, semantic identities/references, registered parameter edits, structural edits, bounded transformations, mesh-template assembly, and one deterministic net-new deck profile are implemented behind registry contracts.
+Objective: make the reasoning model replaceable without changing the BSAM core.
 
-### M2.1 Generic parsing and semantic model
+Implemented:
 
-- [x] Parse registry-matched BOUNDARY/control occurrences and registered values into source-located capability records without changing concrete syntax.
-- [x] Parse current and legacy SOLVER definitions, effective defaults, and BOUNDARY solver-schedule references without rewriting source.
-- [x] Parse named TABLES grids, source-located values, and structured material `table_<name>` references without assigning guessed material ordinals.
-- [x] Parse named UFUNCTIONS point data and structured material `ufunc_<name>` references with exact entry-boundary and monotonicity checks.
-- [x] Parse named STATISTICAL type-3 distributions, dynamic seed dimensions, cluster/section dependencies, and structured material `stat_<name>` references.
-- [x] Attribute named-data references to source-bounded 998/999 structured MATERIALS declarations while preserving legacy bodies without inferred identities.
-- [x] Parse every CONSTITUTIVE and FAILURE variant by exact declaration-order record consumption, including modifiers, wrappers, degradation rows, and dynamic subrecords.
-- [x] Populate direct constitutive material/failure references only when complete declaration-order scans prove the corresponding target identities; preserve unproven legacy MATERIALS bodies without guessed ordinals.
-- [x] Parse cluster-local BOUNDARY and LOAD rows into source-located semantic records with source-defined set-first or LIST node-only target references.
-- [x] Parse cluster-local FIELD and SELECTION records into source-located node, element, and set dependencies while keeping source-defective generation paths blocked.
-- [x] Parse explicit and ALL BOUNDARY cluster selectors into source-located cluster dependencies with missing-name diagnostics.
-- [x] Resolve BOUNDARY data-file, force/traction, volume-average, and CFV output selectors to active clusters and qualified node/element sets, including ALL/list expansion and scope diagnostics.
-- [x] Index source-defined `*CRACK REGION,ELSET=...` dependencies so element-set deletion cannot orphan crack-region selection.
-- [x] Index EXCLUSION and geometric CRACK REGION box/plane/sphere/cylinder selectors as source-located, inspection-only cluster operations.
-- [x] Index BUILD and STOP as source-located, inspection-only topology barriers targeting the active cluster.
-- [x] Index TOLERANCE plus standalone and CRACK SPACING forms as source-located, inspection-only cluster settings.
-- [x] Bind source-located TYPE declarations and DIMENSIONS capacities to the following normalized cluster NAME without changing unnamed legacy entity scope.
-- [x] Expose cluster CONSTITUTIVE assignments as typed, source-located dependencies on declaration-order constitutive definitions.
-- [x] Parse nodal and elemental ORIENTATION rows into source-located node, element, and set dependencies so structural deletion remains fail-closed.
-- [x] Parse SHIFT/SCALE NSET and INTEGRATION element dependencies, and retarget exact SHIFT/SCALE NSET values through the generic modify surface.
-- [x] Index ALL/default SHIFT/SCALE plus FLIP and inertial TRANSFORM as source-located cluster coordinate operations; keep coordinate mutation unavailable.
-- [x] Index NGEN endpoint, NCOPY source-set, and generated output-set relationships without overclaiming generated-node identities.
-- [x] Derive bounded NGEN/NCOPY generated-node identities for direct, arc, paired-set, and explicit-source copy rows so downstream connectivity resolves deterministically.
-- [x] Preserve source-defined generated-set membership: NGEN output sets contain both endpoints and generated nodes, while NCOPY output sets contain generated copies only.
-- [x] Derive bounded ELGEN element identities and shifted connectivity, while blocking generated entities from unsafe single-record deletion.
-- [x] Traverse FE includes inline for semantic indexing so nested fragments inherit active cluster state and included `*NAME` changes persist when the parent stream resumes.
-- [x] Index each reachable INCLUDE occurrence as a typed, source-located operation targeting the cluster active at that point in the inline stream.
-- [x] Emit uniform source-located capability records and registered parameter/default/operation views for every reachable cluster-command occurrence.
-- [x] Declare verified typed read paths for all 12 registered BOUNDARY constructs and expose solver schedules and connections through entity queries.
-- [x] Expose the active INPUT format as a source-located registered block record with registry-driven value validation.
-- [x] Parse canonical MOISTURE settings into a typed workflow record while keeping external execution explicitly unsupported.
-- [x] Expose CLUSTERS and BOUNDARY as source-located container records backed by their typed command/construct children.
-- [x] Type the fixed leading records of global CRACK declarations and resolve name-or-ordinal cluster selectors without claiming optional geometry edits.
-- [x] Cursor-parse numeric USER types 1-5, 101, and 201 into declaration-order entities while retaining types 100 and 301 as explicit preservation-only boundaries.
-- [x] Parse completed registry constructs into typed records while preserving concrete syntax; enforce implemented-or-verified read contracts across all 54 active constructs.
-- [x] Preserve unknown or not-yet-supported records losslessly.
-- [x] Represent loaded source files with workspace-stable identities and link resolved INCLUDE operations to their target files.
-- [x] Resolve CONSTITUTIVE type-3/type-4 curve and twist selectors to declaration-order numeric USER function identities.
-- [x] Give repeated cross-file semantic occurrences unique entity IDs while retaining shared keys for duplicate-definition validation.
-- [x] Derive reference IDs from their source, target, kind, and location so unrelated edges cannot renumber cross-file links.
-- [x] Resolve all twelve legacy MATERIAL type-4 selectors to declaration-order numeric USER identities.
-- [x] Resolve legacy and keyed MATERIAL type-40 plus type-41 selectors to declaration-order numeric USER identities.
-- [x] Resolve MATERIAL type-11 mixtures and type-300 interpolation rows to prior declaration-order material identities.
-- [x] Resolve MATERIAL type-15 compliance/phase and type-500 function selectors to declaration-order numeric USER identities.
-- [x] Resolve every typed `*SECTION` layer row to its declaration-order MATERIAL identity.
-- [x] Resolve MATERIAL type-800 COMPRO ownership to its declaration-order cluster identity.
-- [x] Resolve MATERIAL type-105 and orthotropic `*shear` G13/G12 selectors to declaration-order numeric USER identities.
-- [x] Resolve BOUNDARY connection material, constitutive, and failure selectors to declaration-order identities.
-- [x] Expand BOUNDARY nodal-connection ALL and same-row qualified master/slave set selectors to typed dependencies.
-- [x] Resolve `*SECTION,CONNECTION` layer IDs to CONSTITUTIVE identities while retaining normal MATERIALS-layer semantics.
-- [x] Preserve BSAM's implicit `noname<declaration-index>` cluster identities and scope their child entities consistently.
-- [x] Resolve every table name in structured `poly_<table>...` material parameters.
-- [x] Populate consistent entity identities and cross-file references.
-- [x] Derive INPUT and parameterless top-level container records from registry body and parameter shape instead of feature IDs.
-- [x] Derive canonical repeated key/value top-level records, list values, defaults, and entity settings from registry metadata.
-- [x] Replace feature-specific semantic extraction where registry metadata is sufficient; retain cursor/stateful extractors where executable grammar metadata is not yet available.
+- one provider-neutral request/response/message/tool boundary;
+- local Scout/llama.cpp and OpenAI Responses adapters;
+- structured decisions, usage and error normalization, provider/model/reasoning configuration;
+- environment-variable credentials and `store: false` hosted requests;
+- strict hosted-data minimization and refusal of apparent pasted BSAM source/mesh content;
+- mocked provider conformance tests and separate live acceptance evidence.
 
-### M2.2 Generic parameter editing
+Remaining:
 
-- [x] Select existing key/value parameters by canonical registered capability identity for the currently supported subset.
-- [x] Query explicit and registered-default BOUNDARY/control values with deterministic ambiguity reporting.
-- [x] Query and minimally patch existing current-syntax SOLVER options by canonical capability identity; legacy positional edits remain blocked behind the verified migration.
-- [x] Validate and minimally replace existing real, integer, enum, and string values for the verified editable subset, including finite and signed-range checks encoded by registered value types.
-- [x] Insert an absent optional `*CONVERGENCE` `maxiterations` record only when parameter-level registry policy marks insertion verified.
-- [x] Remove an isolated explicit `*CONVERGENCE` `maxiterations` record to restore its registered default only when parameter-level policy marks removal verified.
-- [x] Enable or disable the optional Boolean `*G-CONTROL` `DAMP` flag through exact command-line tokens and parameter-level registry policy.
-- [x] Insert or remove the optional SHEFF `relative_tolerance` row within a repeated solver option group, restoring the source-defined default on removal.
-- [x] Support append-only insertion and occurrence-selected replacement/removal for explicitly registered repeated-last-wins values where source evidence and edit policy permit them.
-- [x] Produce minimal source patches with deterministic registered defaults and full source-set validation for the supported parameter-edit subset.
-- [x] Return actionable, stable API classifications for missing, unknown, ambiguous, invalid-value, invalid-occurrence, and unsupported parameter edits.
+- define and verify cancellation behavior across providers;
+- execute the same complete synthetic agent trajectory against both providers under one harness;
+- retain an explicit opt-in policy if any future hosted flow needs local-private evidence.
 
-### M2.3 Generic structural editing
+Exit: provider switching is configuration-only, the same synthetic task passes through either
+provider, mocked OpenAI transport tests pass, and hosted providers cannot receive local-private data
+without explicit policy authorization.
 
-- [x] Dispatch boundary-condition rename through a capability-identified generic rename surface while retaining the specialized regression tool.
-- [x] Dispatch verified node create/delete, element create, and node/element-set create/extend operations through capability-gated generic structural surfaces while retaining compatibility tools.
-- [x] Remove one exact explicit node/element-set member through the generic modify surface, including path-bound include edits, while blocking ambiguous or empty-set results.
-- [x] Retarget one exact cluster-local BOUNDARY or LOAD record through the generic modify surface, preserving its source file and blocking ambiguous, missing, LIST-invalid, or POLYNOMIAL-unsafe targets.
-- [x] Delete one isolated, unreferenced explicit node/element set through the generic delete surface while blocking implicit, generated, commented, or multiply-defined sets.
-- [x] Delete one unreferenced explicit element through the generic delete surface, including path-bound include edits, while blocking set, selection, and implicit-membership dependencies.
-- [x] Retarget one exact SECTION assignment to an existing element set through the generic modify surface, including path-bound include edits and ambiguity blocking.
-- [x] Create, delete, rename, and list entities and records whose corresponding registry operation is verified, including dependency-aware explicit node/element-set rename across source files.
-- [x] Keep reorder explicitly fail-closed in operational manifests until a capability's registry contract defines safe ordering semantics; no current capability authorizes it.
-- [x] Edit registered repeated parameter values, explicit set member lists, and referenced set names.
-- [x] Edit one existing TABLES grid value through a one-based, finite-real, reviewed minimal patch without changing axes, names, or shape.
-- [x] Generalize path-bound reviewed include-file edits across verified node, element, set, and empty-cluster mesh insertion operations.
-- [x] Copy a reviewed root edit plus unchanged relative include files to a separate source-set directory with preflight conflict checks, digest verification, and partial-write rollback.
-- [x] Delete an unreferenced node from an included FE fragment through a path-bound patch, and compose root/include changes into one reviewed source-set plan without touching originals.
-- [x] Compute dependent updates for verified renames and block verified destructive changes when semantic dependents are present or definitions are unresolved, ambiguous, implicit, or generated.
-- [x] Complete the node, element, set, generated-membership, and orientation reverse-dependency graph used by guarded structural deletion.
-- [x] Keep specialized transformations for the runtime-qualified notch expansion and legacy solver migration; route ordinary supported syntax edits through generic capability adapters.
+## M2 — Conversational grounding and workspace context
 
-### M2.4 Deterministic generation
+**Status: Substantial.**
 
-- [x] Build new current-syntax decks from typed analysis and mesh intent.
-- [x] Require all essential engineering choices rather than inventing them.
-- [x] Render canonical current syntax with provenance and stable digests.
+Objective: ground each turn in an ongoing engineering task and workspace, not an isolated message.
 
-Exit: ordinary supported BSAM operations are driven by registry metadata, not prompt-specific or fixture-specific code.
+Implemented task/session state includes active source and digest, recent sources and entities,
+selected entity, last query, last generated output, last run, observations, unresolved decisions,
+engineering assumptions, failures, plans, and step/recovery counters. Workspace-relative and
+contained absolute Windows paths are normalized before deterministic execution. Follow-ups such as
+“Which ones are on ply2?”, “Change that value,” “Validate the changed model,” and “Why did it fail?”
+have direct regression coverage.
 
-## M3 — Comprehensive validation and evidence
+Remaining:
 
-Status: complete. Registry `0.136.0` closes the remaining controlled-probe gate with digest-bound successful VTK data-file output from the pinned executable. The narrower runtime claim leaves ParaView/SHEFF, aggregate-output, alternate-selector, and intermediate-output execution unassessed.
+- execute the complete inspect → cracks → ply2 → selected-crack dialogue as one acceptance case;
+- broaden plural and multi-entity reference resolution without guessing;
+- improve user-facing recovery whenever context exists but a narrow query cannot consume it.
 
-- [x] Add end-to-end parser, semantic, query, edit, invalid-value, no-op, and natural-language tests for the initial BOUNDARY/CONVERGENCE operational slice.
-- [x] Add SOLVER parser, schedule-reference, missing-second-solver, safe-option, legacy-preservation, edit, and natural-language trajectory tests.
-- [x] Add TABLES grid, monotonicity, duplicate/missing-reference, query, no-op, and natural-language tests.
-- [x] Add UFUNCTIONS width, point-count, monotonicity, duplicate/missing-reference, query, no-op, and natural-language tests.
-- [x] Add STATISTICAL required-key, dynamic-order, type/range, duplicate/missing-reference, cluster, query, no-op, and natural-language tests.
-- [x] Add structured MATERIALS boundary, partial-support, declaration-attribution, legacy-preservation, query, and natural-language tests.
-- [x] Classify every emitted diagnostic by validation level and evidence provenance, reject unclassified new codes, and summarize diagnostics by both dimensions.
-- [x] Validate exact INPUT presence, current type, single-record cardinality, unique occurrence, and termination.
-- [x] Validate cluster `*SELECTION` positive IDs, uppercase types, nonempty bodies, DIMENSIONS capacity, named-set limits, duplicates, and member references.
-- [x] Validate `*DIMENSIONS` cardinality, nonnegative capacities, declaration order, uniqueness, and node/element/selection/section allocation bounds.
-- [x] Validate explicit node/element headers, exact finite rows, topology widths, fixed lookup-label limits, duplicate labels, and DIMENSIONS capacity overruns.
-- [x] Validate explicit, generated-range, and coordinate-box node/element sets, including headers, bounded expansion, resolved members, and duplicate-membership policy.
-- [x] Validate material compatibility across direct constitutives, solid cluster assignments, and direct or CONNECTION section layers for every active solid element family.
-- [x] Register consumer-required structured-material property groups, dimensional units, missing-value sentinels, source defaults, and fail-closed creation ambiguities.
-- [x] Validate cluster `*TYPE`, `*NAME`, and `*CONSTITUTIVE` cardinality, ordering, values, uniqueness, reserved names, and declaration-order references.
-- [x] Validate command-only cluster `*STOP` records and cluster termination/reachability boundaries.
-- [x] Validate optional/default BOUNDARY `*NAME` records, token limits, reserved names, and case-insensitive cross-problem uniqueness.
-- [x] Validate BOUNDARY `*TYPE` dispatch prefixes, mechanical/thermal record cardinality, finite temperature values, kinematic option flags, and blocked contact execution.
-- [x] Validate BOUNDARY `*G-CONTROL` command-line options, required values, numeric domains, threshold ordering, and UPDATE compatibility.
-- [x] Validate BOUNDARY `*LOADING SEQUENCE` static/fatigue headers, change rows, numeric domains, block markers, and unsafe fatigue-family branches.
-- [x] Validate BOUNDARY `*CONNECTIONS` penalty, nodal, and surface row state machines, selectors, values, and blocked execution branches.
-- [x] Validate command-only cluster `*BUILD` record shape before topology construction.
-- [x] Validate cluster `*FLIP` command-line TYPE mappings, uppercase values, unknown options, and command-only shape.
-- [x] Validate cluster `*TRANSFORM` required INERTIA, optional finite FLATTEN, unknown options, and command-only shape.
-- [x] Validate cluster `*SPACING` default, mutually exclusive command-line modes, positive VALUE, and command-only shape.
-- [x] Validate cluster `*TOLERANCE` TYPE option, uppercase values, exact record cardinality, and nonnegative finite values.
-- [x] Validate cluster `*SHIFT` and `*SCALE` targeting, exact three-real records, finite values, and non-collapsing scale factors.
-- [x] Validate cluster `*EXCLUSION` flags, BOX/PLANE/PREVIOUS cardinality, finite geometry, and safe geometry domains.
-- [x] Validate cluster `*LOAD` options, exact row width, DOF range, finite values, target limits, and target references.
-- [x] Validate cluster `*FIELD` VARIABLES, exact row widths, finite values, target limits, and references while retaining its execution block.
-- [x] Resolve nodal/elemental `*ORIENTATION` semantics and validate headers, exact rows, finite values, targets, and elemental vector geometry.
-- [x] Validate `*NCOPY` options, source sets, exact rows, bounded counts, offsets, finite translations, and generated-label safety.
-- [x] Validate `*ELGEN` TYPE, exact integer rows, seed topology, bounded grids, shifted connectivity, and generated-label safety.
-- [x] Validate `*INTEGRATION` headers, bounded point rows, finite values, effective element types, targets, and replacement semantics.
-- [x] Validate `*SECTION` options, bounded layer counts, exact rows, finite thickness normalization, definition IDs, and references.
-- [x] Validate cluster `*BOUNDARY` FORMAT selection, exact ABAQUS/LIST/POLYNOMIAL rows, finite values, indices, and safe targets.
-- [x] Validate `*NGEN` direct, paired-set, and source-safe arc forms with bounded labels, finite derived coordinates, and chained generation.
-- [x] Validate all cluster `*CRACK` variants, selectors, records, finite geometry, state options, and explicit DEFINITION rejection.
-- [x] Validate structure, types, ranges, cardinality, and required records for every supported construct.
-- [x] Validate references, dependency rules, mesh connectivity, sets, topology, and cross-feature constraints; every registered edge kind is named by a behavioral regression, including explicit SECTION assignment and bounded statistical section seeding.
-- [x] Add direct golden no-op and invalid-cardinality coverage for the previously implicit BOUNDARY `*GEO_NL` and `*STATUS` families.
-- [x] Add golden no-op and minimal-patch tests for every syntax family; byte preservation is a source-set invariant across all active families, and every family with a registered mutation route has a direct successful exact-patch regression.
-- [x] Add invalid, ambiguous, and dependency-breaking test cases; every classified diagnostic code is named by a regression and mutation tests cover ambiguity, stale state, unresolved dependencies, and guarded destructive failures.
-- [x] Add small representative fixtures across capability families; compact current controls, named-data dependencies, two-cluster semantics, and neutral mesh fixtures complement the notch regression.
-- [x] Add controlled executable probes where static source evidence is insufficient; the final VTK data-file probe succeeded with a checked-in input and digest-bound output evidence.
-- [x] Executable-test the bounded mechanical-isotropic generation profile against its pinned solver and boundary-assembly paths.
-- [x] Round-trip and executable-test a representative imported `.ele` model after an appropriate analysis template is available.
+Exit: the specified multi-turn crack dialogue succeeds without repeating the filename and without
+leaking internal query/parser failures.
 
-Exit: capability support is measurable, reproducible, and protected against regression.
+## M3 — Natural-language intent to canonical engineering actions
 
-## M4 — General agent workflow
+**Status: Substantial.**
 
-Status: complete. Registry `0.137.0` closes guarded workflow acceptance on the available trusted non-notch TriC project. Scout correctly proposed a digest-bound run without executing, a separate confirmation launched it, status calls observed running and terminal states, and the pinned executable stopped cleanly at the controlled timeout. Terminal status now also updates persistent task state. The provider interface remains neutral so a hosted provider can later be evaluated behind the same deterministic contracts.
+Objective: separate natural-language understanding, canonical engineering intent, and deterministic
+execution.
 
-- [x] Expose operational support and focused BOUNDARY/control queries through deterministic tools and capability-derived routing.
-- [x] Expose current SOLVER inspection and modification through the same generic query/change trajectory while reporting legacy instances as inspectable but not generically modifiable.
-- [x] Expose verified FE node, element, and set planners through generic capability-identified create, modify, and delete tools.
-- [x] Query entity listings and inbound/outbound references by stable kind/name selectors without requiring opaque source-location IDs.
-- [x] Persist bounded task state, focused ambiguity decisions, ordered tool evidence, failure classifications, and attempt fingerprints separately from message history.
-- [x] Chain safe source inspection and post-apply validation around a confirmed registered change without weakening the confirmation boundary.
-- [x] Add deterministic trajectory cases for parameter modification, ambiguity, dependent rename, unsupported creation, stale revision, and failed execution.
-- [x] Re-preview digest-valid stale plans by replaying typed selectors and requested values, with bounded recovery attempts and a fresh confirmation boundary.
-- [x] Generate high-level inspect, query, create, modify, validate, and run intent maturity from the capability registry and use it for prompt applicability.
-- [x] Map varied language and parameter phrases to capability identities without exposing low-level parser details; registry-derived routes now precede compatibility branches where equivalent tests pass.
-- [x] Persist typed clarification choices and pending arguments for ambiguous parameter context, including save/resume and focused continuation.
-- [x] Compose 2–8 independent same-revision deterministic operations into one reviewed plan, rejecting overlap and revalidating every typed component plus the combined result.
-- [x] Evaluate paraphrases, ambiguity, unsupported requests, prompt injection, confirmation, and stale state across the current capability families with the 33 decision cases and 15 trajectory specifications.
-- [x] Re-benchmark the local model after the generic capability surface is stable; Scout still fails the autonomous-routing gate on the expanded 33-case suite.
-- [x] Complete lossless inspect/review/apply/validate acceptance on the available trusted non-notch `TriC_v311` project without changing its engineering behavior.
-- [x] Complete guarded live-model and executable acceptance on the available trusted non-notch `TriC_v311` project, including separate confirmation, asynchronous status, controlled timeout, and persisted terminal state.
+Implemented:
 
-The target bounded workflow is UNDERSTAND -> INSPECT -> RESOLVE CAPABILITIES -> CLARIFY -> PLAN -> VALIDATE PLAN -> REVIEW -> CONFIRM -> APPLY -> VALIDATE RESULT -> RUN -> VERIFY -> DIAGNOSE/RECOVER -> REPORT. Model output selects the next permitted action; deterministic policy remains authoritative. Safe read-only steps may chain automatically, while mutation and run boundaries retain explicit confirmation. Initial task state is distinct from message history and retains the objective, source, resolved capabilities, assumptions, missing engineering decisions, plan, validation/run state, failure evidence, attempt fingerprints, and bounded step/recovery counts.
+- paraphrase normalization for capability and editable-parameter questions;
+- canonical semantic query names rather than arbitrary text passed into query enums;
+- entity listing/inspection and inbound/outbound reference queries through `query_model`;
+- capability descriptions, deterministic model comparison, validation diagnostics, run state, and
+  bounded run-log inspection;
+- a clear distinction between misunderstood/invalid arguments and unsupported capabilities.
 
-`relevant_tools()` remains a transitional prompt-size optimization, not an authorization boundary. Characterize it with regression tests, introduce capability-derived applicability and routing, retain backward-compatible fallback, and remove prompt-specific keyword branches only after equivalent trajectory evaluations pass.
+Remaining:
 
-Exit: adding a registered deterministic capability makes it available to chat without adding prompt-specific routing code.
+- replace remaining prompt-specific keyword branches with capability-derived applicability after
+  equivalent trajectory tests exist;
+- promote common entity and reference operations to clearer canonical intent forms without
+  multiplying workflow-specific tools;
+- measure paraphrase equivalence across both configured providers.
 
-## M5 — Scoped embedded mesh generation
+Exit: natural paraphrases converge on the same canonical action, arbitrary prose never reaches a
+narrow deterministic enum, and unsupported capability is distinct from misunderstood wording.
 
-- [ ] Select initial geometry families, element mappings, physical-group conventions, ply/orientation rules, and quality tolerances.
-- [ ] Pin a local Gmsh runtime with no network dependency.
-- [ ] Implement typed geometry/meshing recipes and deterministic neutral-mesh conversion.
-- [ ] Validate quality and equivalence against trusted target meshes.
+## M4 — Bounded Codex-like agent loop
 
-Input gate: user selection of the first geometry families and trusted acceptance meshes after M1 completes.
+**Status: Substantial.**
 
-## M6 — Product clients and optional providers
+Objective: operate an explicit observe → reason → act → observe loop until the goal is completed or
+safely blocked.
 
-- [x] Add OpenAI Responses behind explicit data policy, `store: false`, payload minimization, and provider conformance tests.
-- [x] Build a thin VS Code client over the stable local API.
-- [x] Add schema-aware diagnostics, forms, reviewed diffs, chat, and run controls.
+Implemented:
 
-Current M6 coverage: schema-aware source diagnostics, registry-derived parameter forms, reviewed diffs, guarded apply, run/status/controlled-stop controls, a dedicated guarded chat panel, and an optional routing-only OpenAI Responses adapter are implemented. Hosted requests cannot contain BSAM files or registry catalogs; user-typed text remains external-provider data.
+- objective-derived working plans and deterministic completion criteria;
+- compact digest-bound observations and replanning context;
+- automatic chaining of permitted read-only actions;
+- explicit complete, clarify, confirm, refused, failed, blocked, in-progress, step-limit, and
+  recovery-limit outcomes;
+- maximum steps/recoveries, repeated-action detection, failed-action fingerprints, and no repeat of
+  an identical failed action;
+- separate confirmation boundaries for applying changes, running BSAM, and stopping a run;
+- deterministic evidence requirements for creation, validation, comparison, and terminal run state.
 
-Status: complete. The installed VS Code client and `store: false` OpenAI routing
-adapter were exercised on the real notch workflow. Inspection, capability listing,
-reviewed parameter change, separate confirmation, validated apply, and unsupported
-syntax refusal crossed the expected boundaries. The acceptance exposed and closed
-absolute Windows-path parsing, editable-parameter discovery, default-output
-collision, and Responses request-contract defects. Evidence is retained in
-[the 2026-09-14 acceptance record](../bsam/VSCODE_OPENAI_ACCEPTANCE_2026-09-14.md).
+Remaining:
 
-## Deferred
+- prove completion of previously unseen multi-step objectives through model-selected composition,
+  not deterministic request-specific continuation;
+- add working hypotheses distinct from the working plan and retain evidence for hypothesis changes;
+- add an evidence-grounded final synthesis step that cannot override completion checks;
+- characterize model behavior when several equally safe investigation paths exist.
 
-- MPI execution.
-- Automated results interpretation and report generation.
-- General-purpose arbitrary CAD repair and unrestricted meshing.
-- Modification of BSAM source code.
+Exit: an unseen multi-step task is completed by composing registered primitives without a hard-coded
+workflow, while all terminal and safety boundaries remain deterministic.
 
-## Next execution sessions
+## M5 — Autonomous read-only exploration
 
-1. [x] Exercise the installed VS Code client on a real project workflow and retain sanitized acceptance evidence.
-2. [x] Exercise the OpenAI routing adapter on non-sensitive prompts and retain acceptance evidence without recording the API key or raw hosted payloads.
+**Status: Partial.**
 
-M5 remains intentionally skipped pending the geometry-family and trusted-mesh
-decision. No later milestone is currently defined.
+Objective: let the agent investigate engineering questions the way Codex investigates a codebase.
 
-No user input is required until source behavior is genuinely ambiguous, an executable probe needs approval, or the M5 geometry-family gate is reached.
+Available composable reads include model inspection, canonical entity/reference queries, model
+comparison, validation diagnostics, run status, and bounded known-log inspection. Boundary-condition
+investigation and failed-run diagnosis already demonstrate multi-call read-only trajectories without
+confirmation.
+
+Next work:
+
+- add `list_workspace_files`, `read_allowed_text_file`, and `search_workspace` with explicit file
+  classes, byte/line limits, symlink rejection, and hosted-data boundaries;
+- add general `compare_files` only if model comparison cannot serve the tested use case;
+- make `inspect_entity` and `find_references` first-class canonical intents over the existing
+  semantic query engine where that improves composition;
+- add diagnostics, materials, failure definitions, sections, and project-file exploration cases;
+- require evidence-linked summaries and stop exploration when additional reads cannot change the
+  conclusion.
+
+Exit: an open-ended read-only question is answered through several autonomously selected tools
+without asking the user to prescribe the investigation.
+
+## M6 — Goal-oriented model modification and generation
+
+**Status: Partial.**
+
+Objective: achieve engineering outcomes through generic deterministic operations rather than only
+single-parameter edits.
+
+Existing primitives cover capability-gated entity create/modify/delete/rename, reference-aware
+renames and retargeting for verified capabilities, multi-plan composition, source-set copying,
+canonical generation for one profile, and deterministic validation. A specialized notch ply
+expansion remains a regression/compatibility tool and does not satisfy this milestone’s generic
+acceptance criterion.
+
+Next work:
+
+- add generic duplicate/copy-structure and reference-retarget primitives where registry semantics
+  can define them safely;
+- let the agent assemble and review a multi-operation structural plan before one confirmation;
+- distinguish safe structural assumptions from choices affecting materials, loading, thickness,
+  stacking sequence, constitutive behavior, or other physics;
+- demonstrate at least one substantial transformation that has no special-purpose workflow.
+
+Exit: a substantial model transformation is completed with generic primitives, explicit assumptions,
+focused clarification, a reviewed plan, non-overwriting apply, and deterministic validation.
+
+## M7 — Static validation, smoke testing, and full execution
+
+**Status: Partial.**
+
+Objective: prove that generated or modified input is valid at three distinct evidence levels.
+
+### Level 1: static validation
+
+Implemented for parsing, registry constraints, semantic references, dependencies, and deterministic
+diagnostics across the registered active constructs.
+
+### Level 2: BSAM smoke test
+
+Controlled short executions and runtime acceptance records exist, but there is no dedicated
+`run_smoke_test` contract with deterministic acceptance criteria. Add one that records executable
+identity/version, input digest, command/configuration, working directory, bounded stdout/stderr,
+exit/timeout state, BSAM diagnostics, expected artifacts, and initialization/solver-stage evidence.
+Process launch or exit code alone must never count as success.
+
+### Level 3: full run
+
+`run_bsam`, `get_run_status`, `inspect_run_log`, and `stop_run` provide a guarded asynchronous
+foundation. Add explicit full-run intent, monitoring policy, and `inspect_run_outputs`.
+
+Exit: “make sure the input is correct” defaults to static validation plus a successful deterministic
+smoke test, and requested full runs expose terminal and output evidence.
+
+## M8 — Runtime diagnosis and agentic recovery
+
+**Status: Partial.**
+
+Objective: observe failed smoke/full executions, diagnose them, and safely continue.
+
+Current support includes durable manifests, bounded logs, terminal classification, input/execution
+failure evidence, timeout/stop handling, failed-action fingerprints, and bounded stale-plan recovery.
+
+Next work:
+
+- normalize input/syntax, semantic/reference, missing-asset, environment, initialization,
+  convergence/numerical, timeout, and unknown-runtime classifications;
+- connect diagnosis to relevant deterministic evidence and later retrieval;
+- define repairs that are demonstrably operational/structural and do not alter engineering meaning;
+- implement bounded repair → validate → smoke-test/rerun trajectories;
+- require clarification before changing material properties, loads, BC physics, damage parameters,
+  constitutive choices, solver tolerances, mesh physics, or comparable engineering intent.
+
+Exit: at least one controlled runtime failure is detected, classified, diagnosed, safely repaired,
+revalidated, and retested through generic mechanisms.
+
+## M9 — BSAM Knowledge/RAG v1
+
+**Status: Partial (interface only).**
+
+Objective: provide source-aware domain knowledge beyond the active model and registry.
+
+The repository defines fail-closed interfaces for `search_bsam_knowledge`,
+`retrieve_documentation`, `find_similar_validated_examples`, and
+`search_troubleshooting_history`. No retrieval backend or indexed corpus is implemented.
+
+Implement local/private retrieval by default using exact capability lookup, metadata filters,
+keyword search, semantic search where useful, and reranking. Preserve source type, document/project,
+authority, BSAM version, capability IDs, validation/runtime status, and timestamp/version.
+
+Authority order:
+
+```text
+current deterministic model and registry
+    > authoritative BSAM documentation or source
+    > runtime-verified example
+    > validated example
+    > legacy example
+    > unverified notes
+```
+
+RAG provides knowledge and precedent; the deterministic BSAM core decides what is valid.
+
+Exit: documentation, capability, diagnostic, and trusted-example questions return source-aware
+evidence without elevating retrieval above deterministic authority.
+
+## M10 — Trusted-example retrieval and analogical model construction
+
+**Status: Not started.**
+
+Objective: use validated BSAM precedent as evidence for constructing new models.
+
+Index project/example metadata including BSAM version, model type, capability set, material models,
+validation, smoke/full-run status, and important structural features. Retrieved syntax and patterns
+must be rechecked against the current registry and validator before use.
+
+Exit: the agent retrieves a related trusted model, extracts relevant structure, and uses generic
+deterministic operations to create a new validated model.
+
+## M11 — Troubleshooting knowledge and engineering memory
+
+**Status: Not started.**
+
+Objective: retain reusable, verified troubleshooting evidence.
+
+Store structured diagnostic/error, model context, root cause, investigation, attempted fixes,
+successful and failed fixes, validation evidence, runtime evidence, and BSAM version. Historical
+fixes are advisory and cannot be applied automatically when engineering context differs.
+
+Exit: runtime diagnosis can retrieve and cite previous verified troubleshooting evidence while still
+requiring present-model validation and appropriate engineering decisions.
+
+## M12 — Results inspection and engineering interpretation
+
+**Status: Not started.**
+
+Objective: extend the agent loop from input preparation into simulation outcomes.
+
+Add deterministic primitives for available result files, load/displacement histories, solver
+statistics, damage/crack indicators, requested output quantities, execution summaries, and run
+comparisons where the actual BSAM outputs support them. The LLM may summarize deterministic
+evidence but may not fabricate unavailable quantities.
+
+Exit: supported workflows can run a model, explain what happened, compare baseline and changed
+results, and identify evidence such as damage initiation from actual outputs.
+
+## M13 — VS Code Codex-like interaction model
+
+**Status: Substantial.**
+
+Objective: make the engineering-agent architecture natural to use from VS Code.
+
+Implemented: free-form guarded chat, active-file integration, provider/model/reasoning selection,
+schema-aware diagnostics and forms, reviewed diffs, confirmations, generated-file actions, and
+run/status/controlled-stop controls.
+
+Remaining:
+
+- expose current objective, task state, plan, and terminal reason;
+- show expandable tool activity and deterministic evidence without exposing internal identifiers in
+  normal mode;
+- distinguish model reasoning summaries, deterministic findings, assumptions, and user decisions;
+- integrate smoke-test state and later retrieval/result evidence;
+- add recovery/crash UX for long-running tasks.
+
+Exit: a BSAM user can work primarily through conversational engineering objectives without knowing
+tool names, capability IDs, plan IDs, or query enums.
+
+## M14 — Comprehensive agent evaluation
+
+**Status: Partial.**
+
+Objective: base release acceptance on complete engineering-task success rather than routing accuracy.
+
+Maintain three levels:
+
+1. **Tool/decision evaluation** — schema validity, tool selection, arguments, capability invention,
+   and policy behavior.
+2. **Conversational evaluation** — coreference, active-model grounding, continuity, and unnecessary
+   clarification.
+3. **Engineering trajectory evaluation** — completion, tool order, replanning, confirmation,
+   recovery, deterministic evidence, loops, unsupported actions, and final usefulness.
+
+The repository currently has decision benchmarks, conversational tests, 19 trajectory
+specifications, an evidence-based trajectory scorer, and executable tests for selected autonomous
+investigation, change/validate/run boundaries, comparison, and failed-run diagnosis. JSON
+specifications alone do not count as executable acceptance.
+
+Next work is to execute every specified trajectory with controlled fixtures, then add eight-ply
+construction, smoke-test diagnosis, precedent-guided construction, recovery, full-run, and results
+cases.
+
+Exit: all release-critical trajectories execute end to end and are scored on engineering outcomes,
+not merely the first routing decision.
+
+## M15 — Production hardening
+
+**Status: Partial.**
+
+Objective: make BSAM Agent dependable for real engineering use.
+
+Existing foundations include workspace containment, explicit confirmation, deterministic audit
+records, digest-bound plans, durable run manifests, provider data controls, regression CI, and local
+acceptance evidence.
+
+Remaining work includes large-model and long-task profiling, end-to-end cancellation, crash/task
+recovery, provenance throughout retrieval and results, reproducible run environments, configurable
+policy, BSAM/version compatibility, explicit privacy controls, public non-proprietary CI, proprietary
+local acceptance, and opt-in-only telemetry. Apply the capability maturity ladder independently to
+each operation.
+
+Exit: release gates cover safety, correctness, resilience, provenance, compatibility, performance,
+privacy, and both public and proprietary acceptance evidence.
+
+## Long-term acceptance scenario
+
+```text
+User:
+"Take this two-ply notch model and create an eight-ply version.
+Keep the same material system and total thickness.
+Use [45/0/-45/90]s.
+Preserve the loading setup.
+Make a new file, validate it, smoke-test it, and if that succeeds run it.
+Tell me anything you had to assume and diagnose any failures."
+```
+
+Expected autonomous trajectory:
+
+```text
+understand objective
+-> inspect workspace and model
+-> inspect laminate, material, and loading structure
+-> retrieve documentation or examples if useful
+-> identify missing engineering decisions
+-> ask only when genuinely required
+-> formulate a working plan
+-> compose generic deterministic operations
+-> produce a reviewed change and request confirmation
+-> apply to a non-overwriting output
+-> run static validation
+-> run a deterministic smoke test
+-> inspect runtime evidence
+-> diagnose, recover, or replan within bounds
+-> run the full simulation when authorized
+-> inspect outputs
+-> report assumptions, changes, validation, runtime evidence, and results
+```
+
+No special-purpose `make_8_ply_notch_model` or equivalent workflow may be required to pass this
+scenario.
+
+## Dependencies and recommended order
+
+```text
+M0 deterministic authority
+├── M1 providers ──┐
+├── M2 context ────┼──> M4 agent loop ──> M5 exploration ──> M6 modification
+└── M3 actions ────┘                              │                 │
+                                                  └──────┬──────────┘
+                                                         v
+                                                   M7 execution
+                                                         |
+                                      M9 retrieval ──> M8 recovery
+                                           ├─────────> M10 examples
+                                           └─────────> M11 memory
+                                                   M7 ──> M12 results
+
+M13 VS Code consumes stable capabilities incrementally.
+M14 evaluation gates every milestone and release trajectory.
+M15 hardening turns verified capabilities into production-qualified ones.
+```
+
+Immediate prerequisite: close M4 with a genuinely model-composed unseen-task acceptance case.
+
+The next three recommended implementation milestones are:
+
+1. **M5 — Autonomous read-only exploration:** add bounded workspace reads/search and broaden
+   semantic investigations, using executable trajectories to retire remaining M4 special cases.
+2. **M6 — Goal-oriented modification and generation:** prove one substantial multi-operation
+   transformation through generic primitives, with focused engineering clarification.
+3. **M7 — Static validation, smoke testing, and full execution:** define a first-class smoke-test
+   contract and acceptance evidence before expanding automatic runtime recovery.
+
+M8 can begin with classification work during M7, but recovery cannot be accepted until the smoke
+test is deterministic. M10 and M11 depend on M9 provenance. M12 depends on stable M7 output
+artifacts. M13 and M14 proceed continuously as user-facing and evaluation layers over each addition.
+
+## Previous-roadmap mapping and architectural conflicts
+
+The previous numbering is replaced as follows:
+
+- old M0 plus old M1–M3 deterministic specification/engine work are consolidated into new M0;
+- old M4 general workflow is split across new M2–M5 and M14;
+- old M5 scoped embedded mesh generation becomes gated supporting work for future M6/M12 use cases,
+  not the main product sequence;
+- old M6 provider/client work maps to new M1 and M13;
+- new M7–M12 and M14–M15 make runtime proof, retrieval, results, evaluation, and production maturity
+  explicit for the first time.
+
+There is no fundamental conflict between the current trusted-core architecture and this end state.
+The following tactical conflicts or gaps must be retired:
+
+- the project charter still describes the LLM as a narrower workflow assistant and defers automated
+  result interpretation; treat that as Version 1 history and align the charter before the next
+  product-definition release;
+- remaining keyword-driven and deterministic special-case routing cannot be the main mechanism for
+  unseen agent tasks;
+- specialized notch expansion may remain as a regression adapter but cannot satisfy generic M6 or
+  the long-term acceptance scenario;
+- `run_bsam` currently combines short and full execution concerns instead of exposing a deterministic
+  smoke-test contract;
+- retrieval is not yet connected to an indexed, provenance-ranked knowledge service;
+- runtime artifacts are not yet exposed as deterministic engineering results;
+- Scout’s recorded routing accuracy does not meet the existing autonomous-agent quality gate;
+- the VS Code UI is command/workflow capable but does not yet present the full task/evidence loop.
+
+Do not weaken deterministic validation, workspace policy, confirmation, provenance, or unsupported
+capability refusal to close any of these gaps.
+
+## Deferred or supporting work
+
+- MPI execution remains deferred until serial smoke/full-run contracts are production-qualified.
+- Embedded Gmsh generation remains gated on geometry-family and trusted-mesh decisions; it should
+  serve generic model construction rather than displace the agent roadmap.
+- General-purpose arbitrary CAD repair, unrestricted meshing, unrestricted shell access, and direct
+  model-written deck text are out of scope.
+- Modification of BSAM source code is outside the BSAM input-engineering agent boundary.
