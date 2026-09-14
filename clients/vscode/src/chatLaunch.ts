@@ -3,6 +3,9 @@ export function chatArguments(
   configPath: string,
   sessionPath: string,
   auditEnabled: boolean,
+  provider?: string,
+  model?: string,
+  reasoningEffort?: string,
 ): string[] {
   const result = [
     "-m",
@@ -16,6 +19,9 @@ export function chatArguments(
     sessionPath,
     "--jsonl",
   ];
+  if (provider && provider !== "configured") result.push("--provider", provider);
+  if (model) result.push("--model", model);
+  if (reasoningEffort) result.push("--reasoning-effort", reasoningEffort);
   if (!auditEnabled) result.push("--no-audit");
   return result;
 }

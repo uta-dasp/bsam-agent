@@ -176,6 +176,23 @@
           "default": "config/provider.local.json",
           "description": "Provider configuration path, relative to the repository root or absolute."
         },
+        "bsamAgent.provider": {
+          "type": "string",
+          "enum": ["configured", "cpu-local", "openai"],
+          "default": "configured",
+          "description": "Chat provider. 'configured' uses the provider JSON; explicit choices safely override only provider transport defaults."
+        },
+        "bsamAgent.model": {
+          "type": "string",
+          "default": "",
+          "description": "Optional provider model ID, for example gpt-5.6-terra or gpt-5.6-sol. Empty uses provider configuration."
+        },
+        "bsamAgent.reasoningEffort": {
+          "type": "string",
+          "enum": ["", "none", "low", "medium", "high", "xhigh", "max"],
+          "default": "",
+          "description": "Optional OpenAI Responses reasoning effort. Empty uses provider configuration."
+        },
         "bsamAgent.chat.sessionPath": {
           "type": "string",
           "default": ".bsam-agent/conversations/vscode.json",

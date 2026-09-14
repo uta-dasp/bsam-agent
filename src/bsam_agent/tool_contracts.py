@@ -65,6 +65,9 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
         "occurrence": Field("integer", required=False),
     }, ("source_set_sha256", "query", "matches", "summary")),
     "validate_model": ToolContract({"source": S}, ("source_set_sha256", "diagnostics", "summary")),
+    "compare_models": ToolContract({
+        "left": S, "right": S,
+    }, ("left_source_set_sha256", "right_source_set_sha256", "differences", "summary")),
     "import_mesh": ToolContract({"source": S}, ("format", "provenance", "summary")),
     "generate_deck": ToolContract({
         "mesh": S, "intent": O, "destination": S, "manifest": S, "confirm": B,
@@ -137,6 +140,9 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
         "timeout": Field("number", required=False), "stop_grace": Field("number", required=False),
     }, ("classification", "output_directory", "source_set_sha256")),
     "get_run_status": ToolContract({"output_dir": S}, ("classification", "output_directory", "state")),
+    "inspect_run_log": ToolContract({
+        "output_dir": S, "max_characters": Field("integer", required=False),
+    }, ("classification", "output_directory", "excerpts", "summary")),
     "stop_run": ToolContract({"output_dir": S, "confirm": B}, ("output_directory",)),
 }
 
@@ -146,6 +152,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "inspect_model": "Inspect an existing BSAM deck and return its structure, semantic entities, diagnostics, and summary.",
     "query_model": "Run a focused semantic query for registered constructs, parameters, entities, or references.",
     "validate_model": "Validate an existing BSAM deck without changing or running it.",
+    "compare_models": "Compare two workspace-contained BSAM source sets and return bounded deterministic structural and text differences.",
     "import_mesh": "Inspect and validate a manually prepared Abaqus-style .ele mesh without modifying a deck.",
     "generate_deck": "Generate a new canonical BSAM deck and provenance manifest from a registered profile, validated mesh, and complete explicit engineering intent; confirm must be true.",
     "preview_parameter_change": "Create a review plan to replace or insert one registered parameter value, with explicit occurrence selection for repeated-last-wins values.",
@@ -169,6 +176,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "apply_change": "Apply one reviewed change plan to a new deck; confirm must be true or policy refuses execution.",
     "run_bsam": "Run one validated deck in an isolated output directory; confirm must be true or policy refuses execution.",
     "get_run_status": "Read the status of one existing isolated BSAM run.",
+    "inspect_run_log": "Inspect bounded known log artifacts for one workspace-contained BSAM run.",
     "stop_run": "Request a controlled stop for one existing run; confirm must be true or policy refuses execution.",
 }
 

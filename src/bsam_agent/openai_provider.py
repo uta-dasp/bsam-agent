@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 
 from .local_provider import ProviderError, resolve_credential
 from .provider import ProviderConfig, ProviderRequest, ProviderResponse, ToolCall, Usage
-from .tool_contracts import TOOL_DESCRIPTIONS, validate_arguments
+from .tool_contracts import TOOL_DESCRIPTIONS
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,8 @@ class OpenAIResponsesProvider:
             raise ValueError("OpenAI adapter requires store=false")
         if config.data_policy not in {"synthetic-only", "sanitized"}:
             raise ValueError("OpenAI adapter does not accept local-private data")
+        if config.credential_reference != "env:OPENAI_API_KEY":
+            raise ValueError("OpenAI adapter reads credentials only from OPENAI_API_KEY")
         self.config = config
         self._credential_resolver = credential_resolver
 
@@ -118,6 +120,8 @@ class OpenAIResponsesProvider:
             ),
             "store": False,
         }
+        if self.config.reasoning_effort is not None:
+            payload["reasoning"] = {"effort": self.config.reasoning_effort}
         if provider_request.tools:
             payload["tools"] = [
                 {
@@ -127,7 +131,11 @@ class OpenAIResponsesProvider:
                         name, f"BSAM Agent deterministic tool: {name}"
                     ),
                     "parameters": schema,
-                    "strict": True,
+                    # Tool arguments are always validated again by deterministic local code.
+                    # Some generic operation schemas intentionally permit capability-specific
+                    # objects, which cannot be represented by OpenAI strict mode without
+                    # turning the registry into a second programming language.
+                    "strict": False,
                 }
                 for name, schema in provider_request.tools.items()
             ]
@@ -143,8 +151,16 @@ class OpenAIResponsesProvider:
                 "format": {"type": "json_object"}
             }
 
-        credential = self._credential_resolver(self.config.credential_reference)
-        assert credential is not None
+        try:
+            credential = self._credential_resolver("env:OPENAI_API_KEY")
+        except ValueError as exc:
+            raise self._error(
+                "missing_api_key", "OPENAI_API_KEY is not set", False, provider_request,
+            ) from exc
+        if credential is None:
+            raise self._error(
+                "missing_api_key", "OPENAI_API_KEY is not set", False, provider_request,
+            )
         raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         http_request = Request(
             self.config.endpoint.rstrip("/") + "/v1/responses",
@@ -203,7 +219,9 @@ class OpenAIResponsesProvider:
                 if not isinstance(name, str) or name not in provider_request.tools:
                     raise ValueError(f"provider requested unknown tool: {name}")
                 arguments = json.loads(item["arguments"])
-                validate_arguments(name, arguments)
+                _validate_schema_value(
+                    arguments, provider_request.tools[name], path=f"{name} arguments",
+                )
                 call_id = item.get("call_id") or item.get("id")
                 if not isinstance(call_id, str):
                     raise ValueError("function call has no identifier")
@@ -248,3 +266,42 @@ class OpenAIResponsesProvider:
         return ProviderError(
             code, message, retryable=retryable, correlation_id=request.correlation_id
         )
+
+
+def _validate_schema_value(value: Any, schema: dict[str, Any], *, path: str) -> None:
+    """Validate the bounded JSON-Schema subset used by model-facing tool contracts."""
+    expected = schema.get("type")
+    expected_types = expected if isinstance(expected, list) else [expected]
+    kinds = {
+        "null": lambda item: item is None,
+        "string": lambda item: isinstance(item, str),
+        "integer": lambda item: isinstance(item, int) and not isinstance(item, bool),
+        "number": lambda item: isinstance(item, (int, float)) and not isinstance(item, bool),
+        "boolean": lambda item: isinstance(item, bool),
+        "array": lambda item: isinstance(item, list),
+        "object": lambda item: isinstance(item, dict),
+    }
+    if expected is not None and not any(
+        isinstance(kind, str) and kind in kinds and kinds[kind](value)
+        for kind in expected_types
+    ):
+        raise ValueError(f"{path} has an invalid type")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"{path} is not an allowed value")
+    if isinstance(value, dict):
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
+        missing = sorted(name for name in required if name not in value)
+        if missing:
+            raise ValueError(f"{path} missing: {', '.join(missing)}")
+        if schema.get("additionalProperties") is False:
+            extra = sorted(value.keys() - properties.keys())
+            if extra:
+                raise ValueError(f"{path} has unknown fields: {', '.join(extra)}")
+        for name, item in value.items():
+            child = properties.get(name)
+            if isinstance(child, dict):
+                _validate_schema_value(item, child, path=f"{path}.{name}")
+    elif isinstance(value, list) and isinstance(schema.get("items"), dict):
+        for index, item in enumerate(value):
+            _validate_schema_value(item, schema["items"], path=f"{path}[{index}]")

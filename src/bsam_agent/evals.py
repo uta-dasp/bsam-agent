@@ -95,7 +95,7 @@ def load_trajectory_cases(path: Path) -> dict[str, Any]:
         if not isinstance(boundaries, int) or isinstance(boundaries, bool) or boundaries < 0:
             raise ValueError(f"trajectory case {identifier} confirmation count is invalid")
         if expected["terminal_status"] not in {
-            "complete", "clarification", "refused", "failed",
+            "complete", "clarification", "refused", "failed", "blocked",
         }:
             raise ValueError(f"trajectory case {identifier} terminal status is invalid")
         if not isinstance(expected["no_mutation"], bool):

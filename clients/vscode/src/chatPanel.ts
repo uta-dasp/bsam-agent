@@ -33,7 +33,10 @@ export class ChatPanel implements vscode.Disposable {
       "chat.providerConfigPath", "config/provider.local.json",
     ).trim();
     if (!configPath) throw new Error("bsamAgent.chat.providerConfigPath cannot be empty");
-    const credentialEnvironment = configuration.get<string>(
+    const provider = configuration.get<string>("provider", "configured").trim();
+    const model = configuration.get<string>("model", "").trim();
+    const reasoningEffort = configuration.get<string>("reasoningEffort", "").trim();
+    const credentialEnvironment = provider === "openai" ? "OPENAI_API_KEY" : configuration.get<string>(
       "chat.credentialEnvironment", "BSAM_LOCAL_API_KEY",
     ).trim();
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(credentialEnvironment)) {
@@ -42,7 +45,7 @@ export class ChatPanel implements vscode.Disposable {
     const environment = manager.pythonEnvironment();
     if (!environment[credentialEnvironment]) {
       const credential = await vscode.window.showInputBox({
-        title: "Local model session credential",
+        title: provider === "openai" ? "OpenAI API key" : "Local model session credential",
         prompt: `Enter ${credentialEnvironment}; it is passed only to the local chat process and is not stored`,
         password: true,
         ignoreFocusOut: true,
@@ -70,6 +73,9 @@ export class ChatPanel implements vscode.Disposable {
           configPath,
           sessionPath,
           configuration.get<boolean>("chat.auditEnabled", true),
+          provider,
+          model,
+          reasoningEffort,
         ),
         cwd: manager.repositoryRoot(),
         env: environment,
@@ -239,7 +245,7 @@ export class ChatPanel implements vscode.Disposable {
       input.value = '';
       busy = true;
       setControls();
-      status.textContent = 'Working locally…';
+      status.textContent = 'Working through guarded routing…';
       vscode.postMessage({ command: 'send', text: value });
     }
 
@@ -259,8 +265,10 @@ export class ChatPanel implements vscode.Disposable {
       if (message.type === 'ready') {
         busy = false;
         pending = Boolean(message.pending_confirmation);
-        status.textContent = message.model + ' · ' + message.phase;
-        append('system', 'Connected to the guarded local chat for ' + message.workspace + '.');
+        status.textContent = message.provider + ' · ' + message.model
+          + (message.reasoning_effort ? ' · ' + message.reasoning_effort : '')
+          + ' · ' + message.phase;
+        append('system', 'Connected to guarded BSAM routing for ' + message.workspace + '.');
         if (pending) append('system', 'The resumed session has an action awaiting confirmation.');
       } else if (message.type === 'busy') {
         busy = Boolean(message.busy);

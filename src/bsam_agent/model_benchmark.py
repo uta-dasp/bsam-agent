@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from .evals import load_chat_cases
+from .orchestrator import _routing_request_schema
 from .orchestrator import decision_schema as bounded_decision_schema
 from .orchestrator import relevant_tools, routing_prompt
 from .provider import Message, Provider, ProviderRequest, ProviderResponse
+from .query import canonical_query_name
 from .tool_contracts import TOOL_CONTRACTS, validate_arguments
 
 
@@ -72,44 +74,10 @@ def native_evaluation_system_prompt() -> str:
 
 
 def candidate_tools(user: str) -> dict[str, dict[str, Any]]:
-    text = user.casefold()
-    if "without calling another tool" in text or "without another tool" in text:
-        names: tuple[str, ...] = ()
-    elif "status" in text:
-        names = ("get_run_status", "run_bsam", "stop_run")
-    elif "stop" in text:
-        names = ("stop_run", "get_run_status", "run_bsam")
-    elif "run" in text or "launch" in text:
-        names = ("run_bsam", "validate_model", "get_run_status", "stop_run")
-    elif ("generate" in text or "build" in text or "create" in text) and (
-        "deck" in text or "model" in text
-    ):
-        names = ("generate_deck", "import_mesh", "get_capabilities")
-    elif "unknown" in text or "undocumented" in text or "sounds plausible" in text:
-        names = ("get_capabilities", "preview_parameter_change", "validate_model")
-    elif "rename" in text:
-        names = (
-            "preview_rename_boundary_condition", "preview_parameter_change", "review_change"
-        )
-    elif "two-to-eight" in text or "eight-ply" in text:
-        names = ("preview_expand_notch_plies", "preview_parameter_change", "review_change")
-    elif "apply" in text:
-        names = ("apply_change", "review_change", "validate_model")
-    elif "stale" in text or "recheck" in text:
-        names = ("review_change", "apply_change", "validate_model")
-    elif "rewrite" in text or "render" in text:
-        names = (
-            "get_capabilities", "preview_parameter_change", "review_change", "apply_change"
-        )
-    elif "preview" in text or "chang" in text:
-        names = ("preview_parameter_change", "review_change", "apply_change")
-    elif "inspect" in text:
-        names = ("inspect_model", "validate_model", "import_mesh", "get_capabilities")
-    elif "validate" in text:
-        names = ("validate_model", "inspect_model", "get_capabilities")
-    else:
-        names = tuple(TOOL_CONTRACTS)
-    return {name: TOOL_CONTRACTS[name].request_schema() for name in names}
+    return {
+        name: _routing_request_schema(name, include_registry_catalog=False)
+        for name in relevant_tools(user)
+    }
 
 
 def _native_decision(response: ProviderResponse) -> dict[str, Any]:
@@ -184,6 +152,21 @@ def _parse_decision(content: str | None) -> dict[str, Any]:
     return value
 
 
+def _arguments_equivalent(
+    tool: str | None, actual: dict[str, Any], expected: dict[str, Any],
+) -> bool:
+    if tool != "query_model":
+        return actual == expected
+    left = dict(actual)
+    right = dict(expected)
+    try:
+        left["query"] = canonical_query_name(str(left.get("query", "")))
+        right["query"] = canonical_query_name(str(right.get("query", "")))
+    except ValueError:
+        return False
+    return left == right
+
+
 def run_chat_benchmark(
     provider: Provider,
     cases_path: Path,
@@ -198,7 +181,12 @@ def run_chat_benchmark(
     latencies: list[float] = []
     for case in cases:
         tool_names = relevant_tools(case["user"])
-        system = native_evaluation_system_prompt() if native_tools else routing_prompt(tool_names)
+        system = (
+            routing_prompt(
+                tool_names, include_registry_catalog=False, use_function_tools=True,
+            )
+            if native_tools else routing_prompt(tool_names)
+        )
         started = time.perf_counter()
         provider_error: str | None = None
         try:
@@ -234,7 +222,9 @@ def run_chat_benchmark(
             arguments_valid = False
         tool_accurate = (
             arguments_valid and decision["tool"] == expected["tool"]
-            and decision["arguments"] == expected["arguments"]
+            and _arguments_equivalent(
+                decision["tool"], decision["arguments"], expected["arguments"],
+            )
         )
         outcome_accurate = decision["outcome"] == expected["outcome"]
         refusal_accurate = expected["outcome"] != "refuse" or (

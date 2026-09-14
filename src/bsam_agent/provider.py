@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlparse
@@ -74,6 +74,7 @@ class ProviderConfig:
     max_output_tokens: int
     data_policy: str
     store: bool = False
+    reasoning_effort: str | None = None
 
 
 def load_provider_config(path: Path) -> ProviderConfig:
@@ -83,6 +84,7 @@ def load_provider_config(path: Path) -> ProviderConfig:
     allowed = {
         "provider", "model", "endpoint", "credential_reference", "timeout_seconds",
         "max_input_characters", "max_output_tokens", "data_policy", "store",
+        "reasoning_effort",
     }
     extra = sorted(value.keys() - allowed)
     missing = sorted({"provider", "model", "endpoint"} - value.keys())
@@ -113,8 +115,8 @@ def load_provider_config(path: Path) -> ProviderConfig:
             raise ProviderConfigError("openai provider endpoint cannot embed credentials or options")
         if parsed.path not in {"", "/"}:
             raise ProviderConfigError("openai provider endpoint must not include an API path")
-        if not value.get("credential_reference"):
-            raise ProviderConfigError("openai provider requires an environment credential reference")
+        if value.get("credential_reference") != "env:OPENAI_API_KEY":
+            raise ProviderConfigError("openai provider reads credentials only from OPENAI_API_KEY")
         if value.get("store", False) is not False:
             raise ProviderConfigError("openai provider requires store=false")
     else:
@@ -129,8 +131,64 @@ def load_provider_config(path: Path) -> ProviderConfig:
         raise ProviderConfigError("unsupported data policy")
     if provider == "openai" and policy == "local-private":
         raise ProviderConfigError("openai provider requires synthetic-only or sanitized data policy")
+    reasoning_effort_value = value.get("reasoning_effort")
+    reasoning_effort = (
+        str(reasoning_effort_value).casefold()
+        if reasoning_effort_value is not None else None
+    )
+    if reasoning_effort not in {None, "none", "low", "medium", "high", "xhigh", "max"}:
+        raise ProviderConfigError("unsupported reasoning effort")
     return ProviderConfig(
         provider, str(value["model"]), endpoint,
         str(value["credential_reference"]) if value.get("credential_reference") else None,
         timeout, max_input, maximum, policy, bool(value.get("store", False)),
+        reasoning_effort,
+    )
+
+
+def override_provider_config(
+    config: ProviderConfig,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
+) -> ProviderConfig:
+    """Apply UI/CLI selections without ever accepting a credential value."""
+    selected = provider or config.provider
+    if selected == "local":
+        selected = "cpu-local"
+    if selected not in {"cpu-local", "openai"}:
+        raise ProviderConfigError(f"unsupported provider: {selected}")
+    effort = reasoning_effort.casefold() if reasoning_effort else config.reasoning_effort
+    if effort not in {None, "none", "low", "medium", "high", "xhigh", "max"}:
+        raise ProviderConfigError("unsupported reasoning effort")
+    if selected == "openai":
+        return replace(
+            config,
+            provider="openai",
+            model=model or (config.model if config.provider == "openai" else "gpt-5.6-terra"),
+            endpoint="https://api.openai.com",
+            credential_reference="env:OPENAI_API_KEY",
+            data_policy="sanitized",
+            store=False,
+            reasoning_effort=effort or "high",
+        )
+    return replace(
+        config,
+        provider="cpu-local",
+        model=model or (
+            config.model
+            if config.provider == "cpu-local"
+            else "Meta-Llama-3.1-8B-Instruct-Q4_K_M"
+        ),
+        endpoint=(
+            config.endpoint if config.provider == "cpu-local" else "http://127.0.0.1:18080"
+        ),
+        credential_reference=(
+            config.credential_reference
+            if config.provider == "cpu-local" else "env:BSAM_LOCAL_API_KEY"
+        ),
+        data_policy="local-private",
+        store=False,
+        reasoning_effort=None,
     )

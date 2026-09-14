@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import threading
 import time
@@ -48,7 +49,7 @@ from .tool_contracts import (
 )
 
 
-API_VERSION = "0.4.0"
+API_VERSION = "0.5.0"
 MAX_REQUEST_BYTES = 1_048_576
 
 
@@ -166,6 +167,11 @@ class LocalAgentApi:
                 "diagnostics": inspection["diagnostics"],
                 "summary": inspection["summary"],
             }
+        if tool == "compare_models":
+            args = self._args(arguments, {"left", "right"})
+            return self._compare_models(
+                self._path(args["left"], "left"), self._path(args["right"], "right"),
+            )
         if tool == "query_model":
             args = self._args(arguments, {"source", "query"})
             source_set = SourceSet.read(
@@ -401,10 +407,125 @@ class LocalAgentApi:
         if tool == "get_run_status":
             args = self._args(arguments, {"output_dir"})
             return self._run_status(self._path(args["output_dir"], "output_dir"))
+        if tool == "inspect_run_log":
+            args = self._args(arguments, {"output_dir"}, {"max_characters"})
+            maximum = int(args.get("max_characters", 16000))
+            if maximum < 256 or maximum > 65536:
+                raise ApiError(
+                    "invalid_arguments", "max_characters must be between 256 and 65536",
+                )
+            return self._inspect_run_log(
+                self._path(args["output_dir"], "output_dir"), maximum,
+            )
         args = self._args(arguments, {"output_dir", "confirm"})
         if args["confirm"] is not True:
             raise ApiError("confirmation_required", "stop_run requires confirm=true")
         return self._stop_run(self._path(args["output_dir"], "output_dir"))
+
+    def _compare_models(self, left: Path, right: Path) -> dict[str, Any]:
+        left_set = SourceSet.read(left, self.workspace_root)
+        right_set = SourceSet.read(right, self.workspace_root)
+        left_inspection = left_set.inspection()
+        right_inspection = right_set.inspection()
+        left_text = left_set.documents[left_set.root].raw.decode("latin-1").splitlines()
+        right_text = right_set.documents[right_set.root].raw.decode("latin-1").splitlines()
+        difference_lines = difflib.unified_diff(
+            left_text, right_text,
+            fromfile=str(left.relative_to(self.workspace_root)),
+            tofile=str(right.relative_to(self.workspace_root)),
+            lineterm="",
+        )
+        rendered_lines: list[str] = []
+        rendered_characters = 0
+        changed_lines = 0
+        truncated = False
+        for line in difference_lines:
+            if (line.startswith("+") or line.startswith("-")) and not line.startswith(
+                ("+++", "---")
+            ):
+                changed_lines += 1
+            if rendered_characters + len(line) + 1 <= 100_000:
+                rendered_lines.append(line)
+                rendered_characters += len(line) + 1
+            else:
+                truncated = True
+        rendered = "\n".join(rendered_lines)
+        if truncated:
+            rendered += "\n... deterministic diff truncated ..."
+        left_files = {
+            str(path.relative_to(self.workspace_root)).replace("\\", "/"): document.sha256
+            for path, document in left_set.documents.items()
+        }
+        right_files = {
+            str(path.relative_to(self.workspace_root)).replace("\\", "/"): document.sha256
+            for path, document in right_set.documents.items()
+        }
+        changed_files = sorted(
+            name for name in left_files.keys() & right_files.keys()
+            if left_files[name] != right_files[name]
+        )
+        return {
+            "left_source_set_sha256": left_set.sha256,
+            "right_source_set_sha256": right_set.sha256,
+            "differences": {
+                "same": left_set.sha256 == right_set.sha256,
+                "changed_lines": changed_lines,
+                "changed_files": changed_files[:256],
+                "added_files": sorted(right_files.keys() - left_files.keys())[:256],
+                "removed_files": sorted(left_files.keys() - right_files.keys())[:256],
+                "root_diff": rendered,
+                "truncated": truncated,
+            },
+            "summary": {
+                "left": left_inspection["summary"],
+                "right": right_inspection["summary"],
+                "left_file_count": len(left_set.documents),
+                "right_file_count": len(right_set.documents),
+            },
+        }
+
+    def _inspect_run_log(self, output_directory: Path, maximum: int) -> dict[str, Any]:
+        status = self._run_status(output_directory)
+        deck = status.get("deck")
+        names = ["process.stdout.log", "process.stderr.log"]
+        if isinstance(deck, str):
+            names.insert(0, f"{Path(deck).stem}.lst")
+        excerpts: list[dict[str, Any]] = []
+        remaining = maximum
+        for name in names:
+            path = output_directory / name
+            if not path.is_file() or remaining <= 0:
+                continue
+            resolved = path.resolve()
+            if not resolved.is_relative_to(output_directory.resolve()) or not resolved.is_relative_to(
+                self.workspace_root
+            ):
+                raise ApiError("path_not_allowed", f"run log escapes its output directory: {name}")
+            size = resolved.stat().st_size
+            with resolved.open("rb") as stream:
+                stream.seek(max(0, size - remaining))
+                raw = stream.read(remaining)
+            text = raw.decode("latin-1", errors="replace")
+            excerpt = text[-remaining:]
+            excerpts.append({
+                "path": name,
+                "text": excerpt,
+                "truncated": size > len(raw),
+            })
+            remaining -= len(excerpt)
+        return {
+            "classification": status.get("classification", "unknown"),
+            "output_directory": status["output_directory"],
+            "excerpts": excerpts,
+            "summary": {
+                "state": status.get("state", "unknown"),
+                "process_exit_code": status.get("process_exit_code"),
+                "success_sentinel_seen": status.get("success_sentinel_seen", False),
+                "fatal_markers": status.get("fatal_markers", []),
+                "error": status.get("error"),
+                "characters": maximum - remaining,
+            },
+        }
 
     def _start_run(
         self,

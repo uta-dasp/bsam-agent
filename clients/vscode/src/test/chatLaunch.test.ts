@@ -15,3 +15,10 @@ test("builds an audited persistent local chat launch", () => {
 test("can explicitly disable digest audit metadata", () => {
   assert.equal(chatArguments("root", "config", "session", false).at(-1), "--no-audit");
 });
+
+test("passes provider model and reasoning selections without a credential", () => {
+  assert.deepEqual(
+    chatArguments("root", "config", "session", true, "openai", "gpt-5.6-terra", "high").slice(-6),
+    ["--provider", "openai", "--model", "gpt-5.6-terra", "--reasoning-effort", "high"],
+  );
+});

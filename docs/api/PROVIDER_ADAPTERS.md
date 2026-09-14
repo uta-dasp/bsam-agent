@@ -57,7 +57,7 @@ Official references:
 
 ## OpenAI adapter
 
-The implemented adapter uses the Responses API with JSON-object output and deterministic local schema/tool validation. The provider-neutral routing decision contains a tool-dependent arguments object that is intentionally validated after receipt rather than forced into one vendor's strict-schema subset. It accepts only `https://api.openai.com`, environment-referenced credentials, `synthetic-only` or `sanitized` payloads, and `store: false`. The hosted routing prompt omits the registry parameter catalog. Files, deck text, meshes, artifacts, local tool results, and BSAM source/library content are never added to provider requests.
+The implemented adapter uses the Responses API with native function tools for dispatch and deterministic local schema/tool validation. Generic capability payloads are intentionally validated after receipt rather than forced into one vendor's strict-schema subset. Provider configuration accepts a model identifier and the supported Responses reasoning efforts (`none`, `low`, `medium`, `high`, `xhigh`, or `max`); the example starts with `gpt-5.6-terra` at `high`, while `gpt-5.6-sol` is also a supported configuration. The architecture is not tied to either model. It accepts only `https://api.openai.com`, the exact `env:OPENAI_API_KEY` credential reference, `synthetic-only` or `sanitized` payloads, and `store: false`. The hosted routing prompt omits the registry parameter catalog. Files, deck text, meshes, artifacts, local tool results, and BSAM source/library content are never added to provider requests.
 
 The provider does receive the user's typed chat text, a compact routing instruction, selected tool names/contracts, and bounded prior typed turns. Therefore, do not paste proprietary source or deck contents into chat. `store: false` disables Responses application-state storage, but is not a zero-retention promise for standard API abuse-monitoring logs. See [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md) for the exact boundary and workstation instructions.
 
@@ -68,6 +68,6 @@ Official references:
 
 ## Configuration boundary
 
-Provider settings are local configuration, not model data. The configuration schema contains provider identifier, model identifier, endpoint, credential reference, timeout, maximum input characters, maximum output tokens, and data-policy mode. It never contains an API key value.
+Provider settings are local configuration, not model data. The configuration schema contains provider identifier, model identifier, optional reasoning effort, endpoint, credential reference, timeout, maximum input characters, maximum output tokens, and data-policy mode. It never contains an API key value. The CLI and VS Code client may override provider, model, and reasoning effort without changing deterministic capabilities or accepting a credential value.
 
 No provider is enabled by default, and switching providers cannot change the BSAM capability registry, validation rules, renderer, or run policy.

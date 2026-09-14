@@ -36,7 +36,7 @@ class ChatEvaluationTests(unittest.TestCase):
 
     def test_trajectory_cases_cover_bounded_workflow_failures(self) -> None:
         value = load_trajectory_cases(ROOT / "evals" / "trajectory_cases.json")
-        self.assertEqual(15, len(value["cases"]))
+        self.assertEqual(19, len(value["cases"]))
         identifiers = {item["id"] for item in value["cases"]}
         self.assertEqual({
             "inspect-modify-validate", "ambiguous-parameter", "dependent-boundary-rename",
@@ -48,6 +48,10 @@ class ChatEvaluationTests(unittest.TestCase):
             "statistical-reference-inspection",
             "structured-material-reference-attribution",
             "optional-parameter-removal",
+            "autonomous-boundary-investigation",
+            "compare-original-with-last-output",
+            "diagnose-last-failed-run",
+            "syntax-only-repair-unavailable",
         }, identifiers)
         self.assertIn("repeated_action_loops", value["metrics"])
         self.assertIn("guarded_action_compliance", value["metrics"])

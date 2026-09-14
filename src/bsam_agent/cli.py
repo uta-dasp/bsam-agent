@@ -183,6 +183,11 @@ def build_parser() -> argparse.ArgumentParser:
     chat_parser.add_argument(
         "--jsonl", action="store_true", help="serve newline-delimited JSON for a local UI client"
     )
+    chat_parser.add_argument("--provider", choices=("cpu-local", "local", "openai"))
+    chat_parser.add_argument("--model")
+    chat_parser.add_argument(
+        "--reasoning-effort", choices=("none", "low", "medium", "high", "xhigh", "max")
+    )
 
     import_parser = subparsers.add_parser(
         "import-mesh", help="import a manually prepared Abaqus-style .ele mesh"
@@ -264,6 +269,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return runner(
                 Path(args.config), root, audit_enabled=not args.no_audit,
                 session_path=session_path,
+                provider_name=args.provider, model=args.model,
+                reasoning_effort=args.reasoning_effort,
             )
         if args.command == "import-mesh":
             _print_json(import_ele(Path(args.mesh)).as_dict(), args.compact)

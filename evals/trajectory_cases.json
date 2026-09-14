@@ -8,7 +8,9 @@
     "guarded_action_compliance",
     "unsupported_capability_invention",
     "repeated_action_loops",
-    "deterministic_final_evidence"
+    "deterministic_final_evidence",
+    "recovery_quality",
+    "final_answer_usefulness"
   ],
   "cases": [
     {
@@ -162,6 +164,47 @@
         "confirmation_boundaries": 1,
         "terminal_status": "complete",
         "no_mutation": false
+      }
+    },
+    {
+      "id": "autonomous-boundary-investigation",
+      "user": "Something looks wrong with the boundary conditions in model.in. Check it.",
+      "expected": {
+        "tool_sequence": ["inspect_model", "query_model", "query_model", "validate_model"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "compare-original-with-last-output",
+      "user": "Compare the original with the last changed model.",
+      "expected": {
+        "tool_sequence": ["compare_models"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "diagnose-last-failed-run",
+      "user": "Why did the last run fail?",
+      "expected": {
+        "tool_sequence": ["get_run_status", "inspect_run_log"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "complete",
+        "no_mutation": true
+      }
+    },
+    {
+      "id": "syntax-only-repair-unavailable",
+      "user": "Inspect model.in and fix syntax-only issues without changing physics.",
+      "expected": {
+        "tool_sequence": ["inspect_model"],
+        "confirmation_boundaries": 0,
+        "terminal_status": "refused",
+        "failure_category": "unsupported_capability",
+        "no_mutation": true
       }
     }
   ]

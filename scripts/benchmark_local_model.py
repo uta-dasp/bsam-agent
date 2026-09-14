@@ -1,4 +1,4 @@
-"""Run the checked-in synthetic chat suite against a configured local provider."""
+"""Run the checked-in synthetic chat suite against any configured provider."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from bsam_agent.local_provider import LlamaCppProvider  # noqa: E402
 from bsam_agent.model_benchmark import run_chat_benchmark  # noqa: E402
 from bsam_agent.provider import load_provider_config  # noqa: E402
+from bsam_agent.provider_factory import create_provider  # noqa: E402
 
 
 def main() -> int:
@@ -25,7 +25,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = run_chat_benchmark(
-        LlamaCppProvider(load_provider_config(args.config)),
+        create_provider(load_provider_config(args.config)),
         args.cases,
         args.acceptance,
         peak_working_memory_gib=args.peak_working_memory_gib,

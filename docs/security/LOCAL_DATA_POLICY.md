@@ -20,6 +20,11 @@ The OpenAI adapter is routing-only. Its request builder has no filesystem or Age
 
 Typed chat text is external-provider data. Users must not paste BSAM source code, library documentation, full decks, mesh rows, or proprietary result data into hosted chat. Standard OpenAI API abuse-monitoring retention may still apply even when response storage is disabled.
 
+During bounded multi-step routing, a hosted provider may receive compact deterministic observation
+metadata: digests, counts, validation summaries, completed action names, and completion criteria.
+The orchestrator excludes deck text, file diffs, log excerpts, and entity identities from that
+hosted planning context. Local-private source and artifacts remain in deterministic tools.
+
 ## Local providers
 
 Allowed local model families are limited to providers approved by the project owner. The initial allowlist may include Google Gemma and Meta Llama families. Chinese-origin model families are excluded.

@@ -7,6 +7,7 @@ These are the only operations an optional language model should be allowed to re
 | `get_capabilities` | List supported current BSAM features and required fields | No |
 | `inspect_model` | Return source, structure, semantic entities/references, and diagnostics | No |
 | `query_model` | Run focused registered-construct, parameter, entity, and reference queries | No |
+| `compare_models` | Compare two workspace-contained source sets with bounded deterministic diff evidence | No |
 | `validate_model` | Run deterministic validation | No |
 | `import_mesh` | Inspect and validate a manually prepared Abaqus-style `.ele` mesh | No |
 | `generate_deck` | Create a canonical deck and provenance manifest from a registered profile and complete typed intent | Yes, confirmation required |
@@ -26,6 +27,7 @@ These are the only operations an optional language model should be allowed to re
 | `apply_change` | Apply one exact reviewed plan to a new deck and audit sidecar | Yes, confirmation required |
 | `run_bsam` | Launch a validated rendered artifact | Yes |
 | `get_run_status` | Read process and artifact state | No |
+| `inspect_run_log` | Read bounded known listing/stdout/stderr artifacts for one run | No |
 | `stop_run` | Request controlled BSAM termination | Yes |
 
 ## Mandatory policies
@@ -37,6 +39,8 @@ These are the only operations an optional language model should be allowed to re
 - Registry specification `coverage` and per-capability operational support are separate; `get_capabilities` exposes complete operation maturity plus derived inspect/query/create/modify/validate/run intent maturity, and omitted registry operations are reported as `unassessed`.
 - Optional parameter insertion/removal occurs only when its parameter-level registry operation is `verified`. Current cases are absent or isolated-record `BOUNDARY/*CONVERGENCE/maxiterations`, Boolean `BOUNDARY/*G-CONTROL/DAMP` enable/disable, and the repeated SHEFF option row `SOLVER/relative_tolerance`; shared-record removal is blocked.
 - `query_model` reports explicit versus registered-default parameter values, supports stable entity kind/name selectors for listings and references, and returns ambiguity instead of choosing among multiple contexts.
+- `compare_models` never writes either model and bounds returned root-deck diff text; source-set digests and validation summaries remain authoritative.
+- `inspect_run_log` can inspect only the known listing, stdout, and stderr files beneath a validated run directory. It is not an arbitrary file reader.
 - Validation diagnostics identify both their level (`syntax`, `structure`, `references`, `bsam-semantic-constraints`, `numeric-constraints`, `execution-compatibility`, or `engineering-plausibility`) and provenance. Unclassified new diagnostic codes are rejected until both are explicit; engineering heuristics remain warnings and never mutate a deck.
 - `preview_rename_entity` uses canonical capability IDs and deterministic Python adapters; it refuses unverified rename operations instead of interpreting transformation logic from registry text.
 - Generic structural previews use canonical capability IDs, strict capability-specific payloads, and the same dependency-aware typed planners as the compatibility tools. `preview_modify_entity` retargets one exact cluster-local BOUNDARY, LOAD, SECTION, SHIFT, or SCALE record using `entity_name` as the current target and `changes` containing `cluster`, `new_target`, and an optional one-based `occurrence`.

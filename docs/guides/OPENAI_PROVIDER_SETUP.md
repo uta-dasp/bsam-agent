@@ -9,6 +9,8 @@ The adapter sends:
 - the text you type into the chat box;
 - a compact routing instruction and selected deterministic tool contracts;
 - up to eight bounded prior chat messages containing typed text and structured routing decisions.
+- compact multi-step observation metadata such as digests, counts, validation summaries, and
+  completion state. Hosted observations omit deck/diff/log text and entity identities.
 
 It does **not** send:
 
@@ -63,14 +65,15 @@ The resulting ignored file contains no secret:
 ```json
 {
   "provider": "openai",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.6-terra",
   "endpoint": "https://api.openai.com",
   "credential_reference": "env:OPENAI_API_KEY",
   "timeout_seconds": 120,
   "max_input_characters": 24000,
   "max_output_tokens": 2048,
   "data_policy": "sanitized",
-  "store": false
+  "store": false,
+  "reasoning_effort": "high"
 }
 ```
 
@@ -85,12 +88,16 @@ Open VS Code Settings (JSON) for this workspace and add:
   "bsamAgent.repositoryRoot": "D:\\Partha\\BSAM\\bsam agent",
   "bsamAgent.workspaceRoot": "D:\\Partha\\BSAM",
   "bsamAgent.chat.providerConfigPath": "config/provider.openai.json",
-  "bsamAgent.chat.credentialEnvironment": "OPENAI_API_KEY",
+  "bsamAgent.provider": "openai",
+  "bsamAgent.model": "gpt-5.6-terra",
+  "bsamAgent.reasoningEffort": "high",
   "bsamAgent.chat.auditEnabled": true
 }
 ```
 
 The workspace settings file is locally ignored by this repository. Do not add the key itself to settings.
+The extension always prompts for `OPENAI_API_KEY` when `bsamAgent.provider` is `openai`; it does not
+read an API key from settings. `gpt-5.6-sol` can be selected by changing only the model setting.
 
 ## 5. Open the chat safely
 
@@ -126,6 +133,9 @@ $env:PYTHONPATH = "$PWD\src"
 python -m bsam_agent chat `
   --workspace-root "D:\Partha\BSAM" `
   --config config\provider.openai.json `
+  --provider openai `
+  --model gpt-5.6-terra `
+  --reasoning-effort high `
   --session .bsam-agent\conversations\openai.json
 Remove-Item Env:OPENAI_API_KEY
 ```
@@ -134,11 +144,15 @@ Omit `--session` if you do not want a local raw chat transcript. Digest-only aud
 
 ## 7. Switch back to fully local chat
 
-Change the two VS Code settings back to:
+Change the provider setting back to the local provider. The model can be omitted to use the local
+provider configuration:
 
 ```json
 {
   "bsamAgent.chat.providerConfigPath": "config/provider.local.json",
+  "bsamAgent.provider": "cpu-local",
+  "bsamAgent.model": "",
+  "bsamAgent.reasoningEffort": "",
   "bsamAgent.chat.credentialEnvironment": "BSAM_LOCAL_API_KEY"
 }
 ```

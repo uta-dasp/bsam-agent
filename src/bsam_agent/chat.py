@@ -9,7 +9,7 @@ from typing import Callable, TextIO
 
 from .api import LocalAgentApi
 from .orchestrator import ChatOrchestrator
-from .provider import load_provider_config
+from .provider import load_provider_config, override_provider_config
 from .provider_factory import create_provider
 
 
@@ -21,9 +21,15 @@ def run_terminal_chat(
     session_path: Path | None = None,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
+    provider_name: str | None = None,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> int:
     root = workspace_root.resolve()
-    config = load_provider_config(config_path)
+    config = override_provider_config(
+        load_provider_config(config_path), provider=provider_name, model=model,
+        reasoning_effort=reasoning_effort,
+    )
     provider = create_provider(config)
     audit_directory = root / ".bsam-agent" / "audit" if audit_enabled else None
     state = ChatOrchestrator.load_state(session_path) if session_path and session_path.is_file() else None
@@ -59,10 +65,16 @@ def run_jsonl_chat(
     session_path: Path | None = None,
     input_stream: TextIO = sys.stdin,
     output_stream: TextIO = sys.stdout,
+    provider_name: str | None = None,
+    model: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> int:
     """Serve one guarded chat session over newline-delimited JSON for local UI clients."""
     root = workspace_root.resolve()
-    config = load_provider_config(config_path)
+    config = override_provider_config(
+        load_provider_config(config_path), provider=provider_name, model=model,
+        reasoning_effort=reasoning_effort,
+    )
     provider = create_provider(config)
     audit_directory = root / ".bsam-agent" / "audit" if audit_enabled else None
     state = ChatOrchestrator.load_state(session_path) if session_path and session_path.is_file() else None
@@ -77,6 +89,8 @@ def run_jsonl_chat(
     emit({
         "type": "ready",
         "model": config.model,
+        "provider": config.provider,
+        "reasoning_effort": config.reasoning_effort,
         "workspace": str(root),
         "conversation_id": agent.state.conversation_id,
         "phase": agent.state.phase,

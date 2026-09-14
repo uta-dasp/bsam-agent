@@ -16,6 +16,7 @@ from bsam_agent.provider import (
     ToolCall,
     Usage,
     load_provider_config,
+    override_provider_config,
 )
 
 
@@ -67,20 +68,44 @@ class ProviderBoundaryTests(unittest.TestCase):
                 "endpoint": "https://api.openai.com",
                 "credential_reference": "env:OPENAI_API_KEY",
                 "data_policy": "sanitized", "store": False,
+                "reasoning_effort": "high",
             }
             path.write_text(json.dumps(base), encoding="utf-8")
             loaded = load_provider_config(path)
             self.assertFalse(loaded.store)
+            self.assertEqual("high", loaded.reasoning_effort)
 
             for changes in (
                 {"store": True},
                 {"endpoint": "https://example.com"},
                 {"data_policy": "local-private"},
                 {"credential_reference": None},
+                {"credential_reference": "env:OTHER_KEY"},
+                {"reasoning_effort": "extreme"},
             ):
                 path.write_text(json.dumps(base | changes), encoding="utf-8")
                 with self.subTest(changes=changes), self.assertRaises(ProviderConfigError):
                     load_provider_config(path)
+
+    def test_provider_switching_uses_safe_transport_defaults(self) -> None:
+        local = load_provider_config(Path(__file__).resolve().parents[1] / "config" / "provider.local.example.json")
+        hosted = override_provider_config(
+            local, provider="openai", model="gpt-5.6-sol", reasoning_effort="high",
+        )
+        self.assertEqual("openai", hosted.provider)
+        self.assertEqual("gpt-5.6-sol", hosted.model)
+        self.assertEqual("env:OPENAI_API_KEY", hosted.credential_reference)
+        self.assertEqual("https://api.openai.com", hosted.endpoint)
+        self.assertEqual("sanitized", hosted.data_policy)
+        self.assertFalse(hosted.store)
+
+        local_again = override_provider_config(hosted, provider="cpu-local")
+        self.assertEqual("cpu-local", local_again.provider)
+        self.assertEqual("Meta-Llama-3.1-8B-Instruct-Q4_K_M", local_again.model)
+        self.assertEqual("http://127.0.0.1:18080", local_again.endpoint)
+        self.assertEqual("env:BSAM_LOCAL_API_KEY", local_again.credential_reference)
+        self.assertEqual("local-private", local_again.data_policy)
+        self.assertIsNone(local_again.reasoning_effort)
 
 
 if __name__ == "__main__":

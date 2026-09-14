@@ -2,6 +2,12 @@
 
 The chat client routes language into bounded requests through the configured provider. Local deterministic code validates every argument, confines paths to the selected workspace, creates and reviews plans, requires a separate `/confirm` turn for apply/run/stop, and performs all authoritative work. CPU-local Scout remains the default; the optional OpenAI adapter is documented in [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md).
 
+The orchestrator supports a bounded observe-reason-act loop. A task records explicit completion
+criteria and compact deterministic observations, then may continue through additional read-only
+tools until the criteria are met or a clarification, confirmation, policy stop, repeated action,
+run-in-progress boundary, or step/recovery limit is reached. See the
+[agent-loop architecture](../architecture/AGENT_LOOP.md).
+
 ## Start and use
 
 Start the pinned llama.cpp server as described in [Local model runtime](LOCAL_MODEL_RUNTIME.md), then use a second PowerShell with the same session API key:

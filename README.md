@@ -24,6 +24,7 @@ Status: the core vertical slice and guarded local chat are runnable. Current dev
 - [Project charter](docs/PROJECT_CHARTER.md)
 - [Verification and trust model](docs/VERIFICATION.md)
 - [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)
+- [Bounded engineering-agent loop](docs/architecture/AGENT_LOOP.md)
 - [Existing-model editing architecture](docs/architecture/MODEL_EDITING.md)
 - [Abaqus-style mesh import and template assembly](docs/architecture/MESH_IMPORT.md)
 - [Agent API documentation](docs/api/README.md)
