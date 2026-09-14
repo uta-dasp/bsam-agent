@@ -57,7 +57,7 @@ Official references:
 
 ## OpenAI adapter
 
-The implemented adapter uses the Responses API with strict structured output/function schemas. It accepts only `https://api.openai.com`, environment-referenced credentials, `synthetic-only` or `sanitized` payloads, and `store: false`. The hosted routing prompt omits the registry parameter catalog. Files, deck text, meshes, artifacts, local tool results, and BSAM source/library content are never added to provider requests.
+The implemented adapter uses the Responses API with JSON-object output and deterministic local schema/tool validation. The provider-neutral routing decision contains a tool-dependent arguments object that is intentionally validated after receipt rather than forced into one vendor's strict-schema subset. It accepts only `https://api.openai.com`, environment-referenced credentials, `synthetic-only` or `sanitized` payloads, and `store: false`. The hosted routing prompt omits the registry parameter catalog. Files, deck text, meshes, artifacts, local tool results, and BSAM source/library content are never added to provider requests.
 
 The provider does receive the user's typed chat text, a compact routing instruction, selected tool names/contracts, and bounded prior typed turns. Therefore, do not paste proprietary source or deck contents into chat. `store: false` disables Responses application-state storage, but is not a zero-retention promise for standard API abuse-monitoring logs. See [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md) for the exact boundary and workstation instructions.
 

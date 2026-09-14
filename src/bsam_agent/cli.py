@@ -417,6 +417,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_json(result, args.compact)
             return 2 if inspection["summary"]["errors"] else 0
     except (OSError, ValueError, ChangeError, GenerationError, MeshImportError, RunError) as exc:
-        _print_json({"error": str(exc)})
+        if args.command == "chat" and args.jsonl:
+            _print_json({"type": "error", "message": str(exc)}, compact=True)
+        else:
+            _print_json({"error": str(exc)})
         return 2
     return 2

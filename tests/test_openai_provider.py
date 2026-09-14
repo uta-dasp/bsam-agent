@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import io
 import json
 import sys
 import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -56,7 +58,7 @@ class _Response:
 
 class OpenAIProviderTests(unittest.TestCase):
     @patch("bsam_agent.openai_provider.urlopen")
-    def test_uses_responses_api_store_false_and_structured_output(self, mocked: object) -> None:
+    def test_uses_responses_api_store_false_and_json_mode(self, mocked: object) -> None:
         mocked.return_value = _Response({  # type: ignore[attr-defined]
             "status": "completed",
             "output": [{
@@ -73,7 +75,9 @@ class OpenAIProviderTests(unittest.TestCase):
         payload = json.loads(call.data)
         self.assertEqual("https://api.openai.com/v1/responses", call.full_url)
         self.assertIs(payload["store"], False)
-        self.assertEqual("json_schema", payload["text"]["format"]["type"])
+        self.assertEqual({"type": "json_object"}, payload["text"]["format"])
+        self.assertIn("Required response JSON Schema", payload["input"][0]["content"])
+        self.assertIn('"ok"', payload["input"][0]["content"])
         self.assertNotIn("test-secret", call.data.decode("utf-8"))
         self.assertEqual('{"ok":true}', response.content)
         self.assertEqual(12, response.usage.input_tokens)
@@ -116,6 +120,27 @@ class OpenAIProviderTests(unittest.TestCase):
 
     def test_factory_selects_openai_adapter(self) -> None:
         self.assertIsInstance(create_provider(config()), OpenAIResponsesProvider)
+
+    @patch("bsam_agent.openai_provider.urlopen")
+    def test_http_error_reports_only_bounded_code_and_parameter(self, mocked: object) -> None:
+        body = json.dumps({
+            "error": {
+                "code": "invalid_json_schema",
+                "param": "text.format.schema",
+                "message": "sensitive vendor detail",
+            }
+        }).encode("utf-8")
+        mocked.side_effect = HTTPError(  # type: ignore[attr-defined]
+            "https://api.openai.com/v1/responses", 400, "Bad Request", {}, io.BytesIO(body)
+        )
+        with self.assertRaises(ProviderError) as raised:
+            OpenAIResponsesProvider(
+                config(), credential_resolver=lambda _reference: "test-secret"
+            ).complete(request())
+        message = str(raised.exception)
+        self.assertIn("code=invalid_json_schema", message)
+        self.assertIn("param=text.format.schema", message)
+        self.assertNotIn("sensitive vendor detail", message)
 
 
 if __name__ == "__main__":

@@ -91,12 +91,28 @@ class OpenAIResponsesProvider:
             return result.value
 
     def _send(self, provider_request: ProviderRequest) -> ProviderResponse:
+        input_messages = [
+            {"role": item.role, "content": item.content}
+            for item in provider_request.messages
+        ]
+        if provider_request.response_schema is not None:
+            schema_instruction = (
+                "\nRequired response JSON Schema (use exactly these field names): "
+                + json.dumps(
+                    provider_request.response_schema,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+            )
+            for message in input_messages:
+                if message["role"] == "system":
+                    message["content"] += schema_instruction
+                    break
+            else:
+                input_messages.insert(0, {"role": "system", "content": schema_instruction.lstrip()})
         payload: dict[str, Any] = {
             "model": self.config.model,
-            "input": [
-                {"role": item.role, "content": item.content}
-                for item in provider_request.messages
-            ],
+            "input": input_messages,
             "max_output_tokens": min(
                 provider_request.max_output_tokens, self.config.max_output_tokens
             ),
@@ -118,12 +134,13 @@ class OpenAIResponsesProvider:
             payload["tool_choice"] = "auto"
         if provider_request.response_schema is not None:
             payload["text"] = {
-                "format": {
-                    "type": "json_schema",
-                    "name": "bsam_agent_response",
-                    "strict": True,
-                    "schema": provider_request.response_schema,
-                }
+                # The routing decision contains a tool-dependent arguments object. OpenAI's
+                # strict schema mode requires every object property to be closed and required,
+                # which cannot represent that provider-neutral union without changing it.
+                # JSON mode guarantees parseable JSON; the orchestrator then applies the exact
+                # decision schema included in the system message, tool allowlist, argument
+                # schema, and one bounded repair.
+                "format": {"type": "json_object"}
             }
 
         credential = self._credential_resolver(self.config.credential_reference)
@@ -142,8 +159,9 @@ class OpenAIResponsesProvider:
             with urlopen(http_request, timeout=self.config.timeout_seconds) as response:
                 body = response.read()
         except HTTPError as exc:
+            detail = self._http_error_detail(exc)
             raise self._error(
-                "http_error", f"OpenAI provider returned HTTP {exc.code}",
+                "http_error", f"OpenAI provider returned HTTP {exc.code}{detail}",
                 exc.code == 429 or exc.code >= 500, provider_request,
             ) from exc
         except (TimeoutError, URLError, OSError) as exc:
@@ -200,6 +218,25 @@ class OpenAIResponsesProvider:
         )
         status = str(value.get("status", "completed"))
         return ProviderResponse(content, tuple(calls), usage, status)
+
+    @staticmethod
+    def _http_error_detail(error: HTTPError) -> str:
+        """Return bounded structural diagnostics without echoing request or response content."""
+        try:
+            value = json.loads(error.read(16384))
+            detail = value.get("error") if isinstance(value, dict) else None
+            if not isinstance(detail, dict):
+                return ""
+            code = detail.get("code")
+            parameter = detail.get("param")
+            parts = []
+            if isinstance(code, str) and len(code) <= 80:
+                parts.append(f"code={code}")
+            if isinstance(parameter, str) and len(parameter) <= 160:
+                parts.append(f"param={parameter}")
+            return f" ({', '.join(parts)})" if parts else ""
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return ""
 
     @staticmethod
     def _error(

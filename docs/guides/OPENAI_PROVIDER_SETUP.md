@@ -63,7 +63,7 @@ The resulting ignored file contains no secret:
 ```json
 {
   "provider": "openai",
-  "model": "gpt-6-astra",
+  "model": "gpt-5.6-sol",
   "endpoint": "https://api.openai.com",
   "credential_reference": "env:OPENAI_API_KEY",
   "timeout_seconds": 120,
@@ -149,6 +149,7 @@ Then start the pinned loopback model runtime and reopen the chat. The determinis
 
 - `credential environment variable is not set: OPENAI_API_KEY`: reopen the chat and enter the key in the password prompt; confirm the VS Code credential setting is exactly `OPENAI_API_KEY`.
 - `OpenAI provider returned HTTP 401`: the key is missing, invalid, expired, or belongs to the wrong project.
+- `OpenAI provider returned HTTP 400`: confirm the model ID and inspect the bounded `code`/`param` detail. The adapter uses Responses JSON mode, then validates the exact decision and tool schemas locally.
 - `OpenAI provider returned HTTP 429`: check project billing/rate limits and retry later.
 - `openai provider requires store=false`: restore `"store": false` in the ignored provider JSON.
 - `openai provider endpoint must be https://api.openai.com`: restore the exact official endpoint without `/v1`.

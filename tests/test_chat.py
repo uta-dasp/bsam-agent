@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import io
 import json
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -12,7 +13,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.chat import run_jsonl_chat, run_terminal_chat
-from bsam_agent.cli import build_parser
+from bsam_agent.cli import build_parser, main
 
 
 class _Turn:
@@ -103,6 +104,18 @@ class ChatClientTests(unittest.TestCase):
         self.assertEqual("Inspection completed.", records[1]["turn"]["message"])
         self.assertEqual("error", records[2]["type"])
         self.assertEqual("closed", records[3]["type"])
+
+    def test_jsonl_startup_failure_is_one_protocol_error(self) -> None:
+        output = io.StringIO()
+        with patch("bsam_agent.cli.run_jsonl_chat", side_effect=PermissionError("blocked")):
+            with redirect_stdout(output):
+                status = main([
+                    "chat", "--workspace-root", ".", "--config", "provider.json", "--jsonl",
+                ])
+        records = output.getvalue().splitlines()
+        self.assertEqual(2, status)
+        self.assertEqual(1, len(records))
+        self.assertEqual({"message": "blocked", "type": "error"}, json.loads(records[0]))
 
 
 if __name__ == "__main__":
