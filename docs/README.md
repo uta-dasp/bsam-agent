@@ -4,6 +4,8 @@
 
 - [Project charter](PROJECT_CHARTER.md) — product goal, scope, and completion criteria.
 - [Development roadmap](roadmap/MILESTONES.md) — authoritative milestones and current work.
+- [Version 2 vertical delivery plan](roadmap/V2_VERTICAL_TODOS.md) — concrete task IDs, slice order,
+  and promotion gates for the Codex-like engineering agent.
 - [Verification model](VERIFICATION.md) — evidence and acceptance requirements.
 - [Open inputs](OPEN_INPUTS.md) — unresolved user decisions and recorded assumptions.
 

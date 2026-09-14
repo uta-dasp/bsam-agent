@@ -5,6 +5,9 @@ order in which capabilities should mature, and the evidence required to claim ea
 Checked-in code, tests, capability metadata, controlled executable probes, and acceptance records
 take precedence over assumptions about current behavior.
 
+The concrete Version 2 work items and vertical delivery order are maintained in
+[V2_VERTICAL_TODOS.md](V2_VERTICAL_TODOS.md).
+
 ## Product end goal
 
 > Build a Codex-like engineering agent for BSAM that can accept high-level natural-language
