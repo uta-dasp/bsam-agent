@@ -45,6 +45,13 @@ def tool_decision(
     return ProviderResponse(content=json.dumps(decision))
 
 
+def exhausted_decision(response: str) -> ProviderResponse:
+    return ProviderResponse(content=json.dumps({
+        "outcome": "exhausted", "tool": None, "arguments": {},
+        "error_code": None, "response": response,
+    }))
+
+
 class ScriptedProvider:
     def __init__(self, *responses: ProviderResponse) -> None:
         self.responses = list(responses)
@@ -115,6 +122,8 @@ class AgentLoopTests(unittest.TestCase):
         self.assertNotIn("engineering-notes.md", hosted_context)
         self.assertNotIn('"pattern"', hosted_context)
         self.assertIn('"arguments_digest"', hosted_context)
+        self.assertLessEqual(len(local_context), 12_000)
+        self.assertLessEqual(len(hosted_context), 12_000)
 
     def test_unknown_hypothesis_evidence_is_repaired_and_not_persisted(self) -> None:
         invalid = tool_decision(
@@ -164,8 +173,16 @@ class AgentLoopTests(unittest.TestCase):
         self.assertIn("search_workspace", offered)
         self.assertEqual(["workspace_evidence_collected"], agent.state.task.completion_criteria)
 
-    def test_boundary_investigation_chains_without_model_or_confirmation(self) -> None:
-        provider = ScriptedProvider()
+    def test_boundary_investigation_uses_model_selected_read_only_continuations(self) -> None:
+        provider = ScriptedProvider(
+            tool_decision("query_model", {
+                "source": "model.in", "query": "list_boundary_conditions",
+            }),
+            tool_decision("find_references", {
+                "source": "model.in", "direction": "outbound",
+                "entity_kind": "boundary-condition", "entity_name": "bc5-1",
+            }),
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
@@ -175,12 +192,17 @@ class AgentLoopTests(unittest.TestCase):
             )
 
         self.assertEqual(
-            ["inspect_model", "query_model", "query_model", "validate_model"],
+            ["inspect_model", "query_model", "find_references", "validate_model"],
             agent.state.task.completed_steps,
         )
         self.assertEqual("complete", agent.state.task.status)
         self.assertFalse(result.requires_confirmation)
-        self.assertEqual([], provider.requests)
+        self.assertEqual(2, len(provider.requests))
+        self.assertTrue(all("Task context" in request.messages[-1].content for request in provider.requests))
+        offered = provider.requests[0].response_schema["properties"]["tool"]["enum"]
+        self.assertTrue({
+            "query_model", "inspect_entity", "find_references", "validate_model",
+        }.issubset(offered))
 
     def test_repeated_successful_action_stops_the_agent_loop(self) -> None:
         provider = ScriptedProvider(tool_decision("inspect_model", {"source": "model.in"}))
@@ -193,6 +215,42 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual("repeated_action", result.error_code)
         self.assertEqual("blocked", agent.state.task.status)
         self.assertEqual(1, agent.state.task.step_count)
+
+    def test_canonical_alias_cannot_repeat_an_equivalent_successful_query(self) -> None:
+        provider = ScriptedProvider(
+            tool_decision("query_model", {
+                "source": "model.in", "query": "list_boundary_conditions",
+            }),
+            tool_decision("query_model", {
+                "source": "model.in", "query": "list-boundary-conditions",
+            }),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn(
+                "Something looks wrong with the boundary conditions in model.in. Check it."
+            )
+
+        self.assertEqual("repeated_action", result.error_code)
+        self.assertEqual("blocked", agent.state.task.status)
+        self.assertEqual(["inspect_model", "query_model"], agent.state.task.completed_steps)
+
+    def test_model_can_stop_safely_when_useful_read_only_evidence_is_exhausted(self) -> None:
+        provider = ScriptedProvider(exhausted_decision(
+            "The available deterministic observations do not identify a narrower cause."
+        ))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Inspect model.in and tell me whether anything looks wrong.")
+
+        self.assertEqual("evidence_exhausted", result.error_code)
+        self.assertEqual("blocked", agent.state.task.status)
+        self.assertEqual("evidence_exhausted", agent.state.task.terminal_reason)
+        self.assertIn("focused_evidence_collected", result.message)
 
     def test_compare_original_with_last_changed_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

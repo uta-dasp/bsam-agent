@@ -545,7 +545,7 @@ def decision_schema(tool_names: tuple[str, ...]) -> dict[str, Any]:
         "properties": {
             "outcome": {
                 "type": "string",
-                "enum": ["dispatch", "refuse", "answer", "clarify"],
+                "enum": ["dispatch", "refuse", "answer", "clarify", "exhausted"],
             },
             "tool": {"enum": [None, *tool_names]},
             "arguments": {"type": "object"},
@@ -619,7 +619,9 @@ def routing_prompt(
         "no tool is needed and the objective is complete. Use outcome=clarify, tool=null, "
         "arguments={}, error_code=clarification_required, and one focused question only when "
         "an engineering decision cannot be inferred safely. Unknown BSAM features route to "
-        "get_capabilities. An optional task_update may upsert bounded working hypotheses; cite only "
+        "get_capabilities. Use outcome=exhausted with no tool or error code only when retained "
+        "evidence cannot support another useful safe read; this safely blocks rather than completing "
+        "missing deterministic criteria. An optional task_update may upsert bounded working hypotheses; cite only "
         "observation IDs present in task context, and never treat a hypothesis as deterministic evidence. "
         "Available tools: "
         + json.dumps(contracts, separators=(",", ":"), sort_keys=True)
@@ -904,6 +906,17 @@ class ChatOrchestrator:
             return self._result(
                 "explain", decision["response"] or "No further tool action is needed.",
             )
+        if decision["outcome"] == "exhausted":
+            if task is not None:
+                task.status = "blocked"
+                task.terminal_reason = "evidence_exhausted"
+            missing = ", ".join(task.remaining_criteria) if task is not None else "the objective"
+            return self._result(
+                "explain",
+                (decision["response"] or "No additional safe read can change the conclusion.")
+                + f" Deterministic completion evidence remains missing for: {missing}.",
+                error="evidence_exhausted",
+            )
         if decision["outcome"] == "clarify":
             question = decision["response"] or "A focused engineering decision is required."
             if task is not None:
@@ -920,12 +933,11 @@ class ChatOrchestrator:
                 "explain", "The model selected dispatch without a tool.",
                 error="invalid_model_response",
             )
-        arguments = _normalize_arguments(tool, decision["arguments"], routing_text)
-        arguments = _add_safe_defaults(tool, arguments)
-        arguments = _conversation_defaults(tool, arguments, routing_text, self.state)
         workspace_root = getattr(self.api, "workspace_root", None)
-        if isinstance(workspace_root, Path):
-            arguments = _workspace_relative_arguments(arguments, workspace_root)
+        arguments = _prepared_action_arguments(
+            tool, decision["arguments"], routing_text, self.state,
+            workspace_root if isinstance(workspace_root, Path) else None,
+        )
         if tool in GUARDED_TOOLS:
             arguments["confirm"] = False
         try:
@@ -1042,10 +1054,15 @@ class ChatOrchestrator:
                 ))
                 return _combined_turn(turns, task)
             if decision["outcome"] == "dispatch" and decision.get("tool") is not None:
-                candidate_arguments = _conversation_defaults(
-                    str(decision["tool"]), decision["arguments"], routing_text, self.state,
+                candidate_tool = str(decision["tool"])
+                workspace_root = getattr(self.api, "workspace_root", None)
+                candidate_arguments = _prepared_action_arguments(
+                    candidate_tool, decision["arguments"], routing_text, self.state,
+                    workspace_root if isinstance(workspace_root, Path) else None,
                 )
-                fingerprint = _action_fingerprint(str(decision["tool"]), candidate_arguments)
+                if candidate_tool in GUARDED_TOOLS:
+                    candidate_arguments["confirm"] = False
+                fingerprint = _action_fingerprint(candidate_tool, candidate_arguments)
                 if fingerprint in task.attempt_fingerprints and decision["tool"] != "get_run_status":
                     task.status = "blocked"
                     task.terminal_reason = "repeated_action"
@@ -1134,7 +1151,7 @@ class ChatOrchestrator:
         ):
             raise ValueError("decision fields do not match the schema")
         _validate_task_update(value.get("task_update"), self.state.task)
-        if value["outcome"] not in {"dispatch", "refuse", "answer", "clarify"}:
+        if value["outcome"] not in {"dispatch", "refuse", "answer", "clarify", "exhausted"}:
             raise ValueError("decision outcome is invalid")
         if value["tool"] is not None and value["tool"] not in tool_names:
             raise ValueError("decision tool was not offered")
@@ -1165,6 +1182,13 @@ class ChatOrchestrator:
             or not value["response"]
         ):
             raise ValueError("clarification requires one question and no tool")
+        if value["outcome"] == "exhausted" and (
+            value["tool"] is not None
+            or value["arguments"]
+            or value["error_code"] is not None
+            or not value["response"]
+        ):
+            raise ValueError("evidence exhaustion requires an explanation and no tool")
         return value
 
     def _apply_decision_task_update(self, decision: dict[str, Any]) -> None:
@@ -1281,32 +1305,6 @@ class ChatOrchestrator:
                 tool=tool, error="tool_error",
             )
         self._record_task_step(tool, arguments, result)
-        if (
-            tool == "query_model"
-            and result.get("query") == "list-boundary-conditions"
-            and re.search(r"\b(?:references?|sets?)\b", user_text, re.IGNORECASE)
-        ):
-            chained: list[dict[str, Any]] = []
-            for entity in result.get("matches", [])[:32]:
-                if not isinstance(entity, dict) or not isinstance(entity.get("id"), str):
-                    continue
-                chained_result = self._task_read_only_step(
-                    "query_model", {
-                        "source": str(arguments["source"]),
-                        "query": "references_from",
-                        "entity_id": entity["id"],
-                    },
-                ) if self.state.task is not None else self.api.dispatch(
-                    "query_model", {
-                        "source": str(arguments["source"]),
-                        "query": "references_from",
-                        "entity_id": entity["id"],
-                    },
-                )
-                if isinstance(chained_result, ChatTurn):
-                    return chained_result
-                chained.append({"entity_id": entity["id"], "result": chained_result})
-            result = {**result, "read_only_chain": chained}
         self._update_model_context(tool, arguments, result)
         if tool in PREVIEW_TOOLS or tool == "review_change":
             phase = "propose"
@@ -2258,57 +2256,9 @@ def _next_deterministic_task_action(
             "arguments": {"source": source}, "error_code": None, "response": None,
         }
 
-    if "focused_evidence_collected" in task.remaining_criteria and source:
-        if re.search(r"\b(?:BCs?|boundary conditions?)\b", objective, re.IGNORECASE):
-            if not any(
-                observation.get("evidence", {}).get("query") == "list-boundary-conditions"
-                for observation in task.observations
-            ):
-                return {
-                    "outcome": "dispatch", "tool": "query_model",
-                    "arguments": {"source": source, "query": "list_boundary_conditions"},
-                    "error_code": None, "response": None,
-                }
-        if re.search(r"\bconverg\w*\b", objective, re.IGNORECASE):
-            return {
-                "outcome": "dispatch", "tool": "query_model",
-                "arguments": {
-                    "source": source, "query": "describe_parameter",
-                    "parameter": "d_reduction",
-                },
-                "error_code": None, "response": None,
-            }
-
-    if "references_inspected" in task.remaining_criteria and source:
-        queried = {
-            observation.get("evidence", {}).get("arguments", {}).get("entity_id")
-            for observation in task.observations
-            if observation.get("evidence", {}).get("query") in {
-                "references-from", "references_from",
-            }
-        }
-        boundary_entities = [
-            entity
-            for observation in task.observations
-            for entity in observation.get("evidence", {}).get("entities", [])
-            if entity.get("kind") == "boundary-condition"
-        ]
-        target = next(
-            (entity for entity in boundary_entities if entity.get("id") not in queried), None,
-        )
-        if target and target.get("id"):
-            return {
-                "outcome": "dispatch", "tool": "query_model",
-                "arguments": {
-                    "source": source, "query": "references_from",
-                    "entity_id": target["id"],
-                },
-                "error_code": None, "response": None,
-            }
-
     if "validation_passed" in task.remaining_criteria and source and (
         "modify" not in task.requested_outcomes or "apply_change" in completed
-    ):
+    ) and set(task.remaining_criteria) == {"validation_passed"}:
         target = task.last_created_output or source
         return {
             "outcome": "dispatch", "tool": "validate_model",
@@ -3159,6 +3109,21 @@ def _add_safe_defaults(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
             result["plan_path"] = _default_plan_path(
                 source, tool.removeprefix("preview_"),
             )
+    return result
+
+
+def _prepared_action_arguments(
+    tool: str,
+    arguments: dict[str, Any],
+    routing_text: str,
+    state: ConversationState,
+    workspace_root: Path | None,
+) -> dict[str, Any]:
+    result = _normalize_arguments(tool, arguments, routing_text)
+    result = _add_safe_defaults(tool, result)
+    result = _conversation_defaults(tool, result, routing_text, state)
+    if workspace_root is not None:
+        result = _workspace_relative_arguments(result, workspace_root)
     return result
 
 

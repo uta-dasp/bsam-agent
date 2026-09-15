@@ -237,10 +237,13 @@ Implemented:
 - immutable task-local observation IDs and bounded working hypotheses whose supporting/refuting
   links are validated against retained deterministic evidence;
 - automatic chaining of permitted read-only actions;
+- provider-selected focused read-only continuations without boundary- or convergence-specific loop
+  branches;
 - explicit complete, clarify, confirm, refused, failed, blocked, in-progress, step-limit, and
   recovery-limit outcomes;
 - maximum steps/recoveries, repeated-action detection, failed-action fingerprints, and no repeat of
-  an identical failed action;
+  an identical failed action, including canonical-equivalent query aliases;
+- an explicit evidence-exhausted stop that cannot satisfy missing deterministic criteria;
 - separate confirmation boundaries in the current baseline for applying changes, running BSAM, and
   stopping a run;
 - deterministic evidence requirements for creation, validation, comparison, and terminal run state.

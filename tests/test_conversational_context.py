@@ -83,7 +83,6 @@ class ConversationalContextTests(unittest.TestCase):
             followup = agent.turn("What does that BC reference?")
 
         self.assertEqual(["bc5-1"], [item["name"] for item in boundary.tool_result["matches"]])
-        self.assertEqual(1, len(boundary.tool_result["read_only_chain"]))
         self.assertEqual(["bc5-1"], [item["name"] for item in followup_filter.tool_result["matches"]])
         self.assertIn("ply2.edge", direct.message)
         self.assertIn("ply2.edge", followup.message)

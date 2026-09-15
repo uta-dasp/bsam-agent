@@ -15,14 +15,18 @@ missing, it may select an obvious read-only continuation locally or ask the conf
 choose one bounded next tool.
 
 The loop terminates when all deterministic criteria are satisfied, a clarification or confirmation
-is required, a run remains in progress, policy refuses the request, a tool fails, an action would
-repeat, or a step/recovery limit is reached. Model claims cannot satisfy criteria such as validation
-success, model creation, comparison, or terminal run evidence.
+is required, a run remains in progress, policy refuses the request, a tool fails, evidence is
+exhausted, an equivalent canonical action would repeat, or a step/recovery limit is reached.
+Evidence exhaustion safely blocks the task and reports the missing criteria; it cannot manufacture
+completion. Model claims cannot satisfy criteria such as validation success, model creation,
+comparison, or terminal run evidence.
 
-Read-only exploration can compose model inspection, canonical semantic queries, model comparison,
-run status, and bounded known-log inspection. Applying a plan, starting BSAM, and stopping a run
-retain separate user-confirmation boundaries. A change-and-run objective therefore pauses once
-before file creation and again before execution.
+Read-only exploration can compose model inspection, canonical entity/reference queries, bounded
+workspace discovery/read/search, model comparison, run status, and bounded known-log inspection.
+After mandatory general observations, the provider selects among the safe continuations; the loop no
+longer contains boundary- or convergence-specific continuation branches. Applying a plan, starting
+BSAM, and stopping a run retain the current confirmation boundaries pending task-scoped
+authorization work.
 
 The optional knowledge boundary is defined in `bsam_agent.knowledge`. Retrieval evidence is
 non-authoritative and the default implementation returns no results. A future index may provide

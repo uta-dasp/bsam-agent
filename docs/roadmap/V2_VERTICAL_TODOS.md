@@ -120,9 +120,9 @@ a grounded conclusion without the user prescribing tools.
   the existing semantic query engine without duplicating BSAM authority.
 - [x] **V2-S1-008** Add durable working hypotheses, supporting/refuting observation IDs, and schema
   migration to task state.
-- [ ] **V2-S1-009** Let the provider select among several safe read-only continuations; remove
+- [x] **V2-S1-009** Let the provider select among several safe read-only continuations; remove
   request-specific deterministic continuation only after equivalent negative and trajectory tests.
-- [ ] **V2-S1-010** Add exploration stop rules for exhausted evidence, repeated equivalent queries,
+- [x] **V2-S1-010** Add exploration stop rules for exhausted evidence, repeated equivalent queries,
   context-size limits, and conclusions that require an engineering decision.
 - [ ] **V2-S1-011** Add an evidence-grounded final synthesis pass whose prose cannot satisfy or
   override deterministic completion criteria.
