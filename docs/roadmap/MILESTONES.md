@@ -255,7 +255,8 @@ Version 2 extensions:
 - characterize model behavior when several equally safe investigation paths exist.
 - extend the implemented task authorization to the future distinct smoke-test contract while
   retaining mandatory review/confirmation for every physics-changing or model-changing edit;
-- create a per-task engineering workspace and deterministic promotion/cleanup lifecycle;
+- route plans, variants, runs, and observations through the implemented per-task engineering
+  workspace and deterministic promotion/cleanup lifecycle;
 - compact long trajectories deterministically without losing decisions, failures, provenance,
   authorization, or completion evidence.
 

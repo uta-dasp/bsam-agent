@@ -6,7 +6,9 @@ execution environment.
 
 Each objective creates durable task state with completion criteria, a working plan, compact
 observations, evidence-linked working hypotheses, completed steps, attempt fingerprints, failures,
-recovery counts, and active model/run context. Every deterministic observation receives an immutable
+recovery counts, task-scoped authorization, a contained task-workspace reference, and active
+model/run context. For a local workspace the task directory and strict manifest are allocated before
+tool routing; allocation failure blocks the task. Every deterministic observation receives an immutable
 task-local ID. A model may update a bounded hypothesis only with supporting/refuting IDs present in
 task context; hypotheses never count as deterministic completion evidence. Persisted pre-0.7 task
 state receives deterministic observation IDs during migration. After every deterministic result,
@@ -57,5 +59,7 @@ validation, editing, and execution policy remain deterministic.
 
 Hosted providers receive only the typed objective, bounded tool schemas, and compact observations.
 Observations exclude deck text, diffs, log text, and entity identities for hosted routing. The
-grounded synthesis pass uses the same sanitized task context. The existing hosted-data policy and
-pasted-source rejection remain in force.
+grounded synthesis pass uses the same sanitized task context. Hosted task context exposes only the
+task-workspace lifecycle state, not its path or manifest. The existing hosted-data policy and
+pasted-source rejection remain in force. The full task-workspace contract is documented in
+[Per-task engineering workspace](TASK_WORKSPACE.md).

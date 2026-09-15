@@ -18,7 +18,8 @@ The JSON-lines protocol sends a bounded task-view projection on startup and afte
 VS Code chat panel renders it in an expandable local task card: objective/status, plan, completed
 tool activity, evidence IDs and summaries, assumptions, hypotheses, completion criteria,
 authorization mode/status/usage, and the terminal reason. Raw workspace match text and full tool
-payloads are not included in this UI projection.
+payloads are not included in this UI projection. Local tasks also show their contained task-workspace
+state and root; hosted routing receives the state only, never that path.
 
 ## Start and use
 

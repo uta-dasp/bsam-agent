@@ -18,6 +18,7 @@ from .capabilities import capability_manifest
 from .provider import Message, Provider, ProviderConfig, ProviderRequest, ProviderResponse
 from .query import CANONICAL_QUERIES, canonical_query_name
 from .registry import load_registry
+from .task_workspace import TaskWorkspace, TaskWorkspaceError
 from .tool_contracts import TOOL_CONTRACTS, TOOL_DESCRIPTIONS, validate_arguments
 
 
@@ -238,6 +239,7 @@ class TaskState:
     model_step_count: int = 0
     final_synthesis: dict[str, Any] | None = None
     authorization: TaskAuthorization = field(default_factory=TaskAuthorization)
+    task_workspace: dict[str, str] | None = None
     terminal_reason: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -278,6 +280,7 @@ class TaskState:
             "model_step_count": self.model_step_count,
             "final_synthesis": self.final_synthesis,
             "authorization": self.authorization.as_dict(),
+            "task_workspace": self.task_workspace,
             "terminal_reason": self.terminal_reason,
         }
 
@@ -367,6 +370,26 @@ class TaskState:
         ):
             raise ValueError("task final synthesis is invalid")
         migrated["authorization"] = TaskAuthorization.from_dict(migrated["authorization"])
+        task_workspace = migrated["task_workspace"]
+        if task_workspace is not None:
+            if (
+                not isinstance(task_workspace, dict)
+                or set(task_workspace) != {"task_id", "root", "manifest", "state"}
+                or not all(isinstance(item, str) and item for item in task_workspace.values())
+                or re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", task_workspace.get("task_id", ""),
+                ) is None
+            ):
+                raise ValueError("task workspace reference is invalid")
+            expected_root = f".bsam-agent/tasks/{task_workspace['task_id']}"
+            if (
+                task_workspace["root"] != expected_root
+                or task_workspace["manifest"] != f"{expected_root}/task-workspace.json"
+                or task_workspace["state"] not in {
+                    "active", "selected", "promoting", "promoted", "discarded",
+                }
+            ):
+                raise ValueError("task workspace reference is inconsistent")
         task = cls(**migrated)
         if final_synthesis is not None:
             _validate_grounded_synthesis({"claims": final_synthesis["claims"]}, task)
@@ -388,7 +411,7 @@ class ConversationState:
         pending = self.pending_action
         last_plan = self.last_plan
         return {
-            "schema_version": "0.9.0",
+            "schema_version": "0.10.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -405,7 +428,7 @@ class ConversationState:
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
@@ -417,7 +440,7 @@ class ConversationState:
             expected.add("last_plan")
         elif value["schema_version"] in {"0.3.0", "0.4.0"}:
             expected.update({"last_plan", "task"})
-        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
+        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
             expected.update({"last_plan", "task", "model_context"})
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
@@ -974,6 +997,37 @@ class ChatOrchestrator:
                 "authorization_granted", correlation_id=correlation_id,
                 **_authorization_audit_fields(task.authorization),
             )
+            if isinstance(workspace_root, Path):
+                task_id = f"{self.state.conversation_id[:16]}-{self.state.turn_number:04d}"
+                try:
+                    task_area = TaskWorkspace.create(
+                        workspace_root, task_id,
+                        objective_sha256=_digest(task.objective),
+                        source_scope=task.authorization.source_scope,
+                    )
+                except TaskWorkspaceError as exc:
+                    task.status = "blocked"
+                    task.terminal_reason = "task_workspace_unavailable"
+                    self._audit(
+                        "task_workspace_failed", correlation_id=correlation_id,
+                        error_code=exc.code,
+                    )
+                    return self._result(
+                        "explain", f"The contained task workspace could not be created: {exc}",
+                        error=exc.code,
+                    )
+                task_root = str(task_area.root.relative_to(workspace_root)).replace("\\", "/")
+                task.task_workspace = {
+                    "task_id": task_id,
+                    "root": task_root,
+                    "manifest": f"{task_root}/task-workspace.json",
+                    "state": "active",
+                }
+                self._audit(
+                    "task_workspace_created", correlation_id=correlation_id,
+                    task_id=task_id, root=task_root,
+                    manifest=task.task_workspace["manifest"],
+                )
         tool_names = relevant_tools(routing_text)
         decision = (
             _deterministic_clarification_response(routing_text, self.state)
@@ -2836,6 +2890,10 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
             "executions_used": task.authorization.executions_used,
             "expires_after_turn": task.authorization.expires_after_turn,
         },
+        "task_workspace": (
+            {"state": task.task_workspace["state"]}
+            if task.task_workspace is not None else None
+        ),
         "completion_criteria": task.completion_criteria,
         "missing_criteria": task.remaining_criteria,
         "working_plan": task.working_plan,

@@ -138,7 +138,7 @@ a grounded conclusion without the user prescribing tools.
   and backward-compatible conversation-state migration.
 - [x] **V2-S1-017** Implement the grounded explanation policy in planning/synthesis prompts and
   response evidence so current-model claims cannot come from model memory alone.
-- [ ] **V2-S1-018** Add the per-task workspace abstraction, manifest, contained path resolver,
+- [x] **V2-S1-018** Add the per-task workspace abstraction, manifest, contained path resolver,
   lifecycle states, and safe final-artifact promotion contract.
 - [ ] **V2-S1-019** Route plans, intermediate variants, retry artifacts, and temporary observations
   into the task workspace instead of collision-suffixed project files.

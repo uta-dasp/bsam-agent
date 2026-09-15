@@ -211,6 +211,7 @@ export class ChatPanel implements vscode.Disposable {
         <div class="task-section"><strong>Hypotheses</strong><ul id="task-hypotheses"></ul></div>
         <div class="task-section"><strong>Completion</strong><ul id="task-completion"></ul></div>
         <div class="task-section"><strong>Authorization</strong><ul id="task-authorization"></ul></div>
+        <div class="task-section"><strong>Task workspace</strong><ul id="task-workspace"></ul></div>
       </div>
       <div id="task-terminal" hidden></div>
     </details>
@@ -242,6 +243,7 @@ export class ChatPanel implements vscode.Disposable {
     const taskHypotheses = document.getElementById('task-hypotheses');
     const taskCompletion = document.getElementById('task-completion');
     const taskAuthorization = document.getElementById('task-authorization');
+    const taskWorkspace = document.getElementById('task-workspace');
     const taskTerminal = document.getElementById('task-terminal');
     let busy = true;
     let pending = false;
@@ -319,6 +321,12 @@ export class ChatPanel implements vscode.Disposable {
         'Operations: ' + (Array.isArray(authorization.operations) ? authorization.operations.join(', ') : 'read'),
         'Runs: ' + String(authorization.executions_used || 0) + '/' + String(authorization.max_executions || 0),
       ], (item) => String(item), 'No authorization state');
+      const workspace = task.task_workspace && typeof task.task_workspace === 'object'
+        ? task.task_workspace : {};
+      fillTaskList(taskWorkspace, [
+        'State: ' + String(workspace.state || 'unavailable'),
+        'Root: ' + String(workspace.root || 'not allocated'),
+      ], (item) => String(item), 'No task workspace');
       taskTerminal.hidden = !task.terminal_reason;
       taskTerminal.textContent = task.terminal_reason ? 'Terminal reason: ' + String(task.terminal_reason) : '';
     }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tempfile
@@ -663,6 +664,7 @@ class AgentLoopTests(unittest.TestCase):
             legacy["task"].pop("model_step_count")
             legacy["task"].pop("final_synthesis")
             legacy["task"].pop("authorization")
+            legacy["task"].pop("task_workspace")
             for observation in legacy["task"]["observations"]:
                 observation.pop("observation_id")
             migrated = ConversationState.from_dict(legacy)
@@ -672,6 +674,9 @@ class AgentLoopTests(unittest.TestCase):
                 "terminal_status": "complete",
                 "no_mutation": True,
             })
+            workspace_manifest = json.loads(
+                (root / restored.task.task_workspace["manifest"]).read_text(encoding="utf-8")
+            )
 
         self.assertTrue(report["passed"])
         self.assertEqual(1, restored.task.step_count)
@@ -683,6 +688,13 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual("obs-001", restored.task.observations[0]["observation_id"])
         self.assertEqual([], migrated.task.working_hypotheses)
         self.assertEqual("obs-001", migrated.task.observations[0]["observation_id"])
+        self.assertIsNotNone(restored.task.task_workspace)
+        self.assertEqual("active", restored.task.task_workspace["state"])
+        self.assertEqual(["model.in"], workspace_manifest["source_scope"])
+        self.assertEqual(
+            hashlib.sha256(b"Inspect model.in").hexdigest(),
+            workspace_manifest["objective_sha256"],
+        )
 
     def test_task_authorization_rejects_inconsistent_persisted_state(self) -> None:
         value = TaskAuthorization().as_dict()

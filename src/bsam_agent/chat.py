@@ -73,6 +73,7 @@ def task_view_snapshot(task: TaskState | None) -> dict[str, object] | None:
         "completion_criteria": task.completion_criteria,
         "remaining_criteria": task.remaining_criteria,
         "authorization": task.authorization.as_dict(),
+        "task_workspace": task.task_workspace,
         "terminal_reason": task.terminal_reason,
     }
 
