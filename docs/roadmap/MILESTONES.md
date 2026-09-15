@@ -234,6 +234,8 @@ Implemented:
 
 - objective-derived working plans and deterministic completion criteria;
 - compact digest-bound observations and replanning context;
+- immutable task-local observation IDs and bounded working hypotheses whose supporting/refuting
+  links are validated against retained deterministic evidence;
 - automatic chaining of permitted read-only actions;
 - explicit complete, clarify, confirm, refused, failed, blocked, in-progress, step-limit, and
   recovery-limit outcomes;
@@ -247,7 +249,6 @@ Remaining:
 
 - prove completion of previously unseen multi-step objectives through model-selected composition,
   not deterministic request-specific continuation;
-- add working hypotheses distinct from the working plan and retain evidence for hypothesis changes;
 - add an evidence-grounded final synthesis step that cannot override completion checks;
 - characterize model behavior when several equally safe investigation paths exist.
 - replace per-tool execution confirmations with audited task-scoped authorization while retaining

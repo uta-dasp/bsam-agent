@@ -33,11 +33,16 @@ def config() -> ProviderConfig:
     )
 
 
-def tool_decision(tool: str, arguments: dict[str, object]) -> ProviderResponse:
-    return ProviderResponse(content=json.dumps({
+def tool_decision(
+    tool: str, arguments: dict[str, object], *, task_update: dict[str, object] | None = None,
+) -> ProviderResponse:
+    decision = {
         "outcome": "dispatch", "tool": tool, "arguments": arguments,
         "error_code": None, "response": None,
-    }))
+    }
+    if task_update is not None:
+        decision["task_update"] = task_update
+    return ProviderResponse(content=json.dumps(decision))
 
 
 class ScriptedProvider:
@@ -54,9 +59,17 @@ class ScriptedProvider:
 
 class AgentLoopTests(unittest.TestCase):
     def test_model_can_choose_a_second_read_only_action_after_observation(self) -> None:
-        provider = ScriptedProvider(tool_decision("query_model", {
-            "source": "model.in", "query": "list_boundary_conditions",
-        }))
+        provider = ScriptedProvider(tool_decision(
+            "query_model", {
+                "source": "model.in", "query": "list_boundary_conditions",
+            },
+            task_update={"hypotheses": [{
+                "statement": "A boundary-condition reference may explain the reported issue.",
+                "status": "supported",
+                "supporting_observation_ids": ["obs-001"],
+                "refuting_observation_ids": [],
+            }]},
+        ))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
@@ -67,6 +80,12 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual("complete", agent.state.task.status)
         self.assertEqual(2, agent.state.task.step_count)
         self.assertEqual(2, len(agent.state.task.observations))
+        self.assertEqual("obs-001", agent.state.task.observations[0]["observation_id"])
+        self.assertEqual("hypothesis-001", agent.state.task.working_hypotheses[0]["hypothesis_id"])
+        self.assertEqual(
+            ["obs-001"],
+            agent.state.task.working_hypotheses[0]["supporting_observation_ids"],
+        )
         self.assertIn("Task context", provider.requests[0].messages[-1].content)
         self.assertEqual("query_model", result.tool)
 
@@ -96,6 +115,33 @@ class AgentLoopTests(unittest.TestCase):
         self.assertNotIn("engineering-notes.md", hosted_context)
         self.assertNotIn('"pattern"', hosted_context)
         self.assertIn('"arguments_digest"', hosted_context)
+
+    def test_unknown_hypothesis_evidence_is_repaired_and_not_persisted(self) -> None:
+        invalid = tool_decision(
+            "query_model", {
+                "source": "model.in", "query": "list_boundary_conditions",
+            },
+            task_update={"hypotheses": [{
+                "statement": "An unsupported guess.",
+                "status": "supported",
+                "supporting_observation_ids": ["obs-999"],
+                "refuting_observation_ids": [],
+            }]},
+        )
+        corrected = tool_decision("query_model", {
+            "source": "model.in", "query": "list_boundary_conditions",
+        })
+        provider = ScriptedProvider(invalid, corrected)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Inspect model.in and tell me whether anything looks wrong.")
+
+        self.assertEqual("query_model", result.tool)
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual([], agent.state.task.working_hypotheses)
+        self.assertEqual(2, len(provider.requests))
 
     def test_workspace_evidence_request_can_start_without_a_model_source(self) -> None:
         provider = ScriptedProvider(tool_decision("search_workspace", {
@@ -216,6 +262,12 @@ class AgentLoopTests(unittest.TestCase):
             agent = ChatOrchestrator(ScriptedProvider(), config(), LocalAgentApi(root))
             turn = agent.turn("Inspect model.in")
             restored = ConversationState.from_dict(agent.state.as_dict())
+            legacy = agent.state.as_dict()
+            legacy["schema_version"] = "0.6.0"
+            legacy["task"].pop("working_hypotheses")
+            for observation in legacy["task"]["observations"]:
+                observation.pop("observation_id")
+            migrated = ConversationState.from_dict(legacy)
             report = evaluate_trajectory(restored.task, [turn], {
                 "tool_sequence": ["inspect_model"],
                 "confirmation_boundaries": 0,
@@ -230,6 +282,9 @@ class AgentLoopTests(unittest.TestCase):
         self.assertIsNotNone(restored.task.active_source_digest)
         self.assertTrue(restored.task.recent_entities)
         self.assertEqual(["model_inspected"], restored.task.completion_criteria)
+        self.assertEqual("obs-001", restored.task.observations[0]["observation_id"])
+        self.assertEqual([], migrated.task.working_hypotheses)
+        self.assertEqual("obs-001", migrated.task.observations[0]["observation_id"])
 
     def test_model_can_request_one_focused_clarification(self) -> None:
         clarification = ProviderResponse(content=json.dumps({

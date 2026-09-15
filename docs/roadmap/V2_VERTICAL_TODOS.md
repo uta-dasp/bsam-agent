@@ -118,7 +118,7 @@ a grounded conclusion without the user prescribing tools.
   if `compare_models` plus bounded reads cannot satisfy an accepted investigation.
 - [x] **V2-S1-007** Promote `inspect_entity` and `find_references` to canonical agent intents over
   the existing semantic query engine without duplicating BSAM authority.
-- [ ] **V2-S1-008** Add durable working hypotheses, supporting/refuting observation IDs, and schema
+- [x] **V2-S1-008** Add durable working hypotheses, supporting/refuting observation IDs, and schema
   migration to task state.
 - [ ] **V2-S1-009** Let the provider select among several safe read-only continuations; remove
   request-specific deterministic continuation only after equivalent negative and trajectory tests.

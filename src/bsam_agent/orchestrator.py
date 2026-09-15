@@ -133,6 +133,7 @@ class TaskState:
     last_run: dict[str, Any] | None = None
     observations: list[dict[str, Any]] = field(default_factory=list)
     working_plan: list[str] = field(default_factory=list)
+    working_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     completed_steps: list[str] = field(default_factory=list)
     completion_criteria: list[str] = field(default_factory=list)
     remaining_criteria: list[str] = field(default_factory=list)
@@ -169,6 +170,7 @@ class TaskState:
             "last_run": self.last_run,
             "observations": self.observations,
             "working_plan": self.working_plan,
+            "working_hypotheses": self.working_hypotheses,
             "completed_steps": self.completed_steps,
             "completion_criteria": self.completion_criteria,
             "remaining_criteria": self.remaining_criteria,
@@ -193,7 +195,7 @@ class TaskState:
             "requested_outcomes", "resolved_capabilities", "engineering_assumptions",
             "missing_decisions", "steps", "failures", "attempt_fingerprints",
             "failed_fingerprints", "recent_sources", "recent_entities", "observations",
-            "working_plan", "completed_steps", "completion_criteria",
+            "working_plan", "working_hypotheses", "completed_steps", "completion_criteria",
             "remaining_criteria",
         ):
             if not isinstance(migrated[name], list):
@@ -231,6 +233,20 @@ class TaskState:
                 raise ValueError("task step_count does not match completed steps")
         if len(migrated["steps"]) > migrated["max_steps"]:
             raise ValueError("task state exceeds its step bound")
+        observation_ids: set[str] = set()
+        for index, observation in enumerate(migrated["observations"], start=1):
+            if not isinstance(observation, dict):
+                raise ValueError("task observation is invalid")
+            observation.setdefault("observation_id", f"obs-{index:03d}")
+            observation_id = observation.get("observation_id")
+            if (
+                not isinstance(observation_id, str)
+                or not observation_id
+                or observation_id in observation_ids
+            ):
+                raise ValueError("task observation ID is invalid")
+            observation_ids.add(observation_id)
+        _validate_working_hypotheses(migrated["working_hypotheses"], observation_ids)
         for name in (
             "active_source", "active_source_digest", "last_created_output", "terminal_reason",
         ):
@@ -257,7 +273,7 @@ class ConversationState:
         pending = self.pending_action
         last_plan = self.last_plan
         return {
-            "schema_version": "0.6.0",
+            "schema_version": "0.7.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -274,7 +290,7 @@ class ConversationState:
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"}:
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
@@ -286,7 +302,7 @@ class ConversationState:
             expected.add("last_plan")
         elif value["schema_version"] in {"0.3.0", "0.4.0"}:
             expected.update({"last_plan", "task"})
-        elif value["schema_version"] in {"0.5.0", "0.6.0"}:
+        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0"}:
             expected.update({"last_plan", "task", "model_context"})
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
@@ -535,6 +551,37 @@ def decision_schema(tool_names: tuple[str, ...]) -> dict[str, Any]:
             "arguments": {"type": "object"},
             "error_code": {"enum": [None, *POLICY_ERROR_CODES]},
             "response": {"type": ["string", "null"]},
+            "task_update": {
+                "type": ["object", "null"],
+                "additionalProperties": False,
+                "required": ["hypotheses"],
+                "properties": {
+                    "hypotheses": {
+                        "type": "array", "maxItems": 8,
+                        "items": {
+                            "type": "object", "additionalProperties": False,
+                            "required": [
+                                "statement", "status", "supporting_observation_ids",
+                                "refuting_observation_ids",
+                            ],
+                            "properties": {
+                                "hypothesis_id": {"type": "string"},
+                                "statement": {"type": "string"},
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["unresolved", "supported", "refuted"],
+                                },
+                                "supporting_observation_ids": {
+                                    "type": "array", "items": {"type": "string"},
+                                },
+                                "refuting_observation_ids": {
+                                    "type": "array", "items": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         },
     }
 
@@ -572,7 +619,9 @@ def routing_prompt(
         "no tool is needed and the objective is complete. Use outcome=clarify, tool=null, "
         "arguments={}, error_code=clarification_required, and one focused question only when "
         "an engineering decision cannot be inferred safely. Unknown BSAM features route to "
-        "get_capabilities. Available tools: "
+        "get_capabilities. An optional task_update may upsert bounded working hypotheses; cite only "
+        "observation IDs present in task context, and never treat a hypothesis as deterministic evidence. "
+        "Available tools: "
         + json.dumps(contracts, separators=(",", ":"), sort_keys=True)
     )
 
@@ -816,6 +865,7 @@ class ChatOrchestrator:
                 "explain", "The local model could not produce a valid request after one repair.",
                 error="invalid_model_response",
             )
+        self._apply_decision_task_update(decision)
 
         self.state.history.extend((Message("user", text), Message("assistant", json.dumps(
             decision, separators=(",", ":"), sort_keys=True,
@@ -975,6 +1025,7 @@ class ChatOrchestrator:
                         error="invalid_model_response",
                     ))
                     return _combined_turn(turns, task)
+                self._apply_decision_task_update(decision)
                 self._audit(
                     "agent_replanned", tool=decision.get("tool"),
                     response_digest=_digest(response.content or ""),
@@ -1071,14 +1122,18 @@ class ChatOrchestrator:
                 )
         return None, last
 
-    @staticmethod
-    def _parse_decision(content: str | None, tool_names: tuple[str, ...]) -> dict[str, Any]:
+    def _parse_decision(self, content: str | None, tool_names: tuple[str, ...]) -> dict[str, Any]:
         if content is None:
             raise ValueError("model returned no JSON decision")
         value = json.loads(content)
         expected_fields = {"outcome", "tool", "arguments", "error_code", "response"}
-        if not isinstance(value, dict) or set(value) != expected_fields:
+        if (
+            not isinstance(value, dict)
+            or not expected_fields.issubset(value)
+            or not set(value).issubset(expected_fields | {"task_update"})
+        ):
             raise ValueError("decision fields do not match the schema")
+        _validate_task_update(value.get("task_update"), self.state.task)
         if value["outcome"] not in {"dispatch", "refuse", "answer", "clarify"}:
             raise ValueError("decision outcome is invalid")
         if value["tool"] is not None and value["tool"] not in tool_names:
@@ -1111,6 +1166,14 @@ class ChatOrchestrator:
         ):
             raise ValueError("clarification requires one question and no tool")
         return value
+
+    def _apply_decision_task_update(self, decision: dict[str, Any]) -> None:
+        task = self.state.task
+        update = decision.get("task_update")
+        if task is None or update is None:
+            return
+        changed = _apply_task_update(task, update)
+        self._audit("task_hypotheses_updated", changed=changed)
 
     def _confirm(self) -> ChatTurn:
         pending = self.state.pending_action
@@ -1651,6 +1714,129 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+_HYPOTHESIS_STATUSES = frozenset({"unresolved", "supported", "refuted"})
+_HYPOTHESIS_FIELDS = {
+    "hypothesis_id", "statement", "status",
+    "supporting_observation_ids", "refuting_observation_ids",
+}
+
+
+def _validate_working_hypotheses(
+    hypotheses: Any, observation_ids: set[str], *, proposals: bool = False,
+) -> None:
+    if not isinstance(hypotheses, list) or len(hypotheses) > 8:
+        raise ValueError("task working hypotheses are invalid")
+    seen: set[str] = set()
+    for item in hypotheses:
+        if not isinstance(item, dict):
+            raise ValueError("task hypothesis is invalid")
+        required = _HYPOTHESIS_FIELDS - ({"hypothesis_id"} if proposals else set())
+        if not required.issubset(item) or not set(item).issubset(_HYPOTHESIS_FIELDS):
+            raise ValueError("task hypothesis fields are invalid")
+        hypothesis_id = item.get("hypothesis_id")
+        if hypothesis_id is not None and (
+            not isinstance(hypothesis_id, str)
+            or not re.fullmatch(r"hypothesis-\d{3}", hypothesis_id)
+            or hypothesis_id in seen
+        ):
+            raise ValueError("task hypothesis ID is invalid")
+        if isinstance(hypothesis_id, str):
+            seen.add(hypothesis_id)
+        statement = item.get("statement")
+        if not isinstance(statement, str) or not statement.strip() or len(statement) > 500:
+            raise ValueError("task hypothesis statement is invalid")
+        status = item.get("status")
+        if status not in _HYPOTHESIS_STATUSES:
+            raise ValueError("task hypothesis status is invalid")
+        for name in ("supporting_observation_ids", "refuting_observation_ids"):
+            references = item.get(name)
+            if (
+                not isinstance(references, list)
+                or len(references) > 12
+                or not all(isinstance(value, str) for value in references)
+                or len(set(references)) != len(references)
+                or not set(references).issubset(observation_ids)
+            ):
+                raise ValueError("task hypothesis evidence references are invalid")
+        if status == "supported" and not item["supporting_observation_ids"]:
+            raise ValueError("supported hypothesis requires supporting evidence")
+        if status == "refuted" and not item["refuting_observation_ids"]:
+            raise ValueError("refuted hypothesis requires refuting evidence")
+
+
+def _validate_task_update(update: Any, task: TaskState | None) -> None:
+    if update is None:
+        return
+    if task is None or not isinstance(update, dict) or set(update) != {"hypotheses"}:
+        raise ValueError("task update is invalid")
+    observation_ids = {
+        str(item.get("observation_id")) for item in task.observations
+        if isinstance(item, dict) and item.get("observation_id")
+    }
+    _validate_working_hypotheses(
+        update["hypotheses"], observation_ids, proposals=True,
+    )
+    existing_ids = {item["hypothesis_id"] for item in task.working_hypotheses}
+    existing_statements = {
+        str(item["statement"]).casefold() for item in task.working_hypotheses
+    }
+    new_statements: set[str] = set()
+    for item in update["hypotheses"]:
+        hypothesis_id = item.get("hypothesis_id")
+        if hypothesis_id is not None and hypothesis_id not in existing_ids:
+            raise ValueError("task update references an unknown hypothesis")
+        statement = str(item["statement"]).casefold()
+        if statement in new_statements:
+            raise ValueError("task update repeats a hypothesis statement")
+        new_statements.add(statement)
+    additions = {
+        str(item["statement"]).casefold() for item in update["hypotheses"]
+        if item.get("hypothesis_id") is None
+        and str(item["statement"]).casefold() not in existing_statements
+    }
+    if len(task.working_hypotheses) + len(additions) > 8:
+        raise ValueError("task working hypothesis limit reached")
+
+
+def _apply_task_update(task: TaskState, update: dict[str, Any]) -> int:
+    _validate_task_update(update, task)
+    records = deepcopy(task.working_hypotheses)
+    by_id = {item["hypothesis_id"]: index for index, item in enumerate(records)}
+    by_statement = {
+        str(item["statement"]).casefold(): index for index, item in enumerate(records)
+    }
+    next_identifier = 1 + max(
+        (int(str(item["hypothesis_id"]).rsplit("-", 1)[-1]) for item in records),
+        default=0,
+    )
+    changed = 0
+    for proposal in update["hypotheses"]:
+        item = deepcopy(proposal)
+        index = by_id.get(str(item.get("hypothesis_id")))
+        if index is None:
+            index = by_statement.get(str(item["statement"]).casefold())
+        if index is None:
+            if len(records) == 8:
+                raise ValueError("task working hypothesis limit reached")
+            item["hypothesis_id"] = f"hypothesis-{next_identifier:03d}"
+            next_identifier += 1
+            records.append(item)
+            index = len(records) - 1
+        else:
+            item["hypothesis_id"] = records[index]["hypothesis_id"]
+            records[index] = item
+        by_id[item["hypothesis_id"]] = index
+        by_statement[str(item["statement"]).casefold()] = index
+        changed += 1
+    observation_ids = {
+        str(item["observation_id"]) for item in task.observations
+        if isinstance(item, dict) and isinstance(item.get("observation_id"), str)
+    }
+    _validate_working_hypotheses(records, observation_ids)
+    task.working_hypotheses = records
+    return changed
+
+
 def _action_fingerprint(tool: str, arguments: dict[str, Any]) -> str:
     return _digest({"tool": tool, "arguments": arguments})
 
@@ -1734,6 +1920,7 @@ def _bounded_observation(
             for item in excerpts[:4] if isinstance(item, dict)
         ]
     return {
+        "observation_id": f"obs-{index:03d}",
         "index": index,
         "tool": tool,
         "status": "completed",
@@ -2013,6 +2200,7 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
         "completion_criteria": task.completion_criteria,
         "missing_criteria": task.remaining_criteria,
         "working_plan": task.working_plan,
+        "working_hypotheses": task.working_hypotheses,
         "completed_steps": task.completed_steps,
         "step_count": task.step_count,
         "max_steps": task.max_steps,

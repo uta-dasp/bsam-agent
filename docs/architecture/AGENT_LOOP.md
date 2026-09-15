@@ -5,10 +5,14 @@ continue a task through multiple observe, plan, and act cycles; it does not gran
 execution environment.
 
 Each objective creates durable task state with completion criteria, a working plan, compact
-observations, completed steps, attempt fingerprints, failures, recovery counts, and active
-model/run context. After every deterministic result, the orchestrator records digest-bound evidence
-and checks the objective's criteria. If evidence is missing, it may select an obvious read-only
-continuation locally or ask the configured model to choose one bounded next tool.
+observations, evidence-linked working hypotheses, completed steps, attempt fingerprints, failures,
+recovery counts, and active model/run context. Every deterministic observation receives an immutable
+task-local ID. A model may update a bounded hypothesis only with supporting/refuting IDs present in
+task context; hypotheses never count as deterministic completion evidence. Persisted pre-0.7 task
+state receives deterministic observation IDs during migration. After every deterministic result,
+the orchestrator records digest-bound evidence and checks the objective's criteria. If evidence is
+missing, it may select an obvious read-only continuation locally or ask the configured model to
+choose one bounded next tool.
 
 The loop terminates when all deterministic criteria are satisfied, a clarification or confirmation
 is required, a run remains in progress, policy refuses the request, a tool fails, an action would
