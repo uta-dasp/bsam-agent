@@ -255,8 +255,8 @@ Version 2 extensions:
 - characterize model behavior when several equally safe investigation paths exist.
 - extend the implemented task authorization to the future distinct smoke-test contract while
   retaining mandatory review/confirmation for every physics-changing or model-changing edit;
-- route plans, variants, runs, and observations through the implemented per-task engineering
-  workspace and deterministic promotion/cleanup lifecycle;
+- extend the implemented task-workspace routing and source-set promotion contract to later bulk
+  construction, smoke-test, recovery, and result artifacts;
 - compact long trajectories deterministically without losing decisions, failures, provenance,
   authorization, or completion evidence.
 
@@ -619,8 +619,8 @@ The following tactical conflicts or gaps must be retired:
   unseen agent tasks;
 - bounded, revocable task-scoped authorization now covers explicitly requested full runs and
   controlled stops; extend it to smoke execution only after the distinct smoke contract exists;
-- project-root intermediate outputs need to move into a contained task workspace with explicit
-  final-artifact promotion;
+- chat plans, candidates, retries, observations, and run directories now stay in contained task
+  workspaces; later construction, smoke, recovery, and results slices must retain this boundary;
 - long trajectories currently retain bounded recent observations but lack deterministic compaction
   of decisions, evidence, hypotheses, failures, and plans;
 - specialized notch expansion may remain as a regression adapter but cannot satisfy generic M6 or

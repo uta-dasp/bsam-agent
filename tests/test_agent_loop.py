@@ -112,6 +112,35 @@ class AgentLoopTests(unittest.TestCase):
             item["event"] == "confirmation_satisfied_by_task_authorization" for item in events
         ))
 
+    def test_local_run_output_is_routed_into_the_task_workspace(self) -> None:
+        class ScopedRunApi:
+            def __init__(self, workspace_root: Path) -> None:
+                self.workspace_root = workspace_root
+
+            def dispatch(self, tool, arguments):
+                self.arguments = arguments
+                return {
+                    "state": "accepted", "classification": "pending",
+                    "output_directory": arguments["output_dir"],
+                }
+
+        provider = ScriptedProvider(tool_decision("run_bsam", {
+            "source": "model.in", "output_dir": "project-runs/case",
+            "executable": "bsam20.exe", "confirm": False,
+        }))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            api = ScopedRunApi(root)
+            agent = ChatOrchestrator(provider, config(), api)  # type: ignore[arg-type]
+            result = agent.turn("Run model.in in project-runs/case.")
+            task_root = agent.state.task.task_workspace["root"]
+
+        self.assertFalse(result.requires_confirmation)
+        self.assertTrue(api.arguments["output_dir"].startswith(f"{task_root}/runs/full-"))
+        self.assertIn(api.arguments["output_dir"], agent.state.task.authorization.destination_scope)
+        self.assertEqual(api.arguments["output_dir"], result.tool_result["output_directory"])
+
     def test_edit_authorization_can_be_revoked_with_pending_write_cleared(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -367,6 +396,7 @@ class AgentLoopTests(unittest.TestCase):
         self.assertIn('"authorization":{"executions_used":0', local_context)
         self.assertIn('"mode":"read_only"', hosted_context)
         self.assertNotIn('"source_scope"', hosted_context)
+        self.assertNotIn(".bsam-agent/tasks", hosted_context)
         self.assertLessEqual(len(local_context), 12_000)
         self.assertLessEqual(len(hosted_context), 12_000)
         self.assertIn("Documentation:", result.message)

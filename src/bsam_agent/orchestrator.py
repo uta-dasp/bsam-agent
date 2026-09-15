@@ -1184,6 +1184,17 @@ class ChatOrchestrator:
                 tool=tool, error="invalid_arguments",
             )
         if (
+            tool == "apply_change"
+            and task is not None
+            and isinstance(task.destination, str)
+            and task.destination not in task.authorization.destination_scope
+        ):
+            task.authorization.destination_scope.append(task.destination)
+            self._audit(
+                "authorization_scope_updated", reason="reviewed_promotion_destination",
+                **_authorization_audit_fields(task.authorization),
+            )
+        if (
             tool == "run_bsam"
             and task is not None
             and "smoke" in task.authorization.run_kinds
@@ -1210,7 +1221,10 @@ class ChatOrchestrator:
         if (
             tool == "run_bsam"
             and task is not None
-            and self._consume_execution_authorization(task, arguments)
+            and self._consume_execution_authorization(
+                task, arguments,
+                derived_output=_is_task_artifact_path(task, arguments.get("output_dir"), "runs"),
+            )
         ):
             arguments["confirm"] = True
             self._audit(
@@ -1807,7 +1821,27 @@ class ChatOrchestrator:
                 "explain", f"{exc} {_failure_guidance(category)}".strip(),
                 tool=tool, error="tool_error",
             )
-        self._record_task_step(tool, arguments, result)
+        try:
+            task_artifact = self._register_task_artifact(tool, arguments, result)
+        except TaskWorkspaceError as exc:
+            if task is not None:
+                task.status = "blocked"
+                task.terminal_reason = "task_workspace_failure"
+                task.failures.append({
+                    "category": "task_workspace_failure",
+                    "recovery_classification": "hard_failure",
+                    "tool": tool,
+                    "message": str(exc),
+                })
+            self._audit("task_workspace_failed", tool=tool, error_code=exc.code)
+            return self._result(
+                "explain", f"The deterministic result could not be retained safely: {exc}",
+                tool=tool, error=exc.code,
+            )
+        try:
+            self._record_task_step(tool, arguments, result)
+        except TaskWorkspaceError as exc:
+            return self._task_workspace_failure(tool, exc)
         self._update_model_context(tool, arguments, result)
         if (
             tool == "apply_change"
@@ -1846,14 +1880,19 @@ class ChatOrchestrator:
             _preview_follow_up(
                 tool, arguments, user_text,
                 workspace_root=getattr(self.api, "workspace_root", None),
+                task=task,
             )
             if tool in PREVIEW_TOOLS else None
         )
         if pending is not None:
             self.state.pending_action = pending
             if task is not None:
-                task.destination = str(pending.arguments["destination"])
-                if task.destination not in task.authorization.destination_scope:
+                if task.task_workspace is None:
+                    task.destination = str(pending.arguments["destination"])
+                if (
+                    isinstance(task.destination, str)
+                    and task.destination not in task.authorization.destination_scope
+                ):
                     task.authorization.destination_scope.append(task.destination)
                     self._audit(
                         "authorization_scope_updated", reason="reviewed_destination",
@@ -1862,7 +1901,9 @@ class ChatOrchestrator:
                 task.status = "confirm"
             phase = "confirm"
             message += (
-                f" The reviewed output will be written to {pending.arguments['destination']}. "
+                f" The reviewed candidate will be written to {pending.arguments['destination']}"
+                + (f" and promoted to {task.destination}" if task and task.destination else "")
+                + ". "
                 "Type /confirm to create it or /cancel."
             )
         if tool == "apply_change" and task is not None and "validate" in task.requested_outcomes:
@@ -1887,6 +1928,47 @@ class ChatOrchestrator:
             else:
                 task.status = "complete" if "run" not in task.requested_outcomes else "verify"
                 message += " Post-apply validation completed with zero errors."
+        if tool == "apply_change" and task is not None and task_artifact is not None:
+            validation = result.get("post_apply_validation") or result.get("validation")
+            errors = (
+                validation.get("summary", {}).get("errors")
+                if isinstance(validation, dict) else None
+            )
+            if errors == 0 and task.destination:
+                try:
+                    promotion = self._promote_task_artifact(
+                        task, task_artifact["artifact_id"], task.destination,
+                    )
+                except TaskWorkspaceError as exc:
+                    task.status = "blocked"
+                    task.terminal_reason = "task_promotion_failure"
+                    task.failures.append({
+                        "category": "task_promotion_failure",
+                        "recovery_classification": "user_decision_required",
+                        "tool": "promote_task_artifact",
+                        "message": str(exc),
+                    })
+                    self._audit(
+                        "task_workspace_promotion_failed", error_code=exc.code,
+                        destination=task.destination,
+                    )
+                    return self._result(
+                        "explain",
+                        f"The validated candidate remains in its task workspace; promotion failed: {exc}",
+                        tool=tool, result=result, error=exc.code,
+                    )
+                result["task_workspace_candidate"] = str(arguments["destination"])
+                result["promoted_destination"] = task.destination
+                result["promotion"] = promotion
+                try:
+                    self._append_task_observation(
+                        task, "promote_task_artifact",
+                        {"destination": task.destination}, promotion,
+                    )
+                except TaskWorkspaceError as exc:
+                    return self._task_workspace_failure("promote_task_artifact", exc)
+                self._use_promoted_model(task, task.destination)
+                message += f" Promoted the selected model to {task.destination}."
         automatic_run_arguments: dict[str, Any] | None = None
         if (
             tool == "apply_change"
@@ -1895,8 +1977,10 @@ class ChatOrchestrator:
             and isinstance(task.validation_state, dict)
             and task.validation_state.get("errors") == 0
         ):
-            run_source = str(arguments["destination"])
-            output_directory = _default_run_directory(run_source)
+            run_source = task.last_created_output or str(arguments["destination"])
+            output_directory = _task_artifact_path(
+                task, "runs", f"full-{task.step_count + 1:04d}",
+            ) or _default_run_directory(run_source)
             workspace_root = getattr(self.api, "workspace_root", None)
             if isinstance(workspace_root, Path):
                 output_directory = _available_run_directory(output_directory, workspace_root)
@@ -1954,6 +2038,113 @@ class ChatOrchestrator:
             )
             return _combined_turn([completed, run_turn], task)
         return completed
+
+    def _task_area(self, task: TaskState) -> TaskWorkspace | None:
+        workspace_root = getattr(self.api, "workspace_root", None)
+        reference = task.task_workspace
+        if not isinstance(workspace_root, Path) or reference is None:
+            return None
+        return TaskWorkspace.open(workspace_root, reference["task_id"])
+
+    def _register_task_artifact(
+        self, tool: str, arguments: dict[str, Any], result: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        task = self.state.task
+        if task is None:
+            return None
+        task_area = self._task_area(task)
+        if task_area is None:
+            return None
+        if tool in PREVIEW_TOOLS:
+            plan_path = arguments.get("plan_path")
+            if not isinstance(plan_path, str):
+                return None
+            try:
+                relative = (task_area.workspace_root / plan_path).resolve().relative_to(task_area.root)
+            except ValueError as exc:
+                raise TaskWorkspaceError(
+                    "path_not_allowed", "change plan is outside task storage",
+                ) from exc
+            if len(relative.parts) != 2 or relative.parts[0] not in {"plans", "retries"}:
+                raise TaskWorkspaceError("path_not_allowed", "change plan is outside task storage")
+            artifact = task_area.register_artifact(
+                relative.parts[0], relative.name, media_type="application/json",
+            )
+        elif tool == "apply_change":
+            destination = arguments.get("destination")
+            output_files = result.get("output_files")
+            audit_path = result.get("audit")
+            if (
+                not isinstance(destination, str)
+                or not isinstance(output_files, list)
+                or not all(isinstance(item, str) for item in output_files)
+                or not isinstance(audit_path, str)
+            ):
+                raise TaskWorkspaceError("invalid_artifact", "applied source-set evidence is incomplete")
+            variant_root = task_area.root / "variants"
+            members = []
+            for item in [*output_files, audit_path]:
+                path = Path(item).resolve()
+                if not path.is_relative_to(variant_root):
+                    raise TaskWorkspaceError("path_not_allowed", "candidate source set escaped task storage")
+                members.append(str(path.relative_to(variant_root)).replace("\\", "/"))
+            artifact = task_area.register_artifact_set(
+                "variants", Path(destination).name, members,
+                media_type="application/vnd.bsam.source-set",
+            )
+        else:
+            return None
+        task.task_workspace["state"] = task_area.manifest()["state"]
+        self._audit(
+            "task_workspace_artifact_registered", tool=tool,
+            artifact_id=artifact["artifact_id"], category=artifact["category"],
+            artifact_sha256=artifact["sha256"],
+        )
+        return artifact
+
+    def _promote_task_artifact(
+        self, task: TaskState, artifact_id: str, destination: str,
+    ) -> dict[str, Any]:
+        task_area = self._task_area(task)
+        if task_area is None:
+            raise TaskWorkspaceError("task_workspace_not_found", "task workspace is unavailable")
+        task_area.select_artifact(artifact_id)
+        task.task_workspace["state"] = "selected"
+        promotion = task_area.promote_selected(destination, confirm=True)
+        task.task_workspace["state"] = "promoted"
+        self._audit(
+            "task_workspace_promoted", artifact_id=artifact_id,
+            destination=destination, artifact_sha256=promotion["sha256"],
+        )
+        return promotion
+
+    def _use_promoted_model(self, task: TaskState, destination: str) -> None:
+        context = self.state.model_context
+        context.last_created_output = destination
+        context.active_source = destination
+        context.recent_sources = [
+            destination, *(item for item in context.recent_sources if item != destination)
+        ][:8]
+        task.last_created_output = destination
+        task.active_source = destination
+        task.recent_sources = list(context.recent_sources)
+
+    def _task_workspace_failure(self, tool: str, exc: TaskWorkspaceError) -> ChatTurn:
+        task = self.state.task
+        if task is not None:
+            task.status = "blocked"
+            task.terminal_reason = "task_workspace_failure"
+            task.failures.append({
+                "category": "task_workspace_failure",
+                "recovery_classification": "hard_failure",
+                "tool": tool,
+                "message": str(exc),
+            })
+        self._audit("task_workspace_failed", tool=tool, error_code=exc.code)
+        return self._result(
+            "explain", f"Task evidence could not be retained safely: {exc}",
+            tool=tool, error=exc.code,
+        )
 
     def _update_model_context(
         self, tool: str, arguments: dict[str, Any], result: dict[str, Any],
@@ -2084,7 +2275,10 @@ class ChatOrchestrator:
                 "explain", f"{exc} {_failure_guidance(category)}".strip(),
                 tool=tool, error="tool_error",
             )
-        self._record_task_step(tool, arguments, result)
+        try:
+            self._record_task_step(tool, arguments, result)
+        except TaskWorkspaceError as exc:
+            return self._task_workspace_failure(tool, exc)
         self._update_model_context(tool, arguments, result)
         self._audit(
             "tool_completed", tool=tool, result_digest=_digest(result),
@@ -2109,10 +2303,8 @@ class ChatOrchestrator:
         })
         task.step_count = len(task.steps)
         task.completed_steps.append(tool)
-        task.observations.append(
-            _bounded_observation(tool, arguments, result, task.step_count)
-        )
-        task.observations = task.observations[-task.max_steps:]
+        self._append_task_observation(task, tool, arguments, result)
+
         source = arguments.get("source") or arguments.get("template")
         if isinstance(source, str):
             task.active_source = source
@@ -2205,6 +2397,38 @@ class ChatOrchestrator:
                 task.status = "verify"
             else:
                 task.status = "execute"
+
+    def _append_task_observation(
+        self,
+        task: TaskState,
+        tool: str,
+        arguments: dict[str, Any],
+        result: dict[str, Any],
+    ) -> None:
+        indexes = []
+        for item in task.observations:
+            observation_id = item.get("observation_id")
+            match = (
+                re.fullmatch(r"obs-(\d+)", observation_id)
+                if isinstance(observation_id, str) else None
+            )
+            if match is not None:
+                indexes.append(int(match.group(1)))
+        observation = _bounded_observation(
+            tool, arguments, result, max(indexes, default=0) + 1,
+        )
+        task_area = self._task_area(task)
+        if task_area is not None:
+            task_area.write_artifact(
+                "observations", f"{observation['observation_id']}.json",
+                json.dumps(
+                    observation, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False,
+                ).encode("utf-8") + b"\n",
+                media_type="application/json",
+            )
+            task.task_workspace["state"] = task_area.manifest()["state"]
+        task.observations.append(observation)
+        task.observations = task.observations[-task.max_steps:]
 
     def _record_task_failure(
         self, tool: str, arguments: dict[str, Any], code: str, message: str,
@@ -3772,7 +3996,21 @@ def _deterministic_last_plan_request(
     if not re.search(r"\b(?:that|it|change|plan|preview|reviewed)\b", text, re.IGNORECASE):
         return None
     paths = _input_paths_from_text(text)
-    destination = paths[-1] if paths else _default_destination(last_plan.source)
+    task = state.task
+    destination = (
+        paths[-1] if paths
+        else task.destination if task is not None and task.destination
+        else _default_destination(last_plan.source)
+    )
+    if task is not None and task.task_workspace is not None:
+        task.destination = destination
+        suffix = Path(last_plan.source).suffix or ".in"
+        internal_destination = _task_artifact_path(
+            task, "variants", f"candidate-{task.step_count:04d}{suffix}",
+        )
+        if internal_destination is None:
+            return None
+        destination = internal_destination
     return {
         "outcome": "dispatch", "tool": "apply_change",
         "arguments": {
@@ -3854,18 +4092,34 @@ def _conversation_defaults(
         )
         if source:
             result["source"] = source
-    if tool in PREVIEW_TOOLS and not re.search(r"\b[^\s\"']+\.json\b", user_text, re.IGNORECASE):
+    task_plan_path = (
+        _task_artifact_path(
+            state.task,
+            "retries" if tool == "preview_refresh_change" else "plans",
+            f"{state.task.step_count + 1:04d}-{tool.removeprefix('preview_')}.json",
+        )
+        if tool in PREVIEW_TOOLS and state.task is not None else None
+    )
+    if task_plan_path is not None:
+        result["plan_path"] = task_plan_path
+    elif tool in PREVIEW_TOOLS and not re.search(r"\b[^\s\"']+\.json\b", user_text, re.IGNORECASE):
         source = result.get("source") or result.get("template")
         if isinstance(source, str) and source:
             operation = str(result.get("parameter") or tool.removeprefix("preview_"))
             token = f"{operation}-{state.conversation_id[:8]}-{state.turn_number}"
             result["plan_path"] = _default_plan_path(source, token)
+    if tool == "run_bsam" and state.task is not None:
+        task_run_path = _task_artifact_path(
+            state.task, "runs", f"full-{state.task.step_count + 1:04d}",
+        )
+        if task_run_path is not None:
+            result["output_dir"] = task_run_path
     return result
 
 
 def _preview_follow_up(
     tool: str, arguments: dict[str, Any], user_text: str,
-    *, workspace_root: Path | None,
+    *, workspace_root: Path | None, task: TaskState | None = None,
 ) -> PendingAction | None:
     if tool not in PREVIEW_TOOLS:
         return None
@@ -3876,17 +4130,50 @@ def _preview_follow_up(
     paths = _input_paths_from_text(user_text)
     requested_destination = (
         paths[1] if len(paths) > 1
+        else task.destination if task is not None and task.destination
         else _default_destination(source)
     )
-    destination = (
+    final_destination = (
         _available_destination(requested_destination, workspace_root)
         if workspace_root is not None else requested_destination
     )
+    if task is not None and task.task_workspace is not None:
+        task.destination = final_destination
+        suffix = Path(source).suffix or ".in"
+        destination = _task_artifact_path(
+            task, "variants", f"candidate-{task.step_count:04d}{suffix}",
+        )
+        if destination is None:
+            raise ValueError("task workspace candidate path is unavailable")
+    else:
+        destination = final_destination
     return PendingAction("apply_change", {
         "plan_path": plan_path,
         "destination": destination,
         "confirm": False,
     })
+
+
+def _task_artifact_path(
+    task: TaskState, category: str, name: str,
+) -> str | None:
+    reference = task.task_workspace
+    if reference is None:
+        return None
+    if category not in {"plans", "variants", "runs", "observations", "retries"}:
+        raise ValueError("task artifact category is invalid")
+    if Path(name).name != name or name in {"", ".", ".."}:
+        raise ValueError("task artifact name is invalid")
+    return f"{reference['root']}/{category}/{name}"
+
+
+def _is_task_artifact_path(task: TaskState, value: Any, category: str) -> bool:
+    reference = task.task_workspace
+    return (
+        reference is not None
+        and isinstance(value, str)
+        and value.replace("\\", "/").startswith(f"{reference['root']}/{category}/")
+    )
 
 
 def _available_destination(destination: str, workspace_root: Path) -> str:

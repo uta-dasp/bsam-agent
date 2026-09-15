@@ -179,8 +179,9 @@ Expected workflow:
 
 1. The orchestrator resolves `d_reduction` through the capability registry.
 2. Deterministic code inspects and validates the source.
-3. It creates a source-revision-bound plan and prints the unified diff.
-4. Chat reports the proposed new destination and waits for a separate confirmation.
+3. It creates a source-revision-bound plan inside the task workspace and prints the unified diff.
+4. Chat reports the internal candidate path and proposed final destination, then waits for a
+   separate confirmation.
 5. Review the path, parameter value, and every changed line.
 6. Type `/confirm` only if the proposal is correct:
 
@@ -188,7 +189,12 @@ Expected workflow:
 /confirm
 ```
 
-The apply step writes a new deck plus an audit sidecar. It does not overwrite the original deck. If the default deck or audit sidecar already exists, the preview automatically selects the first available numbered destination, such as `notch_v1.changed-2.in`.
+The apply step first writes and validates a complete candidate source set below
+`.bsam-agent/tasks/<task>/variants`. It then promotes only that digest-verified selection, including
+required include files and its audit sidecar, to the final destination. Existing identical include
+dependencies may be reused but are never rewritten. If the default final deck or audit sidecar
+already exists, the preview automatically selects the first available numbered destination, such
+as `notch_v1.changed-2.in`.
 
 To reject the pending operation, type:
 

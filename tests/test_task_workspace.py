@@ -28,7 +28,7 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertEqual(["model.in"], manifest["source_scope"])
             self.assertEqual(manifest, reopened.manifest())
             self.assertEqual(
-                root / ".bsam-agent" / "tasks" / "task-001",
+                (root / ".bsam-agent" / "tasks" / "task-001").resolve(),
                 workspace.root,
             )
             with self.assertRaisesRegex(TaskWorkspaceError, "already exists"):
@@ -95,11 +95,46 @@ class TaskWorkspaceTests(unittest.TestCase):
                 workspace.register_artifact("plans", "change.json")
             self.assertEqual("artifact_exists", caught.exception.code)
 
+    def test_promotes_a_complete_artifact_set_and_renames_root_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(b"source")
+            (root / "project").mkdir()
+            workspace = self.create(root)
+            workspace.resolve("variants/includes").mkdir()
+            workspace.resolve("variants/candidate.in").write_bytes(b"root")
+            workspace.resolve("variants/candidate.in.audit.json").write_bytes(b"audit")
+            workspace.resolve("variants/includes/shared.in").write_bytes(b"include")
+            artifact = workspace.register_artifact_set(
+                "variants", "candidate.in",
+                ["candidate.in", "candidate.in.audit.json", "includes/shared.in"],
+                media_type="application/vnd.bsam.source-set",
+            )
+            workspace.select_artifact(artifact["artifact_id"])
+
+            promotion = workspace.promote_selected("project/final.in", confirm=True)
+
+            self.assertEqual(b"root", (root / "project" / "final.in").read_bytes())
+            self.assertEqual(
+                b"audit", (root / "project" / "final.in.audit.json").read_bytes(),
+            )
+            self.assertEqual(
+                b"include", (root / "project" / "includes" / "shared.in").read_bytes(),
+            )
+            self.assertEqual(
+                [
+                    "project/final.in", "project/final.in.audit.json",
+                    "project/includes/shared.in",
+                ],
+                sorted(promotion["outputs"]),
+            )
+
     def test_promotion_refuses_existing_or_internal_destination(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(b"source")
             (root / "occupied.in").write_bytes(b"keep")
+            (root / "identical.in").write_bytes(b"candidate")
             workspace = self.create(root)
             artifact = workspace.write_artifact("variants", "candidate.in", b"candidate")
             workspace.select_artifact(artifact["artifact_id"])
@@ -109,10 +144,54 @@ class TaskWorkspaceTests(unittest.TestCase):
             self.assertEqual("output_exists", caught.exception.code)
             self.assertEqual(b"keep", (root / "occupied.in").read_bytes())
             with self.assertRaises(TaskWorkspaceError) as caught:
+                workspace.promote_selected("identical.in", confirm=True)
+            self.assertEqual("output_exists", caught.exception.code)
+            with self.assertRaises(TaskWorkspaceError) as caught:
                 workspace.promote_selected(
                     ".bsam-agent/tasks/task-001/variants/export.in", confirm=True,
                 )
             self.assertEqual("path_not_allowed", caught.exception.code)
+
+    def test_promotion_reuses_identical_existing_source_set_members_without_overwrite(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(b"source")
+            shared = root / "shared.in"
+            shared.write_bytes(b"unchanged include")
+            workspace = self.create(root)
+            workspace.resolve("variants/candidate.in").write_bytes(b"changed root")
+            workspace.resolve("variants/shared.in").write_bytes(b"unchanged include")
+            artifact = workspace.register_artifact_set(
+                "variants", "candidate.in", ["candidate.in", "shared.in"],
+            )
+            workspace.select_artifact(artifact["artifact_id"])
+
+            promotion = workspace.promote_selected("final.in", confirm=True)
+
+            self.assertEqual(b"changed root", (root / "final.in").read_bytes())
+            self.assertEqual(b"unchanged include", shared.read_bytes())
+            self.assertEqual(["shared.in"], promotion["reused_outputs"])
+
+    def test_conflicting_source_set_member_blocks_before_any_output_is_promoted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(b"source")
+            shared = root / "shared.in"
+            shared.write_bytes(b"user version")
+            workspace = self.create(root)
+            workspace.resolve("variants/candidate.in").write_bytes(b"changed root")
+            workspace.resolve("variants/shared.in").write_bytes(b"changed include")
+            artifact = workspace.register_artifact_set(
+                "variants", "candidate.in", ["candidate.in", "shared.in"],
+            )
+            workspace.select_artifact(artifact["artifact_id"])
+
+            with self.assertRaises(TaskWorkspaceError) as caught:
+                workspace.promote_selected("final.in", confirm=True)
+
+            self.assertEqual("output_exists", caught.exception.code)
+            self.assertFalse((root / "final.in").exists())
+            self.assertEqual(b"user version", shared.read_bytes())
 
     def test_stale_selected_artifact_cannot_be_promoted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

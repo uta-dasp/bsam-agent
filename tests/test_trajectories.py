@@ -217,6 +217,10 @@ class TaskTrajectoryTests(unittest.TestCase):
             applied = agent.turn("/confirm")
             after_confirmation = [item["tool"] for item in agent.state.task.steps]
             output = (root / "model.changed.in").read_bytes()
+            task_reference = agent.state.task.task_workspace
+            task_manifest = json.loads(
+                (root / task_reference["manifest"]).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(["inspect_model", "preview_parameter_change"], before_confirmation)
         self.assertTrue(preview.requires_confirmation)
@@ -233,6 +237,21 @@ class TaskTrajectoryTests(unittest.TestCase):
         self.assertEqual("consumed", agent.state.task.authorization.status)
         self.assertEqual(0, applied.tool_result["post_apply_validation"]["summary"]["errors"])
         self.assertIn(b"d_reduction=0.4", output)
+        self.assertTrue(agent.state.last_plan.plan_path.startswith(
+            f"{task_reference['root']}/plans/",
+        ))
+        self.assertIn(task_reference["root"], preview.message)
+        self.assertEqual("promoted", task_manifest["state"])
+        self.assertEqual("model.changed.in", task_manifest["promotions"][0]["destination"])
+        self.assertEqual("promote_task_artifact", agent.state.task.observations[-1]["tool"])
+        self.assertEqual(
+            "model.changed.in",
+            agent.state.task.observations[-1]["evidence"]["destination"],
+        )
+        self.assertEqual(
+            {"observations", "plans", "variants"},
+            {item["category"] for item in task_manifest["artifacts"]},
+        )
         self.assertEqual([], provider.requests)
 
     def test_structural_rename_updates_dependents_and_validates(self) -> None:
@@ -258,6 +277,30 @@ class TaskTrajectoryTests(unittest.TestCase):
         self.assertEqual(0, applied.tool_result["post_apply_validation"]["summary"]["errors"])
         self.assertEqual("complete", agent.state.task.status)
         self.assertIn("construct.boundary-conditions", agent.state.task.resolved_capabilities)
+
+    def test_task_workspace_promotes_root_change_and_reuses_unchanged_include(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(PARAMETER_DECK.replace(
+                b"*STOP\n", b"*INCLUDE,FILE=shared.inc\n",
+            ))
+            shared = root / "shared.inc"
+            shared.write_bytes(b"*STOP\n")
+            agent = ChatOrchestrator(ScriptedProvider(), config(), LocalAgentApi(root))
+
+            preview = agent.turn(
+                "Change d_reduction in model.in to 0.4, write final.in, and validate it."
+            )
+            applied = agent.turn("/confirm")
+            manifest = json.loads(
+                (root / agent.state.task.task_workspace["manifest"]).read_text(encoding="utf-8")
+            )
+
+            self.assertTrue(preview.requires_confirmation)
+            self.assertEqual(0, applied.tool_result["post_apply_validation"]["summary"]["errors"])
+            self.assertIn(b"d_reduction=0.4", (root / "final.in").read_bytes())
+            self.assertEqual(b"*STOP\n", shared.read_bytes())
+            self.assertEqual(["shared.inc"], manifest["promotions"][0]["reused_outputs"])
 
     def test_stale_revision_stops_and_identical_failure_is_not_repeated(self) -> None:
         provider = ScriptedProvider()
@@ -286,7 +329,9 @@ class TaskTrajectoryTests(unittest.TestCase):
             source = root / "model.in"
             source.write_bytes(PARAMETER_DECK)
             agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
-            agent.turn("Change d_reduction in model.in to 0.4 and validate it.")
+            agent.turn(
+                "Change d_reduction in model.in to 0.4, write revised.in, and validate it."
+            )
             old_plan = agent.state.last_plan.plan_path
             source.write_bytes(PARAMETER_DECK + b"** unrelated external change\n")
             stale = agent.turn("/confirm")
@@ -294,12 +339,16 @@ class TaskTrajectoryTests(unittest.TestCase):
             refreshed = agent.turn("Refresh the stale plan.")
             new_plan = agent.state.last_plan.plan_path
             completed = agent.turn("/confirm")
-            output = (root / "model.changed.in").read_bytes()
+            output = (root / "revised.in").read_bytes()
+            task_root = agent.state.task.task_workspace["root"]
 
         self.assertEqual("invalid_arguments", stale.error_code)
         self.assertEqual("preview_refresh_change", refreshed.tool)
         self.assertTrue(refreshed.requires_confirmation)
         self.assertNotEqual(old_plan, new_plan)
+        self.assertTrue(old_plan.startswith(f"{task_root}/plans/"))
+        self.assertTrue(new_plan.startswith(f"{task_root}/retries/"))
+        self.assertEqual("revised.in", agent.state.task.last_created_output)
         self.assertEqual(1, agent.state.task.recovery_count)
         self.assertEqual("complete", agent.state.task.status)
         self.assertEqual(0, completed.tool_result["post_apply_validation"]["summary"]["errors"])

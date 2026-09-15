@@ -140,7 +140,7 @@ a grounded conclusion without the user prescribing tools.
   response evidence so current-model claims cannot come from model memory alone.
 - [x] **V2-S1-018** Add the per-task workspace abstraction, manifest, contained path resolver,
   lifecycle states, and safe final-artifact promotion contract.
-- [ ] **V2-S1-019** Route plans, intermediate variants, retry artifacts, and temporary observations
+- [x] **V2-S1-019** Route plans, intermediate variants, retry artifacts, and temporary observations
   into the task workspace instead of collision-suffixed project files.
 - [ ] **V2-S1-020** Implement deterministic context compaction with immutable evidence IDs and a
   compact state summary suitable for 20–50-step trajectories.

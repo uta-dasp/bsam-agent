@@ -59,7 +59,7 @@ A uniquely registered parameter can be changed with safe plan and output default
 Change d_reduction in projects/notch_v1/notch_v1.in to 0.5 and create a new file. Do not overwrite the original.
 ```
 
-Every successful change preview creates a pending apply action and displays its destination. `/confirm` then writes `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file. If that deck or its audit sidecar already exists, the preview selects the first fresh numbered pair, such as `notch_v1.changed-2.in`.
+Every successful change preview stores its plan inside the task workspace, creates a pending apply action, and displays both the internal candidate and final destination. `/confirm` writes and validates the complete candidate source set inside task storage, then exclusively promotes only that selected set to `projects/notch_v1/notch_v1.changed.in`; it never overwrites an existing file. If the final deck or its audit sidecar already exists, the preview selects the first fresh numbered pair, such as `notch_v1.changed-2.in`.
 
 A registered-parameter request can include validation:
 
