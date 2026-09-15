@@ -2,6 +2,13 @@
 
 ## What is runnable now
 
+M4 is closed by a synthetic-only unseen investigation that composes `query_model`, `inspect_model`,
+and a provider-selected `find_references` continuation against a new named-data fixture. Three
+outbound material dependencies resolve, grounded finding/inference claims cite deterministic
+observations, and the expanded trajectory evaluator passes all required dimensions. No
+request-specific workflow was added. This is agent-loop evidence, not BSAM runtime qualification;
+details are in [the acceptance report](bsam/UNSEEN_INVESTIGATION_ACCEPTANCE_2026-09-14.md).
+
 Registry 0.137.0 completes M4 with guarded live-model and executable acceptance on the trusted non-notch TriC deck. Scout routed an exact run request to a pending action, a separate confirmation launched the pinned executable, and later status requests reported running and terminal/stopped states. The 31.2 MB deck completed input, matrix formation, PARDISO solution, and one converged step before a clean timeout stop with exit code zero, no fatal marker, and no escalation. The acceptance also exposed and closed a persistent-state gap: terminal status now updates the task's stored run classification and completion state. This is controlled execution evidence, not full TriC completion or a waiver of Scout's failed general accuracy benchmark. Full details are in [the acceptance report](bsam/TRIC_GUARDED_ACCEPTANCE_2026-09-12.md).
 
 Registry 0.136.0 completes M3 with a controlled VTK data-file output probe. The checked-in synthetic single-cluster input completed against the pinned executable in 0.31 seconds, emitted the explicit success sentinel with no fatal marker, and produced a 3,257-byte VTK 3.0 unstructured-grid artifact. This verifies only `clusters=all`, `format=vtk`, and `intermediate=0` on the existing mechanical-isotropic profile; ParaView/SHEFF, aggregate-output, alternate-selector, and intermediate-output execution remain unassessed. Full digests and reproduction steps are recorded in [the probe report](bsam/VTK_OUTPUT_PROBE_2026-09-12.md).

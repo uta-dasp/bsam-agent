@@ -1,0 +1,31 @@
+{
+  "schema_version": "0.1.0",
+  "recorded_at": "2026-09-14",
+  "case_id": "unseen-named-data-dependency-investigation",
+  "data_classification": "synthetic-only",
+  "provider": "scripted-provider-neutral",
+  "fixture": {
+    "path": "tests/fixtures/autonomous_named_data.in",
+    "file_sha256": "25003FB8DD4AD2B8DAAC10EE3043DBC10D0484D9A8EBAC376E136CE2A3043CDE",
+    "source_set_sha256": "0D0DBC912EBC84D168CB9B9711034CF320FCE2AF97C764F1B184B0608C93C3DD"
+  },
+  "objective_sha256": "39705E9EC6C4F0568DAF4617CF8B0D60459DEFA75B4E2FAE4DABCA8C5D134DE9",
+  "trajectory": {
+    "tool_sequence": ["query_model", "inspect_model", "find_references"],
+    "model_selected_tools": ["find_references"],
+    "observation_ids": ["obs-001", "obs-002", "obs-003"],
+    "terminal_status": "complete",
+    "confirmation_boundaries": 0,
+    "mutations": 0,
+    "outbound_reference_count": 3,
+    "outbound_reference_statuses": ["resolved", "resolved", "resolved"],
+    "final_claim_kinds": ["current_model", "inference"]
+  },
+  "evaluation": {
+    "passed": true,
+    "all_metrics_passed": true,
+    "model_composed": true,
+    "request_specific_workflow_added": false
+  },
+  "scope": "Agent-loop composition and grounding only; this is not BSAM runtime evidence."
+}

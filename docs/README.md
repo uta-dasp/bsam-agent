@@ -39,6 +39,8 @@
 
 ## Acceptance records
 
+- [Unseen investigation acceptance](bsam/UNSEEN_INVESTIGATION_ACCEPTANCE_2026-09-14.md) — synthetic-only model-composed M4 closure evidence.
+
 - [Notch regression acceptance](bsam/NOTCH_ACCEPTANCE_2026-09-01.md) — one laminate transformation fixture, not the product scope.
 - [VS Code and OpenAI routing acceptance](bsam/VSCODE_OPENAI_ACCEPTANCE_2026-09-14.md) — privacy-bounded installed-client evidence on the real notch workflow.
 

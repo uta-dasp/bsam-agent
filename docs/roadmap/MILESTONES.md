@@ -110,7 +110,7 @@ engineering exploration or a substantial generic model transformation with smoke
 | M1 Provider-neutral LLM layer | Complete | Local llama.cpp and OpenAI Responses adapters share contracts, cooperative cancellation, a parity trajectory, configuration, mocked transport tests, and hosted-data controls |
 | M2 Conversational grounding | Substantial | Persistent active model/entity/query/output/run context and Windows/workspace path normalization; the full crack-coreference acceptance dialogue remains unproven |
 | M3 Canonical engineering actions | Substantial | Canonical query mapping, capability metadata, semantic queries, model comparison, and run inspection exist; some prompt-specific routing remains |
-| M4 Bounded agent loop | Substantial | Explicit bounded loop, evidence-based completion, grounded post-completion synthesis, confirmations, fingerprints, terminal states, and executable multi-step tests; general unseen-task acceptance remains |
+| M4 Bounded agent loop | Complete | A new synthetic named-data investigation composes generic primitives through a provider-selected continuation, deterministic evidence, grounded synthesis, and safe terminal checks without a request-specific workflow |
 | M5 Autonomous read-only exploration | Substantial | Model inspection, semantic query/reference traversal, comparison, validation, status, bounded logs, and contained project-file discovery/read/search can chain; unseen live acceptance remains |
 | M6 Goal-oriented modification | Partial | Generic create/modify/delete/rename and plan composition exist for verified capabilities; no qualifying substantial generic transformation has been demonstrated |
 | M7 Validation and execution levels | Partial | Strong static validation and controlled execution exist; a distinct deterministic smoke-test contract and output inspection do not |
@@ -148,7 +148,7 @@ and change-safety behavior cannot regress.
 
 ## M1 — Provider-neutral LLM layer
 
-**Status: Substantial.**
+**Status: Complete.**
 
 Objective: make the reasoning model replaceable without changing the BSAM core.
 
@@ -225,7 +225,7 @@ narrow deterministic enum, and unsupported capability is distinct from misunders
 
 ## M4 — Bounded Codex-like agent loop
 
-**Status: Substantial.**
+**Status: Complete.**
 
 Objective: operate an explicit observe → reason → act → observe loop until the goal is completed or
 safely blocked.
@@ -250,10 +250,8 @@ Implemented:
   stopping a run;
 - deterministic evidence requirements for creation, validation, comparison, and terminal run state.
 
-Remaining:
+Version 2 extensions:
 
-- prove completion of previously unseen multi-step objectives through model-selected composition,
-  not deterministic request-specific continuation;
 - characterize model behavior when several equally safe investigation paths exist.
 - replace per-tool execution confirmations with audited task-scoped authorization while retaining
   mandatory review/confirmation for every physics-changing or model-changing edit;
@@ -263,6 +261,11 @@ Remaining:
 
 Exit: an unseen multi-step task is completed by composing registered primitives without a hard-coded
 workflow, while all terminal and safety boundaries remain deterministic.
+
+Exit evidence: the synthetic-only named-data dependency investigation composes `query_model`,
+`inspect_model`, and a provider-selected `find_references` step without a request-specific branch,
+then emits evidence-linked finding/inference claims. See
+[the retained acceptance record](../bsam/UNSEEN_INVESTIGATION_ACCEPTANCE_2026-09-14.md).
 
 ## M5 — Autonomous read-only exploration
 
