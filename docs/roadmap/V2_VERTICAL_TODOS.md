@@ -114,8 +114,9 @@ a grounded conclusion without the user prescribing tools.
   truncation evidence, and rejection of binary, disallowed, or escaping paths.
 - [x] **V2-S1-005** Implement `search_workspace` with bounded matches, file metadata, stable ordering,
   and no unrestricted regex/resource consumption.
-- [ ] **V2-S1-006** Decide through tests whether general `compare_files` is needed; implement it only
-  if `compare_models` plus bounded reads cannot satisfy an accepted investigation.
+- [x] **V2-S1-006** Decide through tests whether general `compare_files` is needed; accepted
+  investigations are satisfied by semantic `compare_models` plus bounded reads, so no broader raw
+  file-comparison primitive is added.
 - [x] **V2-S1-007** Promote `inspect_entity` and `find_references` to canonical agent intents over
   the existing semantic query engine without duplicating BSAM authority.
 - [x] **V2-S1-008** Add durable working hypotheses, supporting/refuting observation IDs, and schema
@@ -144,9 +145,9 @@ a grounded conclusion without the user prescribing tools.
   into the task workspace instead of collision-suffixed project files.
 - [x] **V2-S1-020** Implement deterministic context compaction with immutable evidence IDs and a
   compact state summary suitable for 20–50-step trajectories.
-- [ ] **V2-S1-021** Add save/resume and compaction-boundary trajectories proving preservation of user
+- [x] **V2-S1-021** Add save/resume and compaction-boundary trajectories proving preservation of user
   decisions, authorization, assumptions, questions, hypotheses, failures, and completion evidence.
-- [ ] **V2-S1-022** Add “Explain the cracks” acceptance: inspect each relevant crack, optionally
+- [x] **V2-S1-022** Add “Explain the cracks” acceptance: inspect each relevant crack, optionally
   retrieve general documentation, synthesize a grounded explanation, and label every inference.
 
 **Exit:** M1–M4 exit criteria are closed, and M5 has one general multi-tool read-only acceptance

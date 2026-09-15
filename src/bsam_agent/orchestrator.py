@@ -2740,7 +2740,10 @@ def _apply_task_update(task: TaskState, update: dict[str, Any]) -> int:
 
 
 def _requires_grounded_synthesis(task: TaskState) -> bool:
-    return task.model_step_count > 0 and bool(re.search(
+    return (
+        task.model_step_count > 0
+        or "relevant_entities_inspected" in task.completion_criteria
+    ) and bool(re.search(
         r"\b(?:explain|why|investigat\w*|diagnos\w*|wrong|review|summari[sz]\w*|"
         r"tell\s+me)\b",
         task.objective, re.IGNORECASE,
@@ -2837,6 +2840,8 @@ def _bounded_observation(
     if isinstance(summary, dict):
         evidence["summary"] = deepcopy(summary)
     matches = result.get("matches")
+    if tool == "inspect_entity" and isinstance(matches, list):
+        evidence["entity_details"] = _bounded_entity_details(matches)
     if tool == "search_workspace" and isinstance(matches, list):
         evidence["workspace_matches"] = [
             {
@@ -2898,6 +2903,40 @@ def _bounded_observation(
     }
 
 
+def _bounded_entity_details(values: list[Any]) -> list[dict[str, Any]]:
+    details: list[dict[str, Any]] = []
+    for item in values[:4]:
+        if not isinstance(item, dict):
+            continue
+        detail: dict[str, Any] = {
+            name: item[name]
+            for name in ("id", "kind", "name", "attributes")
+            if isinstance(item.get(name), (str, int, dict))
+        }
+        records = []
+        for record in item.get("capability_records", [])[:4]:
+            if not isinstance(record, dict):
+                continue
+            parameters = {}
+            for name, occurrences in list(record.get("parameters", {}).items())[:24]:
+                if isinstance(occurrences, list):
+                    parameters[str(name)] = [
+                        occurrence.get("value")
+                        for occurrence in occurrences[:8]
+                        if isinstance(occurrence, dict) and "value" in occurrence
+                    ]
+            records.append({
+                "capability_id": record.get("capability_id"),
+                "canonical": record.get("canonical"),
+                "parameters": parameters,
+                "defaults": deepcopy(record.get("defaults", {})),
+            })
+        if records:
+            detail["capability_records"] = records
+        details.append(detail)
+    return details
+
+
 def _compact_task_state(task: TaskState) -> bool:
     """Archive verbose old observations while retaining stable local evidence references."""
     if (
@@ -2951,6 +2990,14 @@ def _compacted_evidence_summary(value: Any) -> dict[str, Any]:
             summary[name] = item
         elif name in {"summary", "differences", "validation"} and isinstance(item, dict):
             summary[name] = deepcopy(item)
+        elif name == "arguments" and isinstance(item, dict):
+            summary[name] = {
+                key: item[key]
+                for key in ("query", "entity_id", "entity_kind")
+                if isinstance(item.get(key), (str, int))
+            }
+        elif name == "entities" and isinstance(item, list):
+            summary[name] = _context_entities(item)
         elif isinstance(item, list):
             summary[f"{name}_count"] = len(item)
         elif isinstance(item, dict):
@@ -3035,6 +3082,7 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         text, re.IGNORECASE,
     )
     workspace_evidence = _requests_workspace_evidence(text)
+    explained_entity_kind = _explained_entity_kind(text)
     goal_language = re.search(
         r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg|which|what|how|show|list|"
         r"compare|change|changing|set|update|modify|rename|compose|combine|merge|add|create|"
@@ -3095,6 +3143,8 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         criteria.append("model_inspected")
     if "query" in outcomes and not workspace_evidence:
         criteria.append("focused_evidence_collected")
+    if explained_entity_kind is not None:
+        criteria.append("relevant_entities_inspected")
     if "diagnose" in outcomes and not workspace_evidence:
         criteria.append("focused_evidence_collected")
     if workspace_evidence:
@@ -3117,6 +3167,10 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         plan.append("inspect bounded, allowed workspace evidence")
     if "diagnose" in outcomes or "modify" in outcomes:
         plan.append("inspect the active model and collect deterministic evidence")
+    if explained_entity_kind is not None:
+        plan.append(
+            f"inspect each relevant {explained_entity_kind.replace('-', ' ')} entity"
+        )
     if "compare" in outcomes:
         plan.append("compare both workspace-contained models")
     if "modify" in outcomes:
@@ -3220,8 +3274,47 @@ def _authorization_audit_fields(authorization: TaskAuthorization) -> dict[str, A
     }
 
 
+def _entity_explanation_progress(
+    task: TaskState,
+) -> tuple[bool, list[dict[str, str]], set[str]]:
+    entity_kind = _requested_entity_kind(task.objective)
+    if entity_kind is None:
+        return False, [], set()
+    catalog_observed = False
+    candidates: dict[str, dict[str, str]] = {}
+    inspected: set[str] = set()
+    for observation in _task_evidence(task).values():
+        evidence = observation.get("evidence") or observation.get("evidence_summary") or {}
+        if not isinstance(evidence, dict):
+            continue
+        arguments = evidence.get("arguments", {})
+        entities = evidence.get("entities", [])
+        if not isinstance(arguments, dict) or not isinstance(entities, list):
+            continue
+        if (
+            observation.get("tool") == "query_model"
+            and evidence.get("query") in {"list-entities", "list_entities"}
+            and arguments.get("entity_kind") == entity_kind
+        ):
+            catalog_observed = True
+            for entity in _context_entities(entities):
+                if entity["kind"] == entity_kind:
+                    candidates[entity["id"]] = entity
+        if observation.get("tool") == "inspect_entity":
+            entity_id = arguments.get("entity_id")
+            if isinstance(entity_id, str):
+                inspected.add(entity_id)
+            inspected.update(
+                entity["id"] for entity in _context_entities(entities)
+                if entity["kind"] == entity_kind
+            )
+    ordered = sorted(candidates.values(), key=lambda item: (item["name"].casefold(), item["id"]))
+    return catalog_observed, ordered, inspected
+
+
 def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
     tools = task.completed_steps
+    catalog_observed, relevant_entities, inspected_entities = _entity_explanation_progress(task)
     evidence = {
         "model_inspected": "inspect_model" in tools or "validate_model" in tools,
         "focused_evidence_collected": (
@@ -3256,6 +3349,10 @@ def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
             in {"references-from", "references_from"}
             for observation in _task_evidence(task).values()
         ),
+        "relevant_entities_inspected": (
+            catalog_observed
+            and {item["id"] for item in relevant_entities}.issubset(inspected_entities)
+        ),
     }
     missing = [name for name in task.completion_criteria if not evidence.get(name, False)]
     return not missing, missing
@@ -3286,6 +3383,7 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
                     if isinstance(selectors, dict):
                         evidence["arguments_digest"] = _digest(selectors)
                 evidence.pop("entities", None)
+                evidence.pop("entity_details", None)
                 evidence.pop("workspace_files", None)
                 evidence.pop("workspace_matches", None)
                 evidence.pop("text_excerpt", None)
@@ -3300,6 +3398,10 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
                 if isinstance(evidence_summary, dict):
                     for name in ("source", "destination", "output_directory"):
                         evidence_summary.pop(name, None)
+                    selectors = evidence_summary.pop("arguments", None)
+                    if isinstance(selectors, dict):
+                        evidence_summary["arguments_digest"] = _digest(selectors)
+                    evidence_summary.pop("entities", None)
         failures = [
             {
                 name: failure.get(name)
@@ -3413,6 +3515,19 @@ def _next_deterministic_task_action(
             "outcome": "dispatch", "tool": "inspect_model",
             "arguments": {"source": source}, "error_code": None, "response": None,
         }
+
+    if "relevant_entities_inspected" in task.remaining_criteria and source:
+        catalog_observed, candidates, inspected = _entity_explanation_progress(task)
+        if catalog_observed:
+            candidate = next(
+                (item for item in candidates if item["id"] not in inspected), None,
+            )
+            if candidate is not None:
+                return {
+                    "outcome": "dispatch", "tool": "inspect_entity",
+                    "arguments": {"source": source, "entity_id": candidate["id"]},
+                    "error_code": None, "response": None,
+                }
 
     if "validation_passed" in task.remaining_criteria and source and (
         "modify" not in task.requested_outcomes or "apply_change" in completed
@@ -3532,6 +3647,12 @@ def _resolve_contextual_request(text: str, state: ConversationState) -> str:
         result = re.sub(
             r"\bwhich\s+one(?:s)?\b",
             "which " + last_entity_kind.replace("-", " "),
+            result, flags=re.IGNORECASE,
+        )
+    elif selected and isinstance(selected.get("kind"), str):
+        result = re.sub(
+            r"\bwhich\s+one(?:s)?\b",
+            "which " + str(selected["kind"]).replace("-", " "),
             result, flags=re.IGNORECASE,
         )
     parameter = last_query.get("parameter")
@@ -4078,33 +4199,7 @@ def _deterministic_query_request(
             },
             "error_code": None, "response": None,
         }
-    named_entity_kind = None
-    if re.search(r"\bstructured materials?\b", text, re.IGNORECASE):
-        named_entity_kind = "structured-material"
-    else:
-        normalized_text = f" {_normalized_routing_text(text)} "
-        registered_matches: list[tuple[int, str]] = []
-        for item in capability_applicability(text):
-            if not item.get("entity_kind") or item["intents"]["query"] not in {
-                "implemented", "verified",
-            }:
-                continue
-            terms = [*item.get("routing_terms", []), str(item["canonical"]).lstrip("*")]
-            scores = [
-                len(normalized)
-                for term in terms
-                if (normalized := _normalized_routing_text(term))
-                and f" {normalized} " in normalized_text
-            ]
-            if scores:
-                registered_matches.append((max(scores), str(item["entity_kind"])))
-        if registered_matches:
-            best_score = max(score for score, _kind in registered_matches)
-            registered_kinds = {
-                kind for score, kind in registered_matches if score == best_score
-            }
-            if len(registered_kinds) == 1:
-                named_entity_kind = next(iter(registered_kinds))
+    named_entity_kind = _requested_entity_kind(text)
     if named_entity_kind and re.search(
         r"\b(?:what|how\s+many|show|query|list|explain|describe)\b", text, re.IGNORECASE,
     ):
@@ -4144,6 +4239,44 @@ def _deterministic_query_request(
         "outcome": "dispatch", "tool": "query_model", "arguments": arguments,
         "error_code": None, "response": None,
     }
+
+
+def _requested_entity_kind(text: str) -> str | None:
+    """Resolve one registry-backed entity kind without prescribing a domain workflow."""
+    if re.search(r"\bstructured materials?\b", text, re.IGNORECASE):
+        return "structured-material"
+    normalized_text = f" {_normalized_routing_text(text)} "
+    registered_matches: list[tuple[int, str]] = []
+    for item in capability_applicability(text):
+        if not item.get("entity_kind") or item["intents"]["query"] not in {
+            "implemented", "verified",
+        }:
+            continue
+        terms = [*item.get("routing_terms", []), str(item["canonical"]).lstrip("*")]
+        scores = [
+            len(normalized)
+            for term in terms
+            if (normalized := _normalized_routing_text(term))
+            and f" {normalized} " in normalized_text
+        ]
+        if scores:
+            registered_matches.append((max(scores), str(item["entity_kind"])))
+    if not registered_matches:
+        return None
+    best_score = max(score for score, _kind in registered_matches)
+    registered_kinds = {
+        kind for score, kind in registered_matches if score == best_score
+    }
+    return next(iter(registered_kinds)) if len(registered_kinds) == 1 else None
+
+
+def _explained_entity_kind(text: str) -> str | None:
+    """Return a kind only when explain/describe directly introduces that entity set."""
+    for match in re.finditer(r"\b(?:explain|describe)\b", text, re.IGNORECASE):
+        kind = _requested_entity_kind(text[match.end():match.end() + 120])
+        if kind is not None:
+            return kind
+    return None
 
 
 def _deterministic_unsupported_operation(text: str) -> dict[str, Any] | None:

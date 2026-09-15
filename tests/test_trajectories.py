@@ -9,8 +9,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bsam_agent.api import LocalAgentApi
-from bsam_agent.orchestrator import ChatOrchestrator, ConversationState
+from bsam_agent.orchestrator import (
+    ChatOrchestrator, ConversationState, TaskAuthorization, TaskState, _task_completion,
+)
 from bsam_agent.provider import ProviderConfig, ProviderResponse, Usage
+from bsam_agent.task_workspace import TaskWorkspace
 
 
 PARAMETER_DECK = (
@@ -203,6 +206,100 @@ class TaskTrajectoryTests(unittest.TestCase):
         self.assertEqual("BOUNDARY/BOUNDARY CONDITION", resumed.state.task.user_decisions[0]["value"])
         self.assertEqual(2, resumed.state.task.user_decisions[0]["turn"])
         self.assertEqual([], provider.requests)
+
+    def test_save_resume_across_compaction_preserves_task_meaning_and_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(PARAMETER_DECK)
+            task_area = TaskWorkspace.create(
+                root, "resume-compacted", objective_sha256="a" * 64,
+                source_scope=["model.in"],
+            )
+            steps = [
+                {
+                    "index": index, "tool": "inspect_model", "status": "completed",
+                    "arguments_digest": f"{index:064x}",
+                    "result_digest": f"{index + 100:064x}",
+                }
+                for index in range(1, 11)
+            ]
+            task = TaskState(
+                "Investigate model.in, preserve the selected basis, validate, and run it.",
+                "model.in", ["inspect", "validate", "run"], status="clarify",
+                engineering_assumptions=["Use SI units unless explicitly superseded."],
+                missing_decisions=["Choose the crack-growth reporting basis."],
+                user_decisions=[{
+                    "decision_id": "decision-001", "question": "Choose unit system.",
+                    "value": "SI", "turn": 1,
+                }],
+                steps=steps, step_count=10, max_steps=20,
+                completed_steps=["inspect_model"] * 9 + ["validate_model"],
+                validation_state={"errors": 0, "warnings": 0},
+                failures=[{
+                    "category": "missing_reference", "recovery_classification": "recoverable",
+                    "tool": "find_references", "code": "not_found",
+                    "message": "The first selector did not resolve.",
+                }],
+                recovery_count=1,
+                working_plan=["inspect both cracks", "validate evidence", "run if authorized"],
+                completion_criteria=["model_inspected", "validation_passed", "run_terminal_evidence"],
+                remaining_criteria=["run_terminal_evidence"],
+                active_source="model.in", active_source_digest="b" * 64,
+                destination="final.in", last_created_output="final.in",
+                authorization=TaskAuthorization(
+                    mode="execution_when_explicitly_requested",
+                    operations=["read", "execute"], source_scope=["model.in"],
+                    destination_scope=["runs/model"], run_kinds=["full"],
+                    max_executions=1, granted_turn=1, expires_after_turn=9,
+                ),
+                task_workspace={
+                    "task_id": "resume-compacted",
+                    "root": ".bsam-agent/tasks/resume-compacted",
+                    "manifest": ".bsam-agent/tasks/resume-compacted/task-workspace.json",
+                    "state": "active",
+                },
+            )
+            agent = ChatOrchestrator(ScriptedProvider(), config(), LocalAgentApi(root))
+            agent.state.task = task
+            for index in range(1, 11):
+                agent._append_task_observation(
+                    task, "inspect_model", {"source": "model.in"},
+                    {"source_set_sha256": f"{index:064x}", "summary": {"errors": 0}},
+                )
+            task.working_hypotheses = [{
+                "hypothesis_id": "hypothesis-001",
+                "statement": "The first crack definition controls the reported initiation site.",
+                "status": "supported", "supporting_observation_ids": ["obs-001"],
+                "refuting_observation_ids": [],
+            }]
+            session = root / ".bsam-agent" / "conversations" / "resume.json"
+            agent.save_state(session)
+
+            restored_state = ChatOrchestrator.load_state(session)
+            restored = ChatOrchestrator(
+                ScriptedProvider(), config(), LocalAgentApi(root), state=restored_state,
+            )
+            restored._append_task_observation(
+                restored.state.task, "validate_model", {"source": "model.in"},
+                {"source_set_sha256": "c" * 64, "summary": {"errors": 0}},
+            )
+            restored.save_state(session)
+            twice_restored = ChatOrchestrator.load_state(session).task
+            manifest = task_area.manifest()
+
+        self.assertEqual("SI", twice_restored.user_decisions[0]["value"])
+        self.assertEqual(task.authorization.as_dict(), twice_restored.authorization.as_dict())
+        self.assertEqual(task.engineering_assumptions, twice_restored.engineering_assumptions)
+        self.assertEqual(task.missing_decisions, twice_restored.missing_decisions)
+        self.assertEqual(task.working_plan, twice_restored.working_plan)
+        self.assertEqual(task.failures, twice_restored.failures)
+        self.assertEqual(task.validation_state, twice_restored.validation_state)
+        self.assertEqual(["run_terminal_evidence"], twice_restored.remaining_criteria)
+        self.assertEqual(["obs-001"], twice_restored.working_hypotheses[0]["supporting_observation_ids"])
+        self.assertEqual("obs-011", twice_restored.observations[-1]["observation_id"])
+        self.assertEqual("obs-005", twice_restored.context_compaction["archived_observations"][-1]["observation_id"])
+        self.assertEqual(11, len(manifest["artifacts"]))
+        self.assertEqual((False, ["run_terminal_evidence"]), _task_completion(twice_restored))
 
     def test_parameter_change_chains_inspect_preview_confirm_apply_validate(self) -> None:
         provider = ScriptedProvider()

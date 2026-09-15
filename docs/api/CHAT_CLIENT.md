@@ -9,7 +9,8 @@ run-in-progress boundary, or step/recovery limit is reached. See the
 [agent-loop architecture](../architecture/AGENT_LOOP.md).
 
 Completed explanation and review tasks receive a separate grounded synthesis when the model selected
-part of the investigation. Findings about the current model cite deterministic observation IDs;
+part of the investigation or deterministic expansion inspected a complete relevant entity set.
+Findings about the current model cite deterministic observation IDs;
 documentation and inference claims carry their provenance, while general background is explicitly
 labeled. This prose is generated only after deterministic criteria pass and cannot mark an
 incomplete task complete.

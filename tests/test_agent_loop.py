@@ -405,6 +405,65 @@ class AgentLoopTests(unittest.TestCase):
         self.assertLessEqual(len(hosted_context), 12_000)
         self.assertIn("Documentation:", result.message)
 
+    def test_explain_entities_inspects_each_match_then_synthesizes_grounded_claims(self) -> None:
+        provider = ScriptedProvider(synthesis_response(
+            {
+                "kind": "current_model",
+                "text": "Crack 1 is type 301 and targets cluster ply1.",
+                "evidence_ids": ["obs-002"],
+            },
+            {
+                "kind": "current_model",
+                "text": "Crack 2 is type 301 and targets cluster ply2.",
+                "evidence_ids": ["obs-003"],
+            },
+            {
+                "kind": "inference",
+                "text": "The two declarations apply the same crack formulation to different plies.",
+                "evidence_ids": ["obs-002", "obs-003"],
+            },
+            {
+                "kind": "general",
+                "text": "Crack definitions describe candidate discontinuity behavior.",
+                "evidence_ids": [],
+            },
+        ))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "cracks.in").write_bytes(
+                (Path(__file__).parent / "fixtures" / "conversational_cracks.in").read_bytes()
+            )
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Explain the cracks in cracks.in.")
+
+        self.assertEqual(
+            ["query_model", "inspect_entity", "inspect_entity"],
+            agent.state.task.completed_steps,
+        )
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual([], agent.state.task.remaining_criteria)
+        self.assertEqual(
+            ["1", "2"],
+            [
+                observation["evidence"]["entity_details"][0]["name"]
+                for observation in agent.state.task.observations[1:]
+            ],
+        )
+        first_parameters = agent.state.task.observations[1]["evidence"][
+            "entity_details"
+        ][0]["capability_records"][0]["parameters"]
+        self.assertEqual(["ply1"], first_parameters["cluster"])
+        self.assertEqual(["ply2"], agent.state.task.observations[2]["evidence"][
+            "entity_details"
+        ][0]["capability_records"][0]["parameters"]["cluster"])
+        self.assertEqual(1, len(provider.requests))
+        self.assertIn('"cluster":["ply1"]', provider.requests[0].messages[-1].content)
+        self.assertIn('"cluster":["ply2"]', provider.requests[0].messages[-1].content)
+        self.assertIn("Finding:", result.message)
+        self.assertIn("Inference:", result.message)
+        self.assertIn("General context:", result.message)
+        self.assertEqual("inference", agent.state.task.final_synthesis["claims"][2]["kind"])
+
     def test_unknown_hypothesis_evidence_is_repaired_and_not_persisted(self) -> None:
         invalid = tool_decision(
             "query_model", {

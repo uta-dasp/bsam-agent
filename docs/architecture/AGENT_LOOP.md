@@ -24,9 +24,17 @@ hypotheses, failures, authorization, selected outputs, completion state, recent 
 archived evidence references. Hosted context removes workspace paths and sensitive evidence fields.
 Compaction does not alter completed steps, remaining criteria, authorization, or deterministic next
 actions, and persisted pre-compaction conversations migrate with empty compaction state.
+Save/resume regression coverage crosses the compaction boundary and then records new evidence,
+proving stable ID continuation and preservation of decisions, authorization, assumptions, unresolved
+questions, hypotheses, failures, validation evidence, and remaining completion criteria.
+
+For registry-backed multi-entity explanation requests, the loop first lists the relevant entity kind
+and then inspects every returned entity through the generic canonical inspection primitive. This is
+completion evidence, so a partial entity walk cannot be presented as a complete explanation.
 
 Once deterministic completion criteria pass, explanation/review objectives that used model-selected
-steps receive a separate structured synthesis pass. Every current-model or run finding cites a
+steps or the complete multi-entity inspection path receive a separate structured synthesis pass.
+Every current-model or run finding cites a
 deterministic observation ID, documentation claims cite retrieval/workspace evidence, inferences are
 labeled and evidence-linked, and general background is labeled without task citations. Synthesis is
 validated, repaired once if needed, and persisted with provider/model provenance. It runs only after

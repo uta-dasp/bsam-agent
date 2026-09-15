@@ -248,6 +248,19 @@ def query_model(
             if entity_id:
                 matches = [item for item in matches if item.get("id") == entity_id]
             ambiguous = len(matches) > 1
+            records_by_entity: dict[str, list[dict[str, Any]]] = {}
+            for record in records:
+                attributes = record.get("attributes", {})
+                linked_id = attributes.get("entity_id") if isinstance(attributes, dict) else None
+                if isinstance(linked_id, str):
+                    records_by_entity.setdefault(linked_id, []).append(record)
+            matches = [
+                {
+                    **item,
+                    "capability_records": records_by_entity.get(str(item.get("id")), []),
+                }
+                for item in matches
+            ]
         if normalized == "list-boundary-conditions":
             outgoing = {
                 str(item.get("id")): [

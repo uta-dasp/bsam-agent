@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -14,7 +15,7 @@ from bsam_agent.orchestrator import (
     _routing_request_schema,
     _recovery_classification,
 )
-from bsam_agent.provider import ProviderConfig
+from bsam_agent.provider import ProviderConfig, ProviderResponse
 
 
 DECK = (
@@ -41,7 +42,20 @@ def config() -> ProviderConfig:
 
 
 class NoModelProvider:
-    def complete(self, request):  # pragma: no cover - deterministic routes must avoid it
+    def complete(self, request):
+        if not request.tools and "claims" in request.response_schema.get("properties", {}):
+            return ProviderResponse(content=json.dumps({"claims": [
+                {
+                    "kind": "current_model",
+                    "text": "Both crack declarations were inspected as type 301.",
+                    "evidence_ids": ["obs-002", "obs-003"],
+                },
+                {
+                    "kind": "inference",
+                    "text": "The declarations apply the formulation to separate model regions.",
+                    "evidence_ids": ["obs-002", "obs-003"],
+                },
+            ]}))
         raise AssertionError("unexpected provider call")
 
 
@@ -104,8 +118,9 @@ class ConversationalContextTests(unittest.TestCase):
         self.assertEqual("inspect_model", inspected.tool)
         self.assertEqual("query_model", counted.tool)
         self.assertEqual(2, counted.tool_result["summary"]["matches"])
-        self.assertEqual("query_model", explained.tool)
-        self.assertEqual(["1", "2"], [item["name"] for item in explained.tool_result["matches"]])
+        self.assertEqual("inspect_entity", explained.tool)
+        self.assertEqual("2", explained.tool_result["matches"][0]["name"])
+        self.assertIn("Inference:", explained.message)
         self.assertEqual("find_references", linked.tool)
         self.assertEqual(1, linked.tool_result["summary"]["matches"])
         selected = agent.state.model_context.selected_entity

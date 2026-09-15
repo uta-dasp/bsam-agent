@@ -99,17 +99,17 @@ unsupported and ambiguous behavior must remain explicit and fail closed.
 
 ## Current repository position
 
-As of 2026-09-14, the repository is transitioning from **M4 into M5**. The deterministic foundation
-is qualified, provider and conversational layers are substantial, and an initial bounded agent loop
-can complete selected multi-step trajectories. It has not yet demonstrated general open-ended
-engineering exploration or a substantial generic model transformation with smoke-test evidence.
+As of 2026-09-15, the repository has completed the first Version 2 vertical slice and is entering
+**M6**. The deterministic foundation, provider/conversational layers, and bounded agent loop now
+complete grounded multi-step investigations. A substantial generic model transformation with
+smoke-test evidence remains to be demonstrated.
 
 | Milestone | Current status | Evidence summary |
 | --- | --- | --- |
 | M0 Deterministic foundation | Complete | Loss-preserving source sets, registry, semantics, guarded plans, validation, audit, execution supervision, and regression coverage |
 | M1 Provider-neutral LLM layer | Complete | Local llama.cpp and OpenAI Responses adapters share contracts, cooperative cancellation, a parity trajectory, configuration, mocked transport tests, and hosted-data controls |
-| M2 Conversational grounding | Substantial | Persistent active model/entity/query/output/run context and Windows/workspace path normalization; the full crack-coreference acceptance dialogue remains unproven |
-| M3 Canonical engineering actions | Substantial | Canonical query mapping, capability metadata, semantic queries, model comparison, and run inspection exist; some prompt-specific routing remains |
+| M2 Conversational grounding | Complete | Persistent active model/entity/query/output/run context, context compaction, Windows/workspace path normalization, and executable crack-coreference acceptance |
+| M3 Canonical engineering actions | Complete | Canonical query mapping, capability metadata, semantic queries, model comparison, entity-set expansion, and run inspection satisfy the exit contract |
 | M4 Bounded agent loop | Complete | A new synthetic named-data investigation composes generic primitives through a provider-selected continuation, deterministic evidence, grounded synthesis, and safe terminal checks without a request-specific workflow |
 | M5 Autonomous read-only exploration | Substantial | Model inspection, semantic query/reference traversal, comparison, validation, status, bounded logs, and contained project-file discovery/read/search can chain; unseen live acceptance remains |
 | M6 Goal-oriented modification | Partial | Generic create/modify/delete/rename and plan composition exist for verified capabilities; no qualifying substantial generic transformation has been demonstrated |
@@ -173,7 +173,7 @@ without explicit policy authorization.
 
 ## M2 — Conversational grounding and workspace context
 
-**Status: Substantial.**
+**Status: Complete.**
 
 Objective: ground each turn in an ongoing engineering task and workspace, not an isolated message.
 
@@ -185,20 +185,17 @@ contained absolute Windows paths are normalized before deterministic execution. 
 have direct regression coverage. The complete inspect → cracks → ply2 → selected-crack dialogue
 also runs as one executable acceptance case without repeating the filename.
 
-Remaining:
+Version 2 extensions:
 
 - broaden plural and multi-entity reference resolution without guessing;
 - improve user-facing recovery whenever context exists but a narrow query cannot consume it.
-- add deterministic context compaction for 20–50-step tasks, preserving user decisions, active
-  source/digest, assumptions, unresolved questions, evidence references, failures, authorization,
-  and the current plan while reducing verbose historical observations.
 
 Exit: the specified multi-turn crack dialogue succeeds without repeating the filename and without
 leaking internal query/parser failures.
 
 ## M3 — Natural-language intent to canonical engineering actions
 
-**Status: Substantial.**
+**Status: Complete.**
 
 Objective: separate natural-language understanding, canonical engineering intent, and deterministic
 execution.
@@ -214,7 +211,7 @@ Implemented:
   bounded run-log inspection;
 - a clear distinction between misunderstood/invalid arguments and unsupported capabilities.
 
-Remaining:
+Version 2 extensions:
 
 - replace remaining prompt-specific keyword branches with capability-derived applicability after
   equivalent trajectory tests exist;
