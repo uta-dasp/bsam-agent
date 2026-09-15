@@ -130,7 +130,7 @@ a grounded conclusion without the user prescribing tools.
   investigation through local and mocked OpenAI providers.
 - [x] **V2-S1-013** Show current objective, plan, tool activity, evidence, assumptions, and terminal
   reason in an initial expandable VS Code task view.
-- [ ] **V2-S1-014** Score tool order, evidence sufficiency, unnecessary reads/clarification,
+- [x] **V2-S1-014** Score tool order, evidence sufficiency, unnecessary reads/clarification,
   repetition, final usefulness, policy behavior, and provider parity in executable tests.
 - [ ] **V2-S1-015** Retain sanitized acceptance evidence for one previously unseen investigation;
   close M4 only if the trajectory is model-composed rather than hard-coded.

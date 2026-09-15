@@ -120,7 +120,7 @@ engineering exploration or a substantial generic model transformation with smoke
 | M11 Troubleshooting memory | Not started | No structured verified troubleshooting store or retrieval workflow exists |
 | M12 Results interpretation | Not started | Runtime artifacts are classified, but engineering result quantities are not exposed or interpreted |
 | M13 VS Code interaction | Substantial | Chat, provider selection, diagnostics, forms, previews, confirmation, run controls, and an expandable task/evidence card exist; richer reasoning/recovery UX remains |
-| M14 Comprehensive evaluation | Partial | Decision, conversational, and trajectory assets exist; not all trajectory specifications execute end to end |
+| M14 Comprehensive evaluation | Partial | Decision, conversational, and trajectory assets include evidence sufficiency, read bounds, policy, usefulness, and provider-parity scoring; not all specifications execute end to end |
 | M15 Production hardening | Partial | Safety, audit, CI, reproducible manifests, and data controls exist; scale, compatibility, recovery, and production qualification remain |
 
 ## M0 — Preserve and qualify the deterministic foundation
@@ -487,9 +487,13 @@ Maintain three levels:
    recovery, deterministic evidence, loops, unsupported actions, and final usefulness.
 
 The repository currently has decision benchmarks, conversational tests, 19 trajectory
-specifications, an evidence-based trajectory scorer, and executable tests for selected autonomous
-investigation, change/validate/run boundaries, comparison, and failed-run diagnosis. JSON
-specifications alone do not count as executable acceptance.
+specifications, and an evidence-based trajectory scorer covering task completion, tool order,
+argument subsets, unnecessary reads/clarification, guarded actions, policy behavior, deterministic
+evidence sufficiency, recovery, grounded final usefulness, and provider parity. The same synthetic
+investigation executes through both mocked provider adapters and negative scorer tests prove that
+wrong arguments, excess reads, missing evidence, policy mismatches, unhelpful prose, and parity
+drift fail independently. Selected change/validate/run, comparison, and failed-run paths are also
+executable; JSON specifications alone do not count as executable acceptance.
 
 Next work is to execute every specified trajectory with controlled fixtures, then add eight-ply
 construction, smoke-test diagnosis, precedent-guided construction, recovery, full-run, and results

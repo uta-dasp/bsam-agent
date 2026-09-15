@@ -34,6 +34,11 @@ routing, every model-selected continuation, confirmation continuation, and final
 cancelled routing request blocks safely with `provider_cancelled`; cancellation during optional
 synthesis leaves already-proven deterministic completion intact and skips repair/retry.
 
+Trajectory evaluation compares the full deterministic path rather than only the first model
+decision. It scores ordered tools and argument subsets, bounded/unnecessary reads, clarification and
+confirmation behavior, policy outcomes, immutable evidence sufficiency, grounded claim kinds and
+citations, recovery, final response requirements, and a provider-neutral semantic signature.
+
 Read-only exploration can compose model inspection, canonical entity/reference queries, bounded
 workspace discovery/read/search, model comparison, run status, and bounded known-log inspection.
 After mandatory general observations, the provider selects among the safe continuations; the loop no

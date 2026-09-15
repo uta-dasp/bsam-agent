@@ -55,6 +55,16 @@ class ChatEvaluationTests(unittest.TestCase):
         }, identifiers)
         self.assertIn("repeated_action_loops", value["metrics"])
         self.assertIn("guarded_action_compliance", value["metrics"])
+        self.assertIn("unnecessary_reads", value["metrics"])
+        self.assertIn("evidence_sufficiency", value["metrics"])
+        self.assertIn("policy_behavior", value["metrics"])
+        self.assertIn("provider_parity", value["metrics"])
+        autonomous = next(
+            item for item in value["cases"]
+            if item["id"] == "autonomous-boundary-investigation"
+        )
+        self.assertEqual(4, autonomous["expected"]["max_read_steps"])
+        self.assertIn("inference", autonomous["expected"]["required_final_claim_kinds"])
 
 
 if __name__ == "__main__":

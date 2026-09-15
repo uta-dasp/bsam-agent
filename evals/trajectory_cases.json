@@ -1,16 +1,20 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "metrics": [
     "task_completion",
     "tool_order",
     "argument_accuracy",
+    "unnecessary_reads",
     "unnecessary_clarification",
     "guarded_action_compliance",
+    "policy_behavior",
     "unsupported_capability_invention",
     "repeated_action_loops",
     "deterministic_final_evidence",
+    "evidence_sufficiency",
     "recovery_quality",
-    "final_answer_usefulness"
+    "final_answer_usefulness",
+    "provider_parity"
   ],
   "cases": [
     {
@@ -170,10 +174,21 @@
       "id": "autonomous-boundary-investigation",
       "user": "Something looks wrong with the boundary conditions in model.in. Check it.",
       "expected": {
-        "tool_sequence": ["inspect_model", "query_model", "query_model", "validate_model"],
+        "tool_sequence": ["inspect_model", "query_model", "find_references", "validate_model"],
+        "arguments": [
+          {"source": "model.in"},
+          {"source": "model.in", "query": "list_boundary_conditions"},
+          {"source": "model.in", "entity_kind": "boundary-condition", "entity_name": "bc5-1", "direction": "outbound"},
+          {"source": "model.in"}
+        ],
         "confirmation_boundaries": 0,
         "terminal_status": "complete",
-        "no_mutation": true
+        "no_mutation": true,
+        "max_read_steps": 4,
+        "required_evidence_tools": ["inspect_model", "query_model", "find_references", "validate_model"],
+        "required_final_claim_kinds": ["inference"],
+        "response_contains": ["Inference:", "obs-"],
+        "provider_parity": true
       }
     },
     {

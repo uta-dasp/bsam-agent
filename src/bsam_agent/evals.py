@@ -57,7 +57,7 @@ def load_chat_cases(path: Path) -> dict[str, Any]:
 def load_trajectory_cases(path: Path) -> dict[str, Any]:
     """Validate deterministic multi-turn task-trajectory fixtures."""
     value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict) or value.get("schema_version") != "0.1.0":
+    if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0"}:
         raise ValueError("unsupported trajectory-case schema")
     if set(value) != {"schema_version", "metrics", "cases"}:
         raise ValueError("trajectory fixture fields are invalid")
@@ -82,7 +82,9 @@ def load_trajectory_cases(path: Path) -> dict[str, Any]:
         expected = case["expected"]
         allowed = {
             "tool_sequence", "confirmation_boundaries", "terminal_status",
-            "failure_category", "no_mutation",
+            "failure_category", "no_mutation", "arguments", "max_read_steps",
+            "required_evidence_tools", "required_final_claim_kinds", "response_contains",
+            "provider_parity",
         }
         if not isinstance(expected, dict) or set(expected) - allowed or not {
             "tool_sequence", "confirmation_boundaries", "terminal_status", "no_mutation",
@@ -102,4 +104,34 @@ def load_trajectory_cases(path: Path) -> dict[str, Any]:
             raise ValueError(f"trajectory case {identifier} no_mutation is invalid")
         if "failure_category" in expected and not isinstance(expected["failure_category"], str):
             raise ValueError(f"trajectory case {identifier} failure category is invalid")
+        arguments = expected.get("arguments")
+        if arguments is not None and (
+            not isinstance(arguments, list)
+            or len(arguments) != len(sequence)
+            or any(not isinstance(item, dict) for item in arguments)
+        ):
+            raise ValueError(f"trajectory case {identifier} arguments are invalid")
+        max_reads = expected.get("max_read_steps")
+        if max_reads is not None and (
+            not isinstance(max_reads, int) or isinstance(max_reads, bool) or max_reads < 0
+        ):
+            raise ValueError(f"trajectory case {identifier} read bound is invalid")
+        evidence_tools = expected.get("required_evidence_tools", [])
+        if not isinstance(evidence_tools, list) or any(
+            tool not in TOOL_CONTRACTS for tool in evidence_tools
+        ):
+            raise ValueError(f"trajectory case {identifier} evidence tools are invalid")
+        claim_kinds = expected.get("required_final_claim_kinds", [])
+        if not isinstance(claim_kinds, list) or any(
+            kind not in {"current_model", "documentation", "inference", "general"}
+            for kind in claim_kinds
+        ):
+            raise ValueError(f"trajectory case {identifier} claim kinds are invalid")
+        phrases = expected.get("response_contains", [])
+        if not isinstance(phrases, list) or any(
+            not isinstance(phrase, str) or not phrase for phrase in phrases
+        ):
+            raise ValueError(f"trajectory case {identifier} response phrases are invalid")
+        if "provider_parity" in expected and not isinstance(expected["provider_parity"], bool):
+            raise ValueError(f"trajectory case {identifier} provider parity is invalid")
     return value
