@@ -16,6 +16,15 @@ the orchestrator records digest-bound evidence and checks the objective's criter
 missing, it may select an obvious read-only continuation locally or ask the configured model to
 choose one bounded next tool.
 
+After six live observations, deterministic compaction moves older bounded observations into a
+digest-bound evidence index while their complete records remain as immutable task-workspace
+artifacts. Observation IDs never restart or change across compaction. The compact provider context
+retains the active model digest, assumptions, explicit user decisions, unresolved questions, plan,
+hypotheses, failures, authorization, selected outputs, completion state, recent observations, and
+archived evidence references. Hosted context removes workspace paths and sensitive evidence fields.
+Compaction does not alter completed steps, remaining criteria, authorization, or deterministic next
+actions, and persisted pre-compaction conversations migrate with empty compaction state.
+
 Once deterministic completion criteria pass, explanation/review objectives that used model-selected
 steps receive a separate structured synthesis pass. Every current-model or run finding cites a
 deterministic observation ID, documentation claims cite retrieval/workspace evidence, inferences are

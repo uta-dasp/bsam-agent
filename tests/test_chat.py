@@ -50,6 +50,10 @@ class ChatClientTests(unittest.TestCase):
         task = TaskState(
             "Investigate model.in", "model.in", ["inspect"], status="blocked",
             engineering_assumptions=["Treat the checked-in deck as the active source."],
+            user_decisions=[{
+                "decision_id": "decision-001", "question": "Choose units.",
+                "value": "SI", "turn": 2,
+            }],
             working_plan=["Inspect the model", "Follow references"],
             working_hypotheses=[{
                 "hypothesis_id": "hypothesis-001", "statement": "A reference may be stale.",
@@ -70,6 +74,16 @@ class ChatClientTests(unittest.TestCase):
             }],
             completion_criteria=["model_inspected", "references_inspected"],
             remaining_criteria=["references_inspected"], step_count=1,
+            context_compaction={
+                "schema_version": "0.1.0", "compaction_count": 2,
+                "compacted_through_step": 4,
+                "archived_observations": [{
+                    "observation_id": "obs-000", "index": 4, "tool": "query_model",
+                    "status": "completed", "result_digest": "C" * 64,
+                    "artifact": ".bsam-agent/tasks/example/observations/obs-000.json",
+                    "evidence_summary": {},
+                }],
+            },
             terminal_reason="evidence_exhausted",
         )
 
@@ -83,6 +97,8 @@ class ChatClientTests(unittest.TestCase):
         )
         self.assertEqual(1, snapshot["evidence"][0]["details"]["workspace_match_count"])
         self.assertNotIn("workspace_matches", snapshot["evidence"][0]["details"])
+        self.assertEqual("SI", snapshot["decisions"][0]["value"])
+        self.assertEqual(2, snapshot["compaction"]["count"])
         self.assertEqual("read_only", snapshot["authorization"]["mode"])
         self.assertIsNone(snapshot["task_workspace"])
         self.assertEqual("evidence_exhausted", snapshot["terminal_reason"])

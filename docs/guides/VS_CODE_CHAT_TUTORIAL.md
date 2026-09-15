@@ -165,6 +165,10 @@ Which parameters can be safely changed in projects/notch_v1/notch_v1.in?
 
 Read-only inspection and validation do not require `/confirm`.
 
+The current-task card updates throughout the trajectory. Alongside plan, tool, evidence, assumption,
+hypothesis, completion, authorization, and workspace state, it now shows explicit user decisions and
+how many older observations have been compacted into immutable task-local evidence references.
+
 Scout commonly takes roughly 20–30 seconds per routed request on this CPU host. Do not submit the same request repeatedly while one response is being generated.
 
 ## 7. Preview and apply a model change

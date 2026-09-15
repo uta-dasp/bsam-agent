@@ -621,8 +621,8 @@ The following tactical conflicts or gaps must be retired:
   controlled stops; extend it to smoke execution only after the distinct smoke contract exists;
 - chat plans, candidates, retries, observations, and run directories now stay in contained task
   workspaces; later construction, smoke, recovery, and results slices must retain this boundary;
-- long trajectories currently retain bounded recent observations but lack deterministic compaction
-  of decisions, evidence, hypotheses, failures, and plans;
+- long trajectories now compact older observations into immutable task-local evidence references
+  while preserving decisions, hypotheses, failures, plans, authorization, and completion state;
 - specialized notch expansion may remain as a regression adapter but cannot satisfy generic M6 or
   the long-term acceptance scenario;
 - individual entity CRUD and small composed plans are insufficient for large construction without a

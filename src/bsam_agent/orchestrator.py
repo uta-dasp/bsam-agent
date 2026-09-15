@@ -31,6 +31,8 @@ POLICY_ERROR_CODES = (
 CONVERSATION_PHASES = frozenset({
     "understand", "inspect", "propose", "confirm", "execute", "verify", "explain",
 })
+CONTEXT_COMPACTION_RETAINED_OBSERVATIONS = 6
+CONTEXT_COMPACTION_SCHEMA_VERSION = "0.1.0"
 _ROUTING_GENERIC_TERMS = frozenset({"type", "name", "file", "value", "last", "all"})
 _INTENT_TOOLS = {
     "inspect": ("query_model", "inspect_model"),
@@ -210,6 +212,7 @@ class TaskState:
     resolved_capabilities: list[str] = field(default_factory=list)
     engineering_assumptions: list[str] = field(default_factory=list)
     missing_decisions: list[str] = field(default_factory=list)
+    user_decisions: list[dict[str, Any]] = field(default_factory=list)
     clarification: dict[str, Any] | None = None
     plan_path: str | None = None
     destination: str | None = None
@@ -230,6 +233,7 @@ class TaskState:
     last_created_output: str | None = None
     last_run: dict[str, Any] | None = None
     observations: list[dict[str, Any]] = field(default_factory=list)
+    context_compaction: dict[str, Any] | None = None
     working_plan: list[str] = field(default_factory=list)
     working_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     completed_steps: list[str] = field(default_factory=list)
@@ -251,6 +255,7 @@ class TaskState:
             "resolved_capabilities": self.resolved_capabilities,
             "engineering_assumptions": self.engineering_assumptions,
             "missing_decisions": self.missing_decisions,
+            "user_decisions": self.user_decisions,
             "clarification": self.clarification,
             "plan_path": self.plan_path,
             "destination": self.destination,
@@ -271,6 +276,7 @@ class TaskState:
             "last_created_output": self.last_created_output,
             "last_run": self.last_run,
             "observations": self.observations,
+            "context_compaction": self.context_compaction,
             "working_plan": self.working_plan,
             "working_hypotheses": self.working_hypotheses,
             "completed_steps": self.completed_steps,
@@ -299,7 +305,7 @@ class TaskState:
             raise ValueError("task objective or source is invalid")
         for name in (
             "requested_outcomes", "resolved_capabilities", "engineering_assumptions",
-            "missing_decisions", "steps", "failures", "attempt_fingerprints",
+            "missing_decisions", "user_decisions", "steps", "failures", "attempt_fingerprints",
             "failed_fingerprints", "recent_sources", "recent_entities", "observations",
             "working_plan", "working_hypotheses", "completed_steps", "completion_criteria",
             "remaining_criteria",
@@ -339,6 +345,8 @@ class TaskState:
                 raise ValueError("task step_count does not match completed steps")
         if len(migrated["steps"]) > migrated["max_steps"]:
             raise ValueError("task state exceeds its step bound")
+        _validate_user_decisions(migrated["user_decisions"])
+        archived_observations = _validate_context_compaction(migrated["context_compaction"])
         observation_ids: set[str] = set()
         for index, observation in enumerate(migrated["observations"], start=1):
             if not isinstance(observation, dict):
@@ -352,6 +360,9 @@ class TaskState:
             ):
                 raise ValueError("task observation ID is invalid")
             observation_ids.add(observation_id)
+        if observation_ids.intersection(archived_observations):
+            raise ValueError("live and compacted task evidence overlap")
+        observation_ids.update(archived_observations)
         _validate_working_hypotheses(migrated["working_hypotheses"], observation_ids)
         for name in (
             "active_source", "active_source_digest", "last_created_output", "terminal_reason",
@@ -390,6 +401,16 @@ class TaskState:
                 }
             ):
                 raise ValueError("task workspace reference is inconsistent")
+            if migrated["context_compaction"] is not None:
+                for observation in migrated["context_compaction"]["archived_observations"]:
+                    expected_artifact = (
+                        f"{expected_root}/observations/"
+                        f"{observation['observation_id']}.json"
+                    )
+                    if observation["artifact"] != expected_artifact:
+                        raise ValueError("task compacted evidence path is inconsistent")
+        elif migrated["context_compaction"] is not None:
+            raise ValueError("task context compaction requires a task workspace")
         task = cls(**migrated)
         if final_synthesis is not None:
             _validate_grounded_synthesis({"claims": final_synthesis["claims"]}, task)
@@ -411,7 +432,7 @@ class ConversationState:
         pending = self.pending_action
         last_plan = self.last_plan
         return {
-            "schema_version": "0.10.0",
+            "schema_version": "0.11.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -428,7 +449,7 @@ class ConversationState:
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
@@ -440,7 +461,7 @@ class ConversationState:
             expected.add("last_plan")
         elif value["schema_version"] in {"0.3.0", "0.4.0"}:
             expected.update({"last_plan", "task"})
-        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0"}:
+        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}:
             expected.update({"last_plan", "task", "model_context"})
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
@@ -966,7 +987,11 @@ class ChatOrchestrator:
             text, re.IGNORECASE,
         ):
             task = None
-        workspace_root = getattr(self.api, "workspace_root", None)
+        workspace_root_value = getattr(self.api, "workspace_root", None)
+        workspace_root = (
+            workspace_root_value.resolve()
+            if isinstance(workspace_root_value, Path) else None
+        )
         if task is not None:
             if isinstance(workspace_root, Path):
                 task.source = _workspace_relative_path(task.source, workspace_root)
@@ -2406,7 +2431,7 @@ class ChatOrchestrator:
         result: dict[str, Any],
     ) -> None:
         indexes = []
-        for item in task.observations:
+        for item in _task_evidence(task).values():
             observation_id = item.get("observation_id")
             match = (
                 re.fullmatch(r"obs-(\d+)", observation_id)
@@ -2428,7 +2453,15 @@ class ChatOrchestrator:
             )
             task.task_workspace["state"] = task_area.manifest()["state"]
         task.observations.append(observation)
-        task.observations = task.observations[-task.max_steps:]
+        compacted = _compact_task_state(task)
+        if compacted:
+            self._audit(
+                "task_context_compacted",
+                compacted_through_step=task.context_compaction["compacted_through_step"],
+                archived_observations=len(
+                    task.context_compaction["archived_observations"]
+                ),
+            )
 
     def _record_task_failure(
         self, tool: str, arguments: dict[str, Any], code: str, message: str,
@@ -2495,6 +2528,107 @@ _HYPOTHESIS_FIELDS = {
 }
 
 
+def _validate_user_decisions(decisions: Any) -> None:
+    if not isinstance(decisions, list) or len(decisions) > 32:
+        raise ValueError("task user decisions are invalid")
+    seen: set[str] = set()
+    for item in decisions:
+        if not isinstance(item, dict) or set(item) != {
+            "decision_id", "question", "value", "turn",
+        }:
+            raise ValueError("task user decision fields are invalid")
+        decision_id = item["decision_id"]
+        if (
+            not isinstance(decision_id, str)
+            or re.fullmatch(r"decision-\d{3}", decision_id) is None
+            or decision_id in seen
+            or not isinstance(item["question"], str)
+            or not item["question"].strip()
+            or len(item["question"]) > 500
+            or not isinstance(item["value"], str)
+            or not item["value"].strip()
+            or len(item["value"]) > 500
+            or not isinstance(item["turn"], int)
+            or isinstance(item["turn"], bool)
+            or item["turn"] < 0
+        ):
+            raise ValueError("task user decision values are invalid")
+        seen.add(decision_id)
+
+
+def _validate_context_compaction(compaction: Any) -> set[str]:
+    if compaction is None:
+        return set()
+    if not isinstance(compaction, dict) or set(compaction) != {
+        "schema_version", "compaction_count", "compacted_through_step",
+        "archived_observations",
+    }:
+        raise ValueError("task context compaction fields are invalid")
+    if compaction["schema_version"] != CONTEXT_COMPACTION_SCHEMA_VERSION:
+        raise ValueError("task context compaction version is invalid")
+    for name in ("compaction_count", "compacted_through_step"):
+        if (
+            not isinstance(compaction[name], int)
+            or isinstance(compaction[name], bool)
+            or compaction[name] < 1
+        ):
+            raise ValueError("task context compaction counters are invalid")
+    archived = compaction["archived_observations"]
+    if not isinstance(archived, list) or not archived or len(archived) > 50:
+        raise ValueError("task compacted observations are invalid")
+    identifiers: set[str] = set()
+    indexes: list[int] = []
+    for item in archived:
+        if not isinstance(item, dict) or set(item) != {
+            "observation_id", "index", "tool", "status", "result_digest",
+            "artifact", "evidence_summary",
+        }:
+            raise ValueError("task compacted observation fields are invalid")
+        identifier = item["observation_id"]
+        index = item["index"]
+        if (
+            not isinstance(identifier, str)
+            or re.fullmatch(r"obs-\d{3}", identifier) is None
+            or identifier in identifiers
+            or not isinstance(index, int)
+            or isinstance(index, bool)
+            or index < 1
+            or item["status"] != "completed"
+            or not isinstance(item["tool"], str)
+            or not item["tool"]
+            or not isinstance(item["result_digest"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", item["result_digest"]) is None
+            or not isinstance(item["artifact"], str)
+            or not item["artifact"]
+            or Path(item["artifact"]).is_absolute()
+            or ".." in Path(item["artifact"]).parts
+            or not isinstance(item["evidence_summary"], dict)
+            or len(json.dumps(
+                item["evidence_summary"], separators=(",", ":"), sort_keys=True,
+            )) > 4_000
+        ):
+            raise ValueError("task compacted observation values are invalid")
+        identifiers.add(identifier)
+        indexes.append(index)
+    if indexes != sorted(indexes) or len(indexes) != len(set(indexes)):
+        raise ValueError("task compacted observation order is invalid")
+    if compaction["compacted_through_step"] != indexes[-1]:
+        raise ValueError("task context compaction boundary is inconsistent")
+    return identifiers
+
+
+def _task_evidence(task: TaskState) -> dict[str, dict[str, Any]]:
+    archived = (
+        task.context_compaction.get("archived_observations", [])
+        if isinstance(task.context_compaction, dict) else []
+    )
+    return {
+        str(item.get("observation_id")): item
+        for item in [*archived, *task.observations]
+        if isinstance(item, dict) and item.get("observation_id")
+    }
+
+
 def _validate_working_hypotheses(
     hypotheses: Any, observation_ids: set[str], *, proposals: bool = False,
 ) -> None:
@@ -2543,10 +2677,7 @@ def _validate_task_update(update: Any, task: TaskState | None) -> None:
         return
     if task is None or not isinstance(update, dict) or set(update) != {"hypotheses"}:
         raise ValueError("task update is invalid")
-    observation_ids = {
-        str(item.get("observation_id")) for item in task.observations
-        if isinstance(item, dict) and item.get("observation_id")
-    }
+    observation_ids = set(_task_evidence(task))
     _validate_working_hypotheses(
         update["hypotheses"], observation_ids, proposals=True,
     )
@@ -2602,10 +2733,7 @@ def _apply_task_update(task: TaskState, update: dict[str, Any]) -> int:
         by_id[item["hypothesis_id"]] = index
         by_statement[str(item["statement"]).casefold()] = index
         changed += 1
-    observation_ids = {
-        str(item["observation_id"]) for item in task.observations
-        if isinstance(item, dict) and isinstance(item.get("observation_id"), str)
-    }
+    observation_ids = set(_task_evidence(task))
     _validate_working_hypotheses(records, observation_ids)
     task.working_hypotheses = records
     return changed
@@ -2625,10 +2753,7 @@ def _validate_grounded_synthesis(value: Any, task: TaskState) -> None:
     claims = value["claims"]
     if not isinstance(claims, list) or not 1 <= len(claims) <= 12:
         raise ValueError("grounded synthesis claims are invalid")
-    observations = {
-        str(item.get("observation_id")): item for item in task.observations
-        if isinstance(item, dict) and item.get("observation_id")
-    }
+    observations = _task_evidence(task)
     documentation_tools = {
         "list_workspace_files", "read_allowed_text_file", "search_workspace",
         "search_bsam_knowledge",
@@ -2771,6 +2896,66 @@ def _bounded_observation(
         "result_digest": _digest(result),
         "evidence": evidence,
     }
+
+
+def _compact_task_state(task: TaskState) -> bool:
+    """Archive verbose old observations while retaining stable local evidence references."""
+    if (
+        len(task.observations) <= CONTEXT_COMPACTION_RETAINED_OBSERVATIONS
+        or task.task_workspace is None
+    ):
+        return False
+    retiring = task.observations[:-CONTEXT_COMPACTION_RETAINED_OBSERVATIONS]
+    retained = task.observations[-CONTEXT_COMPACTION_RETAINED_OBSERVATIONS:]
+    existing = (
+        deepcopy(task.context_compaction["archived_observations"])
+        if isinstance(task.context_compaction, dict) else []
+    )
+    archived_ids = {item["observation_id"] for item in existing}
+    task_root = task.task_workspace["root"]
+    for observation in retiring:
+        identifier = str(observation["observation_id"])
+        if identifier in archived_ids:
+            continue
+        existing.append({
+            "observation_id": identifier,
+            "index": int(observation["index"]),
+            "tool": str(observation["tool"]),
+            "status": str(observation["status"]),
+            "result_digest": str(observation["result_digest"]),
+            "artifact": f"{task_root}/observations/{identifier}.json",
+            "evidence_summary": _compacted_evidence_summary(observation.get("evidence")),
+        })
+        archived_ids.add(identifier)
+    existing.sort(key=lambda item: item["index"])
+    prior_count = (
+        int(task.context_compaction["compaction_count"])
+        if isinstance(task.context_compaction, dict) else 0
+    )
+    task.context_compaction = {
+        "schema_version": CONTEXT_COMPACTION_SCHEMA_VERSION,
+        "compaction_count": prior_count + 1,
+        "compacted_through_step": int(existing[-1]["index"]),
+        "archived_observations": existing,
+    }
+    task.observations = retained
+    return True
+
+
+def _compacted_evidence_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    summary: dict[str, Any] = {}
+    for name, item in value.items():
+        if isinstance(item, (str, int, float, bool)) or item is None:
+            summary[name] = item
+        elif name in {"summary", "differences", "validation"} and isinstance(item, dict):
+            summary[name] = deepcopy(item)
+        elif isinstance(item, list):
+            summary[f"{name}_count"] = len(item)
+        elif isinstance(item, dict):
+            summary[f"{name}_digest"] = _digest(item)
+    return summary
 
 
 def _failure_category(code: str, message: str) -> str:
@@ -3062,10 +3247,14 @@ def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
             and str(task.last_run.get("state", "")).casefold() == "terminal"
         ),
         "references_inspected": any(
-            observation.get("tool") == "find_references"
-            or observation.get("evidence", {}).get("query") == "references-from"
-            or observation.get("evidence", {}).get("query") == "references_from"
-            for observation in task.observations
+            tool == "find_references" for tool in tools
+        ) or any(
+            (
+                observation.get("evidence", {})
+                or observation.get("evidence_summary", {})
+            ).get("query")
+            in {"references-from", "references_from"}
+            for observation in _task_evidence(task).values()
         ),
     }
     missing = [name for name in task.completion_criteria if not evidence.get(name, False)]
@@ -3085,6 +3274,7 @@ def _agent_loop_tools(objective: str) -> tuple[str, ...]:
 
 def _model_task_context(task: TaskState, *, hosted: bool) -> str:
     observations = deepcopy(task.observations[-6:])
+    compaction = deepcopy(task.context_compaction)
     if hosted:
         for observation in observations:
             evidence = observation.get("evidence")
@@ -3103,8 +3293,29 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
                 if isinstance(selectors, dict):
                     for name in ("entity_id", "entity_name"):
                         selectors.pop(name, None)
+        if isinstance(compaction, dict):
+            for observation in compaction["archived_observations"]:
+                observation.pop("artifact", None)
+                evidence_summary = observation.get("evidence_summary")
+                if isinstance(evidence_summary, dict):
+                    for name in ("source", "destination", "output_directory"):
+                        evidence_summary.pop(name, None)
+        failures = [
+            {
+                name: failure.get(name)
+                for name in ("category", "recovery_classification", "tool", "code")
+                if name in failure
+            }
+            for failure in task.failures[-task.max_recoveries - 1:]
+        ]
+    else:
+        failures = task.failures[-task.max_recoveries - 1:]
     value = {
         "status": task.status,
+        "active_model": {
+            "source": None if hosted else task.active_source,
+            "digest": task.active_source_digest,
+        },
         "authorization": {
             "mode": task.authorization.mode,
             "status": task.authorization.status,
@@ -3120,16 +3331,40 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
         ),
         "completion_criteria": task.completion_criteria,
         "missing_criteria": task.remaining_criteria,
+        "assumptions": task.engineering_assumptions,
+        "user_decisions": task.user_decisions,
+        "unresolved_questions": task.missing_decisions,
         "working_plan": task.working_plan,
         "working_hypotheses": task.working_hypotheses,
+        "failures": failures,
+        "selected_outputs": {
+            "destination": None if hosted else task.destination,
+            "last_created_output": None if hosted else task.last_created_output,
+            "last_run": (
+                {
+                    name: task.last_run.get(name)
+                    for name in ("state", "classification")
+                    if name in task.last_run
+                }
+                if hosted and isinstance(task.last_run, dict) else task.last_run
+            ),
+        },
         "completed_steps": task.completed_steps,
         "step_count": task.step_count,
         "max_steps": task.max_steps,
         "recovery_count": task.recovery_count,
         "max_recoveries": task.max_recoveries,
         "observations": observations,
+        "compaction": compaction,
     }
-    return json.dumps(value, separators=(",", ":"), sort_keys=True)[:12000]
+    encoded = json.dumps(value, separators=(",", ":"), sort_keys=True)
+    if len(encoded) > 12_000 and isinstance(compaction, dict):
+        archived = value["compaction"]["archived_observations"]
+        while len(encoded) > 12_000 and archived:
+            archived.pop(0)
+            value["compaction"]["provider_context_truncated"] = True
+            encoded = json.dumps(value, separators=(",", ":"), sort_keys=True)
+    return encoded
 
 
 def _next_deterministic_task_action(
@@ -3540,6 +3775,15 @@ def _deterministic_clarification_response(
     if len(matched) == 1:
         arguments = deepcopy(clarification["arguments"])
         arguments.update(matched[0])
+        task.user_decisions.append({
+            "decision_id": f"decision-{len(task.user_decisions) + 1:03d}",
+            "question": (
+                task.missing_decisions[0]
+                if task.missing_decisions else "select parameter context"
+            ),
+            "value": f"{matched[0]['block']}/{matched[0]['construct']}",
+            "turn": state.turn_number,
+        })
         task.status = "propose"
         task.missing_decisions = []
         task.clarification = None

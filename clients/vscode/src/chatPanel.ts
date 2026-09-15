@@ -208,10 +208,12 @@ export class ChatPanel implements vscode.Disposable {
         <div class="task-section"><strong>Tool activity</strong><ol id="task-activity"></ol></div>
         <div class="task-section"><strong>Evidence</strong><ul id="task-evidence"></ul></div>
         <div class="task-section"><strong>Assumptions</strong><ul id="task-assumptions"></ul></div>
+        <div class="task-section"><strong>User decisions</strong><ul id="task-decisions"></ul></div>
         <div class="task-section"><strong>Hypotheses</strong><ul id="task-hypotheses"></ul></div>
         <div class="task-section"><strong>Completion</strong><ul id="task-completion"></ul></div>
         <div class="task-section"><strong>Authorization</strong><ul id="task-authorization"></ul></div>
         <div class="task-section"><strong>Task workspace</strong><ul id="task-workspace"></ul></div>
+        <div class="task-section"><strong>Context compaction</strong><ul id="task-compaction"></ul></div>
       </div>
       <div id="task-terminal" hidden></div>
     </details>
@@ -240,10 +242,12 @@ export class ChatPanel implements vscode.Disposable {
     const taskActivity = document.getElementById('task-activity');
     const taskEvidence = document.getElementById('task-evidence');
     const taskAssumptions = document.getElementById('task-assumptions');
+    const taskDecisions = document.getElementById('task-decisions');
     const taskHypotheses = document.getElementById('task-hypotheses');
     const taskCompletion = document.getElementById('task-completion');
     const taskAuthorization = document.getElementById('task-authorization');
     const taskWorkspace = document.getElementById('task-workspace');
+    const taskCompaction = document.getElementById('task-compaction');
     const taskTerminal = document.getElementById('task-terminal');
     let busy = true;
     let pending = false;
@@ -301,6 +305,9 @@ export class ChatPanel implements vscode.Disposable {
           + (details ? ' - ' + details : '');
       }, 'No evidence recorded');
       fillTaskList(taskAssumptions, task.assumptions, (item) => String(item), 'No assumptions');
+      fillTaskList(taskDecisions, task.decisions, (item) =>
+        String(item.value || '') + ' - ' + String(item.question || 'engineering decision'),
+      'No explicit decisions');
       fillTaskList(taskHypotheses, task.hypotheses, (item) => {
         const support = Array.isArray(item.supporting_evidence) ? item.supporting_evidence.join(', ') : '';
         const refute = Array.isArray(item.refuting_evidence) ? item.refuting_evidence.join(', ') : '';
@@ -327,6 +334,13 @@ export class ChatPanel implements vscode.Disposable {
         'State: ' + String(workspace.state || 'unavailable'),
         'Root: ' + String(workspace.root || 'not allocated'),
       ], (item) => String(item), 'No task workspace');
+      const compaction = task.compaction && typeof task.compaction === 'object'
+        ? task.compaction : {};
+      fillTaskList(taskCompaction, [
+        'Passes: ' + String(compaction.count || 0),
+        'Archived evidence: ' + String(compaction.archived_evidence || 0),
+        'Compacted through step: ' + String(compaction.through_step || 'not started'),
+      ], (item) => String(item), 'No compacted context');
       taskTerminal.hidden = !task.terminal_reason;
       taskTerminal.textContent = task.terminal_reason ? 'Terminal reason: ' + String(task.terminal_reason) : '';
     }

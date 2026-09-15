@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 import sys
 import tempfile
 import threading
@@ -15,9 +16,12 @@ from bsam_agent.api import LocalAgentApi
 from bsam_agent.knowledge import KnowledgeQuery, RetrievalUnavailable
 from bsam_agent.local_provider import ProviderError
 from bsam_agent.orchestrator import (
-    ChatOrchestrator, ConversationState, TaskAuthorization, TaskState, _model_task_context,
+    ChatOrchestrator, ChatTurn, ConversationState, TaskAuthorization, TaskState,
+    _bounded_observation, _compact_task_state, _model_task_context,
+    _next_deterministic_task_action, _task_completion, _validate_grounded_synthesis,
 )
 from bsam_agent.provider import ProviderConfig, ProviderResponse
+from bsam_agent.task_workspace import TaskWorkspace
 
 
 DECK = (
@@ -725,6 +729,108 @@ class AgentLoopTests(unittest.TestCase):
             hashlib.sha256(b"Inspect model.in").hexdigest(),
             workspace_manifest["objective_sha256"],
         )
+
+    def test_context_compaction_archives_immutable_evidence_and_keeps_grounding(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            task_area = TaskWorkspace.create(
+                root, "task-compact", objective_sha256="a" * 64,
+                source_scope=["model.in"],
+            )
+            task = TaskState(
+                "Explain model.in", "model.in", ["inspect"], max_steps=20,
+                engineering_assumptions=["Use the selected model."],
+                missing_decisions=["Choose the reporting basis."],
+                user_decisions=[{
+                    "decision_id": "decision-001", "question": "Choose units.",
+                    "value": "SI", "turn": 1,
+                }],
+                task_workspace={
+                    "task_id": "task-compact",
+                    "root": ".bsam-agent/tasks/task-compact",
+                    "manifest": ".bsam-agent/tasks/task-compact/task-workspace.json",
+                    "state": "active",
+                },
+            )
+            agent = ChatOrchestrator(ScriptedProvider(), config(), LocalAgentApi(root))
+            agent.state.task = task
+            for index in range(1, 11):
+                agent._append_task_observation(
+                    task, "inspect_model", {"source": "model.in"},
+                    {"source_set_sha256": f"{index:064x}", "summary": {"errors": 0}},
+                )
+
+            restored = TaskState.from_dict(task.as_dict())
+            context = json.loads(_model_task_context(restored, hosted=False))
+            hosted_context = _model_task_context(restored, hosted=True)
+            archived = restored.context_compaction["archived_observations"]
+            manifest = task_area.manifest()
+
+        self.assertEqual(["obs-001", "obs-002", "obs-003", "obs-004"], [
+            item["observation_id"] for item in archived
+        ])
+        self.assertEqual(["obs-005", "obs-006", "obs-007", "obs-008", "obs-009", "obs-010"], [
+            item["observation_id"] for item in restored.observations
+        ])
+        self.assertEqual(10, len(manifest["artifacts"]))
+        self.assertEqual("SI", context["user_decisions"][0]["value"])
+        self.assertEqual(4, len(context["compaction"]["archived_observations"]))
+        self.assertNotIn(".bsam-agent/tasks", hosted_context)
+        _validate_grounded_synthesis({"claims": [{
+            "kind": "current_model", "text": "The archived inspection is deterministic.",
+            "evidence_ids": ["obs-001"],
+        }]}, restored)
+        tampered = restored.as_dict()
+        tampered["context_compaction"]["archived_observations"][0]["artifact"] = (
+            ".bsam-agent/tasks/another-task/observations/obs-001.json"
+        )
+        with self.assertRaisesRegex(ValueError, "evidence path"):
+            TaskState.from_dict(tampered)
+
+    def test_compaction_preserves_completion_authorization_and_next_action(self) -> None:
+        steps = [
+            {
+                "index": index, "tool": "inspect_model", "status": "completed",
+                "arguments_digest": f"{index:064x}", "result_digest": f"{index + 50:064x}",
+            }
+            for index in range(1, 11)
+        ]
+        task = TaskState(
+            "Inspect and validate model.in", "model.in", ["inspect", "validate"],
+            status="verify", steps=steps, step_count=10, max_steps=20,
+            completed_steps=["inspect_model"] * 10,
+            completion_criteria=["model_inspected", "validation_passed"],
+            remaining_criteria=["validation_passed"],
+            observations=[
+                _bounded_observation(
+                    "inspect_model", {"source": "model.in"},
+                    {"source_set_sha256": f"{index:064x}", "summary": {"errors": 0}},
+                    index,
+                )
+                for index in range(1, 11)
+            ],
+            task_workspace={
+                "task_id": "task-equivalence",
+                "root": ".bsam-agent/tasks/task-equivalence",
+                "manifest": ".bsam-agent/tasks/task-equivalence/task-workspace.json",
+                "state": "active",
+            },
+        )
+        uncompacted = deepcopy(task)
+        latest = ChatTurn("conversation", "verify", "continue")
+
+        self.assertTrue(_compact_task_state(task))
+
+        self.assertEqual(_task_completion(uncompacted), _task_completion(task))
+        self.assertEqual(
+            _next_deterministic_task_action(uncompacted, latest),
+            _next_deterministic_task_action(task, latest),
+        )
+        self.assertEqual(uncompacted.authorization.as_dict(), task.authorization.as_dict())
+        self.assertEqual(uncompacted.remaining_criteria, task.remaining_criteria)
+        self.assertEqual(uncompacted.working_plan, task.working_plan)
+        TaskState.from_dict(task.as_dict())
 
     def test_task_authorization_rejects_inconsistent_persisted_state(self) -> None:
         value = TaskAuthorization().as_dict()

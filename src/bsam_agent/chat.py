@@ -69,7 +69,18 @@ def task_view_snapshot(task: TaskState | None) -> dict[str, object] | None:
         "activity": activity,
         "evidence": evidence,
         "assumptions": task.engineering_assumptions,
+        "decisions": task.user_decisions,
         "hypotheses": hypotheses,
+        "compaction": (
+            {
+                "count": task.context_compaction["compaction_count"],
+                "through_step": task.context_compaction["compacted_through_step"],
+                "archived_evidence": len(
+                    task.context_compaction["archived_observations"]
+                ),
+            }
+            if task.context_compaction is not None else None
+        ),
         "completion_criteria": task.completion_criteria,
         "remaining_criteria": task.remaining_criteria,
         "authorization": task.authorization.as_dict(),

@@ -200,6 +200,8 @@ class TaskTrajectoryTests(unittest.TestCase):
         self.assertEqual("confirm", continued.phase)
         self.assertEqual([], resumed.state.task.missing_decisions)
         self.assertIsNone(resumed.state.task.clarification)
+        self.assertEqual("BOUNDARY/BOUNDARY CONDITION", resumed.state.task.user_decisions[0]["value"])
+        self.assertEqual(2, resumed.state.task.user_decisions[0]["turn"])
         self.assertEqual([], provider.requests)
 
     def test_parameter_change_chains_inspect_preview_confirm_apply_validate(self) -> None:

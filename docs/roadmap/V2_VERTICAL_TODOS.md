@@ -142,7 +142,7 @@ a grounded conclusion without the user prescribing tools.
   lifecycle states, and safe final-artifact promotion contract.
 - [x] **V2-S1-019** Route plans, intermediate variants, retry artifacts, and temporary observations
   into the task workspace instead of collision-suffixed project files.
-- [ ] **V2-S1-020** Implement deterministic context compaction with immutable evidence IDs and a
+- [x] **V2-S1-020** Implement deterministic context compaction with immutable evidence IDs and a
   compact state summary suitable for 20–50-step trajectories.
 - [ ] **V2-S1-021** Add save/resume and compaction-boundary trajectories proving preservation of user
   decisions, authorization, assumptions, questions, hypotheses, failures, and completion evidence.
