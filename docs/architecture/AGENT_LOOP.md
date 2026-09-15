@@ -29,6 +29,11 @@ Evidence exhaustion safely blocks the task and reports the missing criteria; it 
 completion. Model claims cannot satisfy criteria such as validation success, model creation,
 comparison, or terminal run evidence.
 
+Callers may supply one cancellation event for the whole turn. It is propagated through initial
+routing, every model-selected continuation, confirmation continuation, and final synthesis. A
+cancelled routing request blocks safely with `provider_cancelled`; cancellation during optional
+synthesis leaves already-proven deterministic completion intact and skips repair/retry.
+
 Read-only exploration can compose model inspection, canonical entity/reference queries, bounded
 workspace discovery/read/search, model comparison, run status, and bounded known-log inspection.
 After mandatory general observations, the provider selects among the safe continuations; the loop no

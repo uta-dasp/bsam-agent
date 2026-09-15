@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -814,13 +815,15 @@ class ChatOrchestrator:
         )
         temporary.replace(path)
 
-    def turn(self, user_text: str) -> ChatTurn:
+    def turn(
+        self, user_text: str, cancel: threading.Event | None = None,
+    ) -> ChatTurn:
         text = user_text.strip()
         if not text:
             return self._result("understand", "Enter a request or /confirm.", error="empty_request")
         confirmation_words = {"/confirm", "confirm", "approve", "approved", "yes"}
         if text.casefold() in confirmation_words:
-            return self._confirm()
+            return self._confirm(cancel)
         if text.casefold() == "/cancel":
             return self._cancel()
         if self.state.pending_action is not None:
@@ -898,12 +901,13 @@ class ChatOrchestrator:
                     "explain", policy_reason, error="data_policy_violation",
                 )
             try:
-                decision, response = self._route(text, tool_names, correlation_id)
+                decision, response = self._route(
+                    text, tool_names, correlation_id, cancel=cancel,
+                )
                 if decision is not None and task is not None:
                     task.model_step_count += 1
             except (OSError, RuntimeError) as exc:
-                self._audit("provider_failed", correlation_id=correlation_id, error_code=type(exc).__name__)
-                return self._result("explain", str(exc), error="provider_error")
+                return self._provider_failure(exc, task, correlation_id)
         else:
             response = ProviderResponse(content=json.dumps(decision, separators=(",", ":")))
         if decision is None:
@@ -925,7 +929,7 @@ class ChatOrchestrator:
         )
 
         first = self._act_on_decision(decision, routing_text, text)
-        return self._advance_task(first, routing_text, correlation_id)
+        return self._advance_task(first, routing_text, correlation_id, cancel=cancel)
 
     def _act_on_decision(
         self, decision: dict[str, Any], routing_text: str, user_text: str,
@@ -1025,6 +1029,7 @@ class ChatOrchestrator:
 
     def _advance_task(
         self, first: ChatTurn, routing_text: str, correlation_id: str,
+        *, cancel: threading.Event | None = None,
     ) -> ChatTurn:
         """Observe, plan, and act until a bounded terminal or user boundary is reached."""
         task = self.state.task
@@ -1045,7 +1050,9 @@ class ChatOrchestrator:
                 task.remaining_criteria = []
                 task.terminal_reason = "all deterministic completion criteria are satisfied"
                 if _requires_grounded_synthesis(task) and task.final_synthesis is None:
-                    synthesis = self._synthesize_completed_task(task, correlation_id)
+                    synthesis = self._synthesize_completed_task(
+                        task, correlation_id, cancel=cancel,
+                    )
                     if synthesis is not None:
                         turns.append(synthesis)
                 return _combined_turn(turns, task)
@@ -1071,11 +1078,12 @@ class ChatOrchestrator:
                         task.objective, tool_names,
                         f"{correlation_id}-step-{task.step_count + 1}",
                         planning_context=context,
+                        cancel=cancel,
                     )
                 except (OSError, RuntimeError) as exc:
-                    task.status = "blocked"
-                    task.terminal_reason = "provider_error"
-                    turns.append(self._result("explain", str(exc), error="provider_error"))
+                    turns.append(self._provider_failure(
+                        exc, task, f"{correlation_id}-step-{task.step_count + 1}",
+                    ))
                     return _combined_turn(turns, task)
                 if decision is None:
                     task.status = "blocked"
@@ -1129,6 +1137,7 @@ class ChatOrchestrator:
     def _route(
         self, user_text: str, tool_names: tuple[str, ...], correlation_id: str,
         *, planning_context: str | None = None,
+        cancel: threading.Event | None = None,
     ) -> tuple[dict[str, Any] | None, ProviderResponse]:
         system = routing_prompt(
             tool_names,
@@ -1164,7 +1173,7 @@ class ChatOrchestrator:
                 data_policy=self.provider_config.data_policy,
             )
             try:
-                last = self.provider.complete(request)
+                last = self._provider_complete(request, cancel)
                 if last.tool_calls:
                     if len(last.tool_calls) != 1:
                         raise ValueError("model must select at most one deterministic tool")
@@ -1250,6 +1259,7 @@ class ChatOrchestrator:
 
     def _synthesize_completed_task(
         self, task: TaskState, correlation_id: str,
+        *, cancel: threading.Event | None = None,
     ) -> ChatTurn | None:
         hosted = self.provider_config.provider == "openai"
         context = _model_task_context(task, hosted=hosted)
@@ -1276,7 +1286,7 @@ class ChatOrchestrator:
         for attempt in range(self.repair_attempts + 1):
             response = ProviderResponse()
             try:
-                response = self.provider.complete(request)
+                response = self._provider_complete(request, cancel)
                 if response.tool_calls:
                     raise ValueError("grounded synthesis cannot call tools")
                 synthesis = json.loads(response.content or "")
@@ -1299,6 +1309,16 @@ class ChatOrchestrator:
                 return self._result("explain", message)
             except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError, RuntimeError) as exc:
                 last_error = exc
+                if getattr(exc, "code", None) == "cancelled":
+                    self._audit(
+                        "task_synthesis_cancelled", correlation_id=request.correlation_id,
+                        error_code="cancelled",
+                    )
+                    return self._result(
+                        "explain",
+                        "Grounded synthesis was cancelled; deterministic evidence remains complete.",
+                        error="provider_cancelled",
+                    )
                 if attempt >= self.repair_attempts:
                     break
                 request = ProviderRequest(
@@ -1318,7 +1338,31 @@ class ChatOrchestrator:
         )
         return None
 
-    def _confirm(self) -> ChatTurn:
+    def _provider_complete(
+        self, request: ProviderRequest, cancel: threading.Event | None,
+    ) -> ProviderResponse:
+        if cancel is None:
+            return self.provider.complete(request)
+        return self.provider.complete(request, cancel)
+
+    def _provider_failure(
+        self, exc: OSError | RuntimeError, task: TaskState | None, correlation_id: str,
+    ) -> ChatTurn:
+        provider_code = getattr(exc, "code", None)
+        cancelled = provider_code == "cancelled"
+        error_code = "provider_cancelled" if cancelled else "provider_error"
+        if task is not None:
+            task.status = "blocked"
+            task.terminal_reason = error_code
+        self._audit(
+            "provider_cancelled" if cancelled else "provider_failed",
+            correlation_id=correlation_id,
+            error_code=provider_code or type(exc).__name__,
+        )
+        message = "The provider request was cancelled." if cancelled else str(exc)
+        return self._result("explain", message, error=error_code)
+
+    def _confirm(self, cancel: threading.Event | None = None) -> ChatTurn:
         pending = self.state.pending_action
         if pending is None:
             return self._result(
@@ -1333,6 +1377,7 @@ class ChatOrchestrator:
             completed,
             task.objective if task is not None else "confirmed action",
             f"chat-{self.state.conversation_id}-{self.state.turn_number}-confirm",
+            cancel=cancel,
         )
 
     def _cancel(self) -> ChatTurn:

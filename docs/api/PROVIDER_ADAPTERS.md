@@ -20,6 +20,15 @@ Each adapter receives:
 
 Each adapter returns structured content, validated tool calls, or a normalized provider error. Vendor response objects are not exposed through the BSAM Agent API.
 
+Both implemented adapters use the same cooperative cancellation contract. A cancellation event is
+checked before transport and at most every 50 milliseconds while awaiting a response. Cancellation
+returns a non-retryable `cancelled` provider error with the request correlation ID; no returned model
+content or tool call is dispatched. The synchronous caller stops waiting promptly. Because the
+standard-library HTTP call cannot always abort before response headers arrive, its daemon worker may
+finish in the background, bounded by the configured transport timeout, and its result is discarded.
+The orchestrator normalizes cancellation as `provider_cancelled`; cancellation during optional final
+synthesis preserves already-proven deterministic completion and does not trigger schema repair.
+
 ## Initial provider paths
 
 | Path | Transport | Intended use | Groundwork decision |

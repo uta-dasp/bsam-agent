@@ -107,7 +107,7 @@ engineering exploration or a substantial generic model transformation with smoke
 | Milestone | Current status | Evidence summary |
 | --- | --- | --- |
 | M0 Deterministic foundation | Complete | Loss-preserving source sets, registry, semantics, guarded plans, validation, audit, execution supervision, and regression coverage |
-| M1 Provider-neutral LLM layer | Substantial | Local llama.cpp and OpenAI Responses adapters, shared contracts, configuration, mocked transport tests, hosted-data controls; cancellation parity remains |
+| M1 Provider-neutral LLM layer | Complete | Local llama.cpp and OpenAI Responses adapters share contracts, cooperative cancellation, a parity trajectory, configuration, mocked transport tests, and hosted-data controls |
 | M2 Conversational grounding | Substantial | Persistent active model/entity/query/output/run context and Windows/workspace path normalization; the full crack-coreference acceptance dialogue remains unproven |
 | M3 Canonical engineering actions | Substantial | Canonical query mapping, capability metadata, semantic queries, model comparison, and run inspection exist; some prompt-specific routing remains |
 | M4 Bounded agent loop | Substantial | Explicit bounded loop, evidence-based completion, grounded post-completion synthesis, confirmations, fingerprints, terminal states, and executable multi-step tests; general unseen-task acceptance remains |
@@ -159,12 +159,12 @@ Implemented:
 - structured decisions, usage and error normalization, provider/model/reasoning configuration;
 - environment-variable credentials and `store: false` hosted requests;
 - strict hosted-data minimization and refusal of apparent pasted BSAM source/mesh content;
+- preflight/in-flight cooperative cancellation with normalized non-retryable outcomes;
+- one provider-neutral synthetic investigation passing through both mocked adapter transports;
 - mocked provider conformance tests and separate live acceptance evidence.
 
 Remaining:
 
-- define and verify cancellation behavior across providers;
-- execute the same complete synthetic agent trajectory against both providers under one harness;
 - retain an explicit opt-in policy if any future hosted flow needs local-private evidence.
 
 Exit: provider switching is configuration-only, the same synthetic task passes through either

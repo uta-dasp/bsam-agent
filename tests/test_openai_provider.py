@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -175,6 +176,40 @@ class OpenAIProviderTests(unittest.TestCase):
             OpenAIResponsesProvider(config()).complete(request(), cancel)
         self.assertEqual("cancelled", raised.exception.code)
         mocked.assert_not_called()  # type: ignore[attr-defined]
+
+    @patch("bsam_agent.openai_provider.urlopen")
+    def test_inflight_cancellation_returns_promptly_and_is_not_retryable(self, mocked: object) -> None:
+        entered = threading.Event()
+        release = threading.Event()
+        cancel = threading.Event()
+
+        def blocked_transport(*_args: object, **_kwargs: object) -> _Response:
+            entered.set()
+            release.wait(1.0)
+            return _Response({"status": "completed", "output": [{
+                "type": "message",
+                "content": [{"type": "output_text", "text": '{"ok":true}'}],
+            }]})
+
+        mocked.side_effect = blocked_transport  # type: ignore[attr-defined]
+        canceller = threading.Thread(
+            target=lambda: (entered.wait(0.5), cancel.set()), daemon=True,
+        )
+        canceller.start()
+        started = time.monotonic()
+        try:
+            with self.assertRaises(ProviderError) as raised:
+                OpenAIResponsesProvider(
+                    config(), credential_resolver=lambda _reference: "test-secret",
+                ).complete(request(), cancel)
+        finally:
+            release.set()
+            canceller.join(1.0)
+
+        self.assertEqual("cancelled", raised.exception.code)
+        self.assertFalse(raised.exception.retryable)
+        self.assertEqual("hosted-1", raised.exception.correlation_id)
+        self.assertLess(time.monotonic() - started, 0.75)
 
     def test_factory_selects_openai_adapter(self) -> None:
         self.assertIsInstance(create_provider(config()), OpenAIResponsesProvider)

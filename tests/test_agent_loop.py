@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from bsam_agent.agent_benchmark import evaluate_trajectory
 from bsam_agent.api import LocalAgentApi
 from bsam_agent.knowledge import KnowledgeQuery, RetrievalUnavailable
+from bsam_agent.local_provider import ProviderError
 from bsam_agent.orchestrator import ChatOrchestrator, ConversationState, _model_task_context
 from bsam_agent.provider import ProviderConfig, ProviderResponse
 
@@ -69,6 +71,66 @@ class ScriptedProvider:
 
 
 class AgentLoopTests(unittest.TestCase):
+    def test_provider_cancellation_propagates_to_a_safe_task_terminal(self) -> None:
+        class CancelledProvider:
+            def complete(self, request, cancel=None):
+                self.assert_cancelled = cancel is not None and cancel.is_set()
+                raise ProviderError(
+                    "cancelled", "provider request was cancelled", retryable=False,
+                    correlation_id=request.correlation_id,
+                )
+
+        provider = CancelledProvider()
+        cancel = threading.Event()
+        cancel.set()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn(
+                "Inspect model.in and tell me whether anything looks wrong.", cancel=cancel,
+            )
+
+        self.assertTrue(provider.assert_cancelled)
+        self.assertEqual("provider_cancelled", result.error_code)
+        self.assertEqual("blocked", agent.state.task.status)
+        self.assertEqual("provider_cancelled", agent.state.task.terminal_reason)
+
+    def test_synthesis_cancellation_preserves_deterministic_completion_without_retry(self) -> None:
+        cancel = threading.Event()
+
+        class SynthesisCancelledProvider:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def complete(self, request, supplied_cancel=None):
+                self.calls += 1
+                if self.calls == 1:
+                    cancel.set()
+                    return tool_decision("query_model", {
+                        "source": "model.in", "query": "list_boundary_conditions",
+                    })
+                raise ProviderError(
+                    "cancelled", "provider request was cancelled", retryable=False,
+                    correlation_id=request.correlation_id,
+                )
+
+        provider = SynthesisCancelledProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn(
+                "Inspect model.in and tell me whether anything looks wrong.", cancel=cancel,
+            )
+
+        self.assertEqual(2, provider.calls)
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual([], agent.state.task.remaining_criteria)
+        self.assertIsNone(agent.state.task.final_synthesis)
+        self.assertEqual("provider_cancelled", result.error_code)
+        self.assertIn("deterministic evidence remains complete", result.message)
+
     def test_model_can_choose_a_second_read_only_action_after_observation(self) -> None:
         provider = ScriptedProvider(
             tool_decision(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -93,6 +94,35 @@ class LocalProviderTests(unittest.TestCase):
             LlamaCppProvider(config()).complete(request(), cancel)
         self.assertEqual("cancelled", raised.exception.code)
         mocked.assert_not_called()  # type: ignore[attr-defined]
+
+    @patch("bsam_agent.local_provider.urlopen")
+    def test_inflight_cancellation_returns_promptly_and_is_not_retryable(self, mocked: object) -> None:
+        entered = threading.Event()
+        release = threading.Event()
+        cancel = threading.Event()
+
+        def blocked_transport(*_args: object, **_kwargs: object) -> _Response:
+            entered.set()
+            release.wait(1.0)
+            return _Response({"choices": [{"message": {"content": "{}"}}]})
+
+        mocked.side_effect = blocked_transport  # type: ignore[attr-defined]
+        canceller = threading.Thread(
+            target=lambda: (entered.wait(0.5), cancel.set()), daemon=True,
+        )
+        canceller.start()
+        started = time.monotonic()
+        try:
+            with self.assertRaises(ProviderError) as raised:
+                LlamaCppProvider(config()).complete(request(), cancel)
+        finally:
+            release.set()
+            canceller.join(1.0)
+
+        self.assertEqual("cancelled", raised.exception.code)
+        self.assertFalse(raised.exception.retryable)
+        self.assertEqual("test-1", raised.exception.correlation_id)
+        self.assertLess(time.monotonic() - started, 0.75)
 
     @patch("bsam_agent.local_provider.urlopen")
     def test_context_limit_avoids_transport(self, mocked: object) -> None:

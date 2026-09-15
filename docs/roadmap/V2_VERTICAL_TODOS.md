@@ -126,7 +126,7 @@ a grounded conclusion without the user prescribing tools.
   context-size limits, and conclusions that require an engineering decision.
 - [x] **V2-S1-011** Add an evidence-grounded final synthesis pass whose prose cannot satisfy or
   override deterministic completion criteria.
-- [ ] **V2-S1-012** Complete provider cancellation semantics and run the same synthetic
+- [x] **V2-S1-012** Complete provider cancellation semantics and run the same synthetic
   investigation through local and mocked OpenAI providers.
 - [ ] **V2-S1-013** Show current objective, plan, tool activity, evidence, assumptions, and terminal
   reason in an initial expandable VS Code task view.
