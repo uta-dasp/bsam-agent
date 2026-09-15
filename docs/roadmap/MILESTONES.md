@@ -110,8 +110,8 @@ engineering exploration or a substantial generic model transformation with smoke
 | M1 Provider-neutral LLM layer | Substantial | Local llama.cpp and OpenAI Responses adapters, shared contracts, configuration, mocked transport tests, hosted-data controls; cancellation parity remains |
 | M2 Conversational grounding | Substantial | Persistent active model/entity/query/output/run context and Windows/workspace path normalization; the full crack-coreference acceptance dialogue remains unproven |
 | M3 Canonical engineering actions | Substantial | Canonical query mapping, capability metadata, semantic queries, model comparison, and run inspection exist; some prompt-specific routing remains |
-| M4 Bounded agent loop | Substantial | Explicit bounded loop, evidence-based completion, confirmations, fingerprints, terminal states, and executable multi-step tests; general unseen-task acceptance remains |
-| M5 Autonomous read-only exploration | Partial | Model inspection, semantic query/reference traversal, comparison, validation, status, and bounded log inspection can chain; safe project-file search tools are absent |
+| M4 Bounded agent loop | Substantial | Explicit bounded loop, evidence-based completion, grounded post-completion synthesis, confirmations, fingerprints, terminal states, and executable multi-step tests; general unseen-task acceptance remains |
+| M5 Autonomous read-only exploration | Substantial | Model inspection, semantic query/reference traversal, comparison, validation, status, bounded logs, and contained project-file discovery/read/search can chain; unseen live acceptance remains |
 | M6 Goal-oriented modification | Partial | Generic create/modify/delete/rename and plan composition exist for verified capabilities; no qualifying substantial generic transformation has been demonstrated |
 | M7 Validation and execution levels | Partial | Strong static validation and controlled execution exist; a distinct deterministic smoke-test contract and output inspection do not |
 | M8 Runtime diagnosis and recovery | Partial | Run states, logs, failure classification, stale-plan recovery, and safety bounds exist; diagnosis-to-repair-to-rerun is not general |
@@ -244,6 +244,8 @@ Implemented:
 - maximum steps/recoveries, repeated-action detection, failed-action fingerprints, and no repeat of
   an identical failed action, including canonical-equivalent query aliases;
 - an explicit evidence-exhausted stop that cannot satisfy missing deterministic criteria;
+- an evidence-grounded final synthesis pass, validated against deterministic observation IDs and
+  unable to change completion state;
 - separate confirmation boundaries in the current baseline for applying changes, running BSAM, and
   stopping a run;
 - deterministic evidence requirements for creation, validation, comparison, and terminal run state.
@@ -252,7 +254,6 @@ Remaining:
 
 - prove completion of previously unseen multi-step objectives through model-selected composition,
   not deterministic request-specific continuation;
-- add an evidence-grounded final synthesis step that cannot override completion checks;
 - characterize model behavior when several equally safe investigation paths exist.
 - replace per-tool execution confirmations with audited task-scoped authorization while retaining
   mandatory review/confirmation for every physics-changing or model-changing edit;

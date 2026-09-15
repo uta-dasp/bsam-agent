@@ -124,7 +124,7 @@ a grounded conclusion without the user prescribing tools.
   request-specific deterministic continuation only after equivalent negative and trajectory tests.
 - [x] **V2-S1-010** Add exploration stop rules for exhausted evidence, repeated equivalent queries,
   context-size limits, and conclusions that require an engineering decision.
-- [ ] **V2-S1-011** Add an evidence-grounded final synthesis pass whose prose cannot satisfy or
+- [x] **V2-S1-011** Add an evidence-grounded final synthesis pass whose prose cannot satisfy or
   override deterministic completion criteria.
 - [ ] **V2-S1-012** Complete provider cancellation semantics and run the same synthetic
   investigation through local and mocked OpenAI providers.
@@ -136,7 +136,7 @@ a grounded conclusion without the user prescribing tools.
   close M4 only if the trajectory is model-composed rather than hard-coded.
 - [ ] **V2-S1-016** Add task-scoped authorization state, mode transitions, audit events, revocation,
   and backward-compatible conversation-state migration.
-- [ ] **V2-S1-017** Implement the grounded explanation policy in planning/synthesis prompts and
+- [x] **V2-S1-017** Implement the grounded explanation policy in planning/synthesis prompts and
   response evidence so current-model claims cannot come from model memory alone.
 - [ ] **V2-S1-018** Add the per-task workspace abstraction, manifest, contained path resolver,
   lifecycle states, and safe final-artifact promotion contract.

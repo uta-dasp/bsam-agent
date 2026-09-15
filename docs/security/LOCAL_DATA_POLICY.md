@@ -23,7 +23,9 @@ Typed chat text is external-provider data. Users must not paste BSAM source code
 During bounded multi-step routing, a hosted provider may receive compact deterministic observation
 metadata: digests, counts, validation summaries, completed action names, and completion criteria.
 The orchestrator excludes deck text, file diffs, log excerpts, and entity identities from that
-hosted planning context. Local-private source and artifacts remain in deterministic tools.
+hosted planning context. Evidence-grounded final synthesis receives the same sanitized context;
+it cannot receive raw workspace matches or source excerpts merely because the task is complete.
+Local-private source and artifacts remain in deterministic tools.
 
 General workspace discovery is restricted to an allowlist of engineering/document text suffixes
 and rejects hidden or credential-like files, blocked directories, binary/oversized content,

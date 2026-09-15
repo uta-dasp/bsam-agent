@@ -138,6 +138,8 @@ class TaskState:
     completion_criteria: list[str] = field(default_factory=list)
     remaining_criteria: list[str] = field(default_factory=list)
     step_count: int = 0
+    model_step_count: int = 0
+    final_synthesis: dict[str, Any] | None = None
     terminal_reason: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -175,6 +177,8 @@ class TaskState:
             "completion_criteria": self.completion_criteria,
             "remaining_criteria": self.remaining_criteria,
             "step_count": self.step_count,
+            "model_step_count": self.model_step_count,
+            "final_synthesis": self.final_synthesis,
             "terminal_reason": self.terminal_reason,
         }
 
@@ -220,7 +224,7 @@ class TaskState:
                 or not isinstance(clarification["choices"], list)
             ):
                 raise ValueError("task clarification values are invalid")
-        for name in ("recovery_count", "max_steps", "max_recoveries"):
+        for name in ("recovery_count", "max_steps", "max_recoveries", "model_step_count"):
             if not isinstance(migrated[name], int) or isinstance(migrated[name], bool) or migrated[name] < 0:
                 raise ValueError(f"task {name} is invalid")
         if not isinstance(migrated["step_count"], int) or isinstance(migrated["step_count"], bool):
@@ -255,7 +259,18 @@ class TaskState:
         for name in ("selected_entity", "last_run"):
             if migrated[name] is not None and not isinstance(migrated[name], dict):
                 raise ValueError(f"task {name} is invalid")
-        return cls(**migrated)
+        final_synthesis = migrated["final_synthesis"]
+        if final_synthesis is not None and (
+            not isinstance(final_synthesis, dict)
+            or set(final_synthesis) != {"claims", "provider", "model"}
+            or not isinstance(final_synthesis["provider"], str)
+            or not isinstance(final_synthesis["model"], str)
+        ):
+            raise ValueError("task final synthesis is invalid")
+        task = cls(**migrated)
+        if final_synthesis is not None:
+            _validate_grounded_synthesis({"claims": final_synthesis["claims"]}, task)
+        return task
 
 
 @dataclass
@@ -273,7 +288,7 @@ class ConversationState:
         pending = self.pending_action
         last_plan = self.last_plan
         return {
-            "schema_version": "0.7.0",
+            "schema_version": "0.8.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -290,7 +305,7 @@ class ConversationState:
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0"}:
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
@@ -302,7 +317,7 @@ class ConversationState:
             expected.add("last_plan")
         elif value["schema_version"] in {"0.3.0", "0.4.0"}:
             expected.update({"last_plan", "task"})
-        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0"}:
+        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0"}:
             expected.update({"last_plan", "task", "model_context"})
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
@@ -586,6 +601,33 @@ def decision_schema(tool_names: tuple[str, ...]) -> dict[str, Any]:
     }
 
 
+def synthesis_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["claims"],
+        "properties": {
+            "claims": {
+                "type": "array", "minItems": 1, "maxItems": 12,
+                "items": {
+                    "type": "object", "additionalProperties": False,
+                    "required": ["kind", "text", "evidence_ids"],
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "enum": ["current_model", "documentation", "inference", "general"],
+                        },
+                        "text": {"type": "string"},
+                        "evidence_ids": {
+                            "type": "array", "items": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+
 def routing_prompt(
     tool_names: tuple[str, ...], *, include_registry_catalog: bool = True,
     use_function_tools: bool = False,
@@ -857,6 +899,8 @@ class ChatOrchestrator:
                 )
             try:
                 decision, response = self._route(text, tool_names, correlation_id)
+                if decision is not None and task is not None:
+                    task.model_step_count += 1
             except (OSError, RuntimeError) as exc:
                 self._audit("provider_failed", correlation_id=correlation_id, error_code=type(exc).__name__)
                 return self._result("explain", str(exc), error="provider_error")
@@ -1000,6 +1044,10 @@ class ChatOrchestrator:
                 task.missing_decisions = []
                 task.remaining_criteria = []
                 task.terminal_reason = "all deterministic completion criteria are satisfied"
+                if _requires_grounded_synthesis(task) and task.final_synthesis is None:
+                    synthesis = self._synthesize_completed_task(task, correlation_id)
+                    if synthesis is not None:
+                        turns.append(synthesis)
                 return _combined_turn(turns, task)
             task.remaining_criteria = missing
             if task.step_count >= task.max_steps:
@@ -1037,6 +1085,7 @@ class ChatOrchestrator:
                         error="invalid_model_response",
                     ))
                     return _combined_turn(turns, task)
+                task.model_step_count += 1
                 self._apply_decision_task_update(decision)
                 self._audit(
                     "agent_replanned", tool=decision.get("tool"),
@@ -1198,6 +1247,76 @@ class ChatOrchestrator:
             return
         changed = _apply_task_update(task, update)
         self._audit("task_hypotheses_updated", changed=changed)
+
+    def _synthesize_completed_task(
+        self, task: TaskState, correlation_id: str,
+    ) -> ChatTurn | None:
+        hosted = self.provider_config.provider == "openai"
+        context = _model_task_context(task, hosted=hosted)
+        system = (
+            "Produce a concise grounded engineering synthesis as structured claims. "
+            "Current-model or current-run claims must cite deterministic observation IDs. "
+            "Documentation claims must cite retrieval/workspace-document observations. "
+            "Inferences must be labeled as inference and cite their supporting observations. "
+            "General conceptual background must use kind=general and must not be phrased as a "
+            "claim about the current model. Never claim that missing deterministic criteria passed."
+        )
+        request = ProviderRequest(
+            messages=(
+                Message("system", system),
+                Message("user", task.objective + "\n\nCompleted task evidence:\n" + context),
+            ),
+            tools={},
+            response_schema=synthesis_schema(),
+            max_output_tokens=min(768, self.provider_config.max_output_tokens),
+            correlation_id=f"{correlation_id}-synthesis",
+            data_policy=self.provider_config.data_policy,
+        )
+        last_error: Exception | None = None
+        for attempt in range(self.repair_attempts + 1):
+            response = ProviderResponse()
+            try:
+                response = self.provider.complete(request)
+                if response.tool_calls:
+                    raise ValueError("grounded synthesis cannot call tools")
+                synthesis = json.loads(response.content or "")
+                _validate_grounded_synthesis(synthesis, task)
+                task.final_synthesis = {
+                    "claims": deepcopy(synthesis["claims"]),
+                    "provider": self.provider_config.provider,
+                    "model": self.provider_config.model,
+                }
+                message = _format_grounded_synthesis(synthesis)
+                self._audit(
+                    "task_synthesis_completed",
+                    correlation_id=request.correlation_id,
+                    synthesis_digest=_digest(synthesis),
+                    usage={
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    },
+                )
+                return self._result("explain", message)
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError, RuntimeError) as exc:
+                last_error = exc
+                if attempt >= self.repair_attempts:
+                    break
+                request = ProviderRequest(
+                    messages=(
+                        *request.messages,
+                        Message("assistant", response.content or ""),
+                        Message("user", f"Correct the grounded synthesis. Validation error: {exc}"),
+                    ),
+                    tools={}, response_schema=synthesis_schema(),
+                    max_output_tokens=request.max_output_tokens,
+                    correlation_id=request.correlation_id,
+                    data_policy=request.data_policy,
+                )
+        self._audit(
+            "task_synthesis_failed", correlation_id=request.correlation_id,
+            error_code=type(last_error).__name__ if last_error is not None else "unknown",
+        )
+        return None
 
     def _confirm(self) -> ChatTurn:
         pending = self.state.pending_action
@@ -1835,6 +1954,76 @@ def _apply_task_update(task: TaskState, update: dict[str, Any]) -> int:
     return changed
 
 
+def _requires_grounded_synthesis(task: TaskState) -> bool:
+    return task.model_step_count > 0 and bool(re.search(
+        r"\b(?:explain|why|investigat\w*|diagnos\w*|wrong|review|summari[sz]\w*|"
+        r"tell\s+me)\b",
+        task.objective, re.IGNORECASE,
+    ))
+
+
+def _validate_grounded_synthesis(value: Any, task: TaskState) -> None:
+    if not isinstance(value, dict) or set(value) != {"claims"}:
+        raise ValueError("grounded synthesis fields are invalid")
+    claims = value["claims"]
+    if not isinstance(claims, list) or not 1 <= len(claims) <= 12:
+        raise ValueError("grounded synthesis claims are invalid")
+    observations = {
+        str(item.get("observation_id")): item for item in task.observations
+        if isinstance(item, dict) and item.get("observation_id")
+    }
+    documentation_tools = {
+        "list_workspace_files", "read_allowed_text_file", "search_workspace",
+        "search_bsam_knowledge",
+    }
+    deterministic_tools = {
+        "inspect_model", "query_model", "inspect_entity", "find_references",
+        "compare_models", "validate_model", "get_run_status", "inspect_run_log",
+    }
+    for claim in claims:
+        if not isinstance(claim, dict) or set(claim) != {"kind", "text", "evidence_ids"}:
+            raise ValueError("grounded synthesis claim fields are invalid")
+        kind = claim["kind"]
+        text_value = claim["text"]
+        evidence_ids = claim["evidence_ids"]
+        if kind not in {"current_model", "documentation", "inference", "general"}:
+            raise ValueError("grounded synthesis claim kind is invalid")
+        if not isinstance(text_value, str) or not text_value.strip() or len(text_value) > 1_000:
+            raise ValueError("grounded synthesis claim text is invalid")
+        if (
+            not isinstance(evidence_ids, list)
+            or len(evidence_ids) > 8
+            or not all(isinstance(item, str) for item in evidence_ids)
+            or len(set(evidence_ids)) != len(evidence_ids)
+            or not set(evidence_ids).issubset(observations)
+        ):
+            raise ValueError("grounded synthesis evidence IDs are invalid")
+        cited_tools = {str(observations[item].get("tool")) for item in evidence_ids}
+        if kind == "general" and evidence_ids:
+            raise ValueError("general background cannot cite current-task evidence")
+        if kind != "general" and not evidence_ids:
+            raise ValueError("grounded claim requires deterministic evidence")
+        if kind == "current_model" and not cited_tools.intersection(deterministic_tools):
+            raise ValueError("current-model claim lacks model/run evidence")
+        if kind == "documentation" and not cited_tools.intersection(documentation_tools):
+            raise ValueError("documentation claim lacks retrieval evidence")
+
+
+def _format_grounded_synthesis(value: dict[str, Any]) -> str:
+    labels = {
+        "current_model": "Finding",
+        "documentation": "Documentation",
+        "inference": "Inference",
+        "general": "General context",
+    }
+    parts = []
+    for claim in value["claims"]:
+        citations = ", ".join(claim["evidence_ids"])
+        suffix = f" [{citations}]" if citations else ""
+        parts.append(f"{labels[claim['kind']]}: {claim['text'].strip()}{suffix}")
+    return " ".join(parts)
+
+
 def _action_fingerprint(tool: str, arguments: dict[str, Any]) -> str:
     return _digest({"tool": tool, "arguments": arguments})
 
@@ -2272,6 +2461,7 @@ def _combined_turn(turns: list[ChatTurn], task: TaskState) -> ChatTurn:
     if len(turns) == 1:
         return turns[0]
     latest = turns[-1]
+    latest_tool_turn = next((turn for turn in reversed(turns) if turn.tool), latest)
     messages: list[str] = []
     for turn in turns:
         message = turn.message.strip()
@@ -2283,8 +2473,8 @@ def _combined_turn(turns: list[ChatTurn], task: TaskState) -> ChatTurn:
         latest.conversation_id,
         "explain" if task.status == "complete" else latest.phase,
         " ".join(messages),
-        latest.tool,
-        latest.tool_result,
+        latest_tool_turn.tool,
+        latest_tool_turn.tool_result,
         latest.requires_confirmation,
         latest.error_code,
     )

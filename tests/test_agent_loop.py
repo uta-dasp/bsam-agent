@@ -52,6 +52,10 @@ def exhausted_decision(response: str) -> ProviderResponse:
     }))
 
 
+def synthesis_response(*claims: dict[str, object]) -> ProviderResponse:
+    return ProviderResponse(content=json.dumps({"claims": list(claims)}))
+
+
 class ScriptedProvider:
     def __init__(self, *responses: ProviderResponse) -> None:
         self.responses = list(responses)
@@ -66,17 +70,24 @@ class ScriptedProvider:
 
 class AgentLoopTests(unittest.TestCase):
     def test_model_can_choose_a_second_read_only_action_after_observation(self) -> None:
-        provider = ScriptedProvider(tool_decision(
-            "query_model", {
-                "source": "model.in", "query": "list_boundary_conditions",
-            },
-            task_update={"hypotheses": [{
-                "statement": "A boundary-condition reference may explain the reported issue.",
-                "status": "supported",
-                "supporting_observation_ids": ["obs-001"],
-                "refuting_observation_ids": [],
-            }]},
-        ))
+        provider = ScriptedProvider(
+            tool_decision(
+                "query_model", {
+                    "source": "model.in", "query": "list_boundary_conditions",
+                },
+                task_update={"hypotheses": [{
+                    "statement": "A boundary-condition reference may explain the reported issue.",
+                    "status": "supported",
+                    "supporting_observation_ids": ["obs-001"],
+                    "refuting_observation_ids": [],
+                }]},
+            ),
+            synthesis_response({
+                "kind": "current_model",
+                "text": "The inspected model contains one boundary condition requiring review.",
+                "evidence_ids": ["obs-001", "obs-002"],
+            }),
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
@@ -95,11 +106,24 @@ class AgentLoopTests(unittest.TestCase):
         )
         self.assertIn("Task context", provider.requests[0].messages[-1].content)
         self.assertEqual("query_model", result.tool)
+        self.assertIn("Finding:", result.message)
+        self.assertIn("[obs-001, obs-002]", result.message)
+        self.assertIsNotNone(agent.state.task.final_synthesis)
+        self.assertEqual(1, agent.state.task.model_step_count)
+        restored = ConversationState.from_dict(agent.state.as_dict())
+        self.assertEqual(agent.state.task.final_synthesis, restored.task.final_synthesis)
 
     def test_model_can_search_allowed_project_notes_after_model_inspection(self) -> None:
-        provider = ScriptedProvider(tool_decision("search_workspace", {
-            "query": "warning", "pattern": "*.md", "max_matches": 10,
-        }))
+        provider = ScriptedProvider(
+            tool_decision("search_workspace", {
+                "query": "warning", "pattern": "*.md", "max_matches": 10,
+            }),
+            synthesis_response({
+                "kind": "documentation",
+                "text": "The project notes call for checking the ply2 edge set.",
+                "evidence_ids": ["obs-002"],
+            }),
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
@@ -124,6 +148,7 @@ class AgentLoopTests(unittest.TestCase):
         self.assertIn('"arguments_digest"', hosted_context)
         self.assertLessEqual(len(local_context), 12_000)
         self.assertLessEqual(len(hosted_context), 12_000)
+        self.assertIn("Documentation:", result.message)
 
     def test_unknown_hypothesis_evidence_is_repaired_and_not_persisted(self) -> None:
         invalid = tool_decision(
@@ -140,7 +165,15 @@ class AgentLoopTests(unittest.TestCase):
         corrected = tool_decision("query_model", {
             "source": "model.in", "query": "list_boundary_conditions",
         })
-        provider = ScriptedProvider(invalid, corrected)
+        provider = ScriptedProvider(
+            invalid,
+            corrected,
+            synthesis_response({
+                "kind": "inference",
+                "text": "The boundary reference warrants further engineering review.",
+                "evidence_ids": ["obs-001", "obs-002"],
+            }),
+        )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
@@ -150,7 +183,64 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual("query_model", result.tool)
         self.assertEqual("complete", agent.state.task.status)
         self.assertEqual([], agent.state.task.working_hypotheses)
-        self.assertEqual(2, len(provider.requests))
+        self.assertEqual(3, len(provider.requests))
+
+    def test_grounded_synthesis_repairs_unknown_evidence_and_cannot_complete_task(self) -> None:
+        provider = ScriptedProvider(
+            tool_decision("query_model", {
+                "source": "model.in", "query": "list_boundary_conditions",
+            }),
+            synthesis_response({
+                "kind": "current_model", "text": "Unsupported claim.",
+                "evidence_ids": ["obs-999"],
+            }),
+            synthesis_response({
+                "kind": "current_model",
+                "text": "The model has one inspected boundary condition.",
+                "evidence_ids": ["obs-002"],
+            }),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(provider, config(), LocalAgentApi(root))
+            result = agent.turn("Inspect model.in and tell me whether anything looks wrong.")
+
+        self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual([], agent.state.task.remaining_criteria)
+        self.assertEqual(3, len(provider.requests))
+        self.assertIn("[obs-002]", result.message)
+        self.assertIn("Correct the grounded synthesis", provider.requests[-1].messages[-1].content)
+
+    def test_hosted_grounded_synthesis_uses_sanitized_task_context(self) -> None:
+        provider = ScriptedProvider(
+            tool_decision("search_workspace", {
+                "query": "warning", "pattern": "*.md", "max_matches": 10,
+            }),
+            synthesis_response({
+                "kind": "documentation",
+                "text": "Retrieved project documentation contains a warning.",
+                "evidence_ids": ["obs-002"],
+            }),
+        )
+        hosted = ProviderConfig(
+            "openai", "test", "https://api.openai.com/v1", "OPENAI_API_KEY",
+            1.0, 24_000, 512, "hosted-redacted",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            (root / "private-engineering-notes.md").write_text(
+                "Secret boundary warning for the ply2 edge set.\n", encoding="utf-8",
+            )
+            agent = ChatOrchestrator(provider, hosted, LocalAgentApi(root))
+            agent.turn("Inspect model.in and review project documentation for warnings.")
+
+        synthesis_prompt = provider.requests[-1].messages[-1].content
+        self.assertIn("Completed task evidence", synthesis_prompt)
+        self.assertNotIn("private-engineering-notes.md", synthesis_prompt)
+        self.assertNotIn("Secret boundary warning", synthesis_prompt)
+        self.assertNotIn("ply2", synthesis_prompt)
 
     def test_workspace_evidence_request_can_start_without_a_model_source(self) -> None:
         provider = ScriptedProvider(tool_decision("search_workspace", {
@@ -182,6 +272,11 @@ class AgentLoopTests(unittest.TestCase):
                 "source": "model.in", "direction": "outbound",
                 "entity_kind": "boundary-condition", "entity_name": "bc5-1",
             }),
+            synthesis_response({
+                "kind": "inference",
+                "text": "The boundary condition resolves to the inspected ply2 edge set.",
+                "evidence_ids": ["obs-002", "obs-003", "obs-004"],
+            }),
         )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -197,8 +292,11 @@ class AgentLoopTests(unittest.TestCase):
         )
         self.assertEqual("complete", agent.state.task.status)
         self.assertFalse(result.requires_confirmation)
-        self.assertEqual(2, len(provider.requests))
-        self.assertTrue(all("Task context" in request.messages[-1].content for request in provider.requests))
+        self.assertEqual(3, len(provider.requests))
+        self.assertTrue(all(
+            "Task context" in request.messages[-1].content for request in provider.requests[:2]
+        ))
+        self.assertIn("Inference:", result.message)
         offered = provider.requests[0].response_schema["properties"]["tool"]["enum"]
         self.assertTrue({
             "query_model", "inspect_entity", "find_references", "validate_model",
@@ -323,6 +421,8 @@ class AgentLoopTests(unittest.TestCase):
             legacy = agent.state.as_dict()
             legacy["schema_version"] = "0.6.0"
             legacy["task"].pop("working_hypotheses")
+            legacy["task"].pop("model_step_count")
+            legacy["task"].pop("final_synthesis")
             for observation in legacy["task"]["observations"]:
                 observation.pop("observation_id")
             migrated = ConversationState.from_dict(legacy)

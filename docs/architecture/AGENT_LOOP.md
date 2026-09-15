@@ -14,6 +14,14 @@ the orchestrator records digest-bound evidence and checks the objective's criter
 missing, it may select an obvious read-only continuation locally or ask the configured model to
 choose one bounded next tool.
 
+Once deterministic completion criteria pass, explanation/review objectives that used model-selected
+steps receive a separate structured synthesis pass. Every current-model or run finding cites a
+deterministic observation ID, documentation claims cite retrieval/workspace evidence, inferences are
+labeled and evidence-linked, and general background is labeled without task citations. Synthesis is
+validated, repaired once if needed, and persisted with provider/model provenance. It runs only after
+completion and cannot change task status or satisfy a missing criterion; failure falls back to the
+completed deterministic evidence.
+
 The loop terminates when all deterministic criteria are satisfied, a clarification or confirmation
 is required, a run remains in progress, policy refuses the request, a tool fails, evidence is
 exhausted, an equivalent canonical action would repeat, or a step/recovery limit is reached.
@@ -35,4 +43,5 @@ validation, editing, and execution policy remain deterministic.
 
 Hosted providers receive only the typed objective, bounded tool schemas, and compact observations.
 Observations exclude deck text, diffs, log text, and entity identities for hosted routing. The
-existing hosted-data policy and pasted-source rejection remain in force.
+grounded synthesis pass uses the same sanitized task context. The existing hosted-data policy and
+pasted-source rejection remain in force.
