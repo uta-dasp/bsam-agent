@@ -12,8 +12,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bsam_agent.chat import run_jsonl_chat, run_terminal_chat
+from bsam_agent.chat import run_jsonl_chat, run_terminal_chat, task_view_snapshot
 from bsam_agent.cli import build_parser, main
+from bsam_agent.orchestrator import TaskState
 
 
 class _Turn:
@@ -45,6 +46,45 @@ class _Agent:
 
 
 class ChatClientTests(unittest.TestCase):
+    def test_task_view_snapshot_projects_bounded_activity_and_evidence(self) -> None:
+        task = TaskState(
+            "Investigate model.in", "model.in", ["inspect"], status="blocked",
+            engineering_assumptions=["Treat the checked-in deck as the active source."],
+            working_plan=["Inspect the model", "Follow references"],
+            working_hypotheses=[{
+                "hypothesis_id": "hypothesis-001", "statement": "A reference may be stale.",
+                "status": "open", "supporting_observation_ids": ["obs-001"],
+                "refuting_observation_ids": [],
+            }],
+            steps=[{
+                "index": 1, "tool": "inspect_model", "status": "completed",
+                "arguments_digest": "A" * 64, "result_digest": "B" * 64,
+            }],
+            observations=[{
+                "observation_id": "obs-001", "index": 1, "tool": "inspect_model",
+                "status": "completed", "result_digest": "B" * 64,
+                "evidence": {
+                    "summary": {"errors": 0, "warnings": 1},
+                    "workspace_matches": [{"path": "private.md", "text": "private"}],
+                },
+            }],
+            completion_criteria=["model_inspected", "references_inspected"],
+            remaining_criteria=["references_inspected"], step_count=1,
+            terminal_reason="evidence_exhausted",
+        )
+
+        snapshot = task_view_snapshot(task)
+
+        self.assertEqual("Investigate model.in", snapshot["objective"])
+        self.assertEqual("inspect_model", snapshot["activity"][0]["tool"])
+        self.assertEqual("obs-001", snapshot["evidence"][0]["id"])
+        self.assertEqual(
+            {"errors": 0, "warnings": 1}, snapshot["evidence"][0]["details"]["summary"],
+        )
+        self.assertEqual(1, snapshot["evidence"][0]["details"]["workspace_match_count"])
+        self.assertNotIn("workspace_matches", snapshot["evidence"][0]["details"])
+        self.assertEqual("evidence_exhausted", snapshot["terminal_reason"])
+
     def test_chat_parser_binds_workspace_model_config_and_audit_opt_out(self) -> None:
         args = build_parser().parse_args([
             "chat", "--workspace-root", "project", "--config", "provider.json", "--no-audit",
@@ -100,8 +140,10 @@ class ChatClientTests(unittest.TestCase):
         records = [json.loads(line) for line in output.getvalue().splitlines()]
         self.assertEqual(0, status)
         self.assertEqual("ready", records[0]["type"])
+        self.assertIsNone(records[0]["task"])
         self.assertEqual("turn", records[1]["type"])
         self.assertEqual("Inspection completed.", records[1]["turn"]["message"])
+        self.assertIsNone(records[1]["task"])
         self.assertEqual("error", records[2]["type"])
         self.assertEqual("closed", records[3]["type"])
 

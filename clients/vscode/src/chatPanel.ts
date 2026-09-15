@@ -171,6 +171,15 @@ export class ChatPanel implements vscode.Disposable {
     header { padding: 10px 14px; border-bottom: 1px solid var(--vscode-panel-border); }
     header strong { display: block; font-size: 13px; }
     #status { color: var(--vscode-descriptionForeground); font-size: 11px; margin-top: 3px; }
+    #task-card { padding: 8px 14px; border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-sideBar-background); max-height: 42vh; overflow-y: auto; }
+    #task-card details > summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+    #task-title { font-weight: 600; flex: 1; overflow-wrap: anywhere; }
+    #task-state { color: var(--vscode-descriptionForeground); font-size: 11px; text-transform: uppercase; }
+    .task-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 16px; padding: 10px 0 2px; }
+    .task-section strong { display: block; font-size: 11px; margin-bottom: 3px; text-transform: uppercase; color: var(--vscode-descriptionForeground); }
+    .task-section ol, .task-section ul { margin: 0; padding-left: 20px; }
+    .task-section li { margin: 2px 0; overflow-wrap: anywhere; }
+    #task-terminal { margin-top: 8px; padding-left: 8px; border-left: 2px solid var(--vscode-focusBorder); color: var(--vscode-descriptionForeground); }
     #messages { flex: 1; overflow-y: auto; padding: 14px; }
     .message { margin: 0 0 12px; padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
     .user { margin-left: 12%; background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border, transparent); }
@@ -191,6 +200,20 @@ export class ChatPanel implements vscode.Disposable {
 </head>
 <body>
   <header><strong>BSAM Agent</strong><div id="status">Starting guarded local chat…</div></header>
+  <section id="task-card" hidden>
+    <details open>
+      <summary><span id="task-title">Current task</span><span id="task-state"></span></summary>
+      <div class="task-grid">
+        <div class="task-section"><strong>Plan</strong><ol id="task-plan"></ol></div>
+        <div class="task-section"><strong>Tool activity</strong><ol id="task-activity"></ol></div>
+        <div class="task-section"><strong>Evidence</strong><ul id="task-evidence"></ul></div>
+        <div class="task-section"><strong>Assumptions</strong><ul id="task-assumptions"></ul></div>
+        <div class="task-section"><strong>Hypotheses</strong><ul id="task-hypotheses"></ul></div>
+        <div class="task-section"><strong>Completion</strong><ul id="task-completion"></ul></div>
+      </div>
+      <div id="task-terminal" hidden></div>
+    </details>
+  </section>
   <main id="messages" aria-live="polite"></main>
   <footer>
     <textarea id="input" aria-label="Message" placeholder="Ask about a workspace-local BSAM model. Ctrl+Enter sends." disabled></textarea>
@@ -208,6 +231,16 @@ export class ChatPanel implements vscode.Disposable {
     const send = document.getElementById('send');
     const confirm = document.getElementById('confirm');
     const cancel = document.getElementById('cancel');
+    const taskCard = document.getElementById('task-card');
+    const taskTitle = document.getElementById('task-title');
+    const taskState = document.getElementById('task-state');
+    const taskPlan = document.getElementById('task-plan');
+    const taskActivity = document.getElementById('task-activity');
+    const taskEvidence = document.getElementById('task-evidence');
+    const taskAssumptions = document.getElementById('task-assumptions');
+    const taskHypotheses = document.getElementById('task-hypotheses');
+    const taskCompletion = document.getElementById('task-completion');
+    const taskTerminal = document.getElementById('task-terminal');
     let busy = true;
     let pending = false;
 
@@ -226,6 +259,58 @@ export class ChatPanel implements vscode.Disposable {
       messages.appendChild(wrapper);
       messages.scrollTop = messages.scrollHeight;
       return wrapper;
+    }
+
+    function fillTaskList(element, values, format, emptyText) {
+      element.replaceChildren();
+      const items = Array.isArray(values) && values.length ? values : [emptyText];
+      for (const value of items) {
+        const item = document.createElement('li');
+        item.textContent = typeof value === 'string' ? value : format(value || {});
+        element.appendChild(item);
+      }
+    }
+
+    function detailText(details) {
+      if (!details || typeof details !== 'object') return '';
+      return Object.entries(details).map(([key, value]) => {
+        const rendered = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        return key.replaceAll('_', ' ') + '=' + rendered;
+      }).join(', ');
+    }
+
+    function renderTask(task) {
+      if (!task || typeof task !== 'object') {
+        taskCard.hidden = true;
+        return;
+      }
+      taskCard.hidden = false;
+      taskTitle.textContent = String(task.objective || 'Current engineering task');
+      taskState.textContent = String(task.status || 'unknown');
+      fillTaskList(taskPlan, task.plan, (item) => String(item), 'No explicit plan');
+      fillTaskList(taskActivity, task.activity, (item) =>
+        String(item.index || '?') + '. ' + String(item.tool || 'unknown') + ' - ' + String(item.status || 'unknown'),
+      'No tool activity');
+      fillTaskList(taskEvidence, task.evidence, (item) => {
+        const details = detailText(item.details);
+        return String(item.id || 'evidence') + ' - ' + String(item.tool || 'unknown')
+          + (details ? ' - ' + details : '');
+      }, 'No evidence recorded');
+      fillTaskList(taskAssumptions, task.assumptions, (item) => String(item), 'No assumptions');
+      fillTaskList(taskHypotheses, task.hypotheses, (item) => {
+        const support = Array.isArray(item.supporting_evidence) ? item.supporting_evidence.join(', ') : '';
+        const refute = Array.isArray(item.refuting_evidence) ? item.refuting_evidence.join(', ') : '';
+        return String(item.status || 'open') + ': ' + String(item.statement || '')
+          + (support ? ' [supports: ' + support + ']' : '')
+          + (refute ? ' [refutes: ' + refute + ']' : '');
+      }, 'No active hypotheses');
+      const remaining = new Set(Array.isArray(task.remaining_criteria) ? task.remaining_criteria : []);
+      fillTaskList(taskCompletion, task.completion_criteria, (item) => String(item), 'No completion criteria');
+      for (const item of taskCompletion.children) {
+        item.textContent = (remaining.has(item.textContent) ? 'Pending: ' : 'Satisfied: ') + item.textContent;
+      }
+      taskTerminal.hidden = !task.terminal_reason;
+      taskTerminal.textContent = task.terminal_reason ? 'Terminal reason: ' + String(task.terminal_reason) : '';
     }
 
     function setControls() {
@@ -270,6 +355,7 @@ export class ChatPanel implements vscode.Disposable {
           + ' · ' + message.phase;
         append('system', 'Connected to guarded BSAM routing for ' + message.workspace + '.');
         if (pending) append('system', 'The resumed session has an action awaiting confirmation.');
+        renderTask(message.task);
       } else if (message.type === 'busy') {
         busy = Boolean(message.busy);
       } else if (message.type === 'turn') {
@@ -283,6 +369,7 @@ export class ChatPanel implements vscode.Disposable {
           diff.textContent = result.source_diff;
           wrapper.appendChild(diff);
         }
+        renderTask(message.task);
         status.textContent = pending ? 'Review required · confirmation pending' : String(turn.phase || 'Ready');
       } else if (message.type === 'error') {
         busy = false;

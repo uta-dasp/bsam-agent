@@ -119,7 +119,7 @@ engineering exploration or a substantial generic model transformation with smoke
 | M10 Trusted examples | Not started | Fixtures and acceptance projects are not indexed as provenance-ranked precedents |
 | M11 Troubleshooting memory | Not started | No structured verified troubleshooting store or retrieval workflow exists |
 | M12 Results interpretation | Not started | Runtime artifacts are classified, but engineering result quantities are not exposed or interpreted |
-| M13 VS Code interaction | Substantial | Chat, provider selection, diagnostics, forms, previews, confirmation, and run controls exist; task/evidence activity UX remains limited |
+| M13 VS Code interaction | Substantial | Chat, provider selection, diagnostics, forms, previews, confirmation, run controls, and an expandable task/evidence card exist; richer reasoning/recovery UX remains |
 | M14 Comprehensive evaluation | Partial | Decision, conversational, and trajectory assets exist; not all trajectory specifications execute end to end |
 | M15 Production hardening | Partial | Safety, audit, CI, reproducible manifests, and data controls exist; scale, compatibility, recovery, and production qualification remain |
 
@@ -457,14 +457,13 @@ results, and identify evidence such as damage initiation from actual outputs.
 Objective: make the engineering-agent architecture natural to use from VS Code.
 
 Implemented: free-form guarded chat, active-file integration, provider/model/reasoning selection,
-schema-aware diagnostics and forms, reviewed diffs, confirmations, generated-file actions, and
-run/status/controlled-stop controls.
+schema-aware diagnostics and forms, reviewed diffs, confirmations, generated-file actions,
+run/status/controlled-stop controls, and an expandable task card for objective/status, plan,
+completed tool activity, bounded deterministic evidence, assumptions, hypotheses, completion
+criteria, and terminal reason.
 
 Remaining:
 
-- expose current objective, task state, plan, and terminal reason;
-- show expandable tool activity and deterministic evidence without exposing internal identifiers in
-  normal mode;
 - distinguish model reasoning summaries, deterministic findings, assumptions, and user decisions;
 - integrate smoke-test state and later retrieval/result evidence;
 - add recovery/crash UX for long-running tasks.

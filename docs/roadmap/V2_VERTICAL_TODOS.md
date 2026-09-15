@@ -128,7 +128,7 @@ a grounded conclusion without the user prescribing tools.
   override deterministic completion criteria.
 - [x] **V2-S1-012** Complete provider cancellation semantics and run the same synthetic
   investigation through local and mocked OpenAI providers.
-- [ ] **V2-S1-013** Show current objective, plan, tool activity, evidence, assumptions, and terminal
+- [x] **V2-S1-013** Show current objective, plan, tool activity, evidence, assumptions, and terminal
   reason in an initial expandable VS Code task view.
 - [ ] **V2-S1-014** Score tool order, evidence sufficiency, unnecessary reads/clarification,
   repetition, final usefulness, policy behavior, and provider parity in executable tests.

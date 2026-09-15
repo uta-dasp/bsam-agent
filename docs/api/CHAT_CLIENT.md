@@ -14,6 +14,12 @@ documentation and inference claims carry their provenance, while general backgro
 labeled. This prose is generated only after deterministic criteria pass and cannot mark an
 incomplete task complete.
 
+The JSON-lines protocol sends a bounded task-view projection on startup and after every turn. The
+VS Code chat panel renders it in an expandable local task card: objective/status, plan, completed
+tool activity, evidence IDs and summaries, assumptions, hypotheses, completion criteria, and the
+terminal reason. Raw workspace match text and full tool payloads are not included in this UI
+projection.
+
 ## Start and use
 
 Start the pinned llama.cpp server as described in [Local model runtime](LOCAL_MODEL_RUNTIME.md), then use a second PowerShell with the same session API key:

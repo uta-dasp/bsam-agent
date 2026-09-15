@@ -8,9 +8,72 @@ from pathlib import Path
 from typing import Callable, TextIO
 
 from .api import LocalAgentApi
-from .orchestrator import ChatOrchestrator
+from .orchestrator import ChatOrchestrator, TaskState
 from .provider import load_provider_config, override_provider_config
 from .provider_factory import create_provider
+
+
+def task_view_snapshot(task: TaskState | None) -> dict[str, object] | None:
+    """Return a bounded local-UI projection of durable engineering-task state."""
+    if task is None:
+        return None
+    activity = [
+        {
+            "index": item.get("index"),
+            "tool": item.get("tool"),
+            "status": item.get("status"),
+        }
+        for item in task.steps[-task.max_steps:]
+        if isinstance(item, dict)
+    ]
+    evidence = []
+    for observation in task.observations[-task.max_steps:]:
+        if not isinstance(observation, dict):
+            continue
+        value = observation.get("evidence")
+        details: dict[str, object] = {}
+        if isinstance(value, dict):
+            for name in (
+                "summary", "match_count", "state", "classification", "differences",
+                "validation",
+            ):
+                if name in value:
+                    details[name] = value[name]
+            if isinstance(value.get("workspace_matches"), list):
+                details["workspace_match_count"] = len(value["workspace_matches"])
+            if isinstance(value.get("workspace_files"), list):
+                details["workspace_file_count"] = len(value["workspace_files"])
+        evidence.append({
+            "id": observation.get("observation_id"),
+            "index": observation.get("index"),
+            "tool": observation.get("tool"),
+            "status": observation.get("status"),
+            "result_digest": observation.get("result_digest"),
+            "details": details,
+        })
+    hypotheses = [
+        {
+            "id": item.get("hypothesis_id"),
+            "statement": item.get("statement"),
+            "status": item.get("status"),
+            "supporting_evidence": item.get("supporting_observation_ids", []),
+            "refuting_evidence": item.get("refuting_observation_ids", []),
+        }
+        for item in task.working_hypotheses
+        if isinstance(item, dict)
+    ]
+    return {
+        "objective": task.objective,
+        "status": task.status,
+        "plan": task.working_plan,
+        "activity": activity,
+        "evidence": evidence,
+        "assumptions": task.engineering_assumptions,
+        "hypotheses": hypotheses,
+        "completion_criteria": task.completion_criteria,
+        "remaining_criteria": task.remaining_criteria,
+        "terminal_reason": task.terminal_reason,
+    }
 
 
 def run_terminal_chat(
@@ -95,6 +158,7 @@ def run_jsonl_chat(
         "conversation_id": agent.state.conversation_id,
         "phase": agent.state.phase,
         "pending_confirmation": agent.state.pending_action is not None,
+        "task": task_view_snapshot(getattr(agent.state, "task", None)),
     })
     for raw_line in input_stream:
         try:
@@ -109,7 +173,10 @@ def run_jsonl_chat(
             turn = agent.turn(request["text"])
             if session_path is not None:
                 agent.save_state(session_path)
-            emit({"type": "turn", "turn": turn.as_dict()})
+            emit({
+                "type": "turn", "turn": turn.as_dict(),
+                "task": task_view_snapshot(getattr(agent.state, "task", None)),
+            })
         except (json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
             emit({"type": "error", "message": str(exc)})
     return 0
