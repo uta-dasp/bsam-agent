@@ -161,9 +161,9 @@ path spanning model semantics and allowed workspace evidence.
 operations, asks only for unresolved engineering choices, preserves the original, and validates the
 new source set.
 
-- [ ] **V2-S2-001** Select a non-proprietary substantial transformation fixture and acceptance
+- [x] **V2-S2-001** Select a non-proprietary substantial transformation fixture and acceptance
   objective; the acceptance path may not call the specialized notch-expansion tool.
-- [ ] **V2-S2-002** Specify the source structures, invariants, dependencies, and engineering choices
+- [x] **V2-S2-002** Specify the source structures, invariants, dependencies, and engineering choices
   needed by that transformation in capability metadata.
 - [ ] **V2-S2-003** Add generic duplicate/copy-structure operations for the smallest capability set
   exposed by the acceptance fixture.

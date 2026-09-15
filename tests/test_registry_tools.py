@@ -37,7 +37,7 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(29, counts["commands"])
         self.assertEqual(12, counts["constructs"])
         self.assertEqual(1, counts["generation_profiles"])
-        self.assertEqual(2, counts["transformations"])
+        self.assertEqual(3, counts["transformations"])
         self.assertEqual(3, counts["dependency_classes"])
         self.assertEqual(44, counts["primary_entity_capabilities"])
         self.assertEqual(13, counts["additional_entity_outputs"])
@@ -47,9 +47,9 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertEqual(5, counts["repository_checks"])
         self.assertEqual(2, counts["generated_artifacts"])
         self.assertEqual(11, counts["operation_impacts"])
-        self.assertEqual(9, counts["clarification_triggers"])
+        self.assertEqual(10, counts["clarification_triggers"])
         self.assertEqual(5, counts["obsolete_tokens"])
-        self.assertEqual(84, counts["evidence"])
+        self.assertEqual(85, counts["evidence"])
 
     def test_execution_contract_includes_guarded_tric_evidence(self) -> None:
         execution = self.registry["execution_contract"]
@@ -158,7 +158,7 @@ class RegistryToolsTests(unittest.TestCase):
 
     def test_engineering_clarifications_cover_registered_user_choices(self) -> None:
         triggers = self.registry["dependency_contract"]["clarification_triggers"]
-        self.assertEqual(9, len(triggers))
+        self.assertEqual(10, len(triggers))
         self.assertTrue(all(
             item["decision_source"] == "user-approved"
             and item["condition"] and item["required_choices"]
@@ -743,7 +743,7 @@ class RegistryToolsTests(unittest.TestCase):
 
     def test_notch_transformation_rules_are_registered(self) -> None:
         transformations = self.registry["transformations"]
-        self.assertEqual(2, len(transformations))
+        self.assertEqual(3, len(transformations))
         transformation = next(
             item for item in transformations if item["id"] == "transformation.notch-expand-plies"
         )
@@ -769,6 +769,31 @@ class RegistryToolsTests(unittest.TestCase):
         self.assertIn("BASELINE.execution_mode", paths)
         decisions = {item["name"]: item for item in transformation["decisions"]}
         self.assertEqual("pardiso", decisions["target_solver"]["value"])
+
+    def test_structured_cluster_copy_contract_separates_choices_and_invariants(self) -> None:
+        transformation = next(
+            item for item in self.registry["transformations"]
+            if item["id"] == "transformation.structured-cluster-copy"
+        )
+        self.assertEqual("0.1.0", transformation["algorithm_version"])
+        self.assertEqual("identified", transformation["coverage"])
+        self.assertEqual("preview_structured_construction", transformation["tool"])
+        decisions = {item["name"]: item["source"] for item in transformation["decisions"]}
+        self.assertEqual("user-approved", decisions["instance_names_and_transforms"])
+        self.assertEqual("user-approved", decisions["orientation_policy"])
+        self.assertEqual("source-derived", decisions["local_label_policy"])
+        self.assertEqual("source-derived", decisions["topology_and_set_policy"])
+        trigger = next(
+            item for item in self.registry["dependency_contract"]["clarification_triggers"]
+            if item["id"] == "clarification.structured-cluster-copy"
+        )
+        self.assertEqual(
+            {
+                "source_cluster", "instance_names_and_transforms",
+                "material_and_section_policy", "orientation_policy",
+            },
+            set(trigger["required_choices"]),
+        )
 
     def test_last_record_wins_parameter_cardinality_is_explicit(self) -> None:
         solver = next(

@@ -8,9 +8,9 @@
 - Source commit: `9954027f1c325c63d58aeb836e8fec41a4b363af`
 - Executable SHA-256: `7AE34D9821C6FE017897B020D615BFFA8A33F33F6D3734EBA3FD5A435788FB2A`
 - Platform/mode: windows serial
-- Registry version: `0.137.0`
-- Registry SHA-256: `9E61A62C084737C6D6132FDDFEE603860BD012D3876D6E88B97914DD9FF43479`
-- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 2 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 5 repository drift checks, 11 supported change impacts, 9 engineering-clarification triggers, and 44 capabilities with primary entity output
+- Registry version: `0.138.0`
+- Registry SHA-256: `0DC7C932C84209CC22E8F7015C7ED0C5114E20FD0288CD2D8427F7BDCE1AA3F5`
+- Current inventory: 13 top-level blocks, 29 cluster commands, 12 nested constructs, 1 generation profiles, 3 registered transformations, 3 dependency classes, 25 forward/reverse reference contracts, 4 read consumer routes, 23 mutation consumer routes, 5 repository drift checks, 11 supported change impacts, 10 engineering-clarification triggers, and 44 capabilities with primary entity output
 
 Coverage labels describe specification work, not parser availability. `identified` means an active dispatch path is known but its full data grammar is not yet documented. Operational support is tracked separately; omitted operations are unassessed, not implicitly supported.
 
@@ -2011,6 +2011,8 @@ Engineering clarification triggers:
   - Required user-approved choices: `total_thickness`, `layup_degrees`, `interface_constitutive`, `boundary_policy`
 - **clarification.legacy-solver-migration** (`transform`; `transformation.migrate-legacy-solver`): Before replacing a legacy numeric solver body with current PARDISO syntax.
   - Required user-approved choices: `target_solver`
+- **clarification.structured-cluster-copy** (`transform`; `transformation.structured-cluster-copy`): Before copying a cluster structure when the source, instance geometry, or non-preserving section/orientation behavior is not explicit.
+  - Required user-approved choices: `source_cluster`, `instance_names_and_transforms`, `material_and_section_policy`, `orientation_policy`
 - **clarification.structured-material-creation** (`create`, `generate`; `block.materials`, `block.failure`, `block.constitutive`): When proposing a new structured material type 50, 998, or 999 or changing the consumer profile that determines its required fields.
   - Required user-approved choices: `material_type`, `unit_system`, `analysis_and_failure_consumers`, `complete_required_property_set`, `conditional_damage_fatigue_thermal_data`, `type_999_density_interpretation`
 - **clarification.boundary-load-definition** (`create`, `modify`, `generate`; `construct.boundary-type`, `construct.boundary-conditions`, `construct.boundary-loading-sequence`, `command.boundary`, `command.load`, `command.field`): When creating or materially changing analysis type, constraints, fields, loads, or their activation schedule rather than only retargeting an already approved value.
@@ -2082,7 +2084,7 @@ Engineering clarification triggers:
 - Required dependent checks:
   - Require unique bounded names, exact source locations, complete reverse references, and a valid atomic rendered source set.
 
-- Registered transformation impacts: `transformation.notch-expand-plies`, `transformation.migrate-legacy-solver`
+- Registered transformation impacts: `transformation.notch-expand-plies`, `transformation.migrate-legacy-solver`, `transformation.structured-cluster-copy`
 - Transformation policy: Each transformation owns explicit applicability, approved or source-derived decisions, direct impacts, dependencies, validation, revision binding, and non-overwriting apply behavior in its registered versioned contract.
 
 
@@ -2257,6 +2259,36 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
   - The plan must be rebound to the exact source-set digest during review and apply.
   - The output must be written separately from the source with an immutable audit sidecar.
   - The target executable must match the pinned serial baseline fingerprint.
+
+### `transformation.structured-cluster-copy@0.1.0`
+
+Copies one explicitly selected finite-element cluster into bounded named instances with requested coordinate transforms while preserving and retargeting its internal topology, sets, sections, orientations, and semantic references.
+
+- Coverage: identified
+- Tool/operation: `preview_structured_construction` / `structured-cluster-copy`
+- Evidence: [evidence.structured-copy-acceptance-fixture](#evidencestructured-copy-acceptance-fixture)
+- Applicability:
+  - `CLUSTERS.source.unique` equals `true`; otherwise: The source cluster must resolve uniquely.
+  - `CLUSTERS.source.mesh.explicit` equals `true`; otherwise: The initial construction slice requires explicit nodes and elements.
+  - `CLUSTERS.source.references.resolved` equals `true`; otherwise: Every copied internal and external reference must resolve before construction.
+  - `CLUSTERS.destination.names.available` equals `true`; otherwise: Every requested copied-cluster name must be unique and unused.
+  - `CLUSTERS.transforms.finite` equals `true`; otherwise: Every requested transform must be finite and nondegenerate.
+- Approved/source-derived decisions:
+  - `source_cluster` = `"required per request"` (user-approved)
+  - `instance_names_and_transforms` = `"required per request"` (user-approved)
+  - `material_and_section_policy` = `"required per request when not exact preservation"` (user-approved)
+  - `orientation_policy` = `"required per request when not exact preservation"` (user-approved)
+  - `local_label_policy` = `"preserve because labels are cluster-local"` (source-derived)
+  - `topology_and_set_policy` = `"copy exact structure and retarget internal references to each new cluster"` (source-derived)
+- Impacts:
+  - Create bounded copies of the selected cluster without changing the source cluster.
+  - Transform copied node coordinates and preserve valid element connectivity and local labels.
+  - Copy cluster-local sets, sections, orientations, selections, and supported operations while retargeting their semantic ownership and dependencies.
+  - Reject unsupported external or ambiguous dependencies before rendering any output.
+- Dependencies:
+  - The model-building representation and expanded operations must be bounded independently of entity count.
+  - The complete output source set must pass topology, reference, and semantic validation.
+  - The plan must be bound to one source-set digest, reviewed once, and applied only to a separate task-workspace candidate before atomic promotion.
 
 
 ## Obsolete and compatibility tokens
@@ -2453,6 +2485,8 @@ Migrates the established legacy numeric type-9 SOLVER body to explicit current P
 - `evidence.runtime-zero-on-fatal` — runtime: `local-probe/2026-08-27/materials-required` — A controlled copied deck produced a fatal missing-MATERIALS message while the Windows process returned exit code zero.
 <a id="evidenceruntime-current-deck-success"></a>
 - `evidence.runtime-current-deck-success` — runtime: `local-probe/2026-08-27/current-materials-success` — A controlled copied deck changed only MATERIAL to MATERIALS; its existing CLUSTERS and END CLUSTERS tokens were accepted, all steps completed, and the end-of-program sentinel was emitted.
+<a id="evidencestructured-copy-acceptance-fixture"></a>
+- `evidence.structured-copy-acceptance-fixture` — example: `tests/fixtures/structured_copy_source.in` — A non-proprietary one-cluster C3D8 model and explicit acceptance intent establish the source structure, copy transforms, local-label policy, internal dependency retargeting, section assignment, and orientation invariants for generic structured construction.
 
 ## Coverage warning
 

@@ -23,6 +23,7 @@
 - [System architecture](architecture/SYSTEM_ARCHITECTURE.md)
 - [Bounded engineering-agent loop](architecture/AGENT_LOOP.md)
 - [Loss-preserving model editing](architecture/MODEL_EDITING.md)
+- [Structured model construction](architecture/STRUCTURED_CONSTRUCTION.md)
 - [Manual `.ele` import](architecture/MESH_IMPORT.md)
 - [Local-data policy](security/LOCAL_DATA_POLICY.md)
 

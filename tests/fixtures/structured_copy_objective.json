@@ -1,0 +1,39 @@
+{
+  "acceptance_id": "substantial-structured-copy-v1",
+  "objective": "Create a three-layer model from structured_copy_source.in by retaining layer1 and making two deterministic copies named layer2 and layer3, translated by [0,0,1] and [0,0,2]. Preserve each copied cluster's local node and element labels, C3D8 topology, bottom/top node sets, solid element set, material-1 section assignment, and element orientation. Preserve the original file, write structured_copy_result.in, validate the complete output source set, and compare it with the source.",
+  "source": "structured_copy_source.in",
+  "destination": "structured_copy_result.in",
+  "prohibited_tools": [
+    "preview_expand_notch_plies"
+  ],
+  "construction": {
+    "source_cluster": "layer1",
+    "copies": [
+      {
+        "name": "layer2",
+        "translation": [0.0, 0.0, 1.0]
+      },
+      {
+        "name": "layer3",
+        "translation": [0.0, 0.0, 2.0]
+      }
+    ],
+    "local_label_policy": "preserve",
+    "topology_policy": "preserve",
+    "set_policy": "copy-and-retarget-within-new-cluster",
+    "section_policy": "preserve-material-1",
+    "orientation_policy": "preserve"
+  },
+  "expected": {
+    "cluster_names": ["layer1", "layer2", "layer3"],
+    "cluster_count": 3,
+    "node_count": 24,
+    "element_count": 3,
+    "node_set_count": 6,
+    "element_set_count": 3,
+    "orientation_count": 3,
+    "section_count": 3,
+    "validation_errors": 0,
+    "confirmation_boundaries": 1
+  }
+}

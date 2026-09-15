@@ -1,7 +1,7 @@
 {
   "$schema": "../../schemas/capability-registry.schema.json",
   "schema_version": "2.2.0",
-  "registry_version": "0.137.0",
+  "registry_version": "0.138.0",
   "target": {
     "product": "BSAM",
     "product_version": "2.4",
@@ -663,6 +663,12 @@
       "kind": "runtime",
       "locator": "local-probe/2026-08-27/current-materials-success",
       "claim": "A controlled copied deck changed only MATERIAL to MATERIALS; its existing CLUSTERS and END CLUSTERS tokens were accepted, all steps completed, and the end-of-program sentinel was emitted."
+    },
+    {
+      "id": "evidence.structured-copy-acceptance-fixture",
+      "kind": "example",
+      "locator": "tests/fixtures/structured_copy_source.in",
+      "claim": "A non-proprietary one-cluster C3D8 model and explicit acceptance intent establish the source structure, copy transforms, local-label policy, internal dependency retargeting, section assignment, and orientation invariants for generic structured construction."
     }
   ],
   "top_level_blocks": [
@@ -3746,6 +3752,45 @@
         "evidence.runtime-notch-current-solver",
         "evidence.runtime-current-pardiso-definite-rejection"
       ]
+    },
+    {
+      "id": "transformation.structured-cluster-copy",
+      "algorithm_version": "0.1.0",
+      "summary": "Copies one explicitly selected finite-element cluster into bounded named instances with requested coordinate transforms while preserving and retargeting its internal topology, sets, sections, orientations, and semantic references.",
+      "coverage": "identified",
+      "tool": "preview_structured_construction",
+      "operation": "structured-cluster-copy",
+      "applicability": [
+        {"path": "CLUSTERS.source.unique", "operator": "equals", "value": true, "failure": "The source cluster must resolve uniquely."},
+        {"path": "CLUSTERS.source.mesh.explicit", "operator": "equals", "value": true, "failure": "The initial construction slice requires explicit nodes and elements."},
+        {"path": "CLUSTERS.source.references.resolved", "operator": "equals", "value": true, "failure": "Every copied internal and external reference must resolve before construction."},
+        {"path": "CLUSTERS.destination.names.available", "operator": "equals", "value": true, "failure": "Every requested copied-cluster name must be unique and unused."},
+        {"path": "CLUSTERS.transforms.finite", "operator": "equals", "value": true, "failure": "Every requested transform must be finite and nondegenerate."}
+      ],
+      "parameters": [
+        {"name": "source_cluster", "value_type": "existing-unique-cluster-name", "required": true, "summary": "Selects the complete cluster structure to copy."},
+        {"name": "instances", "value_type": "array-of-name-and-transform", "required": true, "summary": "Defines one through 32 destination names and finite transforms."}
+      ],
+      "decisions": [
+        {"name": "source_cluster", "value": "required per request", "source": "user-approved"},
+        {"name": "instance_names_and_transforms", "value": "required per request", "source": "user-approved"},
+        {"name": "material_and_section_policy", "value": "required per request when not exact preservation", "source": "user-approved"},
+        {"name": "orientation_policy", "value": "required per request when not exact preservation", "source": "user-approved"},
+        {"name": "local_label_policy", "value": "preserve because labels are cluster-local", "source": "source-derived"},
+        {"name": "topology_and_set_policy", "value": "copy exact structure and retarget internal references to each new cluster", "source": "source-derived"}
+      ],
+      "impacts": [
+        "Create bounded copies of the selected cluster without changing the source cluster.",
+        "Transform copied node coordinates and preserve valid element connectivity and local labels.",
+        "Copy cluster-local sets, sections, orientations, selections, and supported operations while retargeting their semantic ownership and dependencies.",
+        "Reject unsupported external or ambiguous dependencies before rendering any output."
+      ],
+      "dependencies": [
+        "The model-building representation and expanded operations must be bounded independently of entity count.",
+        "The complete output source set must pass topology, reference, and semantic validation.",
+        "The plan must be bound to one source-set digest, reviewed once, and applied only to a separate task-workspace candidate before atomic promotion."
+      ],
+      "evidence_ids": ["evidence.structured-copy-acceptance-fixture"]
     }
   ],
   "obsolete_tokens": [
@@ -3943,7 +3988,7 @@
         "dependent_checks": ["Require unique bounded names, exact source locations, complete reverse references, and a valid atomic rendered source set."]
       }
     ],
-    "transformation_ids": ["transformation.notch-expand-plies", "transformation.migrate-legacy-solver"],
+    "transformation_ids": ["transformation.notch-expand-plies", "transformation.migrate-legacy-solver", "transformation.structured-cluster-copy"],
     "transformation_policy": "Each transformation owns explicit applicability, approved or source-derived decisions, direct impacts, dependencies, validation, revision binding, and non-overwriting apply behavior in its registered versioned contract."
   },
   "entity_contract": {
@@ -4282,6 +4327,14 @@
         "operations": ["transform"],
         "condition": "Before replacing a legacy numeric solver body with current PARDISO syntax.",
         "required_choices": ["target_solver"],
+        "decision_source": "user-approved"
+      },
+      {
+        "id": "clarification.structured-cluster-copy",
+        "scope_ids": ["transformation.structured-cluster-copy"],
+        "operations": ["transform"],
+        "condition": "Before copying a cluster structure when the source, instance geometry, or non-preserving section/orientation behavior is not explicit.",
+        "required_choices": ["source_cluster", "instance_names_and_transforms", "material_and_section_policy", "orientation_policy"],
         "decision_source": "user-approved"
       },
       {

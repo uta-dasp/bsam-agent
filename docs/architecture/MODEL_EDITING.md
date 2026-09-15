@@ -21,6 +21,11 @@ Examples include a material constant, load magnitude, solver tolerance, output o
 
 Examples include changing ply count, replacing a material throughout selected regions, refining a recognized structured mesh, duplicating cluster patterns, or changing a stacking sequence. These operations can create/remove entities and update many references. Each supported transformation has a versioned algorithm, applicability test, parameter schema, impact rules, and acceptance tests.
 
+The first generic substantial-construction contract is defined in
+[Structured model construction](STRUCTURED_CONSTRUCTION.md). It copies a complete explicit cluster
+through a bounded typed representation, preserving internal structure and retargeting dependencies;
+it is not a workflow-specific ply or notch operation.
+
 ## Required workflow
 
 ```text
