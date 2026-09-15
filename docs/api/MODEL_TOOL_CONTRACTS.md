@@ -10,6 +10,8 @@ These are the only operations an optional language model should be allowed to re
 | `search_workspace` | Search allowed engineering text files for bounded literal matches | No |
 | `inspect_model` | Return source, structure, semantic entities/references, and diagnostics | No |
 | `query_model` | Run focused registered-construct, parameter, entity, and reference queries | No |
+| `inspect_entity` | Inspect one semantic entity by stable ID or unambiguous kind/name | No |
+| `find_references` | Find inbound or outbound semantic references for one selected entity | No |
 | `compare_models` | Compare two workspace-contained source sets with bounded deterministic diff evidence | No |
 | `validate_model` | Run deterministic validation | No |
 | `import_mesh` | Inspect and validate a manually prepared Abaqus-style `.ele` mesh | No |
@@ -48,6 +50,8 @@ These are the only operations an optional language model should be allowed to re
 - Registry specification `coverage` and per-capability operational support are separate; `get_capabilities` exposes complete operation maturity plus derived inspect/query/create/modify/validate/run intent maturity, and omitted registry operations are reported as `unassessed`.
 - Optional parameter insertion/removal occurs only when its parameter-level registry operation is `verified`. Current cases are absent or isolated-record `BOUNDARY/*CONVERGENCE/maxiterations`, Boolean `BOUNDARY/*G-CONTROL/DAMP` enable/disable, and the repeated SHEFF option row `SOLVER/relative_tolerance`; shared-record removal is blocked.
 - `query_model` reports explicit versus registered-default parameter values, supports stable entity kind/name selectors for listings and references, and returns ambiguity instead of choosing among multiple contexts.
+- `inspect_entity` and `find_references` are canonical agent intents over `query_model` and the
+  same semantic index. They do not introduce a second source of BSAM syntax or dependency truth.
 - `compare_models` never writes either model and bounds returned root-deck diff text; source-set digests and validation summaries remain authoritative.
 - `inspect_run_log` can inspect only the known listing, stdout, and stderr files beneath a validated run directory. It is not an arbitrary file reader.
 - Validation diagnostics identify both their level (`syntax`, `structure`, `references`, `bsam-semantic-constraints`, `numeric-constraints`, `execution-compatibility`, or `engineering-plausibility`) and provenance. Unclassified new diagnostic codes are rejected until both are explicit; engineering heuristics remain warnings and never mutate a deck.

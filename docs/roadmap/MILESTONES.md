@@ -182,11 +182,11 @@ selected entity, last query, last generated output, last run, observations, unre
 engineering assumptions, failures, plans, and step/recovery counters. Workspace-relative and
 contained absolute Windows paths are normalized before deterministic execution. Follow-ups such as
 “Which ones are on ply2?”, “Change that value,” “Validate the changed model,” and “Why did it fail?”
-have direct regression coverage.
+have direct regression coverage. The complete inspect → cracks → ply2 → selected-crack dialogue
+also runs as one executable acceptance case without repeating the filename.
 
 Remaining:
 
-- execute the complete inspect → cracks → ply2 → selected-crack dialogue as one acceptance case;
 - broaden plural and multi-entity reference resolution without guessing;
 - improve user-facing recovery whenever context exists but a narrow query cannot consume it.
 - add deterministic context compaction for 20–50-step tasks, preserving user decisions, active
@@ -208,6 +208,8 @@ Implemented:
 - paraphrase normalization for capability and editable-parameter questions;
 - canonical semantic query names rather than arbitrary text passed into query enums;
 - entity listing/inspection and inbound/outbound reference queries through `query_model`;
+- first-class `inspect_entity` and `find_references` agent intents backed by that same semantic
+  query engine;
 - capability descriptions, deterministic model comparison, validation diagnostics, run state, and
   bounded run-log inspection;
 - a clear distinction between misunderstood/invalid arguments and unsupported capabilities.
@@ -216,8 +218,6 @@ Remaining:
 
 - replace remaining prompt-specific keyword branches with capability-derived applicability after
   equivalent trajectory tests exist;
-- promote common entity and reference operations to clearer canonical intent forms without
-  multiplying workflow-specific tools;
 - measure paraphrase equivalence across both configured providers.
 
 Exit: natural paraphrases converge on the same canonical action, arbitrary prose never reaches a
@@ -265,10 +265,10 @@ workflow, while all terminal and safety boundaries remain deterministic.
 
 Objective: let the agent investigate engineering questions the way Codex investigates a codebase.
 
-Available composable reads include model inspection, canonical entity/reference queries, model
-comparison, validation diagnostics, run status, and bounded known-log inspection. Boundary-condition
-investigation and failed-run diagnosis already demonstrate multi-call read-only trajectories without
-confirmation.
+Available composable reads include model inspection, canonical entity/reference intents, bounded
+allowed-file discovery/read/literal search, model comparison, validation diagnostics, run status,
+and bounded known-log inspection. Boundary-condition investigation and failed-run diagnosis already
+demonstrate multi-call read-only trajectories without confirmation.
 
 All read-only synthesis follows the grounded explanation policy: current-model claims require
 deterministic observations, documentation claims require retrieved provenance when available,
@@ -276,11 +276,7 @@ general background is labeled as such, and inferences identify their evidence.
 
 Next work:
 
-- add `list_workspace_files`, `read_allowed_text_file`, and `search_workspace` with explicit file
-  classes, byte/line limits, symlink rejection, and hosted-data boundaries;
 - add general `compare_files` only if model comparison cannot serve the tested use case;
-- make `inspect_entity` and `find_references` first-class canonical intents over the existing
-  semantic query engine where that improves composition;
 - add diagnostics, materials, failure definitions, sections, and project-file exploration cases;
 - require evidence-linked summaries and stop exploration when additional reads cannot change the
   conclusion.

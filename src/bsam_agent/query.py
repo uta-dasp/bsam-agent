@@ -47,6 +47,69 @@ def canonical_query_name(query: str) -> str:
         raise ValueError(f"unsupported canonical model query: {query}") from exc
 
 
+def inspect_entity(
+    source_set: SourceSet,
+    *,
+    entity_id: str | None = None,
+    entity_kind: str | None = None,
+    entity_name: str | None = None,
+) -> dict[str, Any]:
+    """Canonical entity-inspection intent backed by the semantic query engine."""
+    result = query_model(
+        source_set, "inspect_entity", entity_id=entity_id,
+        entity_kind=entity_kind, entity_name=entity_name,
+    )
+    return {**result, "intent": "inspect_entity"}
+
+
+def find_references(
+    source_set: SourceSet,
+    direction: str,
+    *,
+    entity_id: str | None = None,
+    entity_kind: str | None = None,
+    entity_name: str | None = None,
+    source_entity_kind: str | None = None,
+) -> dict[str, Any]:
+    """Canonical inbound/outbound reference intent over semantic references."""
+    normalized_direction = direction.strip().casefold()
+    if normalized_direction not in {"inbound", "outbound"}:
+        raise ValueError("direction must be inbound or outbound")
+    query = "references_to" if normalized_direction == "inbound" else "references_from"
+    result = query_model(
+        source_set, query, entity_id=entity_id,
+        entity_kind=entity_kind, entity_name=entity_name,
+    )
+    semantic = source_set.semantic_index().as_dict()
+    entities = semantic["entities"]
+    matches = list(result["matches"])
+    if normalized_direction == "inbound" and source_entity_kind:
+        source_ids = {
+            str(item["id"]) for item in entities
+            if str(item.get("kind", "")).casefold() == source_entity_kind.casefold()
+        }
+        matches = [item for item in matches if item.get("source_entity_id") in source_ids]
+    if normalized_direction == "inbound":
+        related_ids = {str(item.get("source_entity_id")) for item in matches}
+    elif entity_id:
+        related_ids = {entity_id}
+    else:
+        related_ids = {
+            str(item["id"]) for item in entities
+            if str(item.get("kind", "")).casefold() == str(entity_kind).casefold()
+            and str(item.get("name", "")).casefold() == str(entity_name).casefold()
+        }
+    related_entities = [item for item in entities if str(item.get("id")) in related_ids]
+    return {
+        **result,
+        "intent": "find_references",
+        "direction": normalized_direction,
+        "matches": matches,
+        "related_entities": related_entities,
+        "summary": {**result["summary"], "matches": len(matches)},
+    }
+
+
 def query_model(
     source_set: SourceSet,
     query: str,

@@ -30,6 +30,7 @@ DECK = (
     b"*NSET,NSET=edge\n1\n*NAME\nply2\n*NODE\n2,1,0,0\n"
     b"*NSET,NSET=edge\n2\n*STOP\nEND CLUSTERS\n"
 )
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def config() -> ProviderConfig:
@@ -87,6 +88,34 @@ class ConversationalContextTests(unittest.TestCase):
         self.assertIn("ply2.edge", direct.message)
         self.assertIn("ply2.edge", followup.message)
         self.assertEqual("bc5-1", agent.state.model_context.selected_entity["name"])
+
+    def test_complete_crack_coreference_dialogue_uses_canonical_entity_intents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "notch_v1.in"
+            source.write_bytes((FIXTURES / "conversational_cracks.in").read_bytes())
+            agent = self.agent(root)
+
+            inspected = agent.turn("Inspect notch_v1.in.")
+            counted = agent.turn("How many cracks?")
+            explained = agent.turn("Explain the cracks.")
+            linked = agent.turn("Which one references ply2?")
+            detailed = agent.turn("Show me that crack in more detail.")
+
+        self.assertEqual("inspect_model", inspected.tool)
+        self.assertEqual("query_model", counted.tool)
+        self.assertEqual(2, counted.tool_result["summary"]["matches"])
+        self.assertEqual("query_model", explained.tool)
+        self.assertEqual(["1", "2"], [item["name"] for item in explained.tool_result["matches"]])
+        self.assertEqual("find_references", linked.tool)
+        self.assertEqual(1, linked.tool_result["summary"]["matches"])
+        selected = agent.state.model_context.selected_entity
+        self.assertEqual({"kind": "crack", "name": "2"}, {
+            "kind": selected["kind"], "name": selected["name"],
+        })
+        self.assertEqual("inspect_entity", detailed.tool)
+        self.assertEqual("2", detailed.tool_result["matches"][0]["name"])
+        self.assertIn("type=301", detailed.message)
 
     def test_change_followup_uses_active_source_and_recovers_output_and_audit_collisions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -156,8 +185,12 @@ class ConversationalContextTests(unittest.TestCase):
 
     def test_model_facing_generic_and_query_schemas_are_capability_specific(self) -> None:
         query = _routing_request_schema("query_model", include_registry_catalog=False)
+        references = _routing_request_schema("find_references", include_registry_catalog=False)
         create = _routing_request_schema("preview_create_entity", include_registry_catalog=False)
         self.assertIn("list_boundary_conditions", query["properties"]["query"]["enum"])
+        self.assertEqual(
+            ["inbound", "outbound"], references["properties"]["direction"]["enum"],
+        )
         self.assertIn("command.node", create["properties"]["capability"]["enum"])
         metadata = create["properties"]["attributes"]["description"]
         self.assertIn('"required_fields"', metadata)

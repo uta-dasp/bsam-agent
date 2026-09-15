@@ -456,6 +456,8 @@ def relevant_tools(user_text: str) -> tuple[str, ...]:
         return ("get_run_status", "inspect_run_log", "validate_model", "query_model")
     if "compare" in text:
         return ("compare_models", "inspect_model", "validate_model")
+    if "reference" in text or "depend" in text:
+        return ("find_references", "inspect_entity", "query_model", "inspect_model")
     if "status" in text:
         return ("get_run_status", "run_bsam", "stop_run")
     if "stop" in text:
@@ -508,7 +510,10 @@ def relevant_tools(user_text: str) -> tuple[str, ...]:
             "inspect_model",
         )
     if "inspect" in text or "summar" in text:
-        return ("query_model", "inspect_model", "validate_model", "get_capabilities")
+        return (
+            "inspect_entity", "find_references", "query_model", "inspect_model",
+            "validate_model", "get_capabilities",
+        )
     if "validate" in text or "check" in text:
         return ("validate_model", "inspect_model")
     if capability_applicability(user_text):
@@ -581,6 +586,12 @@ def _routing_request_schema(
             "type": "string",
             "enum": list(CANONICAL_QUERIES),
             "description": "Canonical deterministic query name; never put user prose here.",
+        }
+        return schema
+    if tool == "find_references":
+        schema = TOOL_CONTRACTS[tool].request_schema()
+        schema["properties"]["direction"] = {
+            "type": "string", "enum": ["inbound", "outbound"],
         }
         return schema
     generic_operation = {
@@ -763,7 +774,7 @@ class ChatOrchestrator:
         if decision is None:
             decision = _deterministic_run_log_request(routing_text, self.state)
         if decision is None:
-            decision = _deterministic_query_request(routing_text)
+            decision = _deterministic_query_request(routing_text, self.state)
         if decision is None:
             decision = _deterministic_capability_request(routing_text)
         if decision is None:
@@ -1135,7 +1146,8 @@ class ChatOrchestrator:
     ) -> ChatTurn:
         if tool in {
             "inspect_model", "query_model", "validate_model", "import_mesh", "get_capabilities",
-            "list_workspace_files", "read_allowed_text_file", "search_workspace",
+            "inspect_entity", "find_references", "list_workspace_files",
+            "read_allowed_text_file", "search_workspace",
         }:
             self.state.phase = "inspect"
         elif tool in PREVIEW_TOOLS or tool == "review_change":
@@ -1237,7 +1249,8 @@ class ChatOrchestrator:
             phase = "propose"
         elif tool in {
             "inspect_model", "query_model", "import_mesh", "get_capabilities",
-            "list_workspace_files", "read_allowed_text_file", "search_workspace",
+            "inspect_entity", "find_references", "list_workspace_files",
+            "read_allowed_text_file", "search_workspace",
         }:
             phase = "explain"
         else:
@@ -1351,14 +1364,22 @@ class ChatOrchestrator:
             "source": source if isinstance(source, str) else None,
             "status": "completed",
         }
-        if tool == "query_model":
+        if tool in {"query_model", "inspect_entity", "find_references"}:
             matches = result.get("matches", [])
             context.last_query = {
                 key: arguments[key]
-                for key in ("query", "capability", "parameter", "entity_id", "entity_kind", "entity_name")
+                for key in (
+                    "query", "direction", "capability", "parameter", "entity_id",
+                    "entity_kind", "entity_name", "source_entity_kind",
+                )
                 if key in arguments
-            } | {"matches": len(matches) if isinstance(matches, list) else 0}
-            entities = _context_entities(matches)
+            } | {
+                "query": result.get("intent") or arguments.get("query"),
+                "matches": len(matches) if isinstance(matches, list) else 0,
+            }
+            entities = _context_entities(
+                result.get("related_entities", []) if tool == "find_references" else matches
+            )
             if entities:
                 context.recent_entities = _merge_context_entities(
                     entities, context.recent_entities,
@@ -1522,7 +1543,8 @@ class ChatOrchestrator:
             task.status = "verify"
             task.validation_state = result.get("summary")
         elif tool in {
-            "compare_models", "inspect_run_log", "list_workspace_files",
+            "inspect_entity", "find_references", "compare_models", "inspect_run_log",
+            "list_workspace_files",
             "read_allowed_text_file", "search_workspace",
         }:
             task.status = "verify"
@@ -1642,7 +1664,8 @@ def _bounded_observation(
         name: arguments[name]
         for name in (
             "source", "query", "capability", "parameter", "entity_id", "entity_kind",
-            "entity_name", "left", "right", "output_dir", "path", "directory", "pattern",
+            "entity_name", "source_entity_kind", "direction", "left", "right", "output_dir",
+            "path", "directory", "pattern",
         )
         if isinstance(arguments.get(name), (str, int, float, bool))
     }
@@ -1677,6 +1700,9 @@ def _bounded_observation(
             for item in matches[:16]
             if isinstance(item, dict)
         ]
+    related_entities = result.get("related_entities")
+    if isinstance(related_entities, list):
+        evidence["entities"] = _context_entities(related_entities)
     files = result.get("files")
     if tool == "list_workspace_files" and isinstance(files, list):
         evidence["workspace_files"] = [
@@ -1794,9 +1820,10 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
     )
     workspace_evidence = _requests_workspace_evidence(text)
     goal_language = re.search(
-        r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg|which|what|show|list|"
+        r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg|which|what|how|show|list|"
         r"compare|change|changing|set|update|modify|rename|compose|combine|merge|add|create|"
-        r"insert|append|delete|remove|extend|validate|run|launch|fix|find|search|read|review)\b",
+        r"insert|append|delete|remove|extend|validate|run|launch|fix|find|search|read|review|"
+        r"explain|describe)\b",
         text, re.IGNORECASE,
     )
     if goal_language is None or is_capability_question:
@@ -1821,7 +1848,10 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         outcomes.append("modify")
     if re.search(r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg)\b", text, re.IGNORECASE):
         outcomes.append("inspect")
-    if re.search(r"\b(?:which|what|show|list|find|search|read|review)\b", text, re.IGNORECASE):
+    if re.search(
+        r"\b(?:which|what|how|show|list|find|search|read|review|explain|describe)\b",
+        text, re.IGNORECASE,
+    ):
         outcomes.append("query")
     if re.search(r"\bcompare\b", text, re.IGNORECASE):
         outcomes.append("compare")
@@ -1916,6 +1946,7 @@ def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
         "model_inspected": "inspect_model" in tools or "validate_model" in tools,
         "focused_evidence_collected": (
             "query_model" in tools or "inspect_run_log" in tools or "compare_models" in tools
+            or "inspect_entity" in tools or "find_references" in tools
             or "search_workspace" in tools or "read_allowed_text_file" in tools
         ),
         "workspace_evidence_collected": any(
@@ -1936,7 +1967,8 @@ def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
             and str(task.last_run.get("state", "")).casefold() == "terminal"
         ),
         "references_inspected": any(
-            observation.get("evidence", {}).get("query") == "references-from"
+            observation.get("tool") == "find_references"
+            or observation.get("evidence", {}).get("query") == "references-from"
             or observation.get("evidence", {}).get("query") == "references_from"
             for observation in task.observations
         ),
@@ -1948,7 +1980,8 @@ def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
 def _agent_loop_tools(objective: str) -> tuple[str, ...]:
     ordered = [
         *relevant_tools(objective),
-        "inspect_model", "query_model", "compare_models", "validate_model",
+        "inspect_model", "inspect_entity", "find_references", "query_model",
+        "compare_models", "validate_model",
         "get_run_status", "inspect_run_log", "get_capabilities", "list_workspace_files",
         "read_allowed_text_file", "search_workspace",
     ]
@@ -2180,12 +2213,28 @@ def _resolve_contextual_request(text: str, state: ConversationState) -> str:
                 r"\b(?:that|this)\s+set|those\s+sets\b", f"{kind} {name}",
                 result, flags=re.IGNORECASE,
             )
+        elif name and kind:
+            label = str(kind).replace("-", " ")
+            result = re.sub(
+                rf"\b(?:that|this)\s+(?:{re.escape(label)}|entity)\b",
+                f"{label} {name}", result, flags=re.IGNORECASE,
+            )
     last_query = context.last_query or {}
     if last_query.get("query") in {
         "list-boundary-conditions", "list_boundary_conditions",
     }:
         result = re.sub(
             r"\bwhich\s+ones\b", "which boundary conditions",
+            result, flags=re.IGNORECASE,
+        )
+    last_entity_kind = last_query.get("entity_kind")
+    if (
+        last_query.get("query") in {"list_entities", "list-entities"}
+        and isinstance(last_entity_kind, str)
+    ):
+        result = re.sub(
+            r"\bwhich\s+one(?:s)?\b",
+            "which " + last_entity_kind.replace("-", " "),
             result, flags=re.IGNORECASE,
         )
     parameter = last_query.get("parameter")
@@ -2199,7 +2248,7 @@ def _resolve_contextual_request(text: str, state: ConversationState) -> str:
         if re.search(r"\b(?:changed|created|output)\s+(?:model|file|deck)\b", result, re.IGNORECASE):
             source = context.last_created_output or source
         needs_source = re.search(
-            r"\b(?:inspect|summari[sz]e|show|list|which|what|references?|validate|check|"
+            r"\b(?:inspect|summari[sz]e|show|list|which|what|how|explain|describe|references?|validate|check|"
             r"change|set|update|modify|rename|delete|remove|run|compare)\b",
             result, re.IGNORECASE,
         )
@@ -2566,9 +2615,29 @@ def _deterministic_parameter_removal_request(text: str) -> dict[str, Any] | None
     }
 
 
-def _deterministic_query_request(text: str) -> dict[str, Any] | None:
+def _deterministic_query_request(
+    text: str, state: ConversationState,
+) -> dict[str, Any] | None:
     """Resolve focused read-only parameter queries from registry identities."""
     source = _source_path_from_text(text)
+    selected = state.model_context.selected_entity
+    selected_label = (
+        rf"\b{re.escape(str(selected.get('kind', '')).replace('-', ' '))}\s+"
+        rf"{re.escape(str(selected.get('name', '')))}\b"
+        if selected else None
+    )
+    if (
+        source is not None
+        and selected
+        and selected_label
+        and re.search(selected_label, text, re.IGNORECASE)
+        and re.search(r"\b(?:inspect|show|describe|explain)\b", text, re.IGNORECASE)
+    ):
+        return {
+            "outcome": "dispatch", "tool": "inspect_entity",
+            "arguments": {"source": source, "entity_id": selected["id"]},
+            "error_code": None, "response": None,
+        }
     if source is not None and re.search(
         r"(?:\b(?:which|what|list|show)\b.*\bparameters?\b.*"
         r"\b(?:safe|safely|change|changed|editable|edit|modify|modified)\b|"
@@ -2582,9 +2651,43 @@ def _deterministic_query_request(text: str) -> dict[str, Any] | None:
             "error_code": None, "response": None,
         }
     if source is None or not re.search(
-        r"\b(?:what(?:\s+is|\s+does)?|which|show|get|inspect|query|list)\b", text, re.IGNORECASE,
+        r"\b(?:what(?:\s+is|\s+does)?|which|how\s+many|show|get|inspect|query|list|"
+        r"explain|describe)\b", text, re.IGNORECASE,
     ):
         return None
+    reference_subject = re.search(
+        r"\bwhich\s+(?P<source_kind>[A-Za-z][A-Za-z -]*?)\s+references?\s+"
+        r"(?:the\s+)?(?P<target>[A-Za-z0-9_.-]+)",
+        text, re.IGNORECASE,
+    )
+    if reference_subject:
+        requested_kind = _normalized_routing_text(reference_subject.group("source_kind"))
+        target_name = reference_subject.group("target").rstrip(".?!")
+        known_kinds = {
+            str(item.get("kind")) for item in state.model_context.recent_entities
+            if item.get("kind")
+        }
+        source_kinds = [
+            kind for kind in known_kinds
+            if requested_kind in {
+                _normalized_routing_text(kind),
+                _normalized_routing_text(kind) + "s",
+            }
+        ]
+        targets = [
+            item for item in state.model_context.recent_entities
+            if str(item.get("name", "")).casefold() == target_name.casefold()
+        ]
+        if len(source_kinds) == 1 and len(targets) == 1:
+            return {
+                "outcome": "dispatch", "tool": "find_references",
+                "arguments": {
+                    "source": source, "direction": "inbound",
+                    "entity_id": targets[0]["id"],
+                    "source_entity_kind": source_kinds[0],
+                },
+                "error_code": None, "response": None,
+            }
     bc_target = re.search(
         r"\b(?:which|what|show|list)\b.*\b(?:BCs?|boundary conditions?)\b.*"
         r"\b(?:act(?:s)?\s+on|apply\s+to|target(?:s)?|are\s+on)\s+"
@@ -2607,9 +2710,9 @@ def _deterministic_query_request(text: str) -> dict[str, Any] | None:
     )
     if outgoing:
         return {
-            "outcome": "dispatch", "tool": "query_model",
+            "outcome": "dispatch", "tool": "find_references",
             "arguments": {
-                "source": source, "query": "references_from",
+                "source": source, "direction": "outbound",
                 "entity_kind": "boundary-condition",
                 "entity_name": outgoing.group("name").rstrip(".?!"),
             },
@@ -2652,9 +2755,9 @@ def _deterministic_query_request(text: str) -> dict[str, Any] | None:
     if len(reference_selectors) == 1:
         entity_kind, entity_name = next(iter(reference_selectors))
         return {
-            "outcome": "dispatch", "tool": "query_model",
+            "outcome": "dispatch", "tool": "find_references",
             "arguments": {
-                "source": source, "query": "references-to",
+                "source": source, "direction": "inbound",
                 "entity_kind": entity_kind, "entity_name": entity_name,
             },
             "error_code": None, "response": None,
@@ -2687,7 +2790,7 @@ def _deterministic_query_request(text: str) -> dict[str, Any] | None:
             if len(registered_kinds) == 1:
                 named_entity_kind = next(iter(registered_kinds))
     if named_entity_kind and re.search(
-        r"\b(?:show|query|list)\b", text, re.IGNORECASE,
+        r"\b(?:what|how\s+many|show|query|list|explain|describe)\b", text, re.IGNORECASE,
     ):
         return {
             "outcome": "dispatch", "tool": "query_model",
@@ -2876,7 +2979,8 @@ def _conversation_defaults(
 ) -> dict[str, Any]:
     result = dict(arguments)
     source_tools = {
-        "inspect_model", "query_model", "validate_model", "run_bsam",
+        "inspect_model", "query_model", "inspect_entity", "find_references",
+        "validate_model", "run_bsam",
         *PREVIEW_TOOLS,
     }
     if tool in source_tools and not result.get("source") and not result.get("template"):
@@ -3003,7 +3107,7 @@ def _invalid_argument_guidance(
 
 
 def _summarize_result(tool: str, result: dict[str, Any]) -> str:
-    if tool == "query_model":
+    if tool in {"query_model", "inspect_entity", "find_references"}:
         summary = result.get("summary", {})
         matches = result.get("matches", [])
         if summary.get("ambiguous"):
@@ -3061,6 +3165,42 @@ def _summarize_result(tool: str, result: dict[str, Any]) -> str:
                 f"Found {summary.get('matches', 0)} reference(s)"
                 + (": " + "; ".join(parts) if parts else ".")
                 + _more(len(matches), 24)
+            )
+        if result.get("query") == "inspect-entity":
+            parts = []
+            for item in matches[:12]:
+                if not isinstance(item, dict):
+                    continue
+                attributes = item.get("attributes", {})
+                details = [
+                    f"{name}={value}"
+                    for name, value in sorted(attributes.items())[:8]
+                    if isinstance(value, (str, int, float, bool))
+                ] if isinstance(attributes, dict) else []
+                parts.append(
+                    f"{item.get('kind', 'entity')} {item.get('name', item.get('id', '?'))}"
+                    + (" (" + ", ".join(details) + ")" if details else "")
+                )
+            return (
+                f"Inspected {summary.get('matches', 0)} engineering entity/entities"
+                + (": " + "; ".join(parts) if parts else ".")
+                + _more(len(matches), 12)
+            )
+        if result.get("query") == "list-entities" and matches and all(
+            isinstance(item, dict) and item.get("kind") == "crack" for item in matches
+        ):
+            parts = [
+                f"crack {item.get('name', '?')}"
+                + (
+                    f" (type={item.get('attributes', {}).get('type')})"
+                    if isinstance(item.get("attributes"), dict)
+                    and item.get("attributes", {}).get("type") is not None else ""
+                )
+                for item in matches[:24]
+            ]
+            return (
+                f"Found {summary.get('matches', 0)} crack entity/entities: "
+                + "; ".join(parts) + _more(len(matches), 24)
             )
         if result.get("query") in {
             "list-entities", "list-materials", "list-constitutives", "list-sets",

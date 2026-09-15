@@ -104,7 +104,7 @@ These gates apply to every slice and are not optional feature work.
 model-selected read-only steps, follow semantic references and allowed project evidence, and report
 a grounded conclusion without the user prescribing tools.
 
-- [ ] **V2-S1-001** Add executable acceptance fixtures for the complete crack-coreference dialogue
+- [x] **V2-S1-001** Add executable acceptance fixtures for the complete crack-coreference dialogue
   and at least one unseen open-ended model investigation.
 - [x] **V2-S1-002** Define allowed project-file classes, ignored directories, symlink policy,
   maximum file/result sizes, binary detection, and hosted-provider disclosure policy.
@@ -116,7 +116,7 @@ a grounded conclusion without the user prescribing tools.
   and no unrestricted regex/resource consumption.
 - [ ] **V2-S1-006** Decide through tests whether general `compare_files` is needed; implement it only
   if `compare_models` plus bounded reads cannot satisfy an accepted investigation.
-- [ ] **V2-S1-007** Promote `inspect_entity` and `find_references` to canonical agent intents over
+- [x] **V2-S1-007** Promote `inspect_entity` and `find_references` to canonical agent intents over
   the existing semantic query engine without duplicating BSAM authority.
 - [ ] **V2-S1-008** Add durable working hypotheses, supporting/refuting observation IDs, and schema
   migration to task state.

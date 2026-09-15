@@ -37,7 +37,7 @@ from .change import (
 from .capabilities import capability_manifest
 from .generation import GenerationError, generate_deck
 from .mesh import import_ele
-from .query import query_model
+from .query import find_references, inspect_entity, query_model
 from .registry import load_registry
 from .run import request_run_stop, run_bsam, run_status
 from .source_set import SourceSet
@@ -218,6 +218,32 @@ class LocalAgentApi:
                 entity_kind=str(args["entity_kind"]) if "entity_kind" in args else None,
                 entity_name=str(args["entity_name"]) if "entity_name" in args else None,
                 occurrence=int(args["occurrence"]) if "occurrence" in args else None,
+            )
+        if tool == "inspect_entity":
+            args = self._args(arguments, {"source"})
+            source_set = SourceSet.read(
+                self._path(args["source"], "source"), self.workspace_root
+            )
+            return inspect_entity(
+                source_set,
+                entity_id=str(args["entity_id"]) if "entity_id" in args else None,
+                entity_kind=str(args["entity_kind"]) if "entity_kind" in args else None,
+                entity_name=str(args["entity_name"]) if "entity_name" in args else None,
+            )
+        if tool == "find_references":
+            args = self._args(arguments, {"source", "direction"})
+            source_set = SourceSet.read(
+                self._path(args["source"], "source"), self.workspace_root
+            )
+            return find_references(
+                source_set, str(args["direction"]),
+                entity_id=str(args["entity_id"]) if "entity_id" in args else None,
+                entity_kind=str(args["entity_kind"]) if "entity_kind" in args else None,
+                entity_name=str(args["entity_name"]) if "entity_name" in args else None,
+                source_entity_kind=(
+                    str(args["source_entity_kind"])
+                    if "source_entity_kind" in args else None
+                ),
             )
         if tool == "import_mesh":
             args = self._args(arguments, {"source"})

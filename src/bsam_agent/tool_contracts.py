@@ -82,6 +82,23 @@ TOOL_CONTRACTS: dict[str, ToolContract] = {
         "entity_name": Field("string", required=False),
         "occurrence": Field("integer", required=False),
     }, ("source_set_sha256", "query", "matches", "summary")),
+    "inspect_entity": ToolContract({
+        "source": S,
+        "entity_id": Field("string", required=False),
+        "entity_kind": Field("string", required=False),
+        "entity_name": Field("string", required=False),
+    }, ("source_set_sha256", "intent", "query", "matches", "summary")),
+    "find_references": ToolContract({
+        "source": S,
+        "direction": S,
+        "entity_id": Field("string", required=False),
+        "entity_kind": Field("string", required=False),
+        "entity_name": Field("string", required=False),
+        "source_entity_kind": Field("string", required=False),
+    }, (
+        "source_set_sha256", "intent", "direction", "query", "matches",
+        "related_entities", "summary",
+    )),
     "validate_model": ToolContract({"source": S}, ("source_set_sha256", "diagnostics", "summary")),
     "compare_models": ToolContract({
         "left": S, "right": S,
@@ -172,6 +189,8 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "search_workspace": "Search allowed workspace engineering text files for bounded literal text matches.",
     "inspect_model": "Inspect an existing BSAM deck and return its structure, semantic entities, diagnostics, and summary.",
     "query_model": "Run a focused semantic query for registered constructs, parameters, entities, or references.",
+    "inspect_entity": "Inspect one semantic engineering entity by stable ID or unambiguous kind and name.",
+    "find_references": "Find deterministic inbound or outbound semantic references for one engineering entity.",
     "validate_model": "Validate an existing BSAM deck without changing or running it.",
     "compare_models": "Compare two workspace-contained BSAM source sets and return bounded deterministic structural and text differences.",
     "import_mesh": "Inspect and validate a manually prepared Abaqus-style .ele mesh without modifying a deck.",

@@ -1,0 +1,48 @@
+INPUT
+3
+END INPUT
+BOUNDARY
+*type
+mechanical
+END BOUNDARY
+CRACK
+301
+0,10
+3,-ngap
+ply1,-approximation
+*normal
+301
+0,10
+3,-ngap
+ply2,-approximation
+*normal
+END CRACK
+CONSTITUTIVE
+0
+END CONSTITUTIVE
+MATERIALS
+0
+END MATERIALS
+CLUSTERS
+*type
+solid
+*NAME
+ply1
+*NODE
+1,0,0,0
+2,1,0,0
+3,0,1,0
+4,0,0,1
+*ELEMENT,TYPE=C3D4
+1,1,2,3,4
+*NAME
+ply2
+*NODE
+5,0,0,1
+6,1,0,1
+7,0,1,1
+8,0,0,2
+*ELEMENT,TYPE=C3D4
+2,5,6,7,8
+*STOP
+END CLUSTERS

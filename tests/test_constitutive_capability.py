@@ -88,7 +88,7 @@ class ConstitutiveCapabilityTests(unittest.TestCase):
                     LocalAgentApi(root),
                 )
                 result = agent.turn(prompt)
-                self.assertEqual("query_model", result.tool)
+                self.assertEqual("find_references" if kind is None else "query_model", result.tool)
                 self.assertEqual(count, result.tool_result["summary"]["matches"])
                 if kind is not None:
                     self.assertTrue(all(

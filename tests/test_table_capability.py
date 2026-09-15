@@ -231,7 +231,7 @@ class TableCapabilityTests(unittest.TestCase):
         self.assertEqual("query_model", result.tool)
         self.assertEqual(2, result.tool_result["summary"]["matches"])
         self.assertTrue(all(item["kind"] == "table" for item in result.tool_result["matches"]))
-        self.assertEqual("query_model", references.tool)
+        self.assertEqual("find_references", references.tool)
         self.assertEqual(1, references.tool_result["summary"]["matches"])
 
 
