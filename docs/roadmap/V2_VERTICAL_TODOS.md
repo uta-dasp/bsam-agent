@@ -134,7 +134,7 @@ a grounded conclusion without the user prescribing tools.
   repetition, final usefulness, policy behavior, and provider parity in executable tests.
 - [x] **V2-S1-015** Retain sanitized acceptance evidence for one previously unseen investigation;
   close M4 only if the trajectory is model-composed rather than hard-coded.
-- [ ] **V2-S1-016** Add task-scoped authorization state, mode transitions, audit events, revocation,
+- [x] **V2-S1-016** Add task-scoped authorization state, mode transitions, audit events, revocation,
   and backward-compatible conversation-state migration.
 - [x] **V2-S1-017** Implement the grounded explanation policy in planning/synthesis prompts and
   response evidence so current-model claims cannot come from model memory alone.

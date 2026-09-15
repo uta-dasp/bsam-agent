@@ -120,13 +120,12 @@ class TaskTrajectoryTests(unittest.TestCase):
         api = RunLifecycleApi()
         agent = ChatOrchestrator(provider, config(), api)  # type: ignore[arg-type]
 
-        pending = agent.turn("Run model.in in runs/case with a 30 second timeout.")
-        accepted = agent.turn("/confirm")
+        accepted = agent.turn("Run model.in in runs/case with a 30 second timeout.")
         running = agent.turn("Check status for runs/case.")
         terminal = agent.turn("Check status for runs/case again.")
         restored = ConversationState.from_dict(agent.state.as_dict())
 
-        self.assertTrue(pending.requires_confirmation)
+        self.assertFalse(accepted.requires_confirmation)
         self.assertEqual("pending", accepted.tool_result["classification"])
         self.assertEqual("running", running.tool_result["state"])
         self.assertEqual("stopped", terminal.tool_result["classification"])
@@ -222,6 +221,8 @@ class TaskTrajectoryTests(unittest.TestCase):
         self.assertEqual(["inspect_model", "preview_parameter_change"], before_confirmation)
         self.assertTrue(preview.requires_confirmation)
         self.assertEqual("confirm", preview.phase)
+        self.assertEqual("edits_with_confirmation", restored.task.authorization.mode)
+        self.assertEqual("active", restored.task.authorization.status)
         self.assertIsNotNone(restored.task)
         self.assertEqual(before_confirmation, [item["tool"] for item in restored.task.steps])
         self.assertEqual(
@@ -229,6 +230,7 @@ class TaskTrajectoryTests(unittest.TestCase):
             after_confirmation,
         )
         self.assertEqual("complete", agent.state.task.status)
+        self.assertEqual("consumed", agent.state.task.authorization.status)
         self.assertEqual(0, applied.tool_result["post_apply_validation"]["summary"]["errors"])
         self.assertIn(b"d_reduction=0.4", output)
         self.assertEqual([], provider.requests)
@@ -311,10 +313,9 @@ class TaskTrajectoryTests(unittest.TestCase):
             "executable": "bsam20.exe", "confirm": False,
         }))
         agent = ChatOrchestrator(provider, config(), FailedRunApi())  # type: ignore[arg-type]
-        pending = agent.turn("Run model.in in runs/case and verify whether it succeeds.")
-        result = agent.turn("/confirm")
+        result = agent.turn("Run model.in in runs/case and verify whether it succeeds.")
 
-        self.assertTrue(pending.requires_confirmation)
+        self.assertFalse(result.requires_confirmation)
         self.assertEqual("run_bsam", result.tool)
         self.assertEqual("failed", agent.state.task.status)
         self.assertEqual("execution_input_failure", agent.state.task.failures[0]["category"])

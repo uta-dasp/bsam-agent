@@ -1,6 +1,6 @@
 # Terminal chat client
 
-The chat client routes language into bounded requests through the configured provider. Local deterministic code validates every argument, confines paths to the selected workspace, creates and reviews plans, requires a separate `/confirm` turn for apply/run/stop, and performs all authoritative work. CPU-local Scout remains the default; the optional OpenAI adapter is documented in [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md).
+The chat client routes language into bounded requests through the configured provider. Local deterministic code validates every argument, confines paths to the selected workspace, creates and reviews plans, requires a separate `/confirm` turn for every model-changing apply, and performs all authoritative work. An explicitly requested bounded full run or controlled stop receives scoped, expiring task authorization and does not prompt again after prerequisites pass. CPU-local Scout remains the default; the optional OpenAI adapter is documented in [OpenAI provider setup](../guides/OPENAI_PROVIDER_SETUP.md).
 
 The orchestrator supports a bounded observe-reason-act loop. A task records explicit completion
 criteria and compact deterministic observations, then may continue through additional read-only
@@ -16,9 +16,9 @@ incomplete task complete.
 
 The JSON-lines protocol sends a bounded task-view projection on startup and after every turn. The
 VS Code chat panel renders it in an expandable local task card: objective/status, plan, completed
-tool activity, evidence IDs and summaries, assumptions, hypotheses, completion criteria, and the
-terminal reason. Raw workspace match text and full tool payloads are not included in this UI
-projection.
+tool activity, evidence IDs and summaries, assumptions, hypotheses, completion criteria,
+authorization mode/status/usage, and the terminal reason. Raw workspace match text and full tool
+payloads are not included in this UI projection.
 
 ## Start and use
 
@@ -33,7 +33,7 @@ python -m bsam_agent chat `
   --session .bsam-agent\conversations\notch.json
 ```
 
-`/confirm` executes exactly the pending guarded action; `confirm`, `approve`, `approved`, and `yes` are accepted equivalents. `/cancel` discards it, and `/quit` exits. A different provider configuration selects another model. The workspace root binds every tool path. The optional `--session` file saves raw local chat text, pending confirmation, and bounded engineering-task state so work can resume; omit it for an ephemeral conversation. Digest-only audit metadata is enabled by default beneath `.bsam-agent/audit`; `--no-audit` disables it.
+`/confirm` executes exactly the pending guarded action; `confirm`, `approve`, `approved`, and `yes` are accepted equivalents. `/cancel` discards a pending action, `/revoke` revokes active task authorization and clears any pending action, and `/quit` exits. A different provider configuration selects another model. The workspace root binds every tool path. The optional `--session` file saves raw local chat text, pending confirmation, authorization, and bounded engineering-task state so work can resume; omit it for an ephemeral conversation. Digest-only audit metadata is enabled by default beneath `.bsam-agent/audit`; `--no-audit` disables it.
 
 Start with a deterministic inspection:
 
@@ -92,7 +92,7 @@ If the client reports `credential environment variable is not set: BSAM_LOCAL_AP
 
 - Scout takes roughly 20–30 seconds for many routed requests on the CPU host.
 - Only registered deterministic tools are available; unsupported BSAM operations remain unavailable through chat.
-- Raw model routing is imperfect, so review every proposed tool and diff. No guarded action runs without a separate `/confirm`.
+- Raw model routing is imperfect, so review every proposed tool and diff. Model-changing applies always require `/confirm`; only a bounded full run or controlled stop explicitly named in the task objective may use its persisted one-shot authorization.
 - Multi-step support covers bounded inspect/preview/confirm/apply/validate trajectories and one reviewed composition of independent plans; it is not unrestricted autonomous tool use.
 - If the model server is unavailable, restart it and repeat the request. If a saved state contains an unwanted pending action, resume it and use `/cancel`, or start without `--session`.
 

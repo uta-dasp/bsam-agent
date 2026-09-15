@@ -246,15 +246,15 @@ Implemented:
 - an explicit evidence-exhausted stop that cannot satisfy missing deterministic criteria;
 - an evidence-grounded final synthesis pass, validated against deterministic observation IDs and
   unable to change completion state;
-- separate confirmation boundaries in the current baseline for applying changes, running BSAM, and
-  stopping a run;
+- mandatory deterministic review and confirmation for model-changing applies, plus bounded,
+  expiring, revocable task authorization for explicitly requested full runs and controlled stops;
 - deterministic evidence requirements for creation, validation, comparison, and terminal run state.
 
 Version 2 extensions:
 
 - characterize model behavior when several equally safe investigation paths exist.
-- replace per-tool execution confirmations with audited task-scoped authorization while retaining
-  mandatory review/confirmation for every physics-changing or model-changing edit;
+- extend the implemented task authorization to the future distinct smoke-test contract while
+  retaining mandatory review/confirmation for every physics-changing or model-changing edit;
 - create a per-task engineering workspace and deterministic promotion/cleanup lifecycle;
 - compact long trajectories deterministically without losing decisions, failures, provenance,
   authorization, or completion evidence.
@@ -616,8 +616,8 @@ The following tactical conflicts or gaps must be retired:
   product-definition release;
 - remaining keyword-driven and deterministic special-case routing cannot be the main mechanism for
   unseen agent tasks;
-- per-tool confirmation is too granular for explicitly requested multi-step execution and must be
-  replaced by bounded, revocable task-scoped authorization;
+- bounded, revocable task-scoped authorization now covers explicitly requested full runs and
+  controlled stops; extend it to smoke execution only after the distinct smoke contract exists;
 - project-root intermediate outputs need to move into a contained task workspace with explicit
   final-artifact promotion;
 - long trajectories currently retain bounded recent observations but lack deterministic compaction

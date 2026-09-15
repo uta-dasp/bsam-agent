@@ -2,7 +2,7 @@
 
 This tutorial covers the CPU-local workflow in the dedicated chat window included with BSAM Agent for VS Code 0.6.0. The command opens a theme-aware panel beside the editor. A private local process uses the same guarded orchestrator as `python -m bsam_agent chat`; users do not interact with its command line.
 
-The language model only interprets requests. Deterministic BSAM Agent code resolves registry capabilities, validates paths and values, creates review plans, and performs tool calls. Applying a change, starting a run, or requesting a stop always requires a separate confirmation turn.
+The language model only interprets requests. Deterministic BSAM Agent code resolves registry capabilities, validates paths and values, creates review plans, and performs tool calls. Applying a model-changing plan always requires review and a separate confirmation turn. A task that explicitly requests a bounded full run or controlled stop grants one scoped, expiring authorization for that operation.
 
 ## 1. Confirm the installed components
 
@@ -232,11 +232,9 @@ Use a new output directory and explicitly name the executable:
 Run projects/TriC_v311/TriC_v311.in in .bsam-agent/runs/tric-chat-tutorial with projects/bsam20.exe and a 3600 second timeout.
 ```
 
-Review the proposed source, executable, timeout, and output directory. Then type:
-
-```text
-/confirm
-```
+The explicit request authorizes one full run for that source and output scope. Deterministic code
+validates the request and starts it without a redundant chat confirmation. If the source, output,
+run kind, or execution limit changes, the client does not infer the expanded authorization.
 
 Starting a run is asynchronous. Request status with the same directory:
 
@@ -250,7 +248,7 @@ To request BSAM's controlled stop path:
 Stop the run in .bsam-agent/runs/tric-chat-tutorial.
 ```
 
-Review the target and type `/confirm`. The chat tool requests BSAM's controlled `.exit` mechanism; it does not directly kill the process. The owning run supervisor may escalate only after the configured grace period.
+The explicit stop request authorizes the controlled stop for the active run directory. The chat tool requests BSAM's controlled `.exit` mechanism; it does not directly kill the process. The owning run supervisor may escalate only after the configured grace period. Type `/revoke` at any time to revoke still-active task authorization and clear a pending action.
 
 Use a fresh output directory for every run. Existing run directories are deliberately rejected.
 

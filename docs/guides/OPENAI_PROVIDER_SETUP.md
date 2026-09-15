@@ -20,7 +20,7 @@ It does **not** send:
 - the capability registry's parameter catalog;
 - the API key in the request body, logs, configuration, or conversation file.
 
-The OpenAI adapter has no filesystem or local Agent API access. It receives only the message tuple assembled by the orchestrator. Returned output is untrusted: deterministic local code validates the tool name and arguments, confines paths to the workspace, and requires a separate confirmation before apply, run, or stop.
+The OpenAI adapter has no filesystem or local Agent API access. It receives only the message tuple assembled by the orchestrator. Returned output is untrusted: deterministic local code validates the tool name and arguments, confines paths to the workspace, requires review and separate confirmation before a model-changing apply, and enforces bounded task authorization for explicitly requested full runs or controlled stops.
 
 `store` is fixed to `false` in both configuration validation and the actual HTTP request. This prevents normal Responses application-state storage. It does not promise zero retention: OpenAI documents that standard API abuse-monitoring logs may be retained for up to 30 days unless an account has approved stricter data controls. OpenAI also states that API data is not used to train its models unless the organization explicitly opts in.
 

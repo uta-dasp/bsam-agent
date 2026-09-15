@@ -13,7 +13,9 @@ from bsam_agent.agent_benchmark import evaluate_trajectory
 from bsam_agent.api import LocalAgentApi
 from bsam_agent.knowledge import KnowledgeQuery, RetrievalUnavailable
 from bsam_agent.local_provider import ProviderError
-from bsam_agent.orchestrator import ChatOrchestrator, ConversationState, _model_task_context
+from bsam_agent.orchestrator import (
+    ChatOrchestrator, ConversationState, TaskAuthorization, TaskState, _model_task_context,
+)
 from bsam_agent.provider import ProviderConfig, ProviderResponse
 
 
@@ -71,6 +73,159 @@ class ScriptedProvider:
 
 
 class AgentLoopTests(unittest.TestCase):
+    def test_explicit_run_authorization_is_audited_consumed_and_persisted(self) -> None:
+        class RunApi:
+            def dispatch(self, tool, arguments):
+                self.tool = tool
+                self.arguments = arguments
+                return {
+                    "state": "accepted", "classification": "pending",
+                    "output_directory": arguments["output_dir"],
+                }
+
+        provider = ScriptedProvider(tool_decision("run_bsam", {
+            "source": "model.in", "output_dir": "runs/case",
+            "executable": "bsam20.exe", "confirm": False,
+        }))
+        with tempfile.TemporaryDirectory() as directory:
+            audit = Path(directory) / "audit"
+            api = RunApi()
+            agent = ChatOrchestrator(provider, config(), api, audit_directory=audit)  # type: ignore[arg-type]
+            result = agent.turn("Run model.in in runs/case.")
+            restored = ConversationState.from_dict(agent.state.as_dict())
+            events = [
+                json.loads(line) for line in agent.audit_path.read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertFalse(result.requires_confirmation)
+        self.assertEqual("run_bsam", api.tool)
+        self.assertTrue(api.arguments["confirm"])
+        self.assertEqual("execution_when_explicitly_requested", agent.state.task.authorization.mode)
+        self.assertEqual("consumed", agent.state.task.authorization.status)
+        self.assertEqual(["full"], agent.state.task.authorization.consumed_run_kinds)
+        self.assertEqual(["runs/case"], agent.state.task.authorization.destination_scope)
+        self.assertEqual(agent.state.task.authorization, restored.task.authorization)
+        self.assertTrue(any(item["event"] == "authorization_granted" for item in events))
+        self.assertTrue(any(item["event"] == "authorization_consumed" for item in events))
+        self.assertTrue(any(
+            item["event"] == "confirmation_satisfied_by_task_authorization" for item in events
+        ))
+
+    def test_edit_authorization_can_be_revoked_with_pending_write_cleared(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "model.in").write_bytes(DECK)
+            agent = ChatOrchestrator(ScriptedProvider(), config(), LocalAgentApi(root))
+            preview = agent.turn("Change d_reduction in model.in to 0.5.")
+            revoked = agent.turn("/revoke")
+            restored = ConversationState.from_dict(agent.state.as_dict())
+
+        self.assertTrue(preview.requires_confirmation)
+        self.assertEqual("edits_with_confirmation", agent.state.task.authorization.mode)
+        self.assertEqual("authorization_revoked", revoked.error_code)
+        self.assertIsNone(agent.state.pending_action)
+        self.assertEqual("revoked", restored.task.authorization.status)
+        self.assertEqual("user_revoked", restored.task.authorization.revoked_reason)
+        self.assertEqual("authorization_revoked", restored.task.terminal_reason)
+
+    def test_execution_authorization_expires_rejects_scope_expansion_and_is_single_use(self) -> None:
+        authorization = TaskAuthorization(
+            mode="execution_when_explicitly_requested", operations=["read", "execute"],
+            source_scope=["model.in"], run_kinds=["full"], max_executions=1,
+            granted_turn=1, expires_after_turn=2,
+        )
+        task = TaskState("Run model.in", "model.in", ["run"], authorization=authorization)
+        expired_state = ConversationState(turn_number=3, task=task)
+        expired = ChatOrchestrator(
+            ScriptedProvider(), config(), object(), state=expired_state,  # type: ignore[arg-type]
+        )
+        self.assertFalse(expired._consume_execution_authorization(
+            task, {"source": "model.in", "output_dir": "runs/model"},
+        ))
+        self.assertEqual("expired", authorization.status)
+
+        active = TaskAuthorization(
+            mode="execution_when_explicitly_requested", operations=["read", "execute"],
+            source_scope=["model.in"], run_kinds=["full"], max_executions=1,
+            granted_turn=1, expires_after_turn=9,
+        )
+        active_task = TaskState(
+            "Run model.in in runs/case2", "model.in", ["run"], authorization=active,
+        )
+        agent = ChatOrchestrator(
+            ScriptedProvider(), config(), object(),
+            state=ConversationState(turn_number=2, task=active_task),  # type: ignore[arg-type]
+        )
+        self.assertFalse(agent._consume_execution_authorization(
+            active_task, {"source": "other.in", "output_dir": "runs/model"},
+        ))
+        self.assertEqual(0, active.executions_used)
+        self.assertFalse(agent._consume_execution_authorization(
+            active_task, {"source": "model.in", "output_dir": "runs/other"},
+        ))
+        self.assertFalse(agent._consume_execution_authorization(
+            active_task, {"source": "model.in", "output_dir": "runs/case"},
+        ))
+        self.assertTrue(agent._consume_execution_authorization(
+            active_task, {"source": "model.in", "output_dir": "runs/model"},
+        ))
+        self.assertFalse(agent._consume_execution_authorization(
+            active_task, {"source": "model.in", "output_dir": "runs/model"},
+        ))
+        self.assertEqual("consumed", active.status)
+
+    def test_smoke_request_does_not_silently_dispatch_a_full_run(self) -> None:
+        class NoRunApi:
+            def dispatch(self, tool, arguments):
+                raise AssertionError(f"unexpected full execution: {tool} {arguments}")
+
+        provider = ScriptedProvider(tool_decision("run_bsam", {
+            "source": "model.in", "output_dir": "runs/smoke",
+            "executable": "bsam20.exe", "confirm": False,
+        }))
+        agent = ChatOrchestrator(provider, config(), NoRunApi())  # type: ignore[arg-type]
+        result = agent.turn("Run a smoke test of model.in.")
+
+        self.assertEqual("unsupported_capability", result.error_code)
+        self.assertEqual("smoke_test_unavailable", agent.state.task.terminal_reason)
+        self.assertEqual(["smoke"], agent.state.task.authorization.run_kinds)
+        self.assertEqual(0, agent.state.task.authorization.executions_used)
+
+    def test_explicit_stop_is_authorized_within_the_active_run_lifecycle(self) -> None:
+        class StopApi:
+            def dispatch(self, tool, arguments):
+                self.calls = getattr(self, "calls", [])
+                self.calls.append((tool, arguments))
+                if tool == "get_run_status":
+                    return {
+                        "state": "terminal", "classification": "stopped",
+                        "output_directory": arguments["output_dir"],
+                    }
+                return {
+                    "state": "stopping", "classification": "pending",
+                    "output_directory": arguments["output_dir"],
+                }
+
+        provider = ScriptedProvider(
+            tool_decision("stop_run", {
+                "output_dir": "runs/case", "confirm": False,
+            }),
+            tool_decision("get_run_status", {"output_dir": "runs/case"}),
+        )
+        api = StopApi()
+        agent = ChatOrchestrator(provider, config(), api)  # type: ignore[arg-type]
+        agent.state.model_context.last_run = {
+            "output_directory": "runs/case", "state": "running", "classification": "pending",
+        }
+        result = agent.turn("Stop it.")
+
+        self.assertFalse(result.requires_confirmation)
+        self.assertEqual(["stop_run", "get_run_status"], [item[0] for item in api.calls])
+        self.assertTrue(api.calls[0][1]["confirm"])
+        self.assertEqual("get_run_status", result.tool)
+        self.assertEqual(["read", "stop"], agent.state.task.authorization.operations)
+        self.assertEqual("consumed", agent.state.task.authorization.status)
+
     def test_provider_cancellation_propagates_to_a_safe_task_terminal(self) -> None:
         class CancelledProvider:
             def complete(self, request, cancel=None):
@@ -208,6 +363,9 @@ class AgentLoopTests(unittest.TestCase):
         self.assertNotIn("engineering-notes.md", hosted_context)
         self.assertNotIn('"pattern"', hosted_context)
         self.assertIn('"arguments_digest"', hosted_context)
+        self.assertIn('"authorization":{"executions_used":0', local_context)
+        self.assertIn('"mode":"read_only"', hosted_context)
+        self.assertNotIn('"source_scope"', hosted_context)
         self.assertLessEqual(len(local_context), 12_000)
         self.assertLessEqual(len(hosted_context), 12_000)
         self.assertIn("Documentation:", result.message)
@@ -455,23 +613,42 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual("complete", agent.state.task.status)
         self.assertIn("ERROR:", result.message)
 
-    def test_change_validate_and_run_stops_at_two_distinct_confirmations(self) -> None:
+    def test_change_validate_and_explicit_run_uses_one_edit_confirmation(self) -> None:
+        class ChangeAndRunApi(LocalAgentApi):
+            def dispatch(self, tool, arguments):
+                if tool == "run_bsam":
+                    self.run_arguments = arguments
+                    return {
+                        "state": "accepted", "classification": "pending",
+                        "output_directory": arguments["output_dir"],
+                    }
+                return super().dispatch(tool, arguments)
+
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "model.in").write_bytes(DECK)
-            agent = ChatOrchestrator(ScriptedProvider(), config(), LocalAgentApi(root))
+            api = ChangeAndRunApi(root)
+            agent = ChatOrchestrator(ScriptedProvider(), config(), api)
             preview = agent.turn(
                 "Change d_reduction in model.in to 0.5, preserve the original, validate it, and run it."
             )
-            ready_to_run = agent.turn("/confirm")
+            accepted = agent.turn("/confirm")
 
         self.assertTrue(preview.requires_confirmation)
-        self.assertTrue(ready_to_run.requires_confirmation)
-        self.assertEqual("run_bsam", agent.state.pending_action.tool)
+        self.assertFalse(accepted.requires_confirmation)
+        self.assertEqual("run_bsam", accepted.tool)
+        self.assertIsNone(agent.state.pending_action)
+        self.assertTrue(api.run_arguments["confirm"])
         self.assertEqual(
-            ["inspect_model", "preview_parameter_change", "apply_change", "validate_model"],
+            [
+                "inspect_model", "preview_parameter_change", "apply_change",
+                "validate_model", "run_bsam",
+            ],
             agent.state.task.completed_steps,
         )
+        self.assertEqual("execution_when_explicitly_requested", agent.state.task.authorization.mode)
+        self.assertEqual("consumed", agent.state.task.authorization.status)
+        self.assertEqual(["full"], agent.state.task.authorization.consumed_run_kinds)
 
     def test_state_round_trip_and_trajectory_metrics_include_agent_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -485,6 +662,7 @@ class AgentLoopTests(unittest.TestCase):
             legacy["task"].pop("working_hypotheses")
             legacy["task"].pop("model_step_count")
             legacy["task"].pop("final_synthesis")
+            legacy["task"].pop("authorization")
             for observation in legacy["task"]["observations"]:
                 observation.pop("observation_id")
             migrated = ConversationState.from_dict(legacy)
@@ -505,6 +683,20 @@ class AgentLoopTests(unittest.TestCase):
         self.assertEqual("obs-001", restored.task.observations[0]["observation_id"])
         self.assertEqual([], migrated.task.working_hypotheses)
         self.assertEqual("obs-001", migrated.task.observations[0]["observation_id"])
+
+    def test_task_authorization_rejects_inconsistent_persisted_state(self) -> None:
+        value = TaskAuthorization().as_dict()
+        value["operations"] = ["read", "execute"]
+        with self.assertRaisesRegex(ValueError, "read-only.*inconsistent"):
+            TaskAuthorization.from_dict(value)
+
+        value = TaskAuthorization(
+            mode="execution_when_explicitly_requested",
+            operations=["read", "execute"], run_kinds=["full"], max_executions=1,
+        ).as_dict()
+        value["max_executions"] = 2
+        with self.assertRaisesRegex(ValueError, "limit.*inconsistent"):
+            TaskAuthorization.from_dict(value)
 
     def test_model_can_request_one_focused_clarification(self) -> None:
         clarification = ProviderResponse(content=json.dumps({

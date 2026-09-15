@@ -103,6 +103,102 @@ class ModelContext:
 
 
 @dataclass
+class TaskAuthorization:
+    mode: str = "read_only"
+    status: str = "active"
+    operations: list[str] = field(default_factory=lambda: ["read"])
+    source_scope: list[str] = field(default_factory=list)
+    destination_scope: list[str] = field(default_factory=list)
+    run_kinds: list[str] = field(default_factory=list)
+    max_executions: int = 0
+    executions_used: int = 0
+    consumed_run_kinds: list[str] = field(default_factory=list)
+    granted_turn: int = 0
+    expires_after_turn: int | None = None
+    revoked_reason: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return deepcopy(self.__dict__)
+
+    @classmethod
+    def from_dict(cls, value: Any) -> TaskAuthorization:
+        if not isinstance(value, dict) or set(value) != set(cls().as_dict()):
+            raise ValueError("task authorization fields are invalid")
+        candidate = cls(**deepcopy(value))
+        if candidate.mode not in {
+            "read_only", "edits_with_confirmation",
+            "execution_when_explicitly_requested", "task_scoped_autonomy",
+        }:
+            raise ValueError("task authorization mode is invalid")
+        if candidate.status not in {"active", "consumed", "revoked", "expired"}:
+            raise ValueError("task authorization status is invalid")
+        if (
+            not isinstance(candidate.operations, list)
+            or not candidate.operations
+            or len(candidate.operations) != len(set(candidate.operations))
+            or not set(candidate.operations).issubset({"read", "edit", "execute", "stop"})
+        ):
+            raise ValueError("task authorization operations are invalid")
+        for name in ("source_scope", "destination_scope"):
+            values = getattr(candidate, name)
+            if not isinstance(values, list) or not all(
+                isinstance(item, str) and item for item in values
+            ) or len(values) != len(set(values)) or len(values) > 16:
+                raise ValueError(f"task authorization {name} is invalid")
+        if (
+            not isinstance(candidate.run_kinds, list)
+            or len(candidate.run_kinds) != len(set(candidate.run_kinds))
+            or not set(candidate.run_kinds).issubset({"smoke", "full"})
+            or not isinstance(candidate.consumed_run_kinds, list)
+            or len(candidate.consumed_run_kinds) != len(set(candidate.consumed_run_kinds))
+            or not set(candidate.consumed_run_kinds).issubset(set(candidate.run_kinds))
+        ):
+            raise ValueError("task authorization run kinds are invalid")
+        for name in ("max_executions", "executions_used", "granted_turn"):
+            item = getattr(candidate, name)
+            if not isinstance(item, int) or isinstance(item, bool) or item < 0:
+                raise ValueError(f"task authorization {name} is invalid")
+        if (
+            candidate.executions_used > candidate.max_executions
+            or candidate.executions_used != len(candidate.consumed_run_kinds)
+        ):
+            raise ValueError("task authorization execution count is invalid")
+        if candidate.expires_after_turn is not None and (
+            not isinstance(candidate.expires_after_turn, int)
+            or isinstance(candidate.expires_after_turn, bool)
+            or candidate.expires_after_turn < candidate.granted_turn
+        ):
+            raise ValueError("task authorization expiry is invalid")
+        if candidate.revoked_reason is not None and not isinstance(candidate.revoked_reason, str):
+            raise ValueError("task authorization revocation reason is invalid")
+        if candidate.status == "revoked" and not candidate.revoked_reason:
+            raise ValueError("revoked task authorization requires a reason")
+        if candidate.status != "revoked" and candidate.revoked_reason is not None:
+            raise ValueError("task authorization revocation reason is inconsistent")
+        if candidate.mode == "read_only" and (
+            candidate.operations != ["read"]
+            or candidate.run_kinds
+            or candidate.max_executions != 0
+        ):
+            raise ValueError("read-only task authorization is inconsistent")
+        if (
+            candidate.mode == "edits_with_confirmation"
+            and "edit" not in candidate.operations
+        ):
+            raise ValueError("edit task authorization is inconsistent")
+        if (
+            candidate.mode == "execution_when_explicitly_requested"
+            and not ({"execute", "stop"} & set(candidate.operations))
+        ):
+            raise ValueError("execution task authorization is inconsistent")
+        if "execute" in candidate.operations and (
+            candidate.max_executions != len(candidate.run_kinds)
+        ):
+            raise ValueError("execution task authorization limit is inconsistent")
+        return candidate
+
+
+@dataclass
 class TaskState:
     """Bounded engineering-task state, intentionally separate from message history."""
 
@@ -141,6 +237,7 @@ class TaskState:
     step_count: int = 0
     model_step_count: int = 0
     final_synthesis: dict[str, Any] | None = None
+    authorization: TaskAuthorization = field(default_factory=TaskAuthorization)
     terminal_reason: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -180,6 +277,7 @@ class TaskState:
             "step_count": self.step_count,
             "model_step_count": self.model_step_count,
             "final_synthesis": self.final_synthesis,
+            "authorization": self.authorization.as_dict(),
             "terminal_reason": self.terminal_reason,
         }
 
@@ -268,6 +366,7 @@ class TaskState:
             or not isinstance(final_synthesis["model"], str)
         ):
             raise ValueError("task final synthesis is invalid")
+        migrated["authorization"] = TaskAuthorization.from_dict(migrated["authorization"])
         task = cls(**migrated)
         if final_synthesis is not None:
             _validate_grounded_synthesis({"claims": final_synthesis["claims"]}, task)
@@ -289,7 +388,7 @@ class ConversationState:
         pending = self.pending_action
         last_plan = self.last_plan
         return {
-            "schema_version": "0.8.0",
+            "schema_version": "0.9.0",
             "conversation_id": self.conversation_id,
             "phase": self.phase,
             "turn_number": self.turn_number,
@@ -306,7 +405,7 @@ class ConversationState:
 
     @classmethod
     def from_dict(cls, value: Any) -> ConversationState:
-        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0"}:
+        if not isinstance(value, dict) or value.get("schema_version") not in {"0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
             raise ValueError("unsupported conversation state")
         expected = {
             "schema_version", "conversation_id", "phase", "turn_number", "history",
@@ -318,7 +417,7 @@ class ConversationState:
             expected.add("last_plan")
         elif value["schema_version"] in {"0.3.0", "0.4.0"}:
             expected.update({"last_plan", "task"})
-        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0"}:
+        elif value["schema_version"] in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0"}:
             expected.update({"last_plan", "task", "model_context"})
         if set(value) != expected:
             raise ValueError("conversation state fields are invalid")
@@ -826,6 +925,8 @@ class ChatOrchestrator:
             return self._confirm(cancel)
         if text.casefold() == "/cancel":
             return self._cancel()
+        if text.casefold() in {"/revoke", "revoke authorization"}:
+            return self._revoke_authorization()
         if self.state.pending_action is not None:
             self._audit("confirmation_cancelled", tool=self.state.pending_action.tool)
             self.state.pending_action = None
@@ -854,11 +955,24 @@ class ChatOrchestrator:
                 task.destination = _workspace_relative_path(
                     task.destination, workspace_root,
                 )
+            if isinstance(workspace_root, Path):
+                task.authorization.source_scope = [
+                    _workspace_relative_path(item, workspace_root)
+                    for item in task.authorization.source_scope
+                ]
+                task.authorization.destination_scope = [
+                    _workspace_relative_path(item, workspace_root)
+                    for item in task.authorization.destination_scope
+                ]
             self.state.task = task
             self._audit(
                 "task_started", correlation_id=correlation_id,
                 task_objective_digest=_digest(task.objective), source=task.source,
                 requested_outcomes=task.requested_outcomes,
+            )
+            self._audit(
+                "authorization_granted", correlation_id=correlation_id,
+                **_authorization_audit_fields(task.authorization),
             )
         tool_names = relevant_tools(routing_text)
         decision = (
@@ -1015,6 +1129,41 @@ class ChatOrchestrator:
                 "explain", _invalid_argument_guidance(tool, arguments, exc),
                 tool=tool, error="invalid_arguments",
             )
+        if (
+            tool == "run_bsam"
+            and task is not None
+            and "smoke" in task.authorization.run_kinds
+        ):
+            task.status = "blocked"
+            task.terminal_reason = "smoke_test_unavailable"
+            return self._result(
+                "explain",
+                "The requested smoke-test contract is not implemented yet; a full run was not substituted.",
+                tool=tool,
+                error="unsupported_capability",
+            )
+        if (
+            tool == "stop_run"
+            and task is not None
+            and self._consume_stop_authorization(task, arguments)
+        ):
+            arguments["confirm"] = True
+            self._audit(
+                "confirmation_satisfied_by_task_authorization", tool=tool,
+                arguments_digest=_digest(arguments),
+            )
+            return self._execute(tool, arguments, user_text=user_text)
+        if (
+            tool == "run_bsam"
+            and task is not None
+            and self._consume_execution_authorization(task, arguments)
+        ):
+            arguments["confirm"] = True
+            self._audit(
+                "confirmation_satisfied_by_task_authorization", tool=tool,
+                arguments_digest=_digest(arguments),
+            )
+            return self._execute(tool, arguments, user_text=user_text)
         if tool in GUARDED_TOOLS:
             self.state.pending_action = PendingAction(tool, arguments)
             self.state.phase = "confirm"
@@ -1362,6 +1511,117 @@ class ChatOrchestrator:
         message = "The provider request was cancelled." if cancelled else str(exc)
         return self._result("explain", message, error=error_code)
 
+    def _consume_execution_authorization(
+        self, task: TaskState, arguments: dict[str, Any], *, run_kind: str = "full",
+        derived_output: bool = False,
+    ) -> bool:
+        authorization = task.authorization
+        if (
+            authorization.status == "active"
+            and authorization.expires_after_turn is not None
+            and self.state.turn_number > authorization.expires_after_turn
+        ):
+            authorization.status = "expired"
+            self._audit(
+                "authorization_transition", transition="expired",
+                **_authorization_audit_fields(authorization),
+            )
+        source = arguments.get("source")
+        output_directory = arguments.get("output_dir")
+        if (
+            authorization.status == "active"
+            and isinstance(source, str)
+            and isinstance(output_directory, str)
+            and output_directory not in authorization.destination_scope
+            and (
+                derived_output
+                or output_directory == _default_run_directory(source)
+                or _path_mentioned_in_text(output_directory, task.objective)
+            )
+        ):
+            authorization.destination_scope.append(output_directory)
+            self._audit(
+                "authorization_scope_updated",
+                reason=(
+                    "deterministic_run_output" if derived_output
+                    else "requested_or_default_run_output"
+                ),
+                **_authorization_audit_fields(authorization),
+            )
+        allowed_sources = {
+            *authorization.source_scope, *authorization.destination_scope,
+        }
+        allowed = (
+            authorization.status == "active"
+            and authorization.mode == "execution_when_explicitly_requested"
+            and "execute" in authorization.operations
+            and run_kind in authorization.run_kinds
+            and isinstance(source, str)
+            and source in allowed_sources
+            and isinstance(output_directory, str)
+            and output_directory in authorization.destination_scope
+            and authorization.executions_used < authorization.max_executions
+            and run_kind not in authorization.consumed_run_kinds
+        )
+        if not allowed:
+            self._audit(
+                "authorization_not_consumed", tool="run_bsam", run_kind=run_kind,
+                source=source, output_directory=output_directory,
+                **_authorization_audit_fields(authorization),
+            )
+            return False
+        authorization.consumed_run_kinds.append(run_kind)
+        authorization.executions_used += 1
+        if authorization.executions_used >= authorization.max_executions:
+            authorization.status = "consumed"
+        self._audit(
+            "authorization_consumed", tool="run_bsam", run_kind=run_kind,
+            source=source, output_directory=output_directory,
+            **_authorization_audit_fields(authorization),
+        )
+        return True
+
+    def _consume_stop_authorization(
+        self, task: TaskState, arguments: dict[str, Any],
+    ) -> bool:
+        authorization = task.authorization
+        if (
+            authorization.status == "active"
+            and authorization.expires_after_turn is not None
+            and self.state.turn_number > authorization.expires_after_turn
+        ):
+            authorization.status = "expired"
+            self._audit(
+                "authorization_transition", transition="expired",
+                **_authorization_audit_fields(authorization),
+            )
+        output_directory = arguments.get("output_dir")
+        active_output = (
+            task.last_run.get("output_directory")
+            if isinstance(task.last_run, dict) else None
+        )
+        allowed = (
+            authorization.status == "active"
+            and authorization.mode == "execution_when_explicitly_requested"
+            and "stop" in authorization.operations
+            and isinstance(output_directory, str)
+            and output_directory == active_output
+        )
+        if not allowed:
+            self._audit(
+                "authorization_not_consumed", tool="stop_run",
+                output_directory=output_directory,
+                **_authorization_audit_fields(authorization),
+            )
+            return False
+        authorization.status = "consumed"
+        self._audit(
+            "authorization_consumed", tool="stop_run",
+            output_directory=output_directory,
+            **_authorization_audit_fields(authorization),
+        )
+        return True
+
     def _confirm(self, cancel: threading.Event | None = None) -> ChatTurn:
         pending = self.state.pending_action
         if pending is None:
@@ -1391,6 +1651,31 @@ class ChatOrchestrator:
             self.state.task.status = "blocked"
             self.state.task.terminal_reason = "user_cancelled"
         return self._result("understand", f"Cancelled {pending.tool}.", tool=pending.tool)
+
+    def _revoke_authorization(self) -> ChatTurn:
+        task = self.state.task
+        if (
+            task is None
+            or task.status in {"complete", "failed", "blocked", "refused"}
+            or task.authorization.status in {"consumed", "revoked", "expired"}
+        ):
+            return self._result(
+                "understand", "There is no active task authorization to revoke.",
+                error="nothing_to_revoke",
+            )
+        task.authorization.status = "revoked"
+        task.authorization.revoked_reason = "user_revoked"
+        self.state.pending_action = None
+        task.status = "blocked"
+        task.terminal_reason = "authorization_revoked"
+        self._audit(
+            "authorization_transition", transition="revoked",
+            **_authorization_audit_fields(task.authorization),
+        )
+        return self._result(
+            "understand", "Revoked the active task authorization.",
+            error="authorization_revoked",
+        )
 
     def _execute(
         self, tool: str, arguments: dict[str, Any], *, user_text: str = "",
@@ -1470,6 +1755,17 @@ class ChatOrchestrator:
             )
         self._record_task_step(tool, arguments, result)
         self._update_model_context(tool, arguments, result)
+        if (
+            tool == "apply_change"
+            and task is not None
+            and task.authorization.mode == "edits_with_confirmation"
+            and task.authorization.status == "active"
+        ):
+            task.authorization.status = "consumed"
+            self._audit(
+                "authorization_consumed", tool="apply_change",
+                **_authorization_audit_fields(task.authorization),
+            )
         if tool in PREVIEW_TOOLS or tool == "review_change":
             phase = "propose"
         elif tool in {
@@ -1503,6 +1799,12 @@ class ChatOrchestrator:
             self.state.pending_action = pending
             if task is not None:
                 task.destination = str(pending.arguments["destination"])
+                if task.destination not in task.authorization.destination_scope:
+                    task.authorization.destination_scope.append(task.destination)
+                    self._audit(
+                        "authorization_scope_updated", reason="reviewed_destination",
+                        **_authorization_audit_fields(task.authorization),
+                    )
                 task.status = "confirm"
             phase = "confirm"
             message += (
@@ -1531,6 +1833,7 @@ class ChatOrchestrator:
             else:
                 task.status = "complete" if "run" not in task.requested_outcomes else "verify"
                 message += " Post-apply validation completed with zero errors."
+        automatic_run_arguments: dict[str, Any] | None = None
         if (
             tool == "apply_change"
             and task is not None
@@ -1543,29 +1846,60 @@ class ChatOrchestrator:
             workspace_root = getattr(self.api, "workspace_root", None)
             if isinstance(workspace_root, Path):
                 output_directory = _available_run_directory(output_directory, workspace_root)
-            pending = PendingAction("run_bsam", {
+            run_arguments = {
                 "source": run_source,
                 "output_dir": output_directory,
                 "executable": "bsam20.exe",
                 "confirm": False,
-            })
-            self.state.pending_action = pending
-            task.status = "confirm"
-            phase = "confirm"
-            self._audit(
-                "confirmation_required", tool="run_bsam",
-                arguments_digest=_digest(pending.arguments),
-            )
-            message += (
-                f" Validation passed. A BSAM run in {output_directory} is ready; "
-                "type /confirm to run it or /cancel."
-            )
+            }
+            if "smoke" in task.authorization.run_kinds:
+                task.status = "blocked"
+                task.terminal_reason = "smoke_test_unavailable"
+                phase = "explain"
+                message += (
+                    " Validation passed, but the requested smoke-test contract is not implemented; "
+                    "no full run was substituted."
+                )
+            elif self._consume_execution_authorization(
+                task, run_arguments, derived_output=True,
+            ):
+                run_arguments["confirm"] = True
+                automatic_run_arguments = run_arguments
+                task.status = "verify"
+                phase = "verify"
+                message += (
+                    f" Validation passed. Starting the explicitly authorized BSAM run "
+                    f"in {output_directory}."
+                )
+                self._audit(
+                    "confirmation_satisfied_by_task_authorization", tool="run_bsam",
+                    arguments_digest=_digest(run_arguments),
+                )
+            else:
+                pending = PendingAction("run_bsam", run_arguments)
+                self.state.pending_action = pending
+                task.status = "confirm"
+                phase = "confirm"
+                self._audit(
+                    "confirmation_required", tool="run_bsam",
+                    arguments_digest=_digest(pending.arguments),
+                )
+                message += (
+                    f" Validation passed. A BSAM run in {output_directory} is ready; "
+                    "type /confirm to run it or /cancel."
+                )
         self._audit("tool_completed", tool=tool, result_digest=_digest(result), phase=phase)
-        return self._result(
+        completed = self._result(
             phase, message, tool=tool, result=result,
             requires_confirmation=pending is not None,
             error="confirmation_required" if pending is not None else None,
         )
+        if automatic_run_arguments is not None:
+            run_turn = self._execute(
+                "run_bsam", automatic_run_arguments, user_text=user_text,
+            )
+            return _combined_turn([completed, run_turn], task)
+        return completed
 
     def _update_model_context(
         self, tool: str, arguments: dict[str, Any], result: dict[str, Any],
@@ -2241,14 +2575,17 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
     goal_language = re.search(
         r"\b(?:inspect|investigate|check|diagnos|why|wrong|converg|which|what|how|show|list|"
         r"compare|change|changing|set|update|modify|rename|compose|combine|merge|add|create|"
-        r"insert|append|delete|remove|extend|validate|run|launch|fix|find|search|read|review|"
+        r"insert|append|delete|remove|extend|validate|run|launch|stop|fix|find|search|read|review|"
         r"explain|describe)\b",
         text, re.IGNORECASE,
     )
     if goal_language is None or is_capability_question:
         return None
     if not source and not workspace_evidence and not (
-        re.search(r"\b(?:last run|why did (?:it|the run)|run fail)", text, re.IGNORECASE)
+        re.search(
+            r"\b(?:last run|why did (?:it|the run)|run fail|stop (?:it|the run))",
+            text, re.IGNORECASE,
+        )
         and context.last_run is not None
     ):
         return None
@@ -2276,7 +2613,10 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         outcomes.append("compare")
     if re.search(r"\b(?:validate|validation|check)\b", text, re.IGNORECASE):
         outcomes.append("validate")
-    if re.search(r"\b(?:run|launch|execute)\b", text, re.IGNORECASE):
+    if re.search(r"\b(?:run|launch|execute)\b", text, re.IGNORECASE) or (
+        context.last_run is not None
+        and re.search(r"\bstop\b", text, re.IGNORECASE)
+    ):
         outcomes.append("run")
     if re.search(r"\b(?:why|wrong|diagnos|fail|converg)\w*\b", text, re.IGNORECASE):
         outcomes.append("diagnose")
@@ -2325,7 +2665,7 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         plan.append("validate the requested resulting model")
     if "run" in outcomes:
         plan.extend((
-            "pause for confirmation before execution",
+            "use the bounded execution authorization explicitly granted by the objective",
             "observe the run through terminal evidence",
         ))
 
@@ -2356,7 +2696,65 @@ def _task_from_request(text: str, state: ConversationState) -> TaskState | None:
         engineering_assumptions=assumptions,
         completion_criteria=completion_criteria,
         remaining_criteria=list(completion_criteria),
+        authorization=_authorization_from_request(
+            text, outcomes, source, destination, state.turn_number,
+        ),
     )
+
+
+def _authorization_from_request(
+    text: str, outcomes: list[str], source: str, destination: str | None,
+    turn_number: int,
+) -> TaskAuthorization:
+    operations = ["read"]
+    mode = "read_only"
+    if "modify" in outcomes:
+        mode = "edits_with_confirmation"
+        operations.append("edit")
+    run_kinds: list[str] = []
+    stopping = bool(re.search(r"\bstop\b", text, re.IGNORECASE))
+    if "run" in outcomes and stopping:
+        mode = "execution_when_explicitly_requested"
+        operations.append("stop")
+    elif "run" in outcomes:
+        mode = "execution_when_explicitly_requested"
+        operations.append("execute")
+        smoke = bool(re.search(r"\bsmoke(?:[- ]test)?\w*\b", text, re.IGNORECASE))
+        if smoke:
+            run_kinds.append("smoke")
+        explicit_full = bool(re.search(
+            r"\b(?:full|production|complete)\s+(?:run|execution)\b|"
+            r"\bsmoke(?:[- ]test)?\w*\b.{0,60}\b(?:and|then)\s+"
+            r"(?:fully\s+)?(?:run|execute|launch)\b",
+            text, re.IGNORECASE,
+        ))
+        if not smoke or explicit_full:
+            run_kinds.append("full")
+    return TaskAuthorization(
+        mode=mode,
+        operations=list(dict.fromkeys(operations)),
+        source_scope=[source] if source else [],
+        destination_scope=[destination] if destination else [],
+        run_kinds=run_kinds,
+        max_executions=len(run_kinds),
+        granted_turn=turn_number,
+        expires_after_turn=turn_number + 8,
+    )
+
+
+def _authorization_audit_fields(authorization: TaskAuthorization) -> dict[str, Any]:
+    return {
+        "mode": authorization.mode,
+        "status": authorization.status,
+        "operations": authorization.operations,
+        "source_scope": authorization.source_scope,
+        "destination_scope": authorization.destination_scope,
+        "run_kinds": authorization.run_kinds,
+        "max_executions": authorization.max_executions,
+        "executions_used": authorization.executions_used,
+        "granted_turn": authorization.granted_turn,
+        "expires_after_turn": authorization.expires_after_turn,
+    }
 
 
 def _task_completion(task: TaskState) -> tuple[bool, list[str]]:
@@ -2429,6 +2827,15 @@ def _model_task_context(task: TaskState, *, hosted: bool) -> str:
                         selectors.pop(name, None)
     value = {
         "status": task.status,
+        "authorization": {
+            "mode": task.authorization.mode,
+            "status": task.authorization.status,
+            "operations": task.authorization.operations,
+            "run_kinds": task.authorization.run_kinds,
+            "max_executions": task.authorization.max_executions,
+            "executions_used": task.authorization.executions_used,
+            "expires_after_turn": task.authorization.expires_after_turn,
+        },
         "completion_criteria": task.completion_criteria,
         "missing_criteria": task.remaining_criteria,
         "working_plan": task.working_plan,
@@ -2692,6 +3099,16 @@ def _input_paths_from_text(text: str) -> list[str]:
 def _source_path_from_text(text: str) -> str | None:
     paths = _input_paths_from_text(text)
     return paths[0] if paths else None
+
+
+def _path_mentioned_in_text(path: str, text: str) -> bool:
+    normalized_path = path.replace("\\", "/")
+    normalized_text = text.replace("\\", "/")
+    return re.search(
+        rf"(?<![A-Za-z0-9_.~/:\-]){re.escape(normalized_path)}"
+        rf"(?=$|[\s\"',;:!?)]|\.(?:\s|$))",
+        normalized_text, re.IGNORECASE,
+    ) is not None
 
 
 _PATH_ARGUMENTS = {

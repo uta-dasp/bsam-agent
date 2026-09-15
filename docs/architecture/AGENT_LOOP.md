@@ -42,9 +42,13 @@ citations, recovery, final response requirements, and a provider-neutral semanti
 Read-only exploration can compose model inspection, canonical entity/reference queries, bounded
 workspace discovery/read/search, model comparison, run status, and bounded known-log inspection.
 After mandatory general observations, the provider selects among the safe continuations; the loop no
-longer contains boundary- or convergence-specific continuation branches. Applying a plan, starting
-BSAM, and stopping a run retain the current confirmation boundaries pending task-scoped
-authorization work.
+longer contains boundary- or convergence-specific continuation branches. Applying a model-changing
+plan always stops for deterministic review and explicit confirmation. An objective that explicitly
+requests a bounded full run or controlled stop grants one scoped, expiring authorization for that
+operation, so execution may proceed after prerequisites without another confirmation. Scope
+expansion is not inferred, and `/revoke` clears active authorization and any pending action. Smoke
+requests remain fail-closed until the distinct smoke-test contract exists; a full run is never
+silently substituted.
 
 The optional knowledge boundary is defined in `bsam_agent.knowledge`. Retrieval evidence is
 non-authoritative and the default implementation returns no results. A future index may provide

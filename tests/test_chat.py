@@ -83,6 +83,7 @@ class ChatClientTests(unittest.TestCase):
         )
         self.assertEqual(1, snapshot["evidence"][0]["details"]["workspace_match_count"])
         self.assertNotIn("workspace_matches", snapshot["evidence"][0]["details"])
+        self.assertEqual("read_only", snapshot["authorization"]["mode"])
         self.assertEqual("evidence_exhausted", snapshot["terminal_reason"])
 
     def test_chat_parser_binds_workspace_model_config_and_audit_opt_out(self) -> None:

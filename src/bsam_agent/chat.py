@@ -72,6 +72,7 @@ def task_view_snapshot(task: TaskState | None) -> dict[str, object] | None:
         "hypotheses": hypotheses,
         "completion_criteria": task.completion_criteria,
         "remaining_criteria": task.remaining_criteria,
+        "authorization": task.authorization.as_dict(),
         "terminal_reason": task.terminal_reason,
     }
 
@@ -101,7 +102,7 @@ def run_terminal_chat(
     )
     output_fn(
         f"BSAM Agent chat ({config.model}). Workspace: {root}\n"
-        "Commands: /confirm, /cancel, /quit"
+        "Commands: /confirm, /cancel, /revoke, /quit"
     )
     while True:
         try:

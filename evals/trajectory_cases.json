@@ -74,7 +74,7 @@
       "user": "Run model.in and verify whether it succeeds.",
       "expected": {
         "tool_sequence": ["run_bsam"],
-        "confirmation_boundaries": 1,
+        "confirmation_boundaries": 0,
         "terminal_status": "failed",
         "failure_category": "execution_input_failure",
         "no_mutation": true

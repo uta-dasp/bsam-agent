@@ -210,6 +210,7 @@ export class ChatPanel implements vscode.Disposable {
         <div class="task-section"><strong>Assumptions</strong><ul id="task-assumptions"></ul></div>
         <div class="task-section"><strong>Hypotheses</strong><ul id="task-hypotheses"></ul></div>
         <div class="task-section"><strong>Completion</strong><ul id="task-completion"></ul></div>
+        <div class="task-section"><strong>Authorization</strong><ul id="task-authorization"></ul></div>
       </div>
       <div id="task-terminal" hidden></div>
     </details>
@@ -240,6 +241,7 @@ export class ChatPanel implements vscode.Disposable {
     const taskAssumptions = document.getElementById('task-assumptions');
     const taskHypotheses = document.getElementById('task-hypotheses');
     const taskCompletion = document.getElementById('task-completion');
+    const taskAuthorization = document.getElementById('task-authorization');
     const taskTerminal = document.getElementById('task-terminal');
     let busy = true;
     let pending = false;
@@ -309,6 +311,14 @@ export class ChatPanel implements vscode.Disposable {
       for (const item of taskCompletion.children) {
         item.textContent = (remaining.has(item.textContent) ? 'Pending: ' : 'Satisfied: ') + item.textContent;
       }
+      const authorization = task.authorization && typeof task.authorization === 'object'
+        ? task.authorization : {};
+      fillTaskList(taskAuthorization, [
+        'Mode: ' + String(authorization.mode || 'read_only'),
+        'Status: ' + String(authorization.status || 'unknown'),
+        'Operations: ' + (Array.isArray(authorization.operations) ? authorization.operations.join(', ') : 'read'),
+        'Runs: ' + String(authorization.executions_used || 0) + '/' + String(authorization.max_executions || 0),
+      ], (item) => String(item), 'No authorization state');
       taskTerminal.hidden = !task.terminal_reason;
       taskTerminal.textContent = task.terminal_reason ? 'Terminal reason: ' + String(task.terminal_reason) : '';
     }
